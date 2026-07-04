@@ -1,0 +1,895 @@
+/* MovEazy marketing home — Figma tokens (file: Moveasy, node 1229:2) */
+
+@keyframes mkt-hero-wave {
+  0%,
+  100% {
+    transform: translate3d(0, 0, 0) scale(1);
+  }
+  50% {
+    transform: translate3d(-1.5%, 0.5%, 0) scale(1.02);
+  }
+}
+
+@keyframes mkt-float {
+  0%,
+  100% {
+    transform: translate3d(0, 0, 0);
+  }
+  50% {
+    transform: translate3d(0, -10px, 0);
+  }
+}
+
+@keyframes mkt-float-slow {
+  0%,
+  100% {
+    transform: translate3d(0, 0, 0);
+  }
+  50% {
+    transform: translate3d(6px, -12px, 0);
+  }
+}
+
+.mkt-page {
+  font-family: "Manrope", Inter, system-ui, sans-serif;
+  color: #14171b;
+}
+
+/* —— Hero (1360×567, #F54536) —— */
+.mkt-hero {
+  position: relative;
+  overflow: hidden;
+  border-radius: 40px;
+  background: linear-gradient(122deg, #1a1f25 0%, #2d343c 38%, #e4382b 100%);
+  box-shadow: 0 28px 52px rgba(16, 19, 22, 0.24);
+}
+
+.mkt-hero::before {
+  content: "";
+  position: absolute;
+  width: 140%;
+  height: 115%;
+  left: -22%;
+  top: -28%;
+  border: 164px solid rgba(255, 255, 255, 0.08);
+  border-radius: 600px;
+  pointer-events: none;
+  opacity: 0.55;
+  animation: mkt-hero-wave 16s ease-in-out infinite;
+}
+
+.mkt-hero::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: radial-gradient(circle at 72% 28%, rgba(255, 255, 255, 0.14), transparent 52%);
+  pointer-events: none;
+}
+
+.mkt-hero-inner {
+  max-width: 1360px;
+  margin: 0 auto;
+}
+
+.mkt-hero-visual {
+  position: relative;
+  min-height: 320px;
+  display: flex;
+  align-items: flex-end;
+  justify-content: center;
+}
+
+.mkt-hero-art__img {
+  display: block;
+  width: 100%;
+  max-width: 596px;
+  height: auto;
+  object-fit: contain;
+  object-position: right bottom;
+}
+
+.mkt-hero-grain {
+  position: absolute;
+  inset: 0;
+  opacity: 0.14;
+  pointer-events: none;
+  background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='0.55'/%3E%3C/svg%3E");
+  mix-blend-mode: soft-light;
+}
+
+.mkt-hero-badge-img {
+  position: absolute;
+  z-index: 20;
+  pointer-events: none;
+  height: auto;
+  filter: drop-shadow(0 8px 24px rgba(0, 0, 0, 0.12));
+  animation: mkt-float 5.5s ease-in-out infinite;
+}
+
+.mkt-hero-badge-img--flat {
+  top: 3%;
+  right: -2%;
+  width: min(188px, 40vw);
+}
+
+.mkt-hero-badge-img--move {
+  top: 9%;
+  left: -2%;
+  width: min(200px, 42vw);
+  animation-delay: 0.5s;
+}
+
+.mkt-hero-badge-img--verified {
+  bottom: 5%;
+  right: -1%;
+  width: min(132px, 28vw);
+  animation-delay: 1s;
+}
+
+/* Hero CTAs — Figma 160×48 */
+.mkt-btn-primary {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 160px;
+  height: 48px;
+  padding: 12px 16px;
+  border-radius: 1000px;
+  font-family: "Sora", "Manrope", system-ui, sans-serif;
+  font-weight: 700;
+  font-size: 16px;
+  line-height: 24px;
+  transition: transform 0.2s ease, box-shadow 0.2s ease, background 0.2s ease;
+}
+
+.mkt-btn-primary:hover {
+  transform: translateY(-1px);
+}
+
+.mkt-btn-white {
+  background: #fff;
+  color: #151718;
+  border: none;
+  box-shadow: 0 10px 24px rgba(14, 16, 18, 0.2);
+}
+
+.mkt-btn-ghost {
+  background: rgba(255, 255, 255, 0.12);
+  color: #fff;
+  border: 1px solid rgba(255, 255, 255, 0.7);
+}
+
+.mkt-btn-red {
+  background: linear-gradient(115deg, #ff3131 0%, #e63b24 100%);
+  color: #fff;
+  border: none;
+  border-radius: 10px;
+  min-width: 269px;
+  height: 60px;
+  font-size: 18px;
+  box-shadow: 0 16px 34px rgba(255, 49, 49, 0.28);
+}
+
+/* —— Stats (1076×196, #000, r10) —— */
+.mkt-stat-bar {
+  background: linear-gradient(120deg, #12161b 0%, #1d2228 100%);
+  border: 1px solid rgba(148, 163, 184, 0.2);
+  border-radius: 16px;
+  min-height: 196px;
+  max-width: 1076px;
+  margin-left: auto;
+  margin-right: auto;
+}
+
+.mkt-stat-value {
+  font-family: "Sora", system-ui, sans-serif;
+  font-weight: 700;
+  font-size: 48px;
+  line-height: 60px;
+  color: #fff;
+}
+
+.mkt-stat-label {
+  font-family: "Manrope", system-ui, sans-serif;
+  font-weight: 500;
+  font-size: 16px;
+  line-height: 24px;
+  color: #cbd5e1;
+  margin-top: 12px;
+}
+
+/* —— Story sections (Figma stacked layout) —— */
+.mkt-story--dream {
+  background: #faefe1;
+  color: #111827;
+}
+
+.mkt-story--chaos {
+  background: #10161e;
+  color: #fff;
+}
+
+.mkt-story--realization {
+  background: #f3f3f3;
+}
+
+.mkt-story--peach {
+  background: linear-gradient(180deg, #fff5ef 0%, #ffe8dc 100%);
+}
+
+/* —— Section 04: Why MovEazy —— */
+.mkt-why {
+  background: linear-gradient(180deg, #fdf6f0 0%, #fde9e0 55%, #fce5dc 100%);
+  color: #111827;
+}
+
+.mkt-why__top {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 1.5rem 2rem;
+  align-items: start;
+  margin-bottom: 2rem;
+}
+
+@media (min-width: 1024px) {
+  .mkt-why__top {
+    grid-template-columns: minmax(0, 1.15fr) minmax(0, 1fr) minmax(240px, 300px);
+    gap: 2rem 2.5rem;
+    align-items: center;
+  }
+}
+
+.mkt-why__title {
+  margin: 0;
+  max-width: 14ch;
+}
+
+.mkt-why__quote {
+  margin: 0;
+  font-family: "DM Sans", system-ui, sans-serif;
+  font-size: clamp(1.05rem, 2.2vw, 1.35rem);
+  font-weight: 500;
+  font-style: italic;
+  line-height: 1.45;
+  color: #5c6478;
+  max-width: 22rem;
+}
+
+@media (min-width: 1024px) {
+  .mkt-why__quote {
+    justify-self: center;
+    text-align: center;
+    max-width: 18rem;
+  }
+}
+
+.mkt-why__features-card {
+  background: rgba(255, 248, 244, 0.92);
+  border: 2px solid #ff3131;
+  border-radius: 16px;
+  padding: 1.25rem 1.5rem 1.35rem;
+  box-shadow: 0 8px 28px rgba(255, 49, 49, 0.08);
+}
+
+@media (min-width: 1024px) {
+  .mkt-why__features-card {
+    justify-self: end;
+    width: 100%;
+    max-width: 300px;
+  }
+}
+
+.mkt-why__features-title {
+  margin: 0 0 0.85rem;
+  font-family: "DM Sans", system-ui, sans-serif;
+  font-size: 1.125rem;
+  font-weight: 700;
+  color: #ff3131;
+}
+
+.mkt-why__features-list {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  display: flex;
+  flex-direction: column;
+  gap: 0.45rem;
+}
+
+.mkt-why__features-list li {
+  position: relative;
+  padding-left: 1rem;
+  font-family: "DM Sans", system-ui, sans-serif;
+  font-size: 0.9375rem;
+  font-weight: 500;
+  line-height: 1.4;
+  color: #3d4658;
+}
+
+.mkt-why__features-list li::before {
+  content: "";
+  position: absolute;
+  left: 0;
+  top: 0.55em;
+  width: 5px;
+  height: 5px;
+  border-radius: 50%;
+  background: #ff3131;
+  transform: translateY(-50%);
+}
+
+.mkt-why__footer-art-wrap {
+  width: 100%;
+  margin-top: 0.5rem;
+}
+
+.mkt-why__footer-art {
+  display: block;
+  width: 100%;
+  height: auto;
+  max-height: 220px;
+  object-fit: contain;
+  object-position: left center;
+}
+
+@media (min-width: 768px) {
+  .mkt-why__footer-art {
+    max-height: 280px;
+  }
+}
+
+@media (min-width: 1024px) {
+  .mkt-why__footer-art {
+    max-height: 320px;
+    object-position: center bottom;
+  }
+}
+
+.mkt-story--experience {
+  background: #faefe1;
+  color: #111827;
+}
+
+.mkt-story__banner {
+  padding: 0 1rem 1rem;
+}
+
+.mkt-story__banner--flush {
+  padding: 0;
+}
+
+.mkt-story__banner--chaos {
+  padding-bottom: 0.5rem;
+}
+
+.mkt-story__banner-img {
+  display: block;
+  width: 100%;
+  height: auto;
+  max-height: 420px;
+  object-fit: cover;
+  object-position: center;
+  border-radius: 0 0 16px 16px;
+}
+
+.mkt-story--chaos .mkt-story__banner-img {
+  max-height: 360px;
+  object-position: center top;
+}
+
+.mkt-story__banner--flush .mkt-story__banner-img {
+  border-radius: 0;
+  max-height: none;
+}
+
+.mkt-compare-card {
+  background: #fff;
+  border-radius: 16px;
+  padding: 1.5rem 1.75rem;
+  border: 2px solid transparent;
+}
+
+.mkt-compare-card--bad {
+  border-color: #ef4444;
+}
+
+.mkt-compare-card--bad h3 {
+  color: #dc2626;
+  font-weight: 700;
+  font-size: 1.125rem;
+  margin-bottom: 1rem;
+  padding-bottom: 0.75rem;
+  border-bottom: 1px solid #fecaca;
+}
+
+.mkt-compare-card--good {
+  border-color: #22c55e;
+}
+
+.mkt-compare-card--good h3 {
+  color: #15803d;
+  font-weight: 700;
+  font-size: 1.125rem;
+  margin-bottom: 1rem;
+  padding-bottom: 0.75rem;
+  border-bottom: 1px solid #bbf7d0;
+}
+
+.mkt-compare-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  font-size: 0.875rem;
+  color: #44403c;
+}
+
+.mkt-compare-list li {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.5rem;
+}
+
+.mkt-compare-mark {
+  flex-shrink: 0;
+  font-weight: 700;
+}
+
+.mkt-compare-mark--bad {
+  color: #ef4444;
+}
+
+.mkt-compare-mark--good {
+  color: #16a34a;
+}
+
+.mkt-panel-quote {
+  font-size: 1.125rem;
+  font-weight: 500;
+  font-style: italic;
+  color: #57534e;
+  line-height: 1.5;
+}
+
+.mkt-feature-icons {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 1rem;
+  align-items: center;
+  position: relative;
+}
+
+.mkt-feature-icons::before {
+  content: "";
+  position: absolute;
+  left: 2rem;
+  right: 2rem;
+  top: 50%;
+  height: 2px;
+  background: repeating-linear-gradient(90deg, #fdba74 0 8px, transparent 8px 16px);
+  opacity: 0.5;
+  z-index: 0;
+}
+
+.mkt-feature-icon {
+  position: relative;
+  z-index: 1;
+  width: 3.5rem;
+  height: 3.5rem;
+  border-radius: 9999px;
+  background: #fff;
+  box-shadow: 0 8px 24px rgba(255, 49, 49, 0.12);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 1.35rem;
+  transition: box-shadow 0.25s ease;
+}
+
+.mkt-feature-icon:hover {
+  box-shadow: 0 12px 32px rgba(255, 49, 49, 0.2);
+}
+
+.mkt-experience-cards {
+  position: absolute;
+  right: 2rem;
+  top: 2rem;
+  flex-direction: column;
+  gap: 0.75rem;
+  align-items: flex-end;
+}
+
+.mkt-experience-card {
+  width: 200px;
+  height: auto;
+  filter: drop-shadow(0 10px 28px rgba(0, 0, 0, 0.1));
+  animation: mkt-float 6s ease-in-out infinite;
+}
+
+.mkt-experience-card--2 {
+  animation-delay: 0.6s;
+  margin-right: 2rem;
+}
+
+.mkt-panel-label-num {
+  font-family: "DM Sans", system-ui, sans-serif;
+  font-weight: 700;
+  font-size: 48px;
+  line-height: 48px;
+  opacity: 0.3;
+}
+
+.mkt-panel-dream .mkt-panel-label-num {
+  color: #e03e2d;
+}
+
+.mkt-panel-chaos .mkt-panel-label-num {
+  color: #fed8d4;
+}
+
+.mkt-panel-label-text {
+  font-family: "DM Sans", system-ui, sans-serif;
+  font-weight: 700;
+  font-size: 14px;
+  line-height: 20px;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: #e03e2d;
+}
+
+.mkt-panel-title {
+  font-family: "DM Sans", system-ui, sans-serif;
+  font-weight: 700;
+  font-size: clamp(2rem, 5vw, 60px);
+  line-height: 1.25;
+}
+
+.mkt-panel-body {
+  font-family: "DM Sans", system-ui, sans-serif;
+  font-weight: 400;
+  font-size: 16px;
+  line-height: 21px;
+  color: #6b7280;
+}
+
+.mkt-panel-chaos .mkt-panel-body {
+  color: #9ca3af;
+}
+
+.mkt-stat-item {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+
+/* —— Testimonials (#FEECEB pill) —— */
+.mkt-testimonials-wrap {
+  background: #fff;
+  padding: 0;
+}
+
+.mkt-testimonials-inner {
+  background: #feeceb;
+  border-radius: 120px;
+  padding: 64px 24px;
+}
+
+@media (min-width: 768px) {
+  .mkt-testimonials-inner {
+    padding: 64px 72px;
+  }
+}
+
+.mkt-rating-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 16px;
+  padding: 8px 24px 8px 8px;
+  background: #111826;
+  border-radius: 1000px;
+  color: #fff;
+  font-family: Inter, system-ui, sans-serif;
+  font-size: 16px;
+  line-height: 24px;
+}
+
+.mkt-rating-pill-icon {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 40px;
+  height: 40px;
+  border-radius: 1000px;
+  background: #e8321a;
+  font-size: 18px;
+}
+
+.mkt-testimonials-heading {
+  font-family: "Plus Jakarta Sans", system-ui, sans-serif;
+  font-weight: 400;
+  font-size: clamp(1.75rem, 4vw, 48px);
+  line-height: 1.25;
+  text-align: center;
+  color: #111826;
+}
+
+.mkt-testimonial-card {
+  background: #fff;
+  border-radius: 24px;
+  padding: 32px;
+  display: flex;
+  flex-direction: column;
+  gap: 24px;
+  min-height: 280px;
+}
+
+.mkt-testimonial-quote {
+  font-family: "Plus Jakarta Sans", system-ui, sans-serif;
+  font-weight: 400;
+  font-size: 24px;
+  line-height: 34px;
+  color: #111826;
+  flex: 1;
+}
+
+.mkt-testimonial-name {
+  font-family: Inter, system-ui, sans-serif;
+  font-weight: 600;
+  font-size: 16px;
+  line-height: 24px;
+  color: #111826;
+}
+
+.mkt-testimonial-date {
+  font-family: Inter, system-ui, sans-serif;
+  font-size: 14px;
+  line-height: 20px;
+  color: #64748a;
+}
+
+/* —— City CTA —— */
+.mkt-city-cta {
+  border-radius: 20px;
+  overflow: hidden;
+  min-height: 420px;
+}
+
+.mkt-city-cta__bg {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  object-position: center;
+}
+
+.mkt-city-cta__overlay {
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(
+    180deg,
+    rgba(34, 43, 53, 0.24) 0%,
+    rgba(17, 24, 39, 0.54) 55%,
+    rgba(8, 11, 18, 0.68) 100%
+  );
+  pointer-events: none;
+}
+
+.mkt-city-cta h2 {
+  font-family: "Sora", system-ui, sans-serif;
+  font-weight: 700;
+  font-size: clamp(2rem, 5vw, 64px);
+  line-height: 1.3;
+  color: #fff;
+}
+
+.mkt-city-cta p {
+  font-family: "Manrope", system-ui, sans-serif;
+  font-weight: 400;
+  font-size: 20px;
+  line-height: 26px;
+  color: #dedcdc;
+}
+
+.mkt-listings {
+  background: #fff;
+}
+
+.mkt-deposit {
+  background: linear-gradient(180deg, #fff 0%, #fffaf8 100%);
+}
+
+/* Marketing navbar (Figma 56px bar) */
+.mkt-nav-bar {
+  font-family: "Manrope", system-ui, sans-serif;
+}
+
+.mkt-nav-shell {
+  height: 56px;
+  align-items: center;
+}
+
+.mkt-nav-logo-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  height: 40px;
+  min-width: 0;
+  padding: 0;
+  margin: 0;
+  border: none;
+  background: transparent;
+  cursor: pointer;
+}
+
+.mkt-nav-actions {
+  display: flex;
+  align-items: center;
+  min-height: 0;
+}
+
+.mkt-nav-link {
+  display: inline-flex;
+  align-items: center;
+  height: 40px;
+  font-weight: 700;
+  font-size: 15px;
+  line-height: 1;
+  letter-spacing: -0.02em;
+}
+
+/* Do not set display here — Tailwind hidden/md:inline-flex controls visibility */
+.mkt-nav-cta-outline,
+.mkt-nav-cta-solid,
+.mkt-nav-chip {
+  align-items: center;
+  justify-content: center;
+  height: 40px;
+  padding: 0 16px;
+  font-size: 15px;
+  line-height: 1;
+  font-weight: 700;
+  letter-spacing: -0.02em;
+  white-space: nowrap;
+  transition: background 0.2s ease, color 0.2s ease, border-color 0.2s ease;
+}
+
+.mkt-nav-menu-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 40px;
+  height: 40px;
+  flex-shrink: 0;
+  padding: 0;
+}
+
+@media (max-width: 767px) {
+  .mkt-nav-shell {
+    gap: 8px;
+  }
+
+  .mkt-nav-cta-outline,
+  .mkt-nav-cta-solid {
+    display: none !important;
+  }
+
+  .mkt-nav-actions {
+    gap: 8px;
+  }
+}
+
+.mkt-nav-cta-outline,
+.mkt-nav-cta-solid {
+  border-radius: 999px;
+  padding: 0 20px;
+}
+
+.mkt-nav-chip {
+  border-radius: 8px;
+  border: 1px solid #e7e5e4;
+  background: #fafafa;
+  color: #23272b;
+}
+
+.mkt-nav-chip:hover {
+  background: #f5f5f4;
+}
+
+.mkt-nav-chip--admin {
+  border-color: #fecaca;
+  background: #fef2f2;
+  color: #b91c1c;
+}
+
+.mkt-nav-chip--admin:hover {
+  background: #fee2e2;
+}
+
+.mkt-nav-cta-outline {
+  border: 1px solid #1f2428;
+  color: #1f2428;
+  background: rgba(255, 255, 255, 0.86);
+}
+
+.mkt-nav-cta-outline:hover {
+  background: #f3f5f6;
+}
+
+.mkt-nav-cta-solid {
+  background: linear-gradient(115deg, #ff3131 0%, #e63b24 100%);
+  color: #fff;
+  border: 1px solid #ff3131;
+  box-shadow: 0 10px 22px rgba(255, 49, 49, 0.25);
+}
+
+.mkt-nav-cta-solid:hover {
+  background: #e62a2a;
+  border-color: #e62a2a;
+}
+
+.mkt-hero-ctas .mkt-btn-primary {
+  min-width: 0;
+}
+
+@media (min-width: 640px) {
+  .mkt-hero-ctas .mkt-btn-primary {
+    min-width: 140px;
+  }
+}
+
+
+@media (max-width: 1023px) {
+  .mkt-hero {
+    border-radius: 24px;
+  }
+
+  .mkt-hero-inner {
+    padding-left: 1.25rem;
+    padding-right: 1.25rem;
+    padding-top: 2rem;
+    padding-bottom: 2rem;
+  }
+
+  .mkt-hero-visual {
+    min-height: 280px;
+    margin-top: 1rem;
+  }
+
+  .mkt-hero-art__img {
+    max-width: 360px;
+  }
+
+  .mkt-hero-badge-img--flat {
+    right: 0;
+    width: min(170px, 44vw);
+  }
+
+  .mkt-hero-badge-img--move {
+    left: 0;
+    top: auto;
+    bottom: 36%;
+    width: min(185px, 48vw);
+  }
+
+  .mkt-hero-badge-img--verified {
+    bottom: 2%;
+    right: 2%;
+    width: min(120px, 32vw);
+  }
+
+  .mkt-testimonials-inner {
+    border-radius: 48px;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .mkt-hero::before,
+  .mkt-hero-badge-img,
+  .mkt-experience-card,
+  .mkt-feature-icon {
+    animation: none !important;
+  }
+}

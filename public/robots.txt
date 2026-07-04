@@ -1,0 +1,7 @@
+User-agent: *
+Allow: /
+
+# SPA: listing deep links use /map?listingId=...
+Allow: /map
+
+Sitemap: https://moveazy.in/sitemap.xml

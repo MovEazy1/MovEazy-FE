@@ -1,0 +1,2518 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<title>MovEazy — Your Flat-Finding Plan</title>
+<link href="https://fonts.googleapis.com/css2?family=Inter:ital,wght@0,400..800;1,400..800&display=swap" rel="stylesheet"/>
+<style>
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+  /* Aligned with src/index.css marketing tokens (stone + brand coral) */
+  :root {
+    --coral: #ff3131;
+    --coral-dark: #b91c1c;
+    --coral-light: #fff0f0;
+    --ink: #292524;
+    --ink-mid: #44403c;
+    --sand: #fffaf8;
+    --sand-dark: #f5f0eb;
+    --muted: #57534e;
+    --white: #FFFFFF;
+    --chaos-yellow: #F5C518;
+    --chaos-green: #2EC4B6;
+  }
+
+  html { scroll-behavior: smooth; }
+
+  body {
+    font-family: 'Inter', system-ui, -apple-system, sans-serif;
+    background: var(--sand);
+    color: var(--ink);
+    overflow-x: hidden;
+  }
+
+  /* ── SITE NAV (aligned with moveazy.in React navbar) ── */
+  .plan-site-nav {
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    z-index: 100;
+    background: rgba(0, 0, 0, 0.95);
+    backdrop-filter: blur(12px);
+    -webkit-backdrop-filter: blur(12px);
+    border-bottom: 1px solid rgba(127, 29, 29, 0.25);
+    box-shadow: 0 1px 8px rgba(0, 0, 0, 0.28);
+  }
+
+  .plan-nav-inner {
+    max-width: 1400px;
+    margin: 0 auto;
+    padding: 6px 12px 8px;
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 8px 12px;
+  }
+
+  @media (min-width: 1024px) {
+    .plan-nav-inner { padding: 6px 20px 8px; }
+  }
+
+  .plan-nav-logo {
+    display: inline-flex;
+    align-items: flex-end;
+    gap: 2px;
+    font-family: 'Inter', system-ui, sans-serif;
+    font-weight: 800;
+    font-size: clamp(16px, 3.5vw, 18px);
+    letter-spacing: -0.02em;
+    line-height: 1;
+    color: #fff;
+    text-decoration: none;
+    flex-shrink: 0;
+    padding: 4px 0;
+  }
+
+  .plan-nav-logo .plan-nav-ea { color: #ff3131; }
+
+  .plan-nav-logo svg {
+    margin-bottom: 2px;
+    flex-shrink: 0;
+    color: #ff3131;
+  }
+
+  .plan-nav-cb {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    padding: 0;
+    margin: -1px;
+    overflow: hidden;
+    clip: rect(0, 0, 0, 0);
+    white-space: nowrap;
+    border: 0;
+  }
+
+  .plan-nav-burger {
+    margin-left: auto;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 40px;
+    height: 36px;
+    border-radius: 6px;
+    border: 1px solid #52525b;
+    background: #18181b;
+    color: #e4e4e7;
+    font-size: 16px;
+    font-weight: 700;
+    line-height: 1;
+    cursor: pointer;
+    flex-shrink: 0;
+  }
+
+  .plan-nav-burger:hover {
+    background: #27272a;
+    border-color: #71717a;
+  }
+
+  @media (min-width: 1024px) {
+    .plan-nav-burger { display: none; margin-left: 0; }
+  }
+
+  .plan-nav-links {
+    display: none;
+    flex-direction: column;
+    width: 100%;
+    flex-basis: 100%;
+    gap: 2px;
+    padding: 10px 0 4px;
+    border-top: 1px solid rgba(63, 63, 70, 0.65);
+  }
+
+  .plan-nav-cb:checked ~ .plan-nav-links {
+    display: flex;
+  }
+
+  @media (min-width: 1024px) {
+    .plan-nav-links {
+      display: flex !important;
+      flex-direction: row;
+      flex-wrap: wrap;
+      align-items: center;
+      justify-content: center;
+      flex: 1 1 auto;
+      width: auto;
+      flex-basis: auto;
+      gap: 2px 4px;
+      padding: 0;
+      border-top: none;
+    }
+  }
+
+  .plan-nav-links > a {
+    font-family: 'Inter', system-ui, sans-serif;
+    font-size: 12px;
+    font-weight: 600;
+    color: #d4d4d8;
+    text-decoration: none;
+    padding: 10px 10px;
+    border-radius: 6px;
+    transition: color 0.15s, background 0.15s;
+  }
+
+  .plan-nav-links > a:hover {
+    color: #f87171;
+    background: rgba(39, 39, 42, 0.65);
+  }
+
+  .plan-nav-links > a.plan-nav-link-current {
+    color: #fca5a5;
+    cursor: default;
+  }
+
+  .plan-nav-ctas-mobile {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    padding: 12px 0 4px;
+    margin-top: 8px;
+    border-top: 1px solid rgba(63, 63, 70, 0.5);
+  }
+
+  @media (min-width: 1024px) {
+    .plan-nav-ctas-mobile { display: none; }
+  }
+
+  .plan-nav-ctas {
+    display: none;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 8px;
+    margin-left: auto;
+  }
+
+  @media (min-width: 1024px) {
+    .plan-nav-ctas {
+      display: flex;
+      flex-shrink: 0;
+      margin-left: 0;
+    }
+  }
+
+  .plan-nav-btn-red {
+    font-family: 'Inter', system-ui, sans-serif;
+    font-size: 12px;
+    font-weight: 700;
+    line-height: 1.2;
+    text-align: center;
+    text-decoration: none;
+    color: #fff;
+    background: #dc2626;
+    border: 1px solid #b91c1c;
+    border-radius: 6px;
+    padding: 8px 12px;
+    box-shadow: 0 2px 10px rgba(220, 38, 38, 0.28);
+    transition: background 0.15s, transform 0.12s;
+    cursor: pointer;
+  }
+
+  .plan-nav-btn-red:hover {
+    background: #ef4444;
+    transform: translateY(-1px);
+  }
+
+  .plan-nav-cta-pricing {
+    font-family: 'Inter', system-ui, sans-serif;
+    font-size: 12px;
+    font-weight: 700;
+    color: #fff;
+    background: #dc2626;
+    border: 1px solid #b91c1c;
+    border-radius: 6px;
+    padding: 8px 12px;
+    cursor: pointer;
+    box-shadow: 0 2px 10px rgba(220, 38, 38, 0.28);
+    transition: background 0.15s, transform 0.12s;
+    white-space: nowrap;
+  }
+
+  .plan-nav-cta-pricing:hover {
+    background: #ef4444;
+    transform: translateY(-1px);
+  }
+
+  /* ── HERO ── */
+  .hero {
+    min-height: 100vh;
+    padding: 120px 40px 80px;
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 60px;
+    align-items: center;
+    max-width: 1200px;
+    margin: 0 auto;
+  }
+
+  .hero-left {}
+
+  .hero-chaos-label {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    background: #fff;
+    border: 1.5px solid #E8E3DC;
+    border-radius: 100px;
+    padding: 8px 16px;
+    font-size: 12px;
+    font-weight: 500;
+    color: var(--muted);
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    margin-bottom: 28px;
+    animation: fadeUp 0.5s ease both;
+  }
+
+  .chaos-dot {
+    width: 8px; height: 8px;
+    background: var(--chaos-yellow);
+    border-radius: 50%;
+  }
+
+  .hero-headline {
+    font-family: 'Inter', system-ui, sans-serif;
+    font-size: clamp(28px, 5.5vw, 56px);
+    font-weight: 800;
+    letter-spacing: -0.03em;
+    line-height: 1.08;
+    color: var(--ink);
+    margin-bottom: 10px;
+    animation: fadeUp 0.5s 0.1s ease both;
+  }
+
+  .hero-headline em {
+    font-family: 'Inter', system-ui, sans-serif;
+    font-style: italic;
+    font-weight: 700;
+    color: var(--coral);
+  }
+
+  .hero-sub-headline {
+    font-family: 'Inter', system-ui, sans-serif;
+    font-size: clamp(22px, 3vw, 36px);
+    font-weight: 700;
+    color: var(--ink-mid);
+    margin-bottom: 22px;
+    line-height: 1.2;
+    animation: fadeUp 0.5s 0.15s ease both;
+  }
+
+  .hero-body {
+    font-size: 16px;
+    color: var(--muted);
+    line-height: 1.7;
+    max-width: 420px;
+    margin-bottom: 36px;
+    animation: fadeUp 0.5s 0.2s ease both;
+  }
+
+  .hero-cta-group {
+    display: flex;
+    align-items: center;
+    gap: 16px;
+    flex-wrap: wrap;
+    animation: fadeUp 0.5s 0.25s ease both;
+  }
+
+  .btn-primary {
+    background: var(--coral);
+    color: #fff;
+    border: none;
+    border-radius: 14px;
+    padding: 16px 32px;
+    font-family: 'Inter', system-ui, sans-serif;
+    font-size: 16px;
+    font-weight: 700;
+    cursor: pointer;
+    display: inline-flex;
+    align-items: center;
+    gap: 10px;
+    transition: background 0.18s, transform 0.15s, box-shadow 0.15s;
+    text-decoration: none;
+  }
+
+  .btn-primary:hover {
+    background: var(--coral-dark);
+    transform: translateY(-2px);
+    box-shadow: 0 12px 32px rgba(232,90,79,0.3);
+  }
+
+  .btn-ghost {
+    color: var(--muted);
+    font-size: 14px;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    cursor: pointer;
+    border: none;
+    background: none;
+    font-family: 'Inter', system-ui, sans-serif;
+    transition: color 0.2s;
+  }
+
+  .btn-ghost:hover { color: var(--ink); }
+
+  /* hero right — chaos card stack */
+  .hero-right {
+    position: relative;
+    min-height: 380px;
+    animation: fadeUp 0.6s 0.3s ease both;
+  }
+
+  .chaos-card {
+    position: absolute;
+    background: #fff;
+    border-radius: 20px;
+    padding: 20px 22px;
+    box-shadow: 0 8px 40px rgba(0,0,0,0.09);
+    font-size: 13px;
+    line-height: 1.5;
+  }
+
+  .chaos-card-main {
+    width: 100%;
+    top: 0; left: 0;
+    background: var(--ink);
+    color: #fff;
+    padding: 32px;
+    border-radius: 24px;
+  }
+
+  .chaos-title {
+    font-family: 'Inter', system-ui, sans-serif;
+    font-size: 15px;
+    font-weight: 700;
+    margin-bottom: 16px;
+    color: #fff;
+    opacity: 0.5;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+  }
+
+  .chaos-item {
+    display: flex;
+    align-items: flex-start;
+    gap: 12px;
+    padding: 14px 0;
+    border-bottom: 1px solid rgba(255,255,255,0.08);
+  }
+
+  .chaos-item:last-child { border-bottom: none; }
+
+  .chaos-icon {
+    width: 34px; height: 34px;
+    border-radius: 10px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 16px;
+    flex-shrink: 0;
+  }
+
+  .chaos-icon.red { background: rgba(232,90,79,0.15); }
+  .chaos-icon.yellow { background: rgba(245,197,24,0.15); }
+  .chaos-icon.green { background: rgba(46,196,182,0.12); }
+
+  .chaos-item-text { flex: 1; }
+  .chaos-item-label {
+    font-family: 'Inter', system-ui, sans-serif;
+    font-size: 13px;
+    font-weight: 600;
+    color: #fff;
+    margin-bottom: 2px;
+  }
+  .chaos-item-sub { font-size: 12px; color: rgba(255,255,255,0.4); }
+
+  .chaos-item-status {
+    font-size: 11px;
+    font-weight: 600;
+    padding: 4px 10px;
+    border-radius: 100px;
+    white-space: nowrap;
+    align-self: center;
+  }
+
+  .status-bad { background: rgba(232,90,79,0.18); color: #F4907F; }
+  .status-warn { background: rgba(245,197,24,0.15); color: #D4A800; }
+  .status-ok { background: rgba(46,196,182,0.15); color: #2EC4B6; }
+
+  /* floating small cards */
+  .float-card {
+    position: absolute;
+    background: #fff;
+    border-radius: 16px;
+    padding: 14px 16px;
+    box-shadow: 0 6px 30px rgba(0,0,0,0.10);
+    animation: float 4s ease-in-out infinite;
+  }
+
+  .float-card-1 {
+    bottom: 20px;
+    left: -20px;
+    width: 190px;
+    animation-delay: 0s;
+  }
+
+  .float-card-2 {
+    top: 90px;
+    right: -30px;
+    width: 170px;
+    animation-delay: 1.5s;
+  }
+
+  @keyframes float {
+    0%, 100% { transform: translateY(0px); }
+    50% { transform: translateY(-8px); }
+  }
+
+  .float-label {
+    font-size: 10px;
+    color: var(--muted);
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    margin-bottom: 6px;
+  }
+
+  .float-big {
+    font-family: 'Inter', system-ui, sans-serif;
+    font-size: 22px;
+    font-weight: 800;
+    color: var(--ink);
+  }
+
+  .float-big span { color: var(--coral); }
+  .float-sub { font-size: 11px; color: var(--muted); margin-top: 2px; }
+
+  .float-msg {
+    font-size: 12px;
+    color: var(--ink);
+    font-weight: 500;
+    line-height: 1.4;
+  }
+
+  .float-agent {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin-bottom: 6px;
+  }
+
+  .agent-avatar {
+    width: 28px; height: 28px;
+    background: var(--coral);
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 12px;
+    color: #fff;
+    font-weight: 700;
+  }
+
+  .agent-name { font-size: 11px; font-weight: 600; color: var(--ink); }
+  .agent-role { font-size: 10px; color: var(--muted); }
+
+  /* ── THE CHAOS SECTION ── */
+  .chaos-section {
+    background: var(--ink);
+    padding: 100px 40px;
+    position: relative;
+    overflow: hidden;
+  }
+
+  .chaos-section::before {
+    content: '';
+    position: absolute;
+    inset: 0;
+    background: url("data:image/svg+xml,%3Csvg width='60' height='60' viewBox='0 0 60 60' xmlns='http://www.w3.org/2000/svg'%3E%3Cg fill='none' fill-rule='evenodd'%3E%3Cg fill='%23ffffff' fill-opacity='0.02'%3E%3Cpath d='M36 34v-4h-2v4h-4v2h4v4h2v-4h4v-2h-4zm0-30V0h-2v4h-4v2h4v4h2V6h4V4h-4zM6 34v-4H4v4H0v2h4v4h2v-4h4v-2H6zM6 4V0H4v4H0v2h4v4h2V6h4V4H6z'/%3E%3C/g%3E%3C/g%3E%3C/svg%3E");
+  }
+
+  .chaos-section-inner {
+    max-width: 1100px;
+    margin: 0 auto;
+    position: relative;
+  }
+
+  .section-eyebrow {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    border-radius: 100px;
+    padding: 6px 14px;
+    font-size: 11px;
+    font-weight: 600;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    margin-bottom: 24px;
+  }
+
+  .eyebrow-dark {
+    background: rgba(232,90,79,0.15);
+    border: 1px solid rgba(232,90,79,0.3);
+    color: #F4907F;
+  }
+
+  .eyebrow-light {
+    background: var(--coral-light);
+    border: 1px solid #FBCFC8;
+    color: #C04535;
+  }
+
+  .chaos-section-headline {
+    font-family: 'Inter', system-ui, sans-serif;
+    font-size: clamp(32px, 4vw, 52px);
+    font-weight: 800;
+    color: #fff;
+    line-height: 1.1;
+    margin-bottom: 16px;
+    max-width: 600px;
+  }
+
+  .chaos-section-headline em {
+    font-family: 'Inter', system-ui, sans-serif;
+    font-style: italic;
+    font-weight: 400;
+    color: var(--chaos-yellow);
+  }
+
+  .chaos-section-sub {
+    font-size: 16px;
+    color: rgba(255,255,255,0.45);
+    max-width: 480px;
+    line-height: 1.65;
+    margin-bottom: 60px;
+  }
+
+  .chaos-problems {
+    display: grid;
+    grid-template-columns: repeat(2, 1fr);
+    gap: 2px;
+    max-width: 720px;
+  }
+
+  .problem-item {
+    background: rgba(255,255,255,0.04);
+    border: 1px solid rgba(255,255,255,0.07);
+    padding: 28px 26px;
+    transition: background 0.2s;
+    position: relative;
+    overflow: hidden;
+  }
+
+  .problem-item::before {
+    content: '';
+    position: absolute;
+    top: 0; left: 0; right: 0;
+    height: 2px;
+    background: linear-gradient(90deg, var(--coral), transparent);
+    opacity: 0;
+    transition: opacity 0.2s;
+  }
+
+  .problem-item:hover { background: rgba(255,255,255,0.07); }
+  .problem-item:hover::before { opacity: 1; }
+
+  .problem-item:first-child { border-radius: 16px 0 0 16px; }
+  .problem-item:nth-child(2) { border-radius: 0 16px 16px 0; }
+
+  .problem-emoji { font-size: 28px; margin-bottom: 14px; }
+
+  .problem-title {
+    font-family: 'Inter', system-ui, sans-serif;
+    font-size: 15px;
+    font-weight: 700;
+    color: #fff;
+    margin-bottom: 8px;
+  }
+
+  .problem-desc {
+    font-size: 13px;
+    color: rgba(255,255,255,0.4);
+    line-height: 1.6;
+  }
+
+  /* ── HOW IT WORKS ── */
+  .how-section {
+    padding: 110px 40px;
+    max-width: 1100px;
+    margin: 0 auto;
+  }
+
+  .how-header {
+    display: flex;
+    align-items: flex-end;
+    justify-content: space-between;
+    margin-bottom: 60px;
+    gap: 24px;
+    flex-wrap: wrap;
+  }
+
+  .section-headline {
+    font-family: 'Inter', system-ui, sans-serif;
+    font-size: clamp(30px, 3.5vw, 46px);
+    font-weight: 800;
+    color: var(--ink);
+    line-height: 1.1;
+  }
+
+  .section-headline em {
+    font-family: 'Inter', system-ui, sans-serif;
+    font-style: italic;
+    font-weight: 400;
+    color: var(--coral);
+  }
+
+  .section-note {
+    font-size: 14px;
+    color: var(--muted);
+    max-width: 260px;
+    line-height: 1.6;
+    text-align: right;
+  }
+
+  .steps-timeline {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    position: relative;
+    gap: 0;
+  }
+
+  .steps-timeline::before {
+    content: '';
+    position: absolute;
+    top: 44px;
+    left: 8%;
+    right: 8%;
+    height: 1px;
+    background: linear-gradient(90deg, var(--sand-dark), var(--coral) 50%, var(--sand-dark));
+    z-index: 0;
+  }
+
+  .step-item {
+    padding: 0 16px;
+    position: relative;
+    z-index: 1;
+  }
+
+  .step-node {
+    width: 88px; height: 88px;
+    border-radius: 50%;
+    background: #fff;
+    border: 2px solid var(--sand-dark);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 28px;
+    margin-bottom: 24px;
+    position: relative;
+    transition: border-color 0.2s, box-shadow 0.2s;
+    box-shadow: 0 4px 20px rgba(0,0,0,0.06);
+  }
+
+  .step-item:hover .step-node {
+    border-color: var(--coral);
+    box-shadow: 0 8px 32px rgba(232,90,79,0.18);
+  }
+
+  .step-num-badge {
+    position: absolute;
+    top: -4px; right: -4px;
+    width: 22px; height: 22px;
+    background: var(--coral);
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-family: 'Inter', system-ui, sans-serif;
+    font-size: 10px;
+    font-weight: 800;
+    color: #fff;
+  }
+
+  .step-title {
+    font-family: 'Inter', system-ui, sans-serif;
+    font-size: 15px;
+    font-weight: 700;
+    color: var(--ink);
+    margin-bottom: 8px;
+    line-height: 1.3;
+  }
+
+  .step-desc {
+    font-size: 13px;
+    color: var(--muted);
+    line-height: 1.65;
+  }
+
+  /* ── WHAT'S INCLUDED ── */
+  .included-section {
+    background: #fff;
+    padding: 100px 40px;
+  }
+
+  .included-inner {
+    max-width: 1100px;
+    margin: 0 auto;
+  }
+
+  .included-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 40px;
+    align-items: start;
+    margin-top: 60px;
+  }
+
+  .included-list {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+  }
+
+  .included-item {
+    display: flex;
+    gap: 16px;
+    padding: 20px 20px;
+    border-radius: 14px;
+    transition: background 0.18s;
+    cursor: default;
+    align-items: flex-start;
+  }
+
+  .included-item:hover { background: var(--sand); }
+
+  .included-check {
+    width: 32px; height: 32px;
+    background: var(--coral-light);
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: var(--coral);
+    font-size: 14px;
+    font-weight: 700;
+    flex-shrink: 0;
+    margin-top: 2px;
+  }
+
+  .included-text {}
+  .included-title {
+    font-family: 'Inter', system-ui, sans-serif;
+    font-size: 15px;
+    font-weight: 700;
+    color: var(--ink);
+    margin-bottom: 4px;
+  }
+
+  .included-desc { font-size: 13px; color: var(--muted); line-height: 1.6; }
+
+  /* pricing card */
+  .pricing-sticky {
+    position: sticky;
+    top: 100px;
+  }
+
+  .pricing-card {
+    background: var(--ink);
+    border-radius: 24px;
+    padding: 36px 32px;
+    color: #fff;
+  }
+
+  .pricing-plan-name {
+    font-size: 11px;
+    font-weight: 600;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    color: rgba(255,255,255,0.4);
+    margin-bottom: 20px;
+  }
+
+  .pricing-amount {
+    display: flex;
+    align-items: baseline;
+    gap: 4px;
+    margin-bottom: 6px;
+  }
+
+  .pricing-currency {
+    font-family: 'Inter', system-ui, sans-serif;
+    font-size: 24px;
+    font-weight: 700;
+    color: #fff;
+    opacity: 0.7;
+  }
+
+  .pricing-number {
+    font-family: 'Inter', system-ui, sans-serif;
+    font-size: 56px;
+    font-weight: 800;
+    color: #fff;
+    line-height: 1;
+  }
+
+  .pricing-context {
+    font-size: 13px;
+    color: rgba(255,255,255,0.4);
+    margin-bottom: 28px;
+    line-height: 1.5;
+  }
+
+  .pricing-context strong {
+    color: rgba(255,255,255,0.7);
+    font-weight: 500;
+  }
+
+  .pricing-divider {
+    height: 1px;
+    background: rgba(255,255,255,0.08);
+    margin: 24px 0;
+  }
+
+  .pricing-features {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+    margin-bottom: 28px;
+  }
+
+  .pricing-feature {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    font-size: 14px;
+    color: rgba(255,255,255,0.75);
+  }
+
+  .feat-dot {
+    width: 18px; height: 18px;
+    background: rgba(232,90,79,0.2);
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 9px;
+    color: var(--coral);
+    flex-shrink: 0;
+    font-weight: 800;
+  }
+
+  .btn-cta-full {
+    width: 100%;
+    background: var(--coral);
+    color: #fff;
+    border: none;
+    border-radius: 14px;
+    padding: 16px 24px;
+    font-family: 'Inter', system-ui, sans-serif;
+    font-size: 16px;
+    font-weight: 700;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 10px;
+    transition: background 0.18s, transform 0.15s, box-shadow 0.15s;
+    margin-bottom: 14px;
+  }
+
+  .btn-cta-full:hover {
+    background: var(--coral-dark);
+    transform: translateY(-2px);
+    box-shadow: 0 12px 32px rgba(232,90,79,0.35);
+  }
+
+  .pricing-fine {
+    text-align: center;
+    font-size: 12px;
+    color: rgba(255,255,255,0.3);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 6px;
+  }
+
+  /* ── TESTIMONIALS / TRUST ── */
+  .trust-section {
+    padding: 100px 40px;
+    max-width: 1100px;
+    margin: 0 auto;
+  }
+
+  .trust-grid {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 16px;
+    margin-top: 52px;
+  }
+
+  .trust-card {
+    background: #fff;
+    border: 1px solid var(--sand-dark);
+    border-radius: 20px;
+    padding: 28px 24px;
+    transition: box-shadow 0.2s, transform 0.2s;
+  }
+
+  .trust-card:hover {
+    box-shadow: 0 12px 40px rgba(0,0,0,0.08);
+    transform: translateY(-3px);
+  }
+
+  .trust-stars {
+    color: var(--chaos-yellow);
+    font-size: 14px;
+    letter-spacing: 1px;
+    margin-bottom: 14px;
+  }
+
+  .trust-quote {
+    font-size: 14px;
+    color: var(--ink-mid);
+    line-height: 1.65;
+    margin-bottom: 20px;
+    font-style: italic;
+  }
+
+  .trust-author {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+  }
+
+  .trust-avatar {
+    width: 36px; height: 36px;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-family: 'Inter', system-ui, sans-serif;
+    font-size: 13px;
+    font-weight: 700;
+    color: #fff;
+    flex-shrink: 0;
+  }
+
+  .trust-name { font-family: 'Inter', system-ui, sans-serif; font-size: 13px; font-weight: 700; color: var(--ink); }
+  .trust-meta { font-size: 11px; color: var(--muted); margin-top: 1px; }
+
+  /* ── CTA FINALE ── */
+  .finale-section {
+    padding: 0 40px 100px;
+  }
+
+  .finale-inner {
+    max-width: 1100px;
+    margin: 0 auto;
+    background: var(--ink);
+    border-radius: 32px;
+    padding: 80px 60px;
+    display: grid;
+    grid-template-columns: 1fr auto;
+    align-items: center;
+    gap: 60px;
+    position: relative;
+    overflow: hidden;
+  }
+
+  .finale-inner::before {
+    content: '';
+    position: absolute;
+    width: 400px; height: 400px;
+    background: radial-gradient(circle, rgba(232,90,79,0.15) 0%, transparent 70%);
+    right: -100px; top: -100px;
+    pointer-events: none;
+  }
+
+  .finale-eyebrow {
+    font-size: 11px;
+    font-weight: 600;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    color: var(--coral);
+    margin-bottom: 16px;
+    opacity: 0.9;
+  }
+
+  .finale-headline {
+    font-family: 'Inter', system-ui, sans-serif;
+    font-size: clamp(28px, 3.5vw, 44px);
+    font-weight: 800;
+    color: #fff;
+    line-height: 1.1;
+    margin-bottom: 16px;
+  }
+
+  .finale-headline em {
+    font-family: 'Inter', system-ui, sans-serif;
+    font-style: italic;
+    font-weight: 400;
+    color: var(--chaos-yellow);
+  }
+
+  .finale-body {
+    font-size: 15px;
+    color: rgba(255,255,255,0.45);
+    line-height: 1.65;
+    max-width: 400px;
+  }
+
+  .finale-cta {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 12px;
+    flex-shrink: 0;
+  }
+
+  .btn-finale {
+    background: var(--coral);
+    color: #fff;
+    border: none;
+    border-radius: 16px;
+    padding: 18px 36px;
+    font-family: 'Inter', system-ui, sans-serif;
+    font-size: 18px;
+    font-weight: 800;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    transition: background 0.18s, transform 0.15s, box-shadow 0.15s;
+    white-space: nowrap;
+  }
+
+  .btn-finale:hover {
+    background: var(--coral-dark);
+    transform: translateY(-2px);
+    box-shadow: 0 16px 40px rgba(232,90,79,0.4);
+  }
+
+  .finale-price-note {
+    font-size: 13px;
+    color: rgba(255,255,255,0.35);
+  }
+
+  /* ── FLAT SEARCH (Zillow-style pro directory — layout reference only) ── */
+  /* Area experts directory — hidden until product-ready (see Agents page) */
+  .flat-search-section {
+    display: none !important;
+    background: #e8e8e8;
+    padding: 0 0 80px;
+    border-top: 1px solid rgba(0,0,0,0.06);
+  }
+  .flat-search-inner {
+    max-width: 1180px;
+    margin: 0 auto;
+    padding: 0 24px 40px;
+  }
+  .flat-search-bar {
+    background: #fff;
+    border-radius: 0 0 12px 12px;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.06);
+    padding: 20px 24px 24px;
+    margin-bottom: 8px;
+  }
+  .flat-search-title {
+    font-family: 'Inter', system-ui, sans-serif;
+    font-size: clamp(22px, 2.5vw, 28px);
+    font-weight: 800;
+    color: var(--ink);
+    margin-bottom: 6px;
+  }
+  .flat-search-sub {
+    font-size: 13px;
+    color: var(--muted);
+    margin-bottom: 20px;
+    max-width: 640px;
+    line-height: 1.5;
+  }
+  .flat-search-form {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 12px;
+    align-items: flex-end;
+  }
+  .flat-search-field label {
+    display: block;
+    font-size: 11px;
+    font-weight: 600;
+    color: var(--muted);
+    margin-bottom: 6px;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+  }
+  .flat-search-field input {
+    min-width: 200px;
+    padding: 12px 14px;
+    border: 1px solid #ccc;
+    border-radius: 8px;
+    font-size: 15px;
+    font-family: inherit;
+  }
+  .flat-search-field input:focus {
+    outline: none;
+    border-color: var(--coral);
+    box-shadow: 0 0 0 3px rgba(255, 49, 49, 0.18);
+  }
+  .flat-search-field-wrap {
+    position: relative;
+    flex: 1 1 220px;
+    min-width: 200px;
+  }
+  .fs-suggest {
+    position: absolute;
+    left: 0;
+    right: 0;
+    top: calc(100% + 4px);
+    background: #fff;
+    border: 1px solid #e7e5e4;
+    border-radius: 10px;
+    box-shadow: 0 14px 36px rgba(0, 0, 0, 0.12);
+    max-height: 240px;
+    overflow-y: auto;
+    z-index: 60;
+    display: none;
+  }
+  .fs-suggest.is-open {
+    display: block;
+  }
+  .fs-suggest button {
+    display: block;
+    width: 100%;
+    text-align: left;
+    padding: 11px 14px;
+    border: none;
+    border-bottom: 1px solid #f4f4f5;
+    background: transparent;
+    font-size: 14px;
+    font-family: inherit;
+    color: var(--ink);
+    cursor: pointer;
+    transition: background 0.12s, color 0.12s;
+  }
+  .fs-suggest button:last-child {
+    border-bottom: none;
+  }
+  .fs-suggest button:hover,
+  .fs-suggest button:focus {
+    background: #fff5f5;
+    color: var(--coral);
+    outline: none;
+  }
+  .flat-area-chips {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+    margin-top: 16px;
+    align-items: center;
+  }
+  .flat-area-chips-label {
+    width: 100%;
+    font-size: 11px;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    color: var(--muted);
+    margin-bottom: 2px;
+  }
+  .flat-area-chip {
+    font-family: 'Inter', system-ui, sans-serif;
+    font-size: 13px;
+    font-weight: 600;
+    padding: 8px 14px;
+    border-radius: 999px;
+    border: 1px solid #e7e5e4;
+    background: #fafaf9;
+    color: var(--ink-mid);
+    cursor: pointer;
+    transition: border-color 0.15s, background 0.15s, color 0.15s, transform 0.12s;
+  }
+  .flat-area-chip:hover {
+    border-color: var(--coral);
+    color: var(--coral);
+    background: #fff5f5;
+    transform: translateY(-1px);
+  }
+  .flat-area-chip.is-active {
+    border-color: var(--coral);
+    background: var(--coral);
+    color: #fff;
+  }
+  .btn-zillow-find {
+    background: #dc2626;
+    color: #fff;
+    border: 1px solid #b91c1c;
+    border-radius: 8px;
+    padding: 12px 28px;
+    font-family: 'Inter', system-ui, sans-serif;
+    font-size: 15px;
+    font-weight: 700;
+    cursor: pointer;
+    transition: background 0.15s, filter 0.15s, transform 0.12s;
+    box-shadow: 0 2px 10px rgba(220, 38, 38, 0.22);
+  }
+  .btn-zillow-find:hover {
+    background: #ef4444;
+    filter: none;
+    transform: translateY(-1px);
+  }
+  .flat-search-disclaimer {
+    font-size: 11px;
+    color: #888;
+    margin-top: 14px;
+    line-height: 1.4;
+  }
+  .flat-search-results {
+    padding-top: 20px;
+  }
+  .flat-search-count {
+    font-size: 14px;
+    color: var(--ink-mid);
+    margin-bottom: 16px;
+    font-weight: 600;
+  }
+  .flat-agent-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+    gap: 16px;
+  }
+  .flat-agent-card {
+    background: #fff;
+    border-radius: 12px;
+    padding: 16px;
+    display: flex;
+    gap: 14px;
+    box-shadow: 0 1px 4px rgba(0,0,0,0.08);
+    border: 1px solid #ddd;
+    transition: box-shadow 0.2s;
+  }
+  .flat-agent-card:hover {
+    box-shadow: 0 4px 16px rgba(0,0,0,0.1);
+  }
+  .flat-agent-photo {
+    width: 72px;
+    height: 72px;
+    border-radius: 50%;
+    background: linear-gradient(135deg, var(--coral-light), #e8e8e8);
+    flex-shrink: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-family: 'Inter', system-ui, sans-serif;
+    font-weight: 800;
+    font-size: 22px;
+    color: var(--coral);
+  }
+  .flat-agent-meta { flex: 1; min-width: 0; }
+  .flat-agent-name {
+    font-family: 'Inter', system-ui, sans-serif;
+    font-weight: 700;
+    font-size: 15px;
+    color: var(--ink);
+    margin-bottom: 2px;
+  }
+  .flat-agent-brokerage { font-size: 12px; color: #555; margin-bottom: 6px; }
+  .flat-agent-stats { font-size: 12px; color: var(--muted); line-height: 1.45; }
+  .flat-agent-rating {
+    font-size: 13px;
+    color: var(--coral);
+    font-weight: 700;
+    margin-bottom: 4px;
+  }
+  .flat-search-pager {
+    display: flex;
+    gap: 8px;
+    justify-content: center;
+    align-items: center;
+    margin-top: 28px;
+    flex-wrap: wrap;
+  }
+  .flat-search-pager button {
+    min-width: 36px;
+    height: 36px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 8px;
+    font-size: 14px;
+    font-weight: 600;
+    font-family: inherit;
+    color: var(--coral);
+    border: 1px solid #d6d3d1;
+    background: #fff;
+    cursor: pointer;
+    transition: background 0.15s, color 0.15s, border-color 0.15s;
+  }
+  .flat-search-pager button:hover:not(:disabled) {
+    background: #fff5f5;
+    border-color: var(--coral);
+  }
+  .flat-search-pager button.current {
+    background: var(--coral);
+    color: #fff;
+    border-color: var(--coral);
+  }
+  .flat-search-pager button:disabled {
+    opacity: 0.35;
+    cursor: not-allowed;
+  }
+  .flat-search-pager .fs-pager-meta {
+    border: none;
+    background: transparent;
+    color: var(--muted);
+    font-size: 13px;
+    font-weight: 500;
+    min-width: auto;
+    padding: 0 4px;
+    cursor: default;
+  }
+  .fs-empty {
+    grid-column: 1 / -1;
+    text-align: center;
+    padding: 32px 16px;
+    color: var(--muted);
+    font-size: 15px;
+  }
+
+  /* ── FOOTER (standalone HTML only; hidden in React /plan embed) ── */
+  footer.plan-site-footer {
+    width: 100%;
+    background: var(--white);
+    border-top: 1px solid var(--sand-dark);
+  }
+
+  .plan-site-footer__inner {
+    max-width: 1100px;
+    margin: 0 auto;
+    padding: 32px 40px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 16px;
+  }
+
+  .footer-logo {
+    font-family: 'Inter', system-ui, sans-serif;
+    font-size: 16px;
+    font-weight: 800;
+    color: var(--ink);
+    text-decoration: none;
+    display: inline-flex;
+    align-items: center;
+    gap: 2px;
+    flex-shrink: 0;
+  }
+
+  .footer-logo .plan-nav-ea { color: var(--coral); }
+
+  .footer-note {
+    font-size: 13px;
+    color: var(--muted);
+    line-height: 1.4;
+    text-align: right;
+  }
+
+  html.plan-embed footer.plan-site-footer {
+    display: none !important;
+  }
+
+  /* animations */
+  @keyframes fadeUp {
+    from { opacity: 0; transform: translateY(20px); }
+    to { opacity: 1; transform: translateY(0); }
+  }
+
+  /* scroll reveals */
+  .reveal {
+    opacity: 0;
+    transform: translateY(28px);
+    transition: opacity 0.6s ease, transform 0.6s ease;
+  }
+
+  .reveal.visible {
+    opacity: 1;
+    transform: translateY(0);
+  }
+
+  .reveal-delay-1 { transition-delay: 0.1s; }
+  .reveal-delay-2 { transition-delay: 0.2s; }
+  .reveal-delay-3 { transition-delay: 0.3s; }
+  .reveal-delay-4 { transition-delay: 0.4s; }
+
+  /* /plan route: parent React app owns Navbar — hide duplicate bar inside iframe */
+  html.plan-embed .plan-site-nav {
+    display: none !important;
+  }
+
+  html.plan-embed .hero {
+    padding-top: 28px;
+  }
+
+  html.plan-embed,
+  html.plan-embed body {
+    width: 100%;
+    max-width: 100%;
+    min-height: 0;
+    overflow-x: hidden;
+  }
+
+  html.plan-embed .hero {
+    min-height: unset;
+  }
+
+  html.plan-embed .finale-section {
+    padding-bottom: 48px;
+  }
+
+  /* In /plan iframe: show content immediately (no scroll-reveal hide) */
+  html.plan-embed .reveal {
+    opacity: 1;
+    transform: none;
+    transition: none;
+  }
+
+  /* ── Mobile / phone (≤900px) — full-page responsive pass ── */
+  @media (max-width: 900px) {
+    html, body {
+      overflow-x: hidden;
+      max-width: 100%;
+      width: 100%;
+    }
+
+    .how-section,
+    .included-section,
+    .included-inner,
+    .trust-section,
+    .finale-section {
+      width: 100%;
+      max-width: 100%;
+      box-sizing: border-box;
+    }
+
+    .included-grid > * {
+      min-width: 0;
+    }
+
+    html.plan-embed body {
+      overflow-x: hidden;
+    }
+
+    /* Hero */
+    .hero {
+      grid-template-columns: 1fr;
+      gap: 28px;
+      align-items: stretch;
+      min-height: unset;
+      padding: 96px 18px 48px;
+    }
+
+    html.plan-embed .hero {
+      padding-top: 12px;
+      padding-left: max(16px, env(safe-area-inset-left));
+      padding-right: max(16px, env(safe-area-inset-right));
+      padding-bottom: 40px;
+    }
+
+    .hero-body { max-width: none; }
+
+    .hero-right {
+      min-height: unset;
+      width: 100%;
+      max-width: 100%;
+      overflow: hidden;
+    }
+
+    .chaos-card-main {
+      position: relative;
+      top: auto;
+      left: auto;
+      width: 100%;
+      max-width: 100%;
+      padding: 22px 18px;
+      box-sizing: border-box;
+    }
+
+    .chaos-item {
+      flex-wrap: wrap;
+      gap: 10px 12px;
+      padding: 12px 0;
+    }
+
+    .chaos-item-text {
+      flex: 1 1 calc(100% - 46px);
+      min-width: 0;
+    }
+
+    .chaos-item-status {
+      flex: 1 1 100%;
+      margin-left: 46px;
+      align-self: flex-start;
+      white-space: normal;
+      width: auto;
+    }
+
+    .hero-headline { font-size: clamp(26px, 7.5vw, 40px); }
+
+    .hero-cta-group {
+      flex-direction: column;
+      align-items: stretch;
+    }
+
+    .btn-primary {
+      justify-content: center;
+      width: 100%;
+      max-width: none;
+    }
+
+    /* Chaos problems */
+    .chaos-section { padding: 56px 18px; }
+    .chaos-problems { grid-template-columns: 1fr; max-width: none; }
+    .problem-item:first-child,
+    .problem-item:nth-child(2) { border-radius: 14px; }
+
+    /* How it works — vertical steps (no horizontal scroll) */
+    .how-section { padding: 56px 18px; }
+
+    .how-header {
+      flex-direction: column;
+      align-items: flex-start;
+      margin-bottom: 32px;
+      gap: 12px;
+    }
+
+    .section-note {
+      text-align: left;
+      max-width: none;
+    }
+
+    .steps-timeline {
+      grid-template-columns: 1fr;
+      gap: 24px;
+    }
+
+    .steps-timeline::before { display: none; }
+
+    .step-item {
+      display: grid;
+      grid-template-columns: 72px 1fr;
+      grid-template-rows: auto auto;
+      gap: 4px 16px;
+      padding: 0;
+      align-items: start;
+    }
+
+    .step-node {
+      grid-row: 1 / span 2;
+      width: 72px;
+      height: 72px;
+      font-size: 24px;
+      margin-bottom: 0;
+    }
+
+    .step-title {
+      grid-column: 2;
+      margin-bottom: 4px;
+    }
+
+    .step-desc {
+      grid-column: 2;
+    }
+
+    /* Pricing + included — single column */
+    .included-section { padding: 56px 18px; }
+
+    .included-inner { padding: 0; }
+
+    .included-grid {
+      grid-template-columns: 1fr;
+      gap: 28px;
+      margin-top: 32px;
+    }
+
+    .pricing-sticky {
+      position: static;
+      top: auto;
+      width: 100%;
+      max-width: 100%;
+    }
+
+    .pricing-card {
+      width: 100%;
+      max-width: 100%;
+      box-sizing: border-box;
+      padding: 28px 22px;
+    }
+
+    .pricing-number { font-size: 44px; }
+
+    .pricing-feature span { word-break: break-word; }
+
+    /* Testimonials — stack cards */
+    .trust-section {
+      padding: 56px 18px;
+      max-width: none;
+    }
+
+    .trust-grid {
+      grid-template-columns: 1fr;
+      gap: 16px;
+      margin-top: 32px;
+    }
+
+    .trust-card { padding: 24px 20px; }
+
+    .trust-quote { font-size: 15px; }
+
+    /* Finale CTA — stack, full-width button */
+    .finale-section {
+      padding: 0 max(16px, env(safe-area-inset-right)) 48px max(16px, env(safe-area-inset-left));
+    }
+
+    .finale-inner {
+      grid-template-columns: 1fr;
+      width: 100%;
+      max-width: 100%;
+      box-sizing: border-box;
+      padding: 36px 22px;
+      gap: 24px;
+      border-radius: 24px;
+      overflow: visible;
+    }
+
+    .finale-body { max-width: none; }
+
+    .finale-cta {
+      width: 100%;
+      align-items: stretch;
+    }
+
+    .btn-finale {
+      width: 100%;
+      max-width: 100%;
+      box-sizing: border-box;
+      white-space: normal;
+      text-align: center;
+      justify-content: center;
+      padding: 16px 20px;
+      font-size: 16px;
+    }
+
+    /* Flat search */
+    .flat-search-inner { padding: 0 16px 40px; }
+    .flat-search-bar { padding: 18px 16px 20px; }
+    .flat-search-form { flex-direction: column; align-items: stretch; }
+    .flat-search-field-wrap,
+    .flat-search-field input { min-width: 0; width: 100%; }
+    .btn-zillow-find { width: 100%; }
+    .flat-agent-grid { grid-template-columns: 1fr; }
+
+    /* Footer */
+    .plan-site-footer__inner {
+      flex-direction: column;
+      align-items: flex-start;
+      gap: 12px;
+      padding: 24px 18px;
+    }
+
+    .footer-note {
+      font-size: 12px;
+      line-height: 1.5;
+      text-align: left;
+    }
+  }
+</style>
+</head>
+<body>
+<script>
+(function () {
+  try {
+    if (/\bembed=1\b/.test(location.search)) document.documentElement.classList.add("plan-embed");
+  } catch (_) {}
+})();
+</script>
+
+<!-- NAV — matches main moveazy.in toolbar; links use target="_top" for /plan iframe -->
+<nav class="plan-site-nav" aria-label="MovEazy">
+  <div class="plan-nav-inner">
+    <a href="/" target="_top" rel="noopener" class="plan-nav-logo" aria-label="MovEazy home">
+      Mov<span class="plan-nav-ea">EAZY</span>
+      <svg width="11" height="14" viewBox="0 0 24 28" aria-hidden="true">
+        <path fill="currentColor" d="M12 0C7 0 3 4 3 9c0 6.5 9 19 9 19s9-12.5 9-19c0-5-4-9-9-9zm0 12.5a3.5 3.5 0 110-7 3.5 3.5 0 010 7z"/>
+      </svg>
+    </a>
+    <input type="checkbox" id="plan-nav-cb" class="plan-nav-cb" aria-hidden="true" />
+    <label for="plan-nav-cb" class="plan-nav-burger" aria-label="Toggle menu">
+      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round">
+        <line x1="3" y1="6" x2="21" y2="6"/><line x1="3" y1="12" x2="21" y2="12"/><line x1="3" y1="18" x2="21" y2="18"/>
+      </svg>
+    </label>
+    <div class="plan-nav-links">
+      <a href="/" target="_top" rel="noopener">Home</a>
+      <a href="/services" target="_top" rel="noopener">Services</a>
+      <a href="/guarantee" target="_top" rel="noopener">Guarantee</a>
+      <a href="/plan" target="_top" rel="noopener" class="plan-nav-link-current">Flat plan</a>
+      <a href="/agents" target="_top" rel="noopener">Agents</a>
+      <a href="/map" target="_top" rel="noopener">Listings</a>
+      <a href="/activity" target="_top" rel="noopener">Saved</a>
+      <a href="/contact" target="_top" rel="noopener">Contact</a>
+      <a href="/login" target="_top" rel="noopener">Sign in</a>
+      <div class="plan-nav-ctas-mobile">
+        <a href="/plan" target="_top" rel="noopener" class="plan-nav-btn-red">Personalized match</a>
+        <a href="/map" target="_top" rel="noopener" class="plan-nav-btn-red">Explore map</a>
+        <button type="button" class="plan-nav-cta-pricing" onclick="document.getElementById('plan-nav-cb').checked=false; requestInterestModal()">Get Started</button>
+      </div>
+    </div>
+    <div class="plan-nav-ctas">
+      <a href="/plan" target="_top" rel="noopener" class="plan-nav-btn-red">Personalized match</a>
+      <a href="/map" target="_top" rel="noopener" class="plan-nav-btn-red">Explore map</a>
+      <button type="button" class="plan-nav-cta-pricing" onclick="requestInterestModal()">Get Started</button>
+    </div>
+  </div>
+</nav>
+
+<!-- HERO -->
+<section class="hero">
+  <div class="hero-left">
+    <div class="hero-chaos-label">
+      <span class="chaos-dot"></span>
+      Moving to Bangalore this May?
+    </div>
+    <h1 class="hero-headline">Finding a flat<br>is <em>absolute</em><br>chaos.</h1>
+    <h2 class="hero-sub-headline">We fix that.<br>For ₹1,499.</h2>
+    <p class="hero-body">
+      Brokers who ghost you. Listings that don't exist. Areas you've never heard of. 
+      MovEazy is your on-ground guide — we find, filter, and schedule everything so you don't have to.
+    </p>
+    <div class="hero-cta-group">
+      <button class="btn-primary" type="button" onclick="requestInterestModal()">
+        Start my flat search →
+      </button>
+      <button class="btn-ghost" onclick="document.getElementById('how').scrollIntoView({behavior:'smooth'})">
+        See how it works ↓
+      </button>
+    </div>
+  </div>
+
+  <div class="hero-right">
+    <div class="chaos-card chaos-card-main">
+      <div class="chaos-title">Without MovEazy</div>
+      <div class="chaos-item">
+        <div class="chaos-icon red">😤</div>
+        <div class="chaos-item-text">
+          <div class="chaos-item-label">Called 7 brokers</div>
+          <div class="chaos-item-sub">3 didn't pick up. 2 showed wrong area.</div>
+        </div>
+        <span class="chaos-item-status status-bad">Wasted</span>
+      </div>
+      <div class="chaos-item">
+        <div class="chaos-icon yellow">😰</div>
+        <div class="chaos-item-text">
+          <div class="chaos-item-label">Visited 4 flats</div>
+          <div class="chaos-item-sub">None matched the photos online.</div>
+        </div>
+        <span class="chaos-item-status status-warn">Exhausting</span>
+      </div>
+      <div class="chaos-item">
+        <div class="chaos-icon green">✅</div>
+        <div class="chaos-item-text">
+          <div class="chaos-item-label">With MovEazy — ₹1,499</div>
+          <div class="chaos-item-sub">Flat found. Visit done. Move in.</div>
+        </div>
+        <span class="chaos-item-status status-ok">Sorted</span>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- FLAT SEARCH — demo directory with suggestions, quick chips, working pager -->
+<section class="flat-search-section reveal" id="flat-search">
+  <div class="flat-search-inner">
+    <div class="flat-search-bar">
+      <h2 class="flat-search-title">Area experts in Bangalore</h2>
+      <p class="flat-search-sub">Search by neighbourhood or name — same pattern as professional directories (e.g. <a href="https://www.zillow.com/professionals/real-estate-agent-reviews/chicago-il/?page=3" target="_blank" rel="noopener noreferrer" style="color:var(--coral);">Zillow agent search</a>). MovEazy assigns verified on-ground guides; results below are sample cards.</p>
+      <div class="flat-search-form">
+        <div class="flat-search-field flat-search-field-wrap">
+          <label for="fs-area">Area</label>
+          <input id="fs-area" type="text" placeholder="Type a neighbourhood…" autocomplete="off" />
+          <div id="fs-suggest" class="fs-suggest" role="listbox" aria-label="Area suggestions"></div>
+        </div>
+        <div class="flat-search-field flat-search-field-wrap">
+          <label for="fs-name">Expert name</label>
+          <input id="fs-name" type="text" placeholder="Optional" autocomplete="off" />
+          <div id="fs-name-suggest" class="fs-suggest" role="listbox" aria-label="Name suggestions"></div>
+        </div>
+        <button type="button" class="btn-zillow-find" id="fs-find-btn">Find experts</button>
+      </div>
+      <div class="flat-area-chips" role="group" aria-label="Popular Bangalore areas">
+        <span class="flat-area-chips-label">Quick picks — tap an area</span>
+        <button type="button" class="flat-area-chip" data-area="HSR Layout">HSR Layout</button>
+        <button type="button" class="flat-area-chip" data-area="Koramangala">Koramangala</button>
+        <button type="button" class="flat-area-chip" data-area="Whitefield">Whitefield</button>
+        <button type="button" class="flat-area-chip" data-area="Indiranagar">Indiranagar</button>
+        <button type="button" class="flat-area-chip" data-area="Bellandur">Bellandur</button>
+        <button type="button" class="flat-area-chip" data-area="Marathahalli">Marathahalli</button>
+        <button type="button" class="flat-area-chip" data-area="Electronic City">Electronic City</button>
+        <button type="button" class="flat-area-chip" data-area="Jayanagar">Jayanagar</button>
+        <button type="button" class="flat-area-chip" data-area="Hebbal">Hebbal</button>
+      </div>
+      <p class="flat-search-disclaimer">UI inspired by public real-estate pro listings; MovEazy is not affiliated with Zillow. Live matching uses MovEazy signup &amp; assignment flow.</p>
+    </div>
+    <div class="flat-search-results" id="flat-search-results">
+      <div class="flat-search-count" id="fs-count">18 area experts found (demo)</div>
+      <div class="flat-agent-grid" id="flat-agent-grid"></div>
+      <div class="flat-search-pager" id="flat-search-pager"></div>
+    </div>
+  </div>
+</section>
+
+<!-- CHAOS SECTION -->
+<section class="chaos-section">
+  <div class="chaos-section-inner">
+    <div class="section-eyebrow eyebrow-dark reveal">The harsh reality</div>
+    <h2 class="chaos-section-headline reveal reveal-delay-1">
+      Moving to a new city is<br><em>harder than it looks.</em>
+    </h2>
+    <p class="chaos-section-sub reveal reveal-delay-2">
+      Freshers moving to Bangalore hit the same friction points again and again.
+      We've seen it — and we built MovEazy to fix the worst of it.
+    </p>
+
+    <div class="chaos-problems">
+      <div class="problem-item reveal">
+        <div class="problem-emoji">📵</div>
+        <div class="problem-title">Brokers who ghost</div>
+        <div class="problem-desc">You call, they pick up once, show you something random, then vanish. No follow-up. No accountability.</div>
+      </div>
+      <div class="problem-item reveal reveal-delay-1">
+        <div class="problem-emoji">🗺️</div>
+        <div class="problem-title">You don't know the areas</div>
+        <div class="problem-desc">Koramangala? Marathahalli? HSR? Whitefield? If you're new, these are just words. Bad advice costs months.</div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- HOW IT WORKS -->
+<section class="how-section" id="how">
+  <div class="how-header">
+    <div>
+      <div class="section-eyebrow eyebrow-light reveal" style="display:inline-flex;">How it works</div>
+      <h2 class="section-headline reveal reveal-delay-1">We do the hard part.<br><em>You just move in.</em></h2>
+    </div>
+    <p class="section-note reveal reveal-delay-2">Four simple steps. One flat. Zero broker drama.</p>
+  </div>
+
+  <div class="steps-timeline">
+    <div class="step-item reveal">
+      <div class="step-node">
+        🗺️
+        <div class="step-num-badge">1</div>
+      </div>
+      <div class="step-title">Tell us your needs</div>
+      <div class="step-desc">Budget, area preference, flat type, and move-in date.</div>
+    </div>
+    <div class="step-item reveal reveal-delay-1">
+      <div class="step-node">
+        🤝
+        <div class="step-num-badge">2</div>
+      </div>
+      <div class="step-title">Meet your area agent</div>
+      <div class="step-desc">We assign you a verified local agent who knows that exact area.</div>
+    </div>
+    <div class="step-item reveal reveal-delay-2">
+      <div class="step-node">
+        🏠
+        <div class="step-num-badge">3</div>
+      </div>
+      <div class="step-title">Get handpicked options</div>
+      <div class="step-desc">3–5 verified flats that match your budget — no fake listings.</div>
+    </div>
+    <div class="step-item reveal reveal-delay-3">
+      <div class="step-node">
+        📅
+        <div class="step-num-badge">4</div>
+      </div>
+      <div class="step-title">Visits booked, flat locked</div>
+      <div class="step-desc">We schedule visits and help you close without broker drama.</div>
+    </div>
+  </div>
+</section>
+
+<!-- WHAT'S INCLUDED -->
+<section class="included-section" id="pricing">
+  <div class="included-inner">
+    <div class="section-eyebrow eyebrow-light reveal" style="display:inline-flex;">The plan</div>
+    <h2 class="section-headline reveal reveal-delay-1">Everything you get<br><em>for ₹1,499.</em></h2>
+
+    <div class="included-grid">
+      <div class="included-list">
+        <div class="included-item reveal">
+          <div class="included-check">✓</div>
+          <div class="included-text">
+            <div class="included-title">City orientation call</div>
+            <div class="included-desc">A 30-min call where we understand your lifestyle, office location, and must-haves — and guide you on the best areas to target in Bangalore.</div>
+          </div>
+        </div>
+        <div class="included-item reveal reveal-delay-1">
+          <div class="included-check">✓</div>
+          <div class="included-text">
+            <div class="included-title">Dedicated local area agent</div>
+            <div class="included-desc">A verified on-ground expert assigned specifically to your preferred area. Not a call centre — a real person who knows your neighbourhood.</div>
+          </div>
+        </div>
+        <div class="included-item reveal reveal-delay-2">
+          <div class="included-check">✓</div>
+          <div class="included-text">
+            <div class="included-title">Handpicked property shortlist</div>
+            <div class="included-desc">3–5 verified, real options that match your budget and needs. No fake listings. No bait-and-switch. What you see is what you visit.</div>
+          </div>
+        </div>
+        <div class="included-item reveal reveal-delay-3">
+          <div class="included-check">✓</div>
+          <div class="included-text">
+            <div class="included-title">Scheduled property visits</div>
+            <div class="included-desc">We coordinate with landlords and your agent to set up visits at your convenience. You don't make a single cold call.</div>
+          </div>
+        </div>
+        <div class="included-item reveal reveal-delay-4">
+          <div class="included-check">✓</div>
+          <div class="included-text">
+            <div class="included-title">Move-in guidance & support</div>
+            <div class="included-desc">Once you pick a flat, we help you understand the lease, deposit terms, and what to watch out for before signing anything.</div>
+          </div>
+        </div>
+        <div class="included-item reveal" style="border: 1.5px solid #FBCFC8; background: #FFF8F7; border-radius: 14px;">
+          <div class="included-check" style="background: var(--coral); color: #fff;">💬</div>
+          <div class="included-text">
+            <div class="included-title" style="color: var(--coral);">Direct chat with your area expert</div>
+            <div class="included-desc">Get connected directly with your assigned area expert on WhatsApp. Ask anything — locality safety, commute time, nearby amenities, typical rent ranges. Real answers from someone who lives and works there.</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- PRICING CARD -->
+      <div class="pricing-sticky reveal reveal-delay-2">
+        <div class="pricing-card">
+          <div class="pricing-plan-name">MovEazy Flat Search</div>
+          <div class="pricing-amount">
+            <span class="pricing-currency">₹</span>
+            <span class="pricing-number">1,499</span>
+          </div>
+          <div class="pricing-context">
+            One-time fee. No commission. No hidden charges.<br>
+            <strong>This Amount will be Adjusted in 1-Month Brokerage.</strong>
+          </div>
+
+          <div class="pricing-divider"></div>
+
+          <div class="pricing-features">
+            <div class="pricing-feature"><div class="feat-dot">✓</div>City orientation call</div>
+            <div class="pricing-feature"><div class="feat-dot">✓</div>Dedicated local agent</div>
+            <div class="pricing-feature"><div class="feat-dot">✓</div>3–5 verified shortlisted options</div>
+            <div class="pricing-feature"><div class="feat-dot">✓</div>All visits scheduled for you</div>
+            <div class="pricing-feature"><div class="feat-dot">✓</div>Lease & deposit guidance</div>
+            <div class="pricing-feature" style="background: rgba(232,90,79,0.08); border-radius: 8px; padding: 8px 10px; margin-top: 4px;">
+              <div class="feat-dot" style="background: var(--coral); color: #fff;">✓</div>
+              <span style="color: #fff; font-weight: 500;">Direct contact with area expert</span>
+            </div>
+          </div>
+
+          <button type="button" class="btn-cta-full" onclick="requestInterestModal()" style="width:100%;cursor:pointer;border:none;">
+            Start My Flat Search →
+          </button>
+          <div class="pricing-fine">Our team will contact you shortly</div>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- TESTIMONIALS -->
+<section class="trust-section">
+  <div class="section-eyebrow eyebrow-light reveal" style="display:inline-flex;">What movers say</div>
+  <h2 class="section-headline reveal reveal-delay-1" style="margin-top:12px;">Real freshers.<br><em>Real flats found.</em></h2>
+
+  <div class="trust-grid">
+    <div class="trust-card reveal">
+      <div class="trust-stars">★★★★★</div>
+      <p class="trust-quote">"I was panicking about finding a place before my job started. MovEazy gave me an agent the same day. Within 4 days I had visited 3 places and locked a flat in Koramangala. I couldn't have done this alone."</p>
+      <div class="trust-author">
+        <div class="trust-avatar" style="background:var(--coral);">A</div>
+        <div>
+          <div class="trust-name">Arjun S.</div>
+          <div class="trust-meta">SRM Chennai → Koramangala, Bangalore</div>
+        </div>
+      </div>
+    </div>
+    <div class="trust-card reveal reveal-delay-1">
+      <div class="trust-stars">★★★★★</div>
+      <p class="trust-quote">"Literally every broker I called before this tried to charge me a full month's commission. MovEazy charged ₹1,499 and my agent found me a better place. Don't even bother with brokers."</p>
+      <div class="trust-author">
+        <div class="trust-avatar" style="background:#2EC4B6;">R</div>
+        <div>
+          <div class="trust-name">Riya M.</div>
+          <div class="trust-meta">VIT Vellore → HSR Layout, Bangalore</div>
+        </div>
+      </div>
+    </div>
+    <div class="trust-card reveal reveal-delay-2">
+      <div class="trust-stars">★★★★★</div>
+      <p class="trust-quote">"I didn't know anything about Bangalore areas. My agent explained each neighbourhood and why it suited my budget. Ended up in Marathahalli — close to my office, great flat, no drama."</p>
+      <div class="trust-author">
+        <div class="trust-avatar" style="background:#F4A261;">K</div>
+        <div>
+          <div class="trust-name">Karthik V.</div>
+          <div class="trust-meta">NIT Trichy → Marathahalli, Bangalore</div>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- FINALE CTA -->
+<section class="finale-section">
+  <div class="finale-inner">
+    <div>
+      <div class="finale-eyebrow">You're moving in May. Let's get this done.</div>
+      <h2 class="finale-headline">Stop stressing.<br>Start <em>settling in.</em></h2>
+      <p class="finale-body">Thousands of freshers move to Bangalore every May. The ones who find good flats fast? They didn't do it alone. Let MovEazy be your unfair advantage.</p>
+    </div>
+    <div class="finale-cta">
+      <button type="button" class="btn-finale" onclick="requestInterestModal()" style="border:none;cursor:pointer;">
+        Start My Flat Search →
+      </button>
+    </div>
+  </div>
+</section>
+
+<footer class="plan-site-footer" aria-label="Site footer">
+  <div class="plan-site-footer__inner">
+    <a href="/" target="_top" rel="noopener" class="footer-logo">
+      Mov<span class="plan-nav-ea">EAZY</span>
+      <svg width="11" height="14" viewBox="0 0 24 28" aria-hidden="true" class="plan-nav-ea">
+        <path fill="currentColor" d="M12 0C7 0 3 4 3 9c0 6.5 9 19 9 19s9-12.5 9-19c0-5-4-9-9-9zm0 12.5a3.5 3.5 0 110-7 3.5 3.5 0 010 7z"/>
+      </svg>
+    </a>
+    <div class="footer-note">© 2026 MovEazy · Bengaluru, India · moveazy.in</div>
+  </div>
+</footer>
+
+<!-- Interest capture modal -->
+<div id="interest-modal" style="display:none;position:fixed;inset:0;z-index:9999;background:rgba(0,0,0,0.65);backdrop-filter:blur(6px);-webkit-backdrop-filter:blur(6px);align-items:center;justify-content:center;padding:20px;">
+  <div style="background:#fff;border-radius:24px;padding:44px 40px;max-width:560px;width:100%;position:relative;box-shadow:0 32px 100px rgba(0,0,0,0.35);">
+    <button onclick="closeInterestModal()" style="position:absolute;top:18px;right:20px;background:#f3f4f6;border:none;cursor:pointer;width:32px;height:32px;border-radius:50%;display:flex;align-items:center;justify-content:center;">
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#6b7280" stroke-width="2.5" stroke-linecap="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+    </button>
+    <div id="interest-form-view">
+      <p style="font-size:11px;font-weight:700;letter-spacing:0.14em;text-transform:uppercase;color:#ff3131;margin-bottom:8px;">Get Started</p>
+      <h2 style="font-size:28px;font-weight:800;color:#111827;margin-bottom:6px;line-height:1.2;">Find your flat in Bengaluru</h2>
+      <p style="font-size:14px;color:#6b7280;margin-bottom:28px;line-height:1.6;">Share your details and our team will reach out within a few hours to help you find the perfect flat.</p>
+      <form id="interest-form" onsubmit="submitInterest(event)" style="display:flex;flex-direction:column;gap:16px;">
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;">
+          <div>
+            <label style="display:block;font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:0.08em;color:#6b7280;margin-bottom:6px;">Full Name *</label>
+            <input id="i-name" type="text" required placeholder="Your name" style="width:100%;padding:12px 16px;border-radius:12px;border:1.5px solid #e5e7eb;font-size:14px;font-weight:500;color:#111827;outline:none;transition:border-color 0.15s;" onfocus="this.style.borderColor='#ff3131'" onblur="this.style.borderColor='#e5e7eb'" />
+          </div>
+          <div>
+            <label style="display:block;font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:0.08em;color:#6b7280;margin-bottom:6px;">Phone Number *</label>
+            <input id="i-phone" type="tel" required placeholder="+91 98765 43210" style="width:100%;padding:12px 16px;border-radius:12px;border:1.5px solid #e5e7eb;font-size:14px;font-weight:500;color:#111827;outline:none;transition:border-color 0.15s;" onfocus="this.style.borderColor='#ff3131'" onblur="this.style.borderColor='#e5e7eb'" />
+          </div>
+        </div>
+        <div>
+          <label style="display:block;font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:0.08em;color:#6b7280;margin-bottom:6px;">Email</label>
+          <input id="i-email" type="email" placeholder="you@email.com" style="width:100%;padding:12px 16px;border-radius:12px;border:1.5px solid #e5e7eb;font-size:14px;font-weight:500;color:#111827;outline:none;transition:border-color 0.15s;" onfocus="this.style.borderColor='#ff3131'" onblur="this.style.borderColor='#e5e7eb'" />
+        </div>
+        <div>
+          <label style="display:block;font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:0.08em;color:#6b7280;margin-bottom:6px;">Preferred Area in Bengaluru</label>
+          <input id="i-area" type="text" placeholder="e.g. Koramangala, HSR Layout, Whitefield" style="width:100%;padding:12px 16px;border-radius:12px;border:1.5px solid #e5e7eb;font-size:14px;font-weight:500;color:#111827;outline:none;transition:border-color 0.15s;" onfocus="this.style.borderColor='#ff3131'" onblur="this.style.borderColor='#e5e7eb'" />
+        </div>
+        <div id="interest-err" style="display:none;font-size:12px;font-weight:600;color:#ef4444;padding:10px 14px;background:#fef2f2;border-radius:8px;"></div>
+        <button type="submit" id="interest-submit-btn" style="width:100%;padding:15px;border-radius:14px;background:linear-gradient(135deg,#ff3131,#ef4444);color:#fff;font-size:16px;font-weight:700;border:none;cursor:pointer;transition:opacity 0.15s;margin-top:4px;">
+          Submit — Our team will contact you shortly
+        </button>
+      </form>
+    </div>
+    <div id="interest-success-view" style="display:none;text-align:center;padding:32px 0;">
+      <div style="width:64px;height:64px;background:#f0fdf4;border-radius:50%;display:flex;align-items:center;justify-content:center;margin:0 auto 20px;">
+        <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="#22c55e" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>
+      </div>
+      <h3 style="font-size:24px;font-weight:800;color:#111827;margin-bottom:10px;">We've got your details!</h3>
+      <p style="font-size:15px;color:#6b7280;line-height:1.7;max-width:340px;margin:0 auto;">Our team will contact you shortly to help you find your perfect flat in Bengaluru.</p>
+      <button onclick="closeInterestModal()" style="margin-top:24px;padding:12px 32px;border-radius:12px;background:#111827;color:#fff;font-size:15px;font-weight:700;border:none;cursor:pointer;">Done</button>
+    </div>
+  </div>
+</div>
+
+<script type="module">
+  import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
+  import { getFirestore, collection, addDoc, serverTimestamp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
+
+  const app = initializeApp({
+    apiKey: "AIzaSyBtzwo_M8pUFsd02CP8iOg7oF1mrcTXODo",
+    authDomain: "moveasy-30eed.firebaseapp.com",
+    projectId: "moveasy-30eed",
+    storageBucket: "moveasy-30eed.firebasestorage.app",
+    messagingSenderId: "768343036531",
+    appId: "1:768343036531:web:acb30e3a68e57d5b391006",
+  });
+  const db = getFirestore(app);
+
+  window.submitInterest = async function(e) {
+    e.preventDefault();
+    const btn = document.getElementById('interest-submit-btn');
+    const err = document.getElementById('interest-err');
+    const name = document.getElementById('i-name').value.trim();
+    const phone = document.getElementById('i-phone').value.trim();
+    const email = document.getElementById('i-email').value.trim();
+    const area = document.getElementById('i-area').value.trim();
+    err.style.display = 'none';
+    if (!name || !phone) { err.textContent = 'Name and phone are required.'; err.style.display = 'block'; return; }
+    btn.disabled = true;
+    btn.textContent = 'Saving…';
+    try {
+      await addDoc(collection(db, 'planSubInterest'), {
+        name, phone, email, area,
+        source: 'plan-page',
+        status: 'pending',
+        createdAt: serverTimestamp(),
+      });
+      document.getElementById('interest-form-view').style.display = 'none';
+      document.getElementById('interest-success-view').style.display = 'block';
+    } catch(ex) {
+      err.textContent = 'Something went wrong. Please try again.';
+      err.style.display = 'block';
+      btn.disabled = false;
+      btn.textContent = 'Submit — Our team will contact you shortly';
+    }
+  };
+</script>
+
+<script>
+  function requestInterestModal() {
+    try { window.parent.postMessage({ type: 'moveazy-modal-open' }, '*'); } catch(_) {}
+  }
+</script>
+
+<script>
+  // Scroll reveal
+  const reveals = document.querySelectorAll('.reveal');
+  const observer = new IntersectionObserver((entries) => {
+    entries.forEach(entry => {
+      if (entry.isIntersecting) {
+        entry.target.classList.add('visible');
+      }
+    });
+  }, { threshold: 0.12 });
+
+  reveals.forEach(el => observer.observe(el));
+
+  // Close mobile nav when a link is used
+  (function () {
+    const cb = document.getElementById('plan-nav-cb');
+    if (!cb) return;
+    document.querySelectorAll('.plan-nav-links a[href]').forEach((a) => {
+      a.addEventListener('click', () => { cb.checked = false; });
+    });
+  })();
+
+  /** Flat search: neighbourhood suggestions, quick chips, paginated demo results */
+  (function () {
+    var PAGE_SIZE = 6;
+    var NBH = [
+      'HSR Layout', 'Koramangala', 'Indiranagar', 'Whitefield', 'Marathahalli', 'Bellandur',
+      'Electronic City', 'Sarjapur Road', 'Jayanagar', 'JP Nagar', 'MG Road', 'Ulsoor',
+      'Hebbal', 'Manyata', 'Yelahanka', 'RT Nagar', 'Domlur', 'Banashankari', 'Brookefield',
+      'KR Puram', 'Bannerghatta Road', 'Cunningham Road', 'Hennur', 'Thanisandra', 'Kalyan Nagar',
+      'Btm Layout', 'Basavanagudi', 'Richmond Town', 'Frazer Town', 'Mahadevapura'
+    ];
+    var EXPERTS = [
+      { l: 'R', n: 'Rajan Kumar', r: 5.0, c: 48, a: 'MovEazy · HSR & Koramangala', s: '₹12k–₹45k focus · 24 visits last 90 days', k: 'hsr layout koramangala' },
+      { l: 'P', n: 'Priya Nair', r: 5.0, c: 36, a: 'MovEazy · Bellandur & Marathahalli', s: '₹15k–₹50k focus · 31 visits last 90 days', k: 'bellandur marathahalli' },
+      { l: 'A', n: 'Arun Dev', r: 4.9, c: 22, a: 'MovEazy · Whitefield', s: '₹18k–₹60k focus · 18 visits last 90 days', k: 'whitefield' },
+      { l: 'S', n: 'Sneha Rao', r: 5.0, c: 41, a: 'MovEazy · Indiranagar', s: '₹20k–₹55k focus · 27 visits last 90 days', k: 'indiranagar' },
+      { l: 'K', n: 'Karthik Iyer', r: 4.9, c: 19, a: 'MovEazy · Jayanagar', s: '₹10k–₹35k focus · 14 visits last 90 days', k: 'jayanagar' },
+      { l: 'M', n: 'Meera Shah', r: 5.0, c: 52, a: 'MovEazy · Hebbal & Manyata', s: '₹14k–₹48k focus · 33 visits last 90 days', k: 'hebbal manyata' },
+      { l: 'V', n: 'Vikram Srinivas', r: 5.0, c: 29, a: 'MovEazy · Electronic City', s: '₹16k–₹42k focus · 21 visits last 90 days', k: 'electronic city' },
+      { l: 'D', n: 'Deepa Menon', r: 4.9, c: 33, a: 'MovEazy · Sarjapur Road', s: '₹14k–₹48k focus · 26 visits last 90 days', k: 'sarjapur road sarjapur' },
+      { l: 'N', n: 'Nikhil Reddy', r: 5.0, c: 27, a: 'MovEazy · JP Nagar', s: '₹11k–₹38k focus · 19 visits last 90 days', k: 'jp nagar' },
+      { l: 'U', n: 'Ananya Krishnan', r: 4.8, c: 18, a: 'MovEazy · MG Road & Ulsoor', s: '₹22k–₹58k focus · 16 visits last 90 days', k: 'mg road ulsoor' },
+      { l: 'B', n: 'Rohit Patil', r: 4.9, c: 24, a: 'MovEazy · Banashankari', s: '₹9k–₹32k focus · 22 visits last 90 days', k: 'banashankari' },
+      { l: 'L', n: 'Lakshmi Thota', r: 5.0, c: 31, a: 'MovEazy · Yelahanka', s: '₹13k–₹40k focus · 20 visits last 90 days', k: 'yelahanka' },
+      { l: 'S', n: 'Suresh Nambiar', r: 4.9, c: 21, a: 'MovEazy · KR Puram', s: '₹12k–₹36k focus · 17 visits last 90 days', k: 'kr puram' },
+      { l: 'K', n: 'Kavitha Loganathan', r: 5.0, c: 38, a: 'MovEazy · Bannerghatta Road', s: '₹15k–₹44k focus · 29 visits last 90 days', k: 'bannerghatta road bannerghatta' },
+      { l: 'G', n: 'Manoj George', r: 4.8, c: 16, a: 'MovEazy · Cunningham Road', s: '₹25k–₹62k focus · 12 visits last 90 days', k: 'cunningham road' },
+      { l: 'P', n: 'Pooja Varma', r: 5.0, c: 44, a: 'MovEazy · Brookefield', s: '₹17k–₹50k focus · 25 visits last 90 days', k: 'brookefield' },
+      { l: 'A', n: 'Aditya Walia', r: 4.9, c: 20, a: 'MovEazy · RT Nagar', s: '₹10k–₹34k focus · 15 visits last 90 days', k: 'rt nagar' },
+      { l: 'H', n: 'Sanjay Hegde', r: 5.0, c: 35, a: 'MovEazy · Domlur', s: '₹18k–₹52k focus · 23 visits last 90 days', k: 'domlur' }
+    ];
+
+    var areaEl = document.getElementById('fs-area');
+    var nameEl = document.getElementById('fs-name');
+    var suggestEl = document.getElementById('fs-suggest');
+    var nameSuggestEl = document.getElementById('fs-name-suggest');
+    var gridEl = document.getElementById('flat-agent-grid');
+    var countEl = document.getElementById('fs-count');
+    var pagerEl = document.getElementById('flat-search-pager');
+    var findBtn = document.getElementById('fs-find-btn');
+    if (!areaEl || !nameEl || !gridEl || !pagerEl || !countEl || !findBtn) return;
+
+    var filtered = EXPERTS.slice();
+    var currentPage = 1;
+
+    function closeSuggest() {
+      suggestEl.classList.remove('is-open');
+      suggestEl.innerHTML = '';
+      nameSuggestEl.classList.remove('is-open');
+      nameSuggestEl.innerHTML = '';
+    }
+
+    function pickNeighborhood(val) {
+      areaEl.value = val;
+      closeSuggest();
+      syncChipsActive();
+      applyFilter(true);
+    }
+
+    function updateAreaSuggest() {
+      var v = (areaEl.value || '').trim().toLowerCase();
+      if (v.length < 1) {
+        suggestEl.classList.remove('is-open');
+        suggestEl.innerHTML = '';
+        return;
+      }
+      var hits = NBH.filter(function (n) { return n.toLowerCase().indexOf(v) !== -1; }).slice(0, 10);
+      if (!hits.length) {
+        suggestEl.classList.remove('is-open');
+        suggestEl.innerHTML = '';
+        return;
+      }
+      suggestEl.innerHTML = hits
+        .map(function (n) {
+          return '<button type="button" role="option">' + n.replace(/</g, '&lt;') + '</button>';
+        })
+        .join('');
+      suggestEl.querySelectorAll('button').forEach(function (btn) {
+        btn.addEventListener('mousedown', function (e) {
+          e.preventDefault();
+          pickNeighborhood(btn.textContent);
+        });
+      });
+      suggestEl.classList.add('is-open');
+    }
+
+    function updateNameSuggest() {
+      var v = (nameEl.value || '').trim().toLowerCase();
+      if (v.length < 1) {
+        nameSuggestEl.classList.remove('is-open');
+        nameSuggestEl.innerHTML = '';
+        return;
+      }
+      var hits = EXPERTS.filter(function (e) { return e.n.toLowerCase().indexOf(v) !== -1; })
+        .map(function (e) { return e.n; })
+        .filter(function (n, i, arr) { return arr.indexOf(n) === i; })
+        .slice(0, 8);
+      if (!hits.length) {
+        nameSuggestEl.classList.remove('is-open');
+        nameSuggestEl.innerHTML = '';
+        return;
+      }
+      nameSuggestEl.innerHTML = hits
+        .map(function (n) {
+          return '<button type="button" role="option">' + n.replace(/</g, '&lt;') + '</button>';
+        })
+        .join('');
+      nameSuggestEl.querySelectorAll('button').forEach(function (btn) {
+        btn.addEventListener('mousedown', function (e) {
+          e.preventDefault();
+          nameEl.value = btn.textContent;
+          closeSuggest();
+          applyFilter(true);
+        });
+      });
+      nameSuggestEl.classList.add('is-open');
+    }
+
+    function areaMatches(e, q) {
+      if (!q) return true;
+      var hay = (e.k + ' ' + e.a.toLowerCase()).replace(/\s+/g, ' ');
+      if (hay.indexOf(q) !== -1) return true;
+      var parts = q.split(/\s+/).filter(Boolean);
+      return parts.every(function (p) { return hay.indexOf(p) !== -1; });
+    }
+
+    function applyFilter(scrollToResults) {
+      var q = (areaEl.value || '').trim().toLowerCase();
+      var n = (nameEl.value || '').trim().toLowerCase();
+      filtered = EXPERTS.filter(function (e) {
+        var okA = areaMatches(e, q);
+        var okN = !n || e.n.toLowerCase().indexOf(n) !== -1;
+        return okA && okN;
+      });
+      currentPage = 1;
+      render();
+      if (scrollToResults) {
+        document.getElementById('flat-search-results').scrollIntoView({ behavior: 'smooth' });
+      }
+    }
+
+    function cardHtml(e) {
+      return (
+        '<article class="flat-agent-card"><div class="flat-agent-photo">' +
+        e.l +
+        '</div><div class="flat-agent-meta"><div class="flat-agent-rating">' +
+        e.r.toFixed(1) +
+        ' ★ (' +
+        e.c +
+        ')</div><div class="flat-agent-name">' +
+        e.n.replace(/</g, '&lt;') +
+        '</div><div class="flat-agent-brokerage">' +
+        e.a.replace(/</g, '&lt;') +
+        '</div><div class="flat-agent-stats">' +
+        e.s.replace(/</g, '&lt;') +
+        '</div></div></article>'
+      );
+    }
+
+    function render() {
+      var total = filtered.length;
+      countEl.textContent = total + ' area experts found (demo)';
+      var totalPages = Math.max(1, Math.ceil(total / PAGE_SIZE));
+      if (currentPage > totalPages) currentPage = totalPages;
+      var start = (currentPage - 1) * PAGE_SIZE;
+      var slice = filtered.slice(start, start + PAGE_SIZE);
+      if (!slice.length) {
+        gridEl.innerHTML = '<p class="fs-empty">No sample matches — try another area, pick a quick chip, or clear filters.</p>';
+      } else {
+        gridEl.innerHTML = slice.map(cardHtml).join('');
+      }
+      pagerEl.innerHTML = '';
+      for (var i = 1; i <= totalPages; i++) {
+        (function (pageNum) {
+          var btn = document.createElement('button');
+          btn.type = 'button';
+          btn.textContent = String(pageNum);
+          if (pageNum === currentPage) btn.className = 'current';
+          btn.addEventListener('click', function () {
+            currentPage = pageNum;
+            render();
+            document.getElementById('flat-search-results').scrollIntoView({ behavior: 'smooth' });
+          });
+          pagerEl.appendChild(btn);
+        })(i);
+      }
+      var meta = document.createElement('span');
+      meta.className = 'fs-pager-meta';
+      meta.textContent = 'Page ' + currentPage + ' of ' + totalPages;
+      pagerEl.appendChild(meta);
+    }
+
+    function syncChipsActive() {
+      var v = (areaEl.value || '').trim().toLowerCase();
+      document.querySelectorAll('.flat-area-chip').forEach(function (chip) {
+        var a = (chip.getAttribute('data-area') || '').toLowerCase();
+        chip.classList.toggle('is-active', v === a);
+      });
+    }
+
+    areaEl.addEventListener('input', function () {
+      updateAreaSuggest();
+      syncChipsActive();
+    });
+    areaEl.addEventListener('focus', function () {
+      updateAreaSuggest();
+    });
+    nameEl.addEventListener('input', updateNameSuggest);
+    nameEl.addEventListener('focus', updateNameSuggest);
+
+    document.addEventListener('click', function (e) {
+      if (!e.target.closest('.flat-search-field-wrap')) closeSuggest();
+    });
+
+    findBtn.addEventListener('click', function () {
+      closeSuggest();
+      applyFilter(true);
+    });
+
+    document.querySelectorAll('.flat-area-chip').forEach(function (chip) {
+      chip.addEventListener('click', function () {
+        var a = chip.getAttribute('data-area') || chip.textContent;
+        areaEl.value = a;
+        closeSuggest();
+        syncChipsActive();
+        applyFilter(true);
+      });
+    });
+
+    applyFilter(false);
+  })();
+
+  /* Tell parent React /plan iframe how tall we are (embed=1 only) */
+  (function () {
+    if (!/\bembed=1\b/.test(location.search)) return;
+
+    function reportHeight() {
+      var anchor =
+        document.querySelector(".finale-section") ||
+        document.querySelector("footer.plan-site-footer") ||
+        document.body;
+      var rect = anchor.getBoundingClientRect();
+      var h = Math.ceil(rect.bottom + (window.scrollY || 0) + 8);
+      if (!h || h < 400) {
+        h = Math.max(
+          document.documentElement.scrollHeight,
+          document.body ? document.body.scrollHeight : 0
+        );
+      }
+      try {
+        window.parent.postMessage({ type: "moveazy-plan-iframe-height", height: h }, "*");
+      } catch (_) {}
+    }
+
+    function schedule() {
+      requestAnimationFrame(reportHeight);
+    }
+
+    if (document.readyState === "loading") {
+      document.addEventListener("DOMContentLoaded", schedule);
+    } else {
+      schedule();
+    }
+    window.addEventListener("load", schedule);
+    window.addEventListener("resize", schedule);
+
+    if (typeof ResizeObserver !== "undefined") {
+      try {
+        new ResizeObserver(schedule).observe(document.documentElement);
+      } catch (_) {}
+    }
+
+    [100, 400, 1000, 2500].forEach(function (ms) {
+      setTimeout(schedule, ms);
+    });
+
+    window.addEventListener("message", function (event) {
+      if (event.data && event.data.type === "moveazy-plan-request-height") schedule();
+    });
+
+    document.querySelectorAll(".reveal").forEach(function (el) {
+      if (typeof MutationObserver === "undefined") return;
+      var mo = new MutationObserver(schedule);
+      mo.observe(el, { attributes: true, attributeFilter: ["class"] });
+    });
+  })();
+</script>
+</body>
+</html>

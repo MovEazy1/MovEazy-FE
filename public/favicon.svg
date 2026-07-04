@@ -1,0 +1,11 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" role="img" aria-label="Moveazy icon">
+  <defs>
+    <linearGradient id="pinGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#ff4d4f" />
+      <stop offset="100%" stop-color="#ef4444" />
+    </linearGradient>
+  </defs>
+  <path d="M32 4c-11.6 0-21 9.4-21 21 0 15.1 16.4 30.8 20 34.1.6.6 1.5.6 2.1 0 3.6-3.3 20-19 20-34.1 0-11.6-9.4-21-21-21z" fill="url(#pinGrad)"/>
+  <path d="M21.5 22.5 32 14l10.5 8.5v11h-6.2v-7h-8.6v7h-6.2z" fill="#fff"/>
+  <circle cx="32" cy="53.5" r="4.3" fill="#fff"/>
+</svg>
