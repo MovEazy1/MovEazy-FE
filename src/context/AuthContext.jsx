@@ -14,7 +14,7 @@ import {
 } from "../lib/profileService";
 import { saveCustomerSearchProfile } from "../lib/customerSearchProfile";
 import { isEmailAdminAllowed, getEnvAdminEmails } from "../lib/adminAccess";
-import { supabase, isSupabaseConfigured, normalizeSupabaseError } from "../lib/supabase";
+import { supabase, isSupabaseConfigured, normalizeSupabaseError, getSupabaseAuthSettings } from "../lib/supabase";
 
 const AuthContext = createContext(null);
 const ADMIN_EMAILS = getEnvAdminEmails();
@@ -246,6 +246,15 @@ export function AuthProvider({ children }) {
       return { success: false, error: "Google sign-in requires Supabase configuration." };
     }
     try {
+      // Check the provider is actually enabled before redirecting, so a disabled
+      // provider surfaces a clean in-app message instead of a raw Supabase error page.
+      const settings = await getSupabaseAuthSettings();
+      if (settings?.external && settings.external.google !== true) {
+        return {
+          success: false,
+          error: "Google sign-in isn't enabled on this project yet. Enable it in Supabase → Authentication → Providers → Google (needs a Google OAuth Client ID & Secret).",
+        };
+      }
       const { error } = await supabase.auth.signInWithOAuth({
         provider: "google",
         options: { redirectTo: window.location.origin + window.location.pathname + window.location.search },

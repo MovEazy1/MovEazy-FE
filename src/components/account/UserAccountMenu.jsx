@@ -5,10 +5,40 @@ const INK = "#1A2421";
 const PAPER = "#F7F4ED";
 const LINE = "#D9D3C4";
 
-/** Simple link to profile — no dropdown. Sign out lives on /profile. */
-export default function ProfileNavLink({ user, to = "/profile" }) {
+/** Simple link to profile — no dropdown. Sign out lives on /profile.
+ * @param {boolean} compact — render just the circular avatar, no name label (for tight nav bars). */
+export default function ProfileNavLink({ user, to = "/profile", compact = false }) {
   const initials = getUserInitials(user);
   const firstName = getUserFirstName(user);
+
+  const avatar = (
+    <div
+      style={{
+        width: compact ? 34 : 26,
+        height: compact ? 34 : 26,
+        borderRadius: "50%",
+        background: INK,
+        color: PAPER,
+        display: "flex",
+        alignItems: "center",
+        justifyContent: "center",
+        fontFamily: "JetBrains Mono, monospace",
+        fontSize: compact ? 12 : 10,
+        fontWeight: 700,
+        flexShrink: 0,
+      }}
+    >
+      {initials}
+    </div>
+  );
+
+  if (compact) {
+    return (
+      <Link to={to} aria-label={firstName ? `${firstName}'s profile` : "Your profile"} style={{ display: "inline-flex", textDecoration: "none" }}>
+        {avatar}
+      </Link>
+    );
+  }
 
   return (
     <Link
@@ -27,24 +57,7 @@ export default function ProfileNavLink({ user, to = "/profile" }) {
         textDecoration: "none",
       }}
     >
-      <div
-        style={{
-          width: 26,
-          height: 26,
-          borderRadius: "50%",
-          background: INK,
-          color: PAPER,
-          display: "flex",
-          alignItems: "center",
-          justifyContent: "center",
-          fontFamily: "JetBrains Mono, monospace",
-          fontSize: 10,
-          fontWeight: 700,
-          flexShrink: 0,
-        }}
-      >
-        {initials}
-      </div>
+      {avatar}
       {firstName}
     </Link>
   );

@@ -1,15 +1,18 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { MapContainer, TileLayer, Marker, Popup, useMap, Circle, Polyline } from "react-leaflet";
 import { useLocation, useNavigate } from "react-router-dom";
+import { AnimatePresence, motion } from "framer-motion";
 import L from "leaflet";
 import "leaflet/dist/leaflet.css";
 import { applyListingFilters, FILTER_OPTIONS, getFiltersInitialState, getListings } from "../lib/store";
 import { useAuth } from "../context/AuthContext";
+import { useLoginModal } from "../context/LoginModalContext";
 import { isFirebaseConfigured } from "../lib/firebase";
 import { getListingsData, isListingPubliclyVisible } from "../lib/firestoreStore";
 import { geocodePlace } from "../lib/geocode";
 import { haversineKm } from "../lib/geo";
 import PropertyModal from "./PropertyModal";
+import AIBroker from "./AIBroker";
 import { AREA_NAMES_SORTED } from "../data/listingsData";
 import { BANGALORE_WORKPLACES, EMPLOYER_SEARCH_CHIPS, matchWorkplacePreset } from "../data/bangaloreWorkplaces";
 import {
@@ -20,7 +23,7 @@ import {
 } from "../lib/userActivity";
 import { logSavedListingChange } from "../lib/crmSync";
 import { reportClientWarn } from "../lib/clientLog";
-import MovEAZYLogo from "./branding/MovEAZYLogo";
+import SiteHeader from "./layout/SiteHeader";
 
 const MAP_NEARBY_KM = 12;
 /** Default max distance (km) from workplace / geocoded pin; user-adjustable in search panel. */
@@ -69,7 +72,7 @@ L.Icon.Default.mergeOptions({
 const bhkColors = {
   "1 RK": "#10b981",
   "1 BHK": "#2563eb",
-  "2 BHK": "#ff3131",
+  "2 BHK": "#EF5A45",
   "2.5 BHK": "#f97316",
   "3 BHK": "#9333ea",
   "3+ BHK": "#0d9488",
@@ -87,6 +90,21 @@ const AREA_ANCHORS = {
   "Sarjapur Road": { lat: 12.8996, lng: 77.6815 },
   "Mahadevpura": { lat: 12.9516, lng: 77.68 },
 };
+
+/** Top-bar "Flat type" quick filter — a curated subset of FILTER_OPTIONS.bhkTypes, all checked by default. */
+const QUICK_FLAT_TYPES = [
+  { value: "1 BHK", label: "1 BHK" },
+  { value: "2 BHK", label: "2 BHK" },
+  { value: "3 BHK", label: "3 BHK" },
+  { value: "Roommate needed", label: "Room in Preoccupied flat (cost effective)" },
+];
+
+/** Top-bar "Budget" quick filter presets — mirrors DEFAULT_FILTERS' 10k–100k rent range. */
+const BUDGET_STEPS = [10000, 15000, 20000, 25000, 30000, 40000, 50000, 60000, 75000, 90000, 100000];
+
+function formatBudget(v) {
+  return v >= 100000 ? "₹1L+" : `₹${Math.round(v / 1000)}k`;
+}
 
 function makeBhkIcon(bhk) {
   const c = bhkColors[bhk] || "#6b7280";
@@ -177,7 +195,7 @@ function InvalidateMapSize({ layoutRevision }) {
   return null;
 }
 
-function ToggleOption({ label, active, onClick, activeColor = "#dc2626" }) {
+function ToggleOption({ label, active, onClick, activeColor = "#EF5A45" }) {
   // Convert hex color to an RGBA with low opacity for the background
   const getLightBg = (hex) => {
     if (hex.startsWith("#") && hex.length === 7) {
@@ -186,7 +204,7 @@ function ToggleOption({ label, active, onClick, activeColor = "#dc2626" }) {
       const b = parseInt(hex.slice(5, 7), 16);
       return `rgba(${r}, ${g}, ${b}, 0.15)`;
     }
-    return "#fee2e2";
+    return "#FBE4DF";
   };
 
   return (
@@ -209,10 +227,278 @@ function ToggleOption({ label, active, onClick, activeColor = "#dc2626" }) {
   );
 }
 
+/* ── Top-bar chrome ────────────────────────────────────────────────────────── */
+
+const mtBar = {
+  navGhost: {
+    border: "1px solid transparent",
+    background: "transparent",
+    color: "#5c554e",
+    borderRadius: 999,
+    padding: "9px 18px",
+    fontSize: 14,
+    fontWeight: 600,
+    fontFamily: "'Plus Jakarta Sans', system-ui, sans-serif",
+    cursor: "pointer",
+  },
+  navAdmin: {
+    border: "1px solid #f3c9bc",
+    background: "#fdeee9",
+    color: "#d8412b",
+    borderRadius: 999,
+    padding: "9px 18px",
+    fontSize: 14,
+    fontWeight: 700,
+    fontFamily: "'Plus Jakarta Sans', system-ui, sans-serif",
+    cursor: "pointer",
+  },
+  select: {
+    border: "1px solid #e9e3db",
+    background: "#fff",
+    color: "#171412",
+    borderRadius: 999,
+    padding: "11px 16px",
+    fontSize: 13.5,
+    fontWeight: 600,
+    fontFamily: "'Plus Jakarta Sans', system-ui, sans-serif",
+    cursor: "pointer",
+    flexShrink: 0,
+  },
+  filtersBtn: {
+    display: "inline-flex",
+    alignItems: "center",
+    gap: 8,
+    border: "1px solid #e9e3db",
+    background: "#fff",
+    color: "#171412",
+    borderRadius: 999,
+    padding: "11px 18px",
+    fontSize: 14,
+    fontWeight: 600,
+    fontFamily: "'Plus Jakarta Sans', system-ui, sans-serif",
+    cursor: "pointer",
+    flexShrink: 0,
+    whiteSpace: "nowrap",
+  },
+  searchBtn: {
+    flexShrink: 0,
+    border: "none",
+    borderRadius: 999,
+    background: "#ee5b45",
+    color: "#fff",
+    cursor: "pointer",
+    fontSize: 14.5,
+    fontWeight: 700,
+    fontFamily: "'Plus Jakarta Sans', system-ui, sans-serif",
+    padding: "12px 26px",
+    boxShadow: "0 2px 8px rgba(238,91,69,.32)",
+  },
+};
+
+/** Small removable pill showing the active place/workplace/area anchor, sitting under the search bar. */
+function AnchorChip({ tone, label, onRemove }) {
+  const palette =
+    tone === "warm"
+      ? { bg: "#FBEAE0", fg: "#8a4a1f", chipBtn: "rgba(138,74,31,0.14)" }
+      : { bg: "#EAF1FB", fg: "#1d4ed8", chipBtn: "rgba(29,78,216,0.12)" };
+  return (
+    <span
+      style={{
+        display: "inline-flex",
+        alignItems: "center",
+        gap: 6,
+        background: palette.bg,
+        color: palette.fg,
+        borderRadius: 999,
+        padding: "6px 8px 6px 12px",
+        fontSize: 12.5,
+        fontWeight: 700,
+        maxWidth: "100%",
+      }}
+    >
+      <span style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{label}</span>
+      <button
+        type="button"
+        aria-label="Remove"
+        onClick={onRemove}
+        style={{
+          border: "none",
+          background: palette.chipBtn,
+          color: palette.fg,
+          width: 20,
+          height: 20,
+          borderRadius: 999,
+          cursor: "pointer",
+          fontSize: 13,
+          lineHeight: 1,
+          fontWeight: 800,
+          flexShrink: 0,
+        }}
+      >
+        ×
+      </button>
+    </span>
+  );
+}
+
+/** Suggestions dropdown anchored under the top-bar search input — campuses, employers, commute radius. */
+function MapSearchSuggestions({
+  mapSearchOverlayBodyRef,
+  workplaceAnchor,
+  workplaceError,
+  commuteRadiusKm,
+  setCommuteRadiusKm,
+  applyWorkplaceFromList,
+  setMapSearchInput,
+  mapSearchError,
+  placeAnchor,
+  onClose,
+  openFullFilterPanel,
+}) {
+  return (
+    <div
+      style={{
+        position: "absolute",
+        top: "calc(100% + 8px)",
+        left: 0,
+        right: 0,
+        zIndex: 1005,
+        background: "#fff",
+        borderRadius: 16,
+        boxShadow: "0 20px 50px rgba(20,18,16,0.18), 0 0 0 1px rgba(20,18,16,0.06)",
+        overflow: "hidden",
+      }}
+    >
+      <div
+        ref={mapSearchOverlayBodyRef}
+        style={{ maxHeight: "min(60vh, 460px)", overflowY: "auto", WebkitOverflowScrolling: "touch" }}
+      >
+        {workplaceError ? (
+          <div style={{ padding: "10px 16px", fontSize: 12, color: "#B23A28", fontWeight: 600, background: "#fdf1ec" }}>{workplaceError}</div>
+        ) : null}
+
+        {workplaceAnchor && !workplaceError ? (
+          <div
+            style={{
+              padding: "12px 16px",
+              fontSize: 12.5,
+              color: "#3a1f1a",
+              background: "#FBEAE0",
+              lineHeight: 1.45,
+              display: "flex",
+              flexWrap: "wrap",
+              gap: 12,
+              alignItems: "center",
+              justifyContent: "space-between",
+            }}
+          >
+            <span>
+              Within <strong>{commuteRadiusKm} km</strong> of <strong>{workplaceAnchor.label}</strong> — nearest first
+            </span>
+            <label style={{ display: "flex", alignItems: "center", gap: 8, fontWeight: 700, color: "#6b4226" }}>
+              Max distance
+              <select
+                value={commuteRadiusKm}
+                onChange={(e) => setCommuteRadiusKm(Number(e.target.value))}
+                style={{ border: "1px solid #e8c4ae", borderRadius: 10, padding: "7px 9px", fontSize: 12.5, fontWeight: 700, background: "#fff", color: "#3a1f1a" }}
+              >
+                {[5, 8, 10, 12, 15, 20, 25, 30].map((km) => (
+                  <option key={km} value={km}>{km} km</option>
+                ))}
+              </select>
+            </label>
+          </div>
+        ) : null}
+
+        <div style={{ padding: "14px 16px 16px" }}>
+          <div style={{ fontSize: 11, fontWeight: 700, color: "#8a857c", marginBottom: 9, letterSpacing: "0.04em", textTransform: "uppercase" }}>
+            Popular campuses
+          </div>
+          <div style={{ display: "flex", flexWrap: "wrap", gap: 7 }}>
+            {BANGALORE_WORKPLACES.map((wp) => (
+              <button
+                key={wp.id}
+                type="button"
+                onClick={() => { applyWorkplaceFromList(wp); onClose(); }}
+                style={{
+                  border: workplaceAnchor?.label === wp.name ? "1.5px solid #EF5A45" : "1px solid #e4dfd6",
+                  background: workplaceAnchor?.label === wp.name ? "#FBEAE0" : "#faf8f4",
+                  borderRadius: 999,
+                  padding: "6px 12px",
+                  fontSize: 12,
+                  fontWeight: 600,
+                  color: workplaceAnchor?.label === wp.name ? "#B23A28" : "#4a443d",
+                  cursor: "pointer",
+                  maxWidth: "100%",
+                  textAlign: "left",
+                }}
+              >
+                {wp.name}
+              </button>
+            ))}
+          </div>
+
+          <div style={{ fontSize: 11, fontWeight: 700, color: "#8a857c", margin: "16px 0 9px", letterSpacing: "0.04em", textTransform: "uppercase" }}>
+            Employers
+          </div>
+          <p style={{ margin: "0 0 8px", fontSize: 11.5, color: "#8a857c", lineHeight: 1.5 }}>
+            Tap a company, or switch to <strong style={{ color: "#4a443d" }}>Metro</strong> mode and search any address.
+          </p>
+          <div style={{ display: "flex", flexWrap: "wrap", gap: 6, maxHeight: 110, overflowY: "auto" }}>
+            {EMPLOYER_SEARCH_CHIPS.map((chip) => (
+              <button
+                key={chip.key}
+                type="button"
+                title={`Set workplace to ${chip.wp.name}`}
+                onClick={() => { applyWorkplaceFromList(chip.wp); setMapSearchInput(""); onClose(); }}
+                style={{
+                  border: workplaceAnchor?.label === chip.wp.name ? "1.5px solid #EF5A45" : "1px solid #e4dfd6",
+                  background: workplaceAnchor?.label === chip.wp.name ? "#FBEAE0" : "#fff",
+                  borderRadius: 999,
+                  padding: "5px 10px",
+                  fontSize: 11,
+                  fontWeight: 600,
+                  color: "#4a443d",
+                  cursor: "pointer",
+                  maxWidth: "100%",
+                }}
+              >
+                {chip.label}
+              </button>
+            ))}
+          </div>
+        </div>
+
+        {(mapSearchError || placeAnchor) && (
+          <div style={{ borderTop: "1px solid #f1efe9", padding: "10px 16px 12px", fontSize: 12, lineHeight: 1.45 }}>
+            {mapSearchError ? <div style={{ color: "#B23A28", fontWeight: 600 }}>{mapSearchError}</div> : null}
+            {placeAnchor && !mapSearchError ? (
+              <div style={{ color: "#8a857c" }}>
+                Showing within ~{MAP_NEARBY_KM} km of <strong style={{ color: "#4a443d" }}>{placeAnchor.label}</strong>
+              </div>
+            ) : null}
+          </div>
+        )}
+
+        <div style={{ borderTop: "1px solid #f1efe9", padding: "10px 16px", display: "flex", justifyContent: "space-between", alignItems: "center", background: "#faf8f4" }}>
+          <button type="button" onClick={() => { openFullFilterPanel(); onClose(); }} style={{ border: "none", background: "none", color: "#B23A28", fontSize: 12.5, fontWeight: 700, cursor: "pointer" }}>
+            Open full filter panel →
+          </button>
+          <button type="button" onClick={onClose} style={{ border: "1px solid #e4dfd6", background: "#fff", color: "#4a443d", fontSize: 12, fontWeight: 700, borderRadius: 9, padding: "7px 12px", cursor: "pointer" }}>
+            Close
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 export default function MapView() {
   const navigate = useNavigate();
   const location = useLocation();
   const { user } = useAuth();
+  const { openLogin } = useLoginModal();
+  const [showAgentChat, setShowAgentChat] = useState(false);
   const [listings, setListings] = useState([]);
   /** Central Bangalore — street-level default for local inventory */
   const [mapState, setMapState] = useState({ center: [12.9716, 77.5946], zoom: 15 });
@@ -234,8 +520,12 @@ export default function MapView() {
   /** Desktop: start collapsed so the map uses full width; use map search card + “Show Filters” for the panel. */
   const [showDesktopFilters, setShowDesktopFilters] = useState(false);
   const [showDesktopListings, setShowDesktopListings] = useState(true);
-  /** On-map search card (area / metro / workplace) — independent from sidebar “Filters”. */
-  const [showMapSearchOverlay, setShowMapSearchOverlay] = useState(true);
+  /** Search suggestions dropdown (campuses / employers / commute radius), anchored under the top-bar search box. */
+  const [showMapSearchOverlay, setShowMapSearchOverlay] = useState(false);
+  /** Top-bar "Flat type" checklist dropdown (1/2/3 BHK + Roommate). */
+  const [showFlatTypeMenu, setShowFlatTypeMenu] = useState(false);
+  /** Top-bar "Budget" min/max dropdown. */
+  const [showBudgetMenu, setShowBudgetMenu] = useState(false);
   /** 'local' = filter listings by area name; 'place' = geocode landmark / metro and radius filter */
   const [searchMode, setSearchMode] = useState("local");
   const [helpWidgetOpen, setHelpWidgetOpen] = useState(false);
@@ -500,6 +790,14 @@ export default function MapView() {
 
   const usingRelaxedPins = mapListings.length === 0 && displayPins.length > 0;
 
+  /** List-panel-only sort — never touches `displayPins` itself, so map marker order/behavior is untouched. */
+  const [sortBy, setSortBy] = useState("best");
+  const sortedDisplayPins = useMemo(() => {
+    if (sortBy === "price-asc") return [...displayPins].sort((a, b) => (Number(a.monthlyRent) || 0) - (Number(b.monthlyRent) || 0));
+    if (sortBy === "price-desc") return [...displayPins].sort((a, b) => (Number(b.monthlyRent) || 0) - (Number(a.monthlyRent) || 0));
+    return displayPins;
+  }, [displayPins, sortBy]);
+
   useEffect(() => {
     const t = setTimeout(() => {
       appendFilterHistory(user, {
@@ -625,6 +923,22 @@ export default function MapView() {
     });
   };
 
+  /**
+   * Quick "Flat type" checklist — all types checked by default (empty bhkTypes = no filter).
+   * Unchecking a box expands the implicit "everything" baseline to the full FILTER_OPTIONS.bhkTypes
+   * list minus that value, so 1 RK / 2.5 BHK / 3+ BHK (not offered here) stay visible unless the
+   * full filter panel is used. Re-checking back to the full set collapses back to [] (no filter).
+   */
+  const toggleQuickFlatType = (value) => {
+    setFilters((prev) => {
+      const base = prev.bhkTypes.length ? prev.bhkTypes : FILTER_OPTIONS.bhkTypes;
+      const isChecked = base.includes(value);
+      const next = isChecked ? base.filter((v) => v !== value) : [...base, value];
+      const isFullSet = next.length === FILTER_OPTIONS.bhkTypes.length && FILTER_OPTIONS.bhkTypes.every((t) => next.includes(t));
+      return { ...prev, bhkTypes: isFullSet ? [] : next };
+    });
+  };
+
   const toggleNeighborhood = (name) => {
     setFilters((prev) => {
       const n = prev.neighborhoods || [];
@@ -648,57 +962,21 @@ export default function MapView() {
   /** Map search card and desktop sidebar filters are mutually exclusive; overlay can also be dismissed for a clear map. */
   const showMapSearchCard = showMapSearchOverlay && (isMobile || !showDesktopFilters);
 
-  const mtToolbar = {
-    btn: {
-      border: "1px solid #404040",
-      background: "#171717",
-      color: "#fafafa",
-      borderRadius: "8px",
-      padding: "6px 11px",
-      fontSize: "12px",
-      fontWeight: 700,
-      cursor: "pointer",
-      minHeight: "30px",
-    },
-    btnMuted: {
-      border: "1px solid #52525b",
-      background: "#262626",
-      color: "#e5e5e5",
-      borderRadius: "8px",
-      padding: "6px 11px",
-      fontSize: "12px",
-      fontWeight: 700,
-      cursor: "pointer",
-      minHeight: "30px",
-    },
-    btnAdmin: {
-      border: "1px solid #991b1b",
-      background: "#450a0a",
-      color: "#fecaca",
-      borderRadius: "8px",
-      padding: "6px 11px",
-      fontSize: "12px",
-      fontWeight: 700,
-      cursor: "pointer",
-      minHeight: "30px",
-    },
-    select: {
-      border: "1px solid #404040",
-      background: "#171717",
-      color: "#fafafa",
-      borderRadius: "8px",
-      padding: "5px 10px",
-      fontSize: "12px",
-      fontWeight: 700,
-      minHeight: "28px",
-      cursor: "pointer",
-    },
+  const areaLabel = chipLabel(workplaceAnchor?.label || placeAnchor?.label || selectedLocality || "Bengaluru", 28);
+
+  // "Get My Free Agent" — gate on sign-in first, then open the AI preferences chat.
+  const startAgentChat = () => {
+    if (user) {
+      setShowAgentChat(true);
+    } else {
+      openLogin(() => setShowAgentChat(true));
+    }
   };
 
   return (
     <div
       className="flex h-screen flex-col overflow-hidden"
-      style={{ background: "#f1f5f9" }}
+      style={{ background: "#faf7f2", fontFamily: "'Plus Jakarta Sans', system-ui, sans-serif", color: "#171412" }}
     >
       <style>{`
         .desktop-sidebar {
@@ -749,7 +1027,7 @@ export default function MapView() {
             align-items: center;
             justify-content: center;
             z-index: 1000;
-            background: #171717;
+            background: #1C1A17;
             color: #fafafa;
             border: 1px solid #404040;
             padding: 10px 14px;
@@ -771,87 +1049,309 @@ export default function MapView() {
       `}</style>
       <div
         style={{
-          background: "#000000",
-          padding: isMobile ? "6px 12px" : "8px 16px",
-          borderBottom: "1px solid #27272a",
+          background: "rgba(255,255,255,0.9)",
+          borderBottom: "1px solid #e9e3db",
           position: "relative",
           zIndex: 1001,
-          boxShadow: "0 4px 12px rgba(0,0,0,0.3)",
+          fontFamily: "'Plus Jakarta Sans', system-ui, sans-serif",
         }}
       >
+        <SiteHeader onGetAgent={startAgentChat} />
+
+        {/* Row 2: the search bar — area / company / campus, filters, view mode */}
         <div
           style={{
+            padding: isMobile ? "10px 12px" : "14px 24px",
             display: "flex",
-            justifyContent: "space-between",
             alignItems: "center",
-            gap: "12px",
+            gap: 10,
             flexWrap: "wrap",
           }}
         >
-          {/* Left: Logo & Nav */}
-          <div style={{ display: "flex", alignItems: "center", gap: "12px", flexWrap: "wrap" }}>
+          <div style={{ position: "relative", flex: "1 1 260px", minWidth: isMobile ? "100%" : 220, display: "flex", alignItems: "center", gap: 10 }}>
             <div
-              onClick={() => navigate("/")}
-              style={{ cursor: "pointer", display: "flex", alignItems: "center", marginRight: "8px" }}
+              style={{
+                flex: 1,
+                minWidth: 0,
+                display: "flex",
+                alignItems: "center",
+                gap: 10,
+                border: "1px solid #e9e3db",
+                borderRadius: 999,
+                background: "#faf7f2",
+                padding: "5px 6px 5px 18px",
+                transition: "border-color .18s, box-shadow .18s, background .18s",
+              }}
             >
-              <MovEAZYLogo variant="dark" size={isMobile ? "sm" : "lg"} />
+              <svg viewBox="0 0 24 24" width="17" height="17" fill="none" stroke="#948c83" strokeWidth="2.2" aria-hidden style={{ flexShrink: 0 }}>
+                <circle cx="11" cy="11" r="7" />
+                <path d="M21 21l-4.3-4.3" strokeLinecap="round" />
+              </svg>
+              <input
+                value={mapSearchInput}
+                onChange={(e) => setMapSearchInput(e.target.value)}
+                onFocus={() => setShowMapSearchOverlay(true)}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter") { submitMapSearch(); setShowMapSearchOverlay(false); }
+                }}
+                placeholder={
+                  searchMode === "place"
+                    ? "Search by metro, landmark, or company…"
+                    : "Search by area, society, or broker…"
+                }
+                style={{
+                  flex: 1,
+                  minWidth: 0,
+                  border: "none",
+                  background: "transparent",
+                  padding: "8px 0",
+                  fontSize: 15,
+                  fontFamily: "inherit",
+                  outline: "none",
+                  color: "#171412",
+                }}
+              />
+              <div style={{ display: "inline-flex", borderRadius: 999, background: "#fff", border: "1px solid #e9e3db", padding: 3, flexShrink: 0 }}>
+                {["local", "place"].map((m) => (
+                  <button
+                    key={m}
+                    type="button"
+                    onClick={() => setSearchMode(m)}
+                    style={{
+                      border: "none",
+                      borderRadius: 999,
+                      padding: "7px 13px",
+                      fontSize: 12.5,
+                      fontWeight: 600,
+                      fontFamily: "inherit",
+                      cursor: "pointer",
+                      background: searchMode === m ? "#171412" : "transparent",
+                      color: searchMode === m ? "#fff" : "#5c554e",
+                    }}
+                  >
+                    {m === "local" ? "Area" : "Metro"}
+                  </button>
+                ))}
+              </div>
             </div>
+            <button
+              type="button"
+              disabled={mapSearchLoading}
+              onClick={() => { submitMapSearch(); setShowMapSearchOverlay(false); }}
+              style={mtBar.searchBtn}
+            >
+              {mapSearchLoading ? "…" : "Search"}
+            </button>
 
-            <div style={{ display: "flex", alignItems: "center", gap: "6px" }}>
-              <button type="button" onClick={() => navigate("/")} style={mtToolbar.btn}>
-                Home
-              </button>
-              <button type="button" onClick={() => navigate("/activity")} style={mtToolbar.btnMuted}>
-                Saved
-              </button>
-              {user?.role === "admin" ? (
-                <button type="button" onClick={() => navigate("/admin")} style={mtToolbar.btnAdmin}>
-                  Admin
+            {showMapSearchCard ? (
+              <MapSearchSuggestions
+                isMobile={isMobile}
+                mapSearchOverlayBodyRef={mapSearchOverlayBodyRef}
+                placeAnchor={placeAnchor}
+                setPlaceAnchor={setPlaceAnchor}
+                selectedLocality={selectedLocality}
+                setSelectedLocality={setSelectedLocality}
+                setMapSearchInput={setMapSearchInput}
+                setMapSearchError={setMapSearchError}
+                workplaceAnchor={workplaceAnchor}
+                setWorkplaceAnchor={setWorkplaceAnchor}
+                setWorkplaceError={setWorkplaceError}
+                workplaceError={workplaceError}
+                commuteRadiusKm={commuteRadiusKm}
+                setCommuteRadiusKm={setCommuteRadiusKm}
+                applyWorkplaceFromList={applyWorkplaceFromList}
+                mapSearchError={mapSearchError}
+                onClose={() => setShowMapSearchOverlay(false)}
+                openFullFilterPanel={openFullFilterPanel}
+                chipLabel={chipLabel}
+              />
+            ) : null}
+          </div>
+
+          <div style={{ position: "relative", flexShrink: 0 }}>
+            <button type="button" onClick={() => setShowFlatTypeMenu((v) => !v)} style={mtBar.filtersBtn}>
+              Flat type
+              <svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" strokeWidth="2.4" aria-hidden>
+                <path d="M6 9l6 6 6-6" strokeLinecap="round" strokeLinejoin="round" />
+              </svg>
+            </button>
+            {showFlatTypeMenu ? (
+              <>
+                <button
+                  type="button"
+                  aria-hidden="true"
+                  tabIndex={-1}
+                  onClick={() => setShowFlatTypeMenu(false)}
+                  style={{ position: "fixed", inset: 0, zIndex: 1004, background: "transparent", border: "none", cursor: "default" }}
+                />
+                <div
+                  style={{
+                    position: "absolute",
+                    top: "calc(100% + 8px)",
+                    left: 0,
+                    zIndex: 1005,
+                    minWidth: 280,
+                    background: "#fff",
+                    borderRadius: 14,
+                    boxShadow: "0 20px 50px rgba(20,18,16,0.18), 0 0 0 1px rgba(20,18,16,0.06)",
+                    padding: 16,
+                  }}
+                >
+                  <div style={{ fontSize: 11, fontWeight: 700, letterSpacing: "0.04em", textTransform: "uppercase", color: "#8a857c", marginBottom: 12 }}>
+                    Flat type
+                  </div>
+                  <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
+                    {QUICK_FLAT_TYPES.map(({ value, label }) => {
+                      const checked = filters.bhkTypes.length === 0 || filters.bhkTypes.includes(value);
+                      return (
+                        <label key={value} style={{ display: "flex", alignItems: "center", gap: 10, fontSize: 13.5, fontWeight: 600, color: "#17140f", cursor: "pointer" }}>
+                          <input
+                            type="checkbox"
+                            checked={checked}
+                            onChange={() => toggleQuickFlatType(value)}
+                            style={{ width: 17, height: 17, accentColor: "#EF5A45", cursor: "pointer", flexShrink: 0 }}
+                          />
+                          {label}
+                        </label>
+                      );
+                    })}
+                  </div>
+                </div>
+              </>
+            ) : null}
+          </div>
+
+          <button type="button" onClick={() => setShowDesktopFilters((v) => !v)} style={mtBar.filtersBtn}>
+            <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden>
+              <path d="M4 6h16M7 12h10M10 18h4" strokeLinecap="round" />
+            </svg>
+            {showDesktopFilters ? "Hide filters" : "More filters"}
+          </button>
+
+          <div style={{ position: "relative", flexShrink: 0, marginLeft: isMobile ? 0 : "auto" }}>
+            <button type="button" onClick={() => setShowBudgetMenu((v) => !v)} style={mtBar.filtersBtn}>
+              Budget
+              {(filters.minRent > 10000 || filters.maxRent < 100000) ? (
+                <span style={{ fontWeight: 700, color: "#c98f2c" }}>
+                  {formatBudget(filters.minRent)}–{formatBudget(filters.maxRent)}
+                </span>
+              ) : null}
+              <svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" strokeWidth="2.4" aria-hidden>
+                <path d="M6 9l6 6 6-6" strokeLinecap="round" strokeLinejoin="round" />
+              </svg>
+            </button>
+            {showBudgetMenu ? (
+              <>
+                <button
+                  type="button"
+                  aria-hidden="true"
+                  tabIndex={-1}
+                  onClick={() => setShowBudgetMenu(false)}
+                  style={{ position: "fixed", inset: 0, zIndex: 1004, background: "transparent", border: "none", cursor: "default" }}
+                />
+                <div
+                  style={{
+                    position: "absolute",
+                    top: "calc(100% + 8px)",
+                    right: isMobile ? "auto" : 0,
+                    left: isMobile ? 0 : "auto",
+                    zIndex: 1005,
+                    minWidth: 260,
+                    background: "#fff",
+                    borderRadius: 14,
+                    boxShadow: "0 20px 50px rgba(20,18,16,0.18), 0 0 0 1px rgba(20,18,16,0.06)",
+                    padding: 16,
+                  }}
+                >
+                  <div style={{ fontSize: 11, fontWeight: 700, letterSpacing: "0.04em", textTransform: "uppercase", color: "#8a857c", marginBottom: 12 }}>
+                    Monthly budget
+                  </div>
+                  <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+                    <label style={{ flex: 1, display: "flex", flexDirection: "column", gap: 4, fontSize: 11, fontWeight: 600, color: "#8a857c" }}>
+                      Min
+                      <select
+                        value={filters.minRent}
+                        onChange={(e) => {
+                          const v = Number(e.target.value);
+                          setFilters((p) => ({ ...p, minRent: v, maxRent: Math.max(p.maxRent, v) }));
+                        }}
+                        style={{ padding: "9px 10px", borderRadius: 9, border: "1px solid #e9e3db", fontSize: 13.5, fontWeight: 600, color: "#17140f", fontFamily: "inherit", background: "#faf7f2" }}
+                      >
+                        {BUDGET_STEPS.map((v) => (
+                          <option key={v} value={v}>{formatBudget(v)}</option>
+                        ))}
+                      </select>
+                    </label>
+                    <span style={{ color: "#8a857c", marginTop: 14 }}>–</span>
+                    <label style={{ flex: 1, display: "flex", flexDirection: "column", gap: 4, fontSize: 11, fontWeight: 600, color: "#8a857c" }}>
+                      Max
+                      <select
+                        value={filters.maxRent}
+                        onChange={(e) => {
+                          const v = Number(e.target.value);
+                          setFilters((p) => ({ ...p, maxRent: v, minRent: Math.min(p.minRent, v) }));
+                        }}
+                        style={{ padding: "9px 10px", borderRadius: 9, border: "1px solid #e9e3db", fontSize: 13.5, fontWeight: 600, color: "#17140f", fontFamily: "inherit", background: "#faf7f2" }}
+                      >
+                        {BUDGET_STEPS.map((v) => (
+                          <option key={v} value={v}>{formatBudget(v)}{v >= 100000 ? " (no max)" : ""}</option>
+                        ))}
+                      </select>
+                    </label>
+                  </div>
+                </div>
+              </>
+            ) : null}
+          </div>
+
+          {!isMobile && (
+            <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+              <div style={{ display: "inline-flex", borderRadius: 999, background: "#f3f0ea", padding: 3 }}>
+                {[["split", "Split"], ["map", "Full map"]].map(([v, label]) => (
+                  <button
+                    key={v}
+                    type="button"
+                    onClick={() => {
+                      setDesktopMode(v);
+                      if (v === "map") { setShowDesktopListings(false); setShowDesktopFilters(false); }
+                    }}
+                    style={{
+                      border: "none",
+                      borderRadius: 999,
+                      padding: "8px 14px",
+                      fontSize: 12.5,
+                      fontWeight: 700,
+                      cursor: "pointer",
+                      background: desktopMode === v ? "#1C1A17" : "transparent",
+                      color: desktopMode === v ? "#fff" : "#57534b",
+                    }}
+                  >
+                    {label}
+                  </button>
+                ))}
+              </div>
+              {!showDesktopListings ? (
+                <button type="button" onClick={() => setShowDesktopListings(true)} style={mtBar.navGhost}>
+                  Show list
                 </button>
               ) : null}
             </div>
-
-            {!isMobile && (
-              <div style={{ display: "flex", alignItems: "center", gap: "6px", marginLeft: "12px", borderLeft: "1px solid #3f3f46", paddingLeft: "12px" }}>
-                <select
-                  value={desktopMode}
-                  onChange={(e) => {
-                    const v = e.target.value;
-                    setDesktopMode(v);
-                    if (v === "map") {
-                      setShowDesktopListings(false);
-                      setShowDesktopFilters(false);
-                    }
-                  }}
-                  style={mtToolbar.select}
-                >
-                  <option value="split">Split view</option>
-                  <option value="map">Full map</option>
-                </select>
-                <button type="button" onClick={() => setShowMapSearchOverlay((v) => !v)} style={mtToolbar.btnMuted}>
-                  {showMapSearchOverlay ? "Hide search" : "Show search"}
-                </button>
-                <button type="button" onClick={() => setShowDesktopFilters((v) => !v)} style={mtToolbar.btnMuted}>
-                  {showDesktopFilters ? "Hide filters" : "Show filters"}
-                </button>
-                {!showDesktopListings ? (
-                  <button type="button" onClick={() => setShowDesktopListings(true)} style={mtToolbar.btnMuted}>
-                    Show list
-                  </button>
-                ) : null}
-              </div>
-            )}
-          </div>
-
-          {/* Right: Stats */}
-          <div style={{ fontSize: "12px", color: "#a3a3a3", fontWeight: 600 }}>
-            {usingRelaxedPins ? (
-              <span style={{ color: "#fca5a5" }}>Nearby ({displayPins.length})</span>
-            ) : (
-              <span>{mapListings.length} homes</span>
-            )}
-          </div>
+          )}
         </div>
+
+        {(placeAnchor || workplaceAnchor || selectedLocality) && (
+          <div style={{ display: "flex", flexWrap: "wrap", gap: 8, padding: isMobile ? "0 12px 10px" : "0 20px 12px" }}>
+            {workplaceAnchor && (
+              <AnchorChip tone="warm" label={`Office: ${chipLabel(workplaceAnchor.label, 26)}`} onRemove={() => { setWorkplaceAnchor(null); setWorkplaceError(""); }} />
+            )}
+            {placeAnchor && (
+              <AnchorChip tone="cool" label={chipLabel(placeAnchor.label, 30)} onRemove={() => { setPlaceAnchor(null); setMapSearchError(""); }} />
+            )}
+            {selectedLocality && !placeAnchor && (
+              <AnchorChip tone="cool" label={chipLabel(selectedLocality, 30)} onRemove={() => { setSelectedLocality(""); setMapSearchInput(""); }} />
+            )}
+          </div>
+        )}
       </div>
 
       {isMobile && showMobileFilters ? (
@@ -905,11 +1405,11 @@ export default function MapView() {
           <div style={{ marginBottom: "16px", paddingBottom: "14px", borderBottom: "1px solid #e2e8f0", fontSize: "14px", color: "#334155", lineHeight: 1.55, fontWeight: 500 }}>
             {isMobile ? (
               <>
-                Use the <strong style={{ color: "#0f172a" }}>search card on the map</strong> for area, landmark, or workplace. Fine-tune rent and more here.
+                Use the <strong style={{ color: "#0f172a" }}>search bar above</strong> for area, landmark, or workplace. Fine-tune rent and more here.
               </>
             ) : (
               <>
-                Rent range, BHK, building type, and area chips. <strong style={{ color: "#0f172a" }}>Hide filters</strong> when you want the map search card back (metro, workplace, free-text).
+                Rent range, building type, and area chips. Use the <strong style={{ color: "#0f172a" }}>search bar above</strong> for area, landmark, or workplace.
               </>
             )}
           </div>
@@ -936,9 +1436,9 @@ export default function MapView() {
                     type="button"
                     onClick={() => toggleNeighborhood(name)}
                     style={{
-                      border: on ? "1px solid #ff3131" : "1px solid #cbd5e1",
+                      border: on ? "1px solid #EF5A45" : "1px solid #cbd5e1",
                       background: on ? "#fff1f2" : "#ffffff",
-                      color: on ? "#ff3131" : "#0f172a",
+                      color: on ? "#EF5A45" : "#0f172a",
                       borderRadius: "999px",
                       padding: "6px 11px",
                       fontSize: "13px",
@@ -970,8 +1470,8 @@ export default function MapView() {
                   type="button"
                   onClick={() => setListingType(val)}
                   style={{
-                    border: listingType === val ? "1px solid #ff3131" : "1px solid #e2e8f0",
-                    background: listingType === val ? "#ff3131" : "#ffffff",
+                    border: listingType === val ? "1px solid #EF5A45" : "1px solid #e2e8f0",
+                    background: listingType === val ? "#EF5A45" : "#ffffff",
                     color: listingType === val ? "#ffffff" : "#334155",
                     borderRadius: "999px",
                     padding: "7px 16px",
@@ -995,7 +1495,7 @@ export default function MapView() {
                   label={item}
                   active={filters.bhkTypes.includes(item)}
                   onClick={() => toggleFilter("bhkTypes", item)}
-                  activeColor={bhkColors[item] || "#dc2626"}
+                  activeColor={bhkColors[item] || "#EF5A45"}
                 />
               ))}
             </div>
@@ -1047,8 +1547,10 @@ export default function MapView() {
               fallbackZoom={15}
             />
             <TileLayer
-              url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
-              attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>'
+              url="https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png"
+              attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors &copy; <a href="https://carto.com/attributions">CARTO</a>'
+              subdomains="abcd"
+              maxZoom={20}
             />
             {placeAnchor && (
               <>
@@ -1072,7 +1574,7 @@ export default function MapView() {
                 <Circle
                   center={[workplaceAnchor.lat, workplaceAnchor.lng]}
                   radius={commuteRadiusKm * 1000}
-                  pathOptions={{ color: "#b91c1c", fillColor: "#fecaca", fillOpacity: 0.14, weight: 2, dashArray: "6 6" }}
+                  pathOptions={{ color: "#D8432E", fillColor: "#F6C6BC", fillOpacity: 0.14, weight: 2, dashArray: "6 6" }}
                 />
                 <Marker position={[workplaceAnchor.lat, workplaceAnchor.lng]}>
                   <Popup autoPan={false} keepInView={false}>
@@ -1112,7 +1614,7 @@ export default function MapView() {
                       maxWidth: "360px",
                       padding: "14px",
                       backgroundColor: "#fafafa",
-                      color: "#0a0a0a",
+                      color: "#141210",
                       borderRadius: "14px",
                       isolation: "isolate",
                       border: "1px solid #e4e4e7",
@@ -1129,12 +1631,12 @@ export default function MapView() {
                     <div style={{ fontWeight: 800, fontSize: "16px", lineHeight: 1.35, letterSpacing: "-0.02em" }}>{l.title}</div>
                     <div style={{ fontSize: "13px", color: "#52525b", marginTop: "6px", lineHeight: 1.45 }}>{l.address}</div>
                     {(workplaceAnchor || placeAnchor) && Number.isFinite(Number(l.lat)) && Number.isFinite(Number(l.lng)) ? (
-                      <div style={{ fontSize: "12px", color: "#b91c1c", fontWeight: 700, marginTop: "8px" }}>
+                      <div style={{ fontSize: "12px", color: "#D8432E", fontWeight: 700, marginTop: "8px" }}>
                         ~{haversineKm((workplaceAnchor || placeAnchor).lat, (workplaceAnchor || placeAnchor).lng, Number(l.lat), Number(l.lng)).toFixed(1)} km from{" "}
                         {workplaceAnchor ? "workplace" : "search pin"}
                       </div>
                     ) : null}
-                    <div style={{ fontWeight: 800, color: "#15803d", fontSize: "18px", margin: "10px 0 6px" }}>{l.price}</div>
+                    <div style={{ fontWeight: 800, color: "#1C1A17", fontSize: "18px", margin: "10px 0 6px" }}>{l.price}</div>
                     <div style={{ fontSize: "13px", color: "#3f3f46", lineHeight: 1.5, paddingBottom: "4px" }}>
                       {l.seller}
                       {String(l.contact || "").trim() ? ` | ${l.contact}` : " · Broker phone not published on the map"}
@@ -1146,7 +1648,7 @@ export default function MapView() {
                           style={{
                             flex: 1,
                             padding: "10px 12px",
-                            background: "#18181b",
+                            background: "#211E1A",
                             color: "#fafafa",
                             borderRadius: "10px",
                             textAlign: "center",
@@ -1165,10 +1667,10 @@ export default function MapView() {
                         style={{
                           flex: 1,
                           padding: "10px 12px",
-                          background: "#b91c1c",
+                          background: "#D8432E",
                           color: "white",
                           borderRadius: "10px",
-                          border: "1px solid #991b1b",
+                          border: "1px solid #B23A28",
                           cursor: "pointer",
                           fontSize: "13px",
                           fontWeight: 700,
@@ -1183,513 +1685,6 @@ export default function MapView() {
             ))}
           </MapContainer>
 
-          {showMapSearchCard ? (
-          <div
-            style={{
-              position: "absolute",
-              top: isMobile ? 48 : 14,
-              left: 12,
-              right: isMobile ? 12 : "auto",
-              zIndex: 1005,
-              maxWidth: isMobile ? "none" : 520,
-              pointerEvents: "none",
-            }}
-          >
-            <div
-              style={{
-                pointerEvents: "auto",
-                background: "#fafafa",
-                borderRadius: 16,
-                boxShadow: "0 16px 48px rgba(0,0,0,0.22), 0 0 0 1px rgba(185, 28, 28, 0.12)",
-                overflow: "hidden",
-              }}
-            >
-              <div
-                style={{
-                  display: "flex",
-                  alignItems: "center",
-                  justifyContent: "space-between",
-                  gap: 10,
-                  padding: "12px 16px",
-                  background: "linear-gradient(90deg, #0a0a0a 0%, #1c1917 100%)",
-                  borderBottom: "1px solid #3f3f46",
-                }}
-              >
-                <span style={{ fontSize: 14, fontWeight: 800, color: "#fafafa", letterSpacing: "-0.02em" }}>
-                  Search <span style={{ color: "#f87171" }}>&</span> location
-                </span>
-                <button
-                  type="button"
-                  aria-label="Hide search panel"
-                  onClick={() => setShowMapSearchOverlay(false)}
-                  style={{
-                    border: "1px solid #52525b",
-                    background: "#262626",
-                    borderRadius: 10,
-                    padding: "8px 14px",
-                    fontSize: 12,
-                    fontWeight: 800,
-                    color: "#e5e5e5",
-                    cursor: "pointer",
-                    flexShrink: 0,
-                  }}
-                >
-                  Hide
-                </button>
-              </div>
-              <div
-                ref={mapSearchOverlayBodyRef}
-                style={{
-                  maxHeight: isMobile ? "min(56vh, 500px)" : 440,
-                  overflowY: "auto",
-                  WebkitOverflowScrolling: "touch",
-                }}
-              >
-              <div style={{ padding: "12px 14px", display: "flex", flexWrap: "wrap", alignItems: "center", gap: 10 }}>
-                {(placeAnchor || selectedLocality || workplaceAnchor) && (
-                  <div style={{ display: "flex", flexWrap: "wrap", gap: 8, alignItems: "center", width: "100%" }}>
-                    {workplaceAnchor && (
-                      <span
-                        style={{
-                          display: "inline-flex",
-                          alignItems: "center",
-                          gap: 6,
-                          background: "#fffbeb",
-                          color: "#92400e",
-                          borderRadius: 999,
-                          padding: "6px 10px 6px 12px",
-                          fontSize: 13,
-                          fontWeight: 700,
-                          maxWidth: "100%",
-                        }}
-                      >
-                        <span style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>Office: {chipLabel(workplaceAnchor.label, 24)}</span>
-                        <button
-                          type="button"
-                          aria-label="Remove workplace"
-                          onClick={() => {
-                            setWorkplaceAnchor(null);
-                            setWorkplaceError("");
-                          }}
-                          style={{
-                            border: "none",
-                            background: "rgba(146, 64, 14, 0.12)",
-                            color: "#78350f",
-                            width: 22,
-                            height: 22,
-                            borderRadius: 999,
-                            cursor: "pointer",
-                            fontSize: 14,
-                            lineHeight: 1,
-                            fontWeight: 800,
-                          }}
-                        >
-                          ×
-                        </button>
-                      </span>
-                    )}
-                    {placeAnchor && (
-                      <span
-                        style={{
-                          display: "inline-flex",
-                          alignItems: "center",
-                          gap: 6,
-                          background: "#eff6ff",
-                          color: "#1d4ed8",
-                          borderRadius: 999,
-                          padding: "6px 10px 6px 12px",
-                          fontSize: 13,
-                          fontWeight: 700,
-                          maxWidth: "100%",
-                        }}
-                      >
-                        <span style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{chipLabel(placeAnchor.label, 28)}</span>
-                        <button
-                          type="button"
-                          aria-label="Remove place pin"
-                          onClick={() => {
-                            setPlaceAnchor(null);
-                            setMapSearchError("");
-                          }}
-                          style={{
-                            border: "none",
-                            background: "rgba(29, 78, 216, 0.12)",
-                            color: "#1e40af",
-                            width: 22,
-                            height: 22,
-                            borderRadius: 999,
-                            cursor: "pointer",
-                            fontSize: 14,
-                            lineHeight: 1,
-                            fontWeight: 800,
-                          }}
-                        >
-                          ×
-                        </button>
-                      </span>
-                    )}
-                    {selectedLocality && !placeAnchor && (
-                      <span
-                        style={{
-                          display: "inline-flex",
-                          alignItems: "center",
-                          gap: 6,
-                          background: "#eff6ff",
-                          color: "#1d4ed8",
-                          borderRadius: 999,
-                          padding: "6px 10px 6px 12px",
-                          fontSize: 13,
-                          fontWeight: 700,
-                          maxWidth: "100%",
-                        }}
-                      >
-                        <span style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{chipLabel(selectedLocality, 28)}</span>
-                        <button
-                          type="button"
-                          aria-label="Clear area filter"
-                          onClick={() => {
-                            setSelectedLocality("");
-                            setMapSearchInput("");
-                          }}
-                          style={{
-                            border: "none",
-                            background: "rgba(29, 78, 216, 0.12)",
-                            color: "#1e40af",
-                            width: 22,
-                            height: 22,
-                            borderRadius: 999,
-                            cursor: "pointer",
-                            fontSize: 14,
-                            lineHeight: 1,
-                            fontWeight: 800,
-                          }}
-                        >
-                          ×
-                        </button>
-                      </span>
-                    )}
-                  </div>
-                )}
-                <input
-                  value={mapSearchInput}
-                  onChange={(e) => setMapSearchInput(e.target.value)}
-                  onKeyDown={(e) => {
-                    if (e.key === "Enter") submitMapSearch();
-                  }}
-                  placeholder={
-                    searchMode === "place"
-                      ? "Metro, landmark, company (e.g. Google)…"
-                      : "Area, society, broker / company name…"
-                  }
-                  style={{
-                    flex: "1 1 160px",
-                    minWidth: 0,
-                    border: "1px solid #e2e8f0",
-                    borderRadius: 12,
-                    padding: "10px 12px",
-                    fontSize: 15,
-                    outline: "none",
-                    background: "#f8fafc",
-                  }}
-                />
-                <div
-                  style={{
-                    display: "inline-flex",
-                    borderRadius: 999,
-                    background: "#f1f5f9",
-                    padding: 3,
-                    flexShrink: 0,
-                  }}
-                >
-                  {["local", "place"].map((m) => (
-                    <button
-                      key={m}
-                      type="button"
-                      onClick={() => setSearchMode(m)}
-                      style={{
-                        border: "none",
-                        borderRadius: 999,
-                        padding: "7px 12px",
-                        fontSize: 12,
-                        fontWeight: 800,
-                        cursor: "pointer",
-                        background: searchMode === m ? "#ffffff" : "transparent",
-                        color: searchMode === m ? "#b91c1c" : "#64748b",
-                        boxShadow: searchMode === m ? "0 1px 4px rgba(15,23,42,0.12)" : "none",
-                      }}
-                    >
-                      {m === "local" ? "Location" : "Metro"}
-                    </button>
-                  ))}
-                </div>
-                <button
-                  type="button"
-                  disabled={mapSearchLoading}
-                  onClick={submitMapSearch}
-                  aria-label="Search"
-                  style={{
-                    flexShrink: 0,
-                    border: "1px solid #991b1b",
-                    borderRadius: 10,
-                    background: "#b91c1c",
-                    color: "#fff",
-                    cursor: mapSearchLoading ? "wait" : "pointer",
-                    display: "inline-flex",
-                    alignItems: "center",
-                    justifyContent: "center",
-                    fontSize: 13,
-                    fontWeight: 800,
-                    padding: "10px 16px",
-                    minHeight: 44,
-                    boxShadow: "0 4px 14px rgba(185, 28, 28, 0.35)",
-                  }}
-                >
-                  {mapSearchLoading ? "…" : "Search"}
-                </button>
-              </div>
-              <p style={{ width: "100%", margin: "4px 0 0", padding: "0 2px", fontSize: 11, color: "#64748b", lineHeight: 1.45 }}>
-                Same search box: <strong>company</strong> (e.g. Google, Amazon), <strong>campus</strong> name, or switch{" "}
-                <strong>Location</strong> / <strong>Metro</strong> for area vs map pin.
-              </p>
-              <div
-                style={{
-                  borderTop: "1px solid #f1f5f9",
-                  padding: "10px 14px 12px",
-                  display: "flex",
-                  flexWrap: "wrap",
-                  gap: 10,
-                  alignItems: "center",
-                  background: "#fafafa",
-                }}
-              >
-                <label style={{ display: "flex", flexDirection: "column", gap: 4, fontSize: 11, fontWeight: 800, color: "#64748b", flex: "1 1 120px", minWidth: 110 }}>
-                    Looking for
-                    <select
-                      value={listingType}
-                      onChange={(e) => setListingType(e.target.value)}
-                      style={{
-                        border: "1px solid #cbd5e1",
-                        borderRadius: 10,
-                        padding: "10px 10px",
-                        fontSize: 14,
-                        fontWeight: 600,
-                        background: "#fff",
-                      }}
-                    >
-                      <option value="all">All</option>
-                      <option value="flatmate">Flatmate</option>
-                      <option value="entire">Entire flat</option>
-                    </select>
-                  </label>
-                <label style={{ display: "flex", flexDirection: "column", gap: 4, fontSize: 11, fontWeight: 800, color: "#64748b", flex: "1 1 140px", minWidth: 120 }}>
-                    BHK type
-                    <select
-                      value={filters.bhkTypes.length === 1 ? filters.bhkTypes[0] : ""}
-                      onChange={(e) => {
-                        const v = e.target.value;
-                        setFilters((p) => ({ ...p, bhkTypes: v ? [v] : [] }));
-                      }}
-                      style={{
-                        border: "1px solid #cbd5e1",
-                        borderRadius: 10,
-                        padding: "10px 10px",
-                        fontSize: 14,
-                        fontWeight: 600,
-                        background: "#fff",
-                      }}
-                    >
-                      <option value="">Any</option>
-                      {FILTER_OPTIONS.bhkTypes.map((item) => (
-                        <option key={item} value={item}>
-                          {item}
-                        </option>
-                      ))}
-                    </select>
-                  </label>
-                  <label style={{ display: "flex", flexDirection: "column", gap: 4, fontSize: 11, fontWeight: 800, color: "#64748b", flex: "1 1 160px", minWidth: 140 }}>
-                    Building type
-                    <select
-                      value={filters.propertyTypes.length === 1 ? filters.propertyTypes[0] : ""}
-                      onChange={(e) => {
-                        const v = e.target.value;
-                        setFilters((p) => ({ ...p, propertyTypes: v ? [v] : [] }));
-                      }}
-                      style={{
-                        border: "1px solid #cbd5e1",
-                        borderRadius: 10,
-                        padding: "10px 10px",
-                        fontSize: 14,
-                        fontWeight: 600,
-                        background: "#fff",
-                      }}
-                    >
-                      <option value="">Any</option>
-                      {FILTER_OPTIONS.propertyTypes.map((item) => (
-                        <option key={item} value={item}>
-                          {item}
-                        </option>
-                      ))}
-                    </select>
-                  </label>
-                </div>
-              {workplaceError ? (
-                <div style={{ padding: "0 14px 10px", fontSize: 12, color: "#b91c1c", fontWeight: 600, background: "#fffbeb" }}>{workplaceError}</div>
-              ) : null}
-              {workplaceAnchor && !workplaceError ? (
-                <div
-                  style={{
-                    padding: "10px 14px",
-                    fontSize: 12,
-                    color: "#fafafa",
-                    background: "linear-gradient(135deg, #18181b 0%, #27272a 100%)",
-                    lineHeight: 1.45,
-                    borderTop: "1px solid #3f3f46",
-                    display: "flex",
-                    flexWrap: "wrap",
-                    gap: 12,
-                    alignItems: "center",
-                    justifyContent: "space-between",
-                  }}
-                >
-                  <span>
-                    Within <strong style={{ color: "#fecaca" }}>{commuteRadiusKm} km</strong> of <strong style={{ color: "#fff" }}>{workplaceAnchor.label}</strong> · nearest listings first
-                  </span>
-                  <label style={{ display: "flex", alignItems: "center", gap: 8, fontWeight: 700, color: "#d4d4d8" }}>
-                    Max distance
-                    <select
-                      value={commuteRadiusKm}
-                      onChange={(e) => setCommuteRadiusKm(Number(e.target.value))}
-                      style={{
-                        border: "1px solid #52525b",
-                        borderRadius: 10,
-                        padding: "8px 10px",
-                        fontSize: 13,
-                        fontWeight: 700,
-                        background: "#0a0a0a",
-                        color: "#fafafa",
-                      }}
-                    >
-                      {[5, 8, 10, 12, 15, 20, 25, 30].map((km) => (
-                        <option key={km} value={km}>
-                          {km} km
-                        </option>
-                      ))}
-                    </select>
-                  </label>
-                </div>
-              ) : null}
-              <div
-                style={{
-                  width: "100%",
-                  borderTop: "1px solid #fde68a",
-                  padding: "10px 14px 12px",
-                  background: "#fffbeb",
-                  maxHeight: 320,
-                  overflowY: "auto",
-                }}
-              >
-                <div style={{ fontSize: 11, fontWeight: 800, color: "#92400e", marginBottom: 8, letterSpacing: "0.03em" }}>
-                  POPULAR BENGALURU CAMPUSES (TAP)
-                </div>
-                <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
-                  {BANGALORE_WORKPLACES.map((wp) => (
-                    <button
-                      key={wp.id}
-                      type="button"
-                      onClick={() => applyWorkplaceFromList(wp)}
-                      style={{
-                        border: workplaceAnchor?.label === wp.name ? "2px solid #b45309" : "1px solid #fcd34d",
-                        background: workplaceAnchor?.label === wp.name ? "#fef3c7" : "#fff",
-                        borderRadius: 999,
-                        padding: "5px 10px",
-                        fontSize: 11,
-                        fontWeight: 700,
-                        color: "#78350f",
-                        cursor: "pointer",
-                        maxWidth: "100%",
-                        textAlign: "left",
-                      }}
-                    >
-                      {wp.name}
-                    </button>
-                  ))}
-                </div>
-                <div style={{ fontSize: 11, fontWeight: 800, color: "#92400e", margin: "10px 0 6px", letterSpacing: "0.03em" }}>
-                  EMPLOYERS — TAP OR TYPE IN SEARCH (BENGALURU PRESETS)
-                </div>
-                <p style={{ margin: "0 0 8px", fontSize: 10, fontWeight: 600, color: "#a16207", lineHeight: 1.4 }}>
-                  Pins are approximate campus centers for commute search — not official HQ locations. Missing a company? Use{" "}
-                  <strong>Metro</strong> mode + Search for any address worldwide via OpenStreetMap.
-                </p>
-                <div
-                  style={{
-                    display: "flex",
-                    flexWrap: "wrap",
-                    gap: 5,
-                    maxHeight: 112,
-                    overflowY: "auto",
-                    paddingBottom: 2,
-                  }}
-                >
-                  {EMPLOYER_SEARCH_CHIPS.map((chip) => (
-                    <button
-                      key={chip.key}
-                      type="button"
-                      title={`Set workplace to ${chip.wp.name}`}
-                      onClick={() => {
-                        applyWorkplaceFromList(chip.wp);
-                        setMapSearchInput("");
-                      }}
-                      style={{
-                        border:
-                          workplaceAnchor?.label === chip.wp.name ? "2px solid #b45309" : "1px solid #e2e8f0",
-                        background: workplaceAnchor?.label === chip.wp.name ? "#fef3c7" : "#fff",
-                        borderRadius: 999,
-                        padding: "4px 9px",
-                        fontSize: 10,
-                        fontWeight: 700,
-                        color: "#334155",
-                        cursor: "pointer",
-                        maxWidth: "100%",
-                      }}
-                    >
-                      {chip.label}
-                    </button>
-                  ))}
-                </div>
-              </div>
-              <div style={{ borderTop: "1px solid #f1f5f9", padding: "8px 12px", display: "flex", flexWrap: "wrap", gap: 8, alignItems: "center", justifyContent: "flex-end", background: "#fff" }}>
-                <button
-                  type="button"
-                  onClick={openFullFilterPanel}
-                  style={{
-                    border: "1px solid #e2e8f0",
-                    background: "#fff",
-                    color: "#b91c1c",
-                    fontSize: 13,
-                    fontWeight: 800,
-                    borderRadius: 10,
-                    padding: "8px 12px",
-                    cursor: "pointer",
-                  }}
-                >
-                  Full filter panel
-                </button>
-              </div>
-              {(mapSearchError || placeAnchor) && (
-                <div style={{ borderTop: "1px solid #f1f5f9", padding: "8px 14px 10px", fontSize: 12, lineHeight: 1.45 }}>
-                  {mapSearchError ? <div style={{ color: "#b91c1c", fontWeight: 600 }}>{mapSearchError}</div> : null}
-                  {placeAnchor && !mapSearchError ? (
-                    <div style={{ color: "#64748b" }}>
-                      Showing within ~{MAP_NEARBY_KM} km of <strong style={{ color: "#334155" }}>{placeAnchor.label}</strong>
-                    </div>
-                  ) : null}
-                </div>
-              )}
-              </div>
-            </div>
-          </div>
-          ) : null}
 
           {helpWidgetOpen ? (
             <div
@@ -1718,7 +1713,7 @@ export default function MapView() {
                         width: 36,
                         height: 36,
                         borderRadius: "10px",
-                        background: "#b91c1c",
+                        background: "#D8432E",
                         color: "#fff",
                         display: "flex",
                         alignItems: "center",
@@ -1762,10 +1757,10 @@ export default function MapView() {
                   onClick={() => navigate("/contact")}
                   style={{
                     width: "100%",
-                    border: "1px solid #991b1b",
+                    border: "1px solid #B23A28",
                     borderRadius: 10,
                     padding: "10px 14px",
-                    background: "#b91c1c",
+                    background: "#D8432E",
                     color: "#fff",
                     fontSize: 14,
                     fontWeight: 800,
@@ -1790,8 +1785,8 @@ export default function MapView() {
                 width: 48,
                 height: 48,
                 borderRadius: "10px",
-                border: "1px solid #991b1b",
-                background: "#b91c1c",
+                border: "1px solid #B23A28",
+                background: "#D8432E",
                 color: "#fff",
                 fontSize: 20,
                 fontWeight: 800,
@@ -1805,24 +1800,6 @@ export default function MapView() {
           
           {isMobile && (
             <div style={{ position: "absolute", top: 12, right: 12, zIndex: 1000, display: "flex", gap: "8px", flexWrap: "wrap", justifyContent: "flex-end", maxWidth: "calc(100% - 24px)" }}>
-              {!showMapSearchOverlay ? (
-                <button
-                  type="button"
-                  onClick={() => setShowMapSearchOverlay(true)}
-                  style={{
-                    background: "#171717",
-                    color: "#fafafa",
-                    border: "1px solid #404040",
-                    padding: "10px 16px",
-                    borderRadius: "10px",
-                    fontWeight: 700,
-                    fontSize: "13px",
-                    boxShadow: "0 4px 12px rgba(0,0,0,0.25)",
-                  }}
-                >
-                  Search
-                </button>
-              ) : null}
               <button className="mobile-filter-btn" onClick={() => setShowMobileFilters(true)} style={{ position: "static", transform: "none", margin: 0 }}>
                 Filters
               </button>
@@ -1854,31 +1831,38 @@ export default function MapView() {
             transition: "transform 0.25s ease",
           }}
         >
-          <div style={{ fontSize: "17px", fontWeight: 800, marginBottom: "6px", color: "#0f172a" }}>
-            Properties ({displayPins.length})
-            {usingRelaxedPins ? (
-              <div style={{ fontSize: "12px", fontWeight: 600, color: "#b45309", marginTop: "4px" }}>
-                Shown for context — adjust filters for exact matches.
-              </div>
-            ) : null}
+          <div style={{ display: "flex", alignItems: "baseline", gap: 12 }}>
+            <h1 style={{ fontFamily: "'Instrument Serif', serif", fontWeight: 400, fontSize: 30, letterSpacing: "-0.01em", margin: 0, color: "#171412" }}>
+              Homes in {areaLabel}
+            </h1>
           </div>
+          <p style={{ margin: "6px 0 0", color: "#5c554e", fontSize: 13.5, lineHeight: 1.5, maxWidth: "52ch" }}>
+            <span style={{ fontWeight: 700, color: "#ee5b45" }}>{displayPins.length} place{displayPins.length === 1 ? "" : "s"}</span>
+            {" "}{workplaceAnchor || placeAnchor || selectedLocality ? `near ${areaLabel}` : "across Bengaluru"}. Tap a card to fly the map there; hover to spotlight its pin.
+          </p>
+          {usingRelaxedPins ? (
+            <div style={{ fontSize: 12, fontWeight: 600, color: "#b45309", marginTop: 6 }}>
+              Shown for context — adjust filters for exact matches.
+            </div>
+          ) : null}
 
-          {/* Looking for: Flatmate / Entire flat filter */}
-          <div style={{ display: "flex", gap: "8px", marginBottom: "12px", flexWrap: "wrap" }}>
+          <div style={{ display: "flex", gap: 8, marginTop: 16 }}>
             {[["all", "All"], ["flatmate", "Flatmate"], ["entire", "Entire flat"]].map(([val, label]) => (
               <button
                 key={val}
                 type="button"
                 onClick={() => setListingType(val)}
                 style={{
-                  border: listingType === val ? "1px solid #ff3131" : "1px solid #e2e8f0",
-                  background: listingType === val ? "#ff3131" : "#ffffff",
-                  color: listingType === val ? "#ffffff" : "#334155",
-                  borderRadius: "999px",
-                  padding: "7px 16px",
-                  fontSize: "13px",
-                  fontWeight: 700,
+                  border: listingType === val ? "1px solid #ee5b45" : "1px solid #e9e3db",
+                  background: listingType === val ? "#ee5b45" : "#ffffff",
+                  color: listingType === val ? "#ffffff" : "#5c554e",
+                  borderRadius: 999,
+                  padding: "9px 18px",
+                  fontSize: 13.5,
+                  fontWeight: 600,
+                  fontFamily: "inherit",
                   cursor: "pointer",
+                  boxShadow: listingType === val ? "0 2px 8px rgba(238,91,69,.28)" : "none",
                   transition: "all 0.15s",
                 }}
               >
@@ -1887,137 +1871,184 @@ export default function MapView() {
             ))}
           </div>
 
-          <div style={{ fontSize: "12px", color: "#64748b", marginBottom: "12px", lineHeight: 1.45 }}>
-            Tap a card to move the map to that home. Open <strong>Details</strong> for photos and full info. With a workplace set, a blue route line shows the driving path (when routing is available).
-          </div>
-          {!isMobile && desktopMode === "split" ? (
-            <div style={{ display: "flex", justifyContent: "flex-end", marginBottom: "10px" }}>
-              <button
-                type="button"
-                onClick={() => setShowDesktopListings(false)}
+          <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginTop: 14, gap: 10, flexWrap: "wrap" }}>
+            <span style={{ fontSize: 12.5, color: "#948c83", fontWeight: 500 }}>
+              Showing {sortedDisplayPins.length} of {listings.length} results
+            </span>
+            <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+              <select
+                value={sortBy}
+                onChange={(e) => setSortBy(e.target.value)}
                 style={{
-                  ...mtToolbar.btnMuted,
-                  fontSize: "12px",
+                  fontFamily: "inherit",
+                  fontSize: 13,
+                  fontWeight: 600,
+                  color: "#171412",
+                  border: "1px solid #e9e3db",
+                  background: "#fff",
+                  borderRadius: 999,
                   padding: "8px 14px",
-                  fontWeight: 700,
+                  cursor: "pointer",
                 }}
               >
-                Hide list
-              </button>
+                <option value="best">Sort: Best match</option>
+                <option value="price-asc">Price: low to high</option>
+                <option value="price-desc">Price: high to low</option>
+              </select>
+              {!isMobile && desktopMode === "split" ? (
+                <button
+                  type="button"
+                  onClick={() => setShowDesktopListings(false)}
+                  style={{
+                    border: "1px solid #e9e3db",
+                    background: "#fff",
+                    color: "#5c554e",
+                    borderRadius: 999,
+                    padding: "8px 14px",
+                    fontSize: 12.5,
+                    fontWeight: 600,
+                    fontFamily: "inherit",
+                    cursor: "pointer",
+                  }}
+                >
+                  Hide list
+                </button>
+              ) : null}
             </div>
-          ) : null}
+          </div>
+
           <div
             style={{
               display: "grid",
-              gridTemplateColumns: isMobile ? "1fr" : "repeat(2, minmax(0, 1fr))",
-              gap: isMobile ? "12px" : "14px",
+              gridTemplateColumns: "1fr",
+              gap: isMobile ? 14 : 16,
+              marginTop: 18,
             }}
           >
-          {displayPins.map((l) => (
-            <div
-              key={l.id}
-              role="button"
-              tabIndex={0}
-              onClick={() => {
-                setSelected(l);
-                setMapState(mapStateForListingFocus(l.lat, l.lng, isMobile));
-                if (isMobile) setMobileTab("map");
-              }}
-              onKeyDown={(e) => {
-                if (e.key !== "Enter" && e.key !== " ") return;
-                e.preventDefault();
-                setSelected(l);
-                setMapState(mapStateForListingFocus(l.lat, l.lng, isMobile));
-                if (isMobile) setMobileTab("map");
-              }}
-              style={{
-                background: "white",
-                borderRadius: "12px",
-                padding: isMobile ? "14px" : "12px",
-                marginBottom: 0,
-                cursor: "pointer",
-                border: selected?.id === l.id ? "2px solid #3b82f6" : "1px solid #e2e8f0",
-                transition: "all 0.2s",
-                minWidth: 0,
-              }}
-            >
-              <div style={{ position: "relative", marginBottom: "10px" }}>
-                {listingCoverSrc(l) ? (
-                  <MediaElement src={listingCoverSrc(l)} alt={l.title} style={{ width: "100%", height: isMobile ? "148px" : "120px", objectFit: "cover", borderRadius: "10px", display: "block" }} />
-                ) : (
-                  <div style={{ width: "100%", height: isMobile ? "148px" : "120px", borderRadius: "10px", background: "#e2e8f0" }} aria-hidden />
-                )}
-                <button
-                  type="button"
-                  aria-label={isListingSaved(user, l.id) ? "Remove from saved" : "Save listing"}
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    const now = toggleSavedListing(user, l.id, l.title);
-                    void logSavedListingChange(user, l.id, now, l.title);
-                    setSavedRevision((v) => v + 1);
-                  }}
-                  style={{
-                    position: "absolute",
-                    top: 8,
-                    right: 8,
-                    width: 40,
-                    height: 40,
-                    borderRadius: "10px",
-                    border: "1px solid rgba(255,255,255,0.9)",
-                    background: "rgba(255,255,255,0.95)",
-                    boxShadow: "0 2px 10px rgba(15,23,42,0.15)",
-                    cursor: "pointer",
-                    fontSize: 18,
-                    lineHeight: 1,
-                    color: isListingSaved(user, l.id) ? "#ff3131" : "#64748b",
-                    display: "flex",
-                    alignItems: "center",
-                    justifyContent: "center",
-                  }}
-                >
-                  {isListingSaved(user, l.id) ? "♥" : "♡"}
-                </button>
-              </div>
-              <div style={{ display: "flex", justifyContent: "space-between", marginBottom: "6px", alignItems: "center", gap: "8px" }}>
-                <span style={{ background: bhkColors[l.bhk] || "#6b7280", color: "white", padding: "4px 10px", borderRadius: "999px", fontSize: "12px", fontWeight: 700 }}>{l.bhk}</span>
-                <span style={{ fontWeight: 800, color: "#16a34a", fontSize: "15px", flexShrink: 0 }}>{l.price}</span>
-              </div>
-              <div style={{ fontWeight: 600, fontSize: "16px", color: "#1e293b", lineHeight: 1.35 }}>{l.title}</div>
-              <div style={{ fontSize: "13px", color: "#64748b", marginTop: "4px", lineHeight: 1.45 }}>{l.address}</div>
-              {(workplaceAnchor || placeAnchor) && Number.isFinite(Number(l.lat)) && Number.isFinite(Number(l.lng)) ? (
-                <div style={{ fontSize: "12px", color: "#ff3131", fontWeight: 700, marginTop: "6px" }}>
-                  ~{haversineKm((workplaceAnchor || placeAnchor).lat, (workplaceAnchor || placeAnchor).lng, Number(l.lat), Number(l.lng)).toFixed(1)} km from{" "}
-                  {workplaceAnchor ? "workplace" : "pin"}
-                </div>
-              ) : null}
-              <div style={{ fontSize: "13px", color: "#94a3b8", marginTop: "6px" }}>
-                {l.seller}
-                {String(l.contact || "").trim() ? ` | ${l.contact}` : " · Phone not on public map"}
-              </div>
-              <button
-                type="button"
-                onClick={(e) => {
-                  e.stopPropagation();
-                  setViewingProperty(l);
+          {sortedDisplayPins.map((l) => {
+            const isFlatmate = l.bhk === "Roommate needed";
+            const anchor = workplaceAnchor || placeAnchor;
+            const distanceKm = anchor && Number.isFinite(Number(l.lat)) && Number.isFinite(Number(l.lng))
+              ? haversineKm(anchor.lat, anchor.lng, Number(l.lat), Number(l.lng)).toFixed(1)
+              : null;
+            const saved = isListingSaved(user, l.id);
+            return (
+              <article
+                key={l.id}
+                role="button"
+                tabIndex={0}
+                onClick={() => {
+                  setSelected(l);
+                  setMapState(mapStateForListingFocus(l.lat, l.lng, isMobile));
+                  if (isMobile) setMobileTab("map");
+                }}
+                onKeyDown={(e) => {
+                  if (e.key !== "Enter" && e.key !== " ") return;
+                  e.preventDefault();
+                  setSelected(l);
+                  setMapState(mapStateForListingFocus(l.lat, l.lng, isMobile));
+                  if (isMobile) setMobileTab("map");
                 }}
                 style={{
-                  marginTop: "12px",
-                  width: "100%",
-                  padding: "10px 12px",
-                  borderRadius: "10px",
-                  border: "1px solid #ff3131",
-                  background: "#ff3131",
-                  color: "#fff",
-                  fontSize: "13px",
-                  fontWeight: 800,
+                  background: "#fff",
+                  border: selected?.id === l.id ? "1px solid #ee5b45" : "1px solid #e9e3db",
+                  borderRadius: 16,
+                  overflow: "hidden",
+                  display: "flex",
                   cursor: "pointer",
-                  boxShadow: "0 2px 8px rgba(185,28,28,0.25)",
+                  transition: "transform 0.18s, box-shadow 0.18s, border-color 0.18s",
+                  boxShadow: selected?.id === l.id ? "0 4px 14px rgba(23,20,18,.08), 0 10px 34px rgba(23,20,18,.07)" : "0 1px 2px rgba(23,20,18,.05), 0 2px 6px rgba(23,20,18,.04)",
                 }}
               >
-                Details
-              </button>
-            </div>
-          ))}
+                <div style={{ width: isMobile ? 120 : 148, flexShrink: 0, position: "relative", background: "#efe7dc" }}>
+                  {listingCoverSrc(l) ? (
+                    <MediaElement src={listingCoverSrc(l)} alt={l.title} style={{ width: "100%", height: "100%", objectFit: "cover", display: "block" }} />
+                  ) : (
+                    <div style={{ width: "100%", height: "100%" }} aria-hidden />
+                  )}
+                  <span
+                    style={{
+                      position: "absolute", top: 10, left: 10,
+                      background: isFlatmate ? "rgba(124,140,107,.92)" : "rgba(23,20,18,.82)",
+                      color: "#fff", fontSize: 11, fontWeight: 700, padding: "4px 10px", borderRadius: 999,
+                    }}
+                  >
+                    {isFlatmate ? "Flatmate" : "Entire flat"}
+                  </span>
+                  <button
+                    type="button"
+                    aria-label={saved ? "Remove from saved" : "Save listing"}
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      const now = toggleSavedListing(user, l.id, l.title);
+                      void logSavedListingChange(user, l.id, now, l.title);
+                      setSavedRevision((v) => v + 1);
+                    }}
+                    style={{
+                      position: "absolute", top: 8, right: 8, width: 30, height: 30, borderRadius: "50%",
+                      border: "none", background: "rgba(255,255,255,.9)", boxShadow: "0 1px 2px rgba(23,20,18,.05)",
+                      cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center",
+                      color: saved ? "#ee5b45" : "#5c554e",
+                    }}
+                  >
+                    <svg width="15" height="15" viewBox="0 0 24 24" fill={saved ? "currentColor" : "none"} stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                      <path d="M12 21s-7-4.4-9.5-8.5C.7 9 2 5.5 5 5.5c2 0 3.2 1.3 4 2.5.8-1.2 2-2.5 4-2.5 3 0 4.3 3.5 2.5 7C19 16.6 12 21 12 21z" />
+                    </svg>
+                  </button>
+                </div>
+                <div style={{ flex: 1, minWidth: 0, padding: "14px 16px", display: "flex", flexDirection: "column" }}>
+                  <div style={{ display: "flex", alignItems: "baseline", justifyContent: "space-between", gap: 8, flexWrap: "wrap" }}>
+                    <div style={{ fontWeight: 800, fontSize: 17, letterSpacing: "-0.01em", color: "#171412" }}>{l.price}</div>
+                    {distanceKm ? (
+                      <span style={{ fontSize: 11, fontWeight: 700, color: "#ee5b45", background: "#fdeee9", padding: "3px 8px", borderRadius: 999, whiteSpace: "nowrap" }}>
+                        ~{distanceKm} km {workplaceAnchor ? "away" : "from pin"}
+                      </span>
+                    ) : (
+                      <span style={{ fontSize: 11, fontWeight: 700, color: "#7c8c6b", background: "#eef1e9", padding: "3px 8px", borderRadius: 999, whiteSpace: "nowrap" }}>
+                        {l.bhk}
+                      </span>
+                    )}
+                  </div>
+                  <div style={{ fontWeight: 700, fontSize: 15, margin: "6px 0 2px", letterSpacing: "-0.01em", color: "#171412", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                    {l.title}
+                  </div>
+                  <div style={{ display: "flex", alignItems: "center", gap: 5, color: "#5c554e", fontSize: 12.5 }}>
+                    <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" style={{ flexShrink: 0, color: "#948c83" }}>
+                      <path d="M12 22s7-7.8 7-13a7 7 0 10-14 0c0 5.2 7 13 7 13z" /><circle cx="12" cy="9" r="2.5" />
+                    </svg>
+                    <span style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{l.address}</span>
+                  </div>
+                  <div style={{ display: "flex", gap: 12, marginTop: "auto", paddingTop: 10, color: "#5c554e", fontSize: 11.5, fontWeight: 600, flexWrap: "wrap" }}>
+                    {l.propertyType ? <span>{l.propertyType}</span> : null}
+                    {l.furnishing ? <span>· {l.furnishing}</span> : null}
+                    {l.availability ? <span>· {l.availability}</span> : null}
+                  </div>
+                  <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginTop: 10, paddingTop: 10, borderTop: "1px solid #f1ece5" }}>
+                    <span style={{ display: "flex", alignItems: "center", gap: 8, fontSize: 12, color: "#5c554e" }}>
+                      <span style={{ width: 22, height: 22, borderRadius: "50%", background: "#fdeee9", color: "#d8412b", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 10.5, fontWeight: 800, flexShrink: 0 }}>
+                        {String(l.seller || "?").trim().charAt(0).toUpperCase() || "?"}
+                      </span>
+                      {l.seller}
+                    </span>
+                    <button
+                      type="button"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        setViewingProperty(l);
+                      }}
+                      style={{
+                        border: "none", background: "none", padding: 0, cursor: "pointer",
+                        fontSize: 12.5, fontWeight: 700, color: "#d8412b", display: "flex", alignItems: "center", gap: 3,
+                      }}
+                    >
+                      Details
+                      <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round"><path d="M9 6l6 6-6 6" /></svg>
+                    </button>
+                  </div>
+                </div>
+              </article>
+            );
+          })}
           </div>
         </div>
         )}
@@ -2032,7 +2063,7 @@ export default function MapView() {
             left: 0,
             right: 0,
             height: 56,
-            background: "#000000",
+            background: "#1C1A17",
             borderTop: "1px solid #27272a",
             display: "flex",
             zIndex: 1010,
@@ -2048,11 +2079,11 @@ export default function MapView() {
                 flex: 1,
                 border: "none",
                 background: mobileTab === tab ? "#1a1a1a" : "transparent",
-                color: mobileTab === tab ? "#ff3131" : "#a1a1aa",
+                color: mobileTab === tab ? "#EF5A45" : "#a1a1aa",
                 fontSize: "13px",
                 fontWeight: 800,
                 cursor: "pointer",
-                borderTop: mobileTab === tab ? "2px solid #ff3131" : "2px solid transparent",
+                borderTop: mobileTab === tab ? "2px solid #EF5A45" : "2px solid transparent",
                 transition: "all 0.15s",
               }}
             >
@@ -2079,6 +2110,9 @@ export default function MapView() {
           }}
         />
       )}
+
+      {/* ── AI Broker consultant ── */}
+      <AIBroker open={showAgentChat} onClose={() => setShowAgentChat(false)} />
     </div>
   );
 }
