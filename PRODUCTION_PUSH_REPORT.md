@@ -6,7 +6,7 @@
 | **Date** | 2026-07-23 |
 | **Repository** | `MovEazy1/MovEazy-FE` |
 | **Branch** | `feat/broker-consultant-and-marketing-pages` → PR into `main` |
-| **Net change** | **+5,153 / −1,612** across 17 files (16 source + 1 image asset) |
+| **Net change** | **+5,153 / −1,612** across 17 code & asset files<br/>_(excludes this report file; full branch diff including it: +5,237 / −1,612 over 18 files)_ |
 
 ---
 
@@ -68,7 +68,8 @@ navigation system and a real map-based office picker.
 | `src/pages/MapPage.jsx` | 1 | 5 |
 | `src/index.css` | 1 | 1 |
 
-**Totals: +5,153 / −1,612**
+**Totals: +5,153 / −1,612** — code & assets only, verified via `git diff --numstat main`.
+(This report file itself is excluded from the totals, since counting it changes its own line count.)
 
 ---
 
