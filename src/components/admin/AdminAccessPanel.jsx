@@ -105,7 +105,7 @@ export default function AdminAccessPanel({ currentEmail, onChanged }) {
         <p style={{ margin: "0 0 16px", fontSize: 14, color: "#64748b", lineHeight: 1.55, maxWidth: 640 }}>
           Only emails on this allowlist (plus bootstrap addresses in <code style={{ fontSize: 12 }}>VITE_ADMIN_EMAILS</code>)
           can open the admin dashboard. Manage the list below after running{" "}
-          <code style={{ fontSize: 12 }}>fe/supabase/admin_schema.sql</code> in Supabase.
+          <code style={{ fontSize: 12 }}>be/supabase/admin_schema.sql</code> in Supabase.
         </p>
 
         {!isSupabaseConfigured ? (

@@ -8,6 +8,9 @@ import ErrorBoundary from "./components/ErrorBoundary";
 const Profile = lazy(() => import("./pages/Profile"));
 const SupabaseLogin = lazy(() => import("./pages/SupabaseLogin"));
 const BrokerDashboard = lazy(() => import("./pages/BrokerDashboard"));
+const MapPage = lazy(() => import("./pages/MapPage"));
+const HowItWorks = lazy(() => import("./pages/HowItWorks"));
+const About = lazy(() => import("./pages/About"));
 
 function PageLoader() {
   return (
@@ -45,6 +48,9 @@ function AppRoutes() {
     <Suspense fallback={<PageLoader />}>
       <Routes>
         <Route path="/" element={<ForkHome />} />
+        <Route path="/map" element={<MapPage />} />
+        <Route path="/how-it-works" element={<HowItWorks />} />
+        <Route path="/about" element={<About />} />
         <Route path="/auth" element={<SupabaseLogin />} />
         <Route path="/login" element={<Navigate to="/auth" replace />} />
         <Route
