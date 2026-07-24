@@ -6,7 +6,7 @@
 | **Date** | 2026-07-23 |
 | **Repository** | `MovEazy1/MovEazy-FE` |
 | **Branch** | `feat/broker-consultant-and-marketing-pages` → PR into `main` |
-| **Net change** | **+5,153 / −1,612** across 17 files (16 source + 1 image asset) |
+| **Net change** | **+5,236 / −1,612** across 18 files (17 source + 1 image asset) |
 
 ---
 
@@ -50,6 +50,7 @@ navigation system and a real map-based office picker.
 | `src/pages/About.jsx` | 996 | 0 |
 | `src/pages/HowItWorks.jsx` | 980 | 0 |
 | `src/components/layout/SiteHeader.jsx` | 113 | 0 |
+| `PRODUCTION_PUSH_REPORT.md` | 83 | 0 |
 | `GOOGLE_AUTH_SETUP.md` | 71 | 0 |
 | `.gitignore` | 24 | 0 |
 | `src/assets/images/yatharthdesk.png` | — | — (binary image) |
@@ -68,7 +69,7 @@ navigation system and a real map-based office picker.
 | `src/pages/MapPage.jsx` | 1 | 5 |
 | `src/index.css` | 1 | 1 |
 
-**Totals: +5,153 / −1,612**
+**Totals: +5,236 / −1,612** (verified against `git diff --numstat main`)
 
 ---
 
