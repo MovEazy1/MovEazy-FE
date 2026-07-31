@@ -4,4 +4,4 @@ Allow: /
 # SPA: listing deep links use /map?listingId=...
 Allow: /map
 
-Sitemap: https://moveazy.co.in/sitemap.xml
+Sitemap: https://www.moveazy.co.in/sitemap.xml

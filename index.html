@@ -1,16 +1,8 @@
 <!doctype html>
 <html lang="en">
   <head>
-    <!-- Prefer apex host for SEO (Firebase Hosting has no hostname-based 301 in firebase.json). -->
-    <script>
-      (function () {
-        if (location.hostname === "www.moveazy.co.in") {
-          location.replace(
-            location.protocol + "//moveazy.co.in" + location.pathname + location.search + location.hash
-          );
-        }
-      })();
-    </script>
+    <!-- Canonical host (www.moveazy.co.in) is enforced by Vercel's apex→www 308 redirect,
+         so no client-side hostname redirect is needed here. -->
     <meta charset="UTF-8" />
     <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
