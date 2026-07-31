@@ -24,8 +24,8 @@ const CONTACT_ITEMS = [
       </svg>
     ),
     label: "Email us",
-    value: "support@moveazy.in",
-    href: "mailto:support@moveazy.in",
+    value: "support@moveazy.co.in",
+    href: "mailto:support@moveazy.co.in",
   },
   {
     icon: (
@@ -78,7 +78,7 @@ const inputCls =
 
 export default function Contact() {
   const { sitePublic } = useSitePublicSettings();
-  const supportEmail = sitePublic.supportEmail || "support@moveazy.in";
+  const supportEmail = sitePublic.supportEmail || "support@moveazy.co.in";
 
   const [form, setForm] = useState({ name: "", email: "", phone: "", message: "", agreed: false });
   const [status, setStatus] = useState(null);

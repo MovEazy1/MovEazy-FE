@@ -17,7 +17,7 @@ export default function PlanPageSiteFooter() {
           <MovEazyLogoLight size="footer" />
         </button>
         <p className="text-[13px] leading-snug text-stone-500 sm:text-right">
-          © 2026 MovEazy · Bengaluru, India · moveazy.in
+          © 2026 MovEazy · Bengaluru, India · moveazy.co.in
         </p>
       </div>
     </footer>
