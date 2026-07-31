@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from "react";
 import L from "leaflet";
 import { MapContainer, TileLayer, Marker, useMap, useMapEvents } from "react-leaflet";
 import "leaflet/dist/leaflet.css";
-import { geocodePlace } from "../lib/geocode";
+import { geocodePlace, searchPlaces } from "../lib/geocode";
 
 delete L.Icon.Default.prototype._getIconUrl;
 L.Icon.Default.mergeOptions({
@@ -47,12 +47,64 @@ function PinMarker({ position }) {
   return <Marker position={position} />;
 }
 
-export default function ListingMapPicker({ markerPosition, onMarkerChange, height = 260, initialZoom = 12 }) {
+export default function ListingMapPicker({ markerPosition, onMarkerChange, height = 260, initialZoom = 12, focusQuery = "" }) {
   const [search, setSearch] = useState("");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
   const [mapCenter, setMapCenter] = useState(() => (validLatLng(markerPosition) ? markerPosition : BLR_DEFAULT));
   const [zoom, setZoom] = useState(() => (validLatLng(markerPosition) ? 14 : initialZoom));
+
+  // Live autocomplete
+  const [results, setResults] = useState([]);
+  const [open, setOpen] = useState(false);
+  const [active, setActive] = useState(-1);
+  const justPicked = useRef(false);
+  const markerRef = useRef(markerPosition);
+  markerRef.current = markerPosition;
+
+  // Debounced as-you-type place search (Photon), cancelling stale requests.
+  useEffect(() => {
+    const q = search.trim();
+    if (justPicked.current) { justPicked.current = false; return; }
+    if (q.length < 2) { setResults([]); setOpen(false); return; }
+    const ctrl = new AbortController();
+    const t = setTimeout(async () => {
+      try {
+        const r = await searchPlaces(q, { limit: 6, signal: ctrl.signal });
+        setResults(r);
+        setOpen(r.length > 0);
+        setActive(-1);
+      } catch { /* aborted / network */ }
+    }, 200);
+    return () => { clearTimeout(t); ctrl.abort(); };
+  }, [search]);
+
+  // Zoom the map to the area chosen in the form above, until the user pins a spot.
+  useEffect(() => {
+    const q = String(focusQuery || "").trim();
+    if (!q || validLatLng(markerRef.current)) return;
+    let alive = true;
+    (async () => {
+      try {
+        const r = await geocodePlace(q);
+        if (alive && r.ok) { setMapCenter([r.lat, r.lng]); setZoom(15); }
+      } catch { /* ignore */ }
+    })();
+    return () => { alive = false; };
+  }, [focusQuery]);
+
+  const pick = (r) => {
+    if (!r) return;
+    justPicked.current = true;
+    setSearch(r.display || r.label || r.primary || "");
+    setResults([]);
+    setOpen(false);
+    setActive(-1);
+    setError("");
+    setMapCenter([r.lat, r.lng]);
+    setZoom(17);
+    onMarkerChange?.([r.lat, r.lng]); // selecting a suggestion drops the pin there
+  };
 
   const runSearch = async () => {
     setError("");
@@ -61,6 +113,7 @@ export default function ListingMapPicker({ markerPosition, onMarkerChange, heigh
       setError("Enter an area, society, or landmark.");
       return;
     }
+    if (results.length) { pick(results[active >= 0 ? active : 0]); return; }
     setLoading(true);
     try {
       const r = await geocodePlace(q);
@@ -78,29 +131,62 @@ export default function ListingMapPicker({ markerPosition, onMarkerChange, heigh
     }
   };
 
+  const onKeyDown = (e) => {
+    if (open && results.length) {
+      if (e.key === "ArrowDown") { e.preventDefault(); setActive((i) => Math.min(i + 1, results.length - 1)); return; }
+      if (e.key === "ArrowUp") { e.preventDefault(); setActive((i) => Math.max(i - 1, 0)); return; }
+      if (e.key === "Escape") { setOpen(false); return; }
+    }
+    if (e.key === "Enter") { e.preventDefault(); runSearch(); }
+  };
+
   return (
     <div>
-      <div style={{ display: "flex", gap: "8px", flexWrap: "wrap", marginBottom: "8px", alignItems: "center" }}>
-        <input
-          type="text"
-          value={search}
-          onChange={(e) => setSearch(e.target.value)}
-          onKeyDown={(e) => {
-            if (e.key === "Enter") {
-              e.preventDefault();
-              runSearch();
-            }
-          }}
-          placeholder="Area / society / landmark (e.g. Whitefield, Indiranagar)"
-          style={{
-            flex: 1,
-            minWidth: "160px",
-            padding: "8px 10px",
-            border: "1px solid #cbd5e1",
-            borderRadius: "6px",
-            fontSize: "13px",
-          }}
-        />
+      <div style={{ display: "flex", gap: "8px", flexWrap: "wrap", marginBottom: "8px", alignItems: "center", position: "relative" }}>
+        <div style={{ position: "relative", flex: 1, minWidth: "160px" }}>
+          <input
+            type="text"
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            onKeyDown={onKeyDown}
+            onFocus={() => results.length && setOpen(true)}
+            onBlur={() => setTimeout(() => setOpen(false), 150)}
+            autoComplete="off"
+            placeholder="Start typing an address, society, or landmark…"
+            style={{
+              width: "100%",
+              padding: "8px 10px",
+              border: "1px solid #cbd5e1",
+              borderRadius: "6px",
+              fontSize: "13px",
+            }}
+          />
+          {open && results.length > 0 && (
+            <ul
+              style={{
+                position: "absolute", top: "calc(100% + 4px)", left: 0, right: 0, zIndex: 1000,
+                margin: 0, padding: "4px", listStyle: "none", background: "white",
+                border: "1px solid #e2e8f0", borderRadius: "8px", boxShadow: "0 12px 30px rgba(15,23,42,0.16)",
+                maxHeight: "240px", overflowY: "auto",
+              }}
+            >
+              {results.map((r, i) => (
+                <li
+                  key={r.id || i}
+                  onMouseDown={(e) => { e.preventDefault(); pick(r); }}
+                  onMouseEnter={() => setActive(i)}
+                  style={{
+                    padding: "8px 10px", borderRadius: "6px", cursor: "pointer",
+                    background: i === active ? "#fff5f5" : "transparent",
+                  }}
+                >
+                  <div style={{ fontSize: "13px", fontWeight: 700, color: "#1f2937" }}>{r.primary}</div>
+                  {r.secondary && <div style={{ fontSize: "11px", color: "#64748b" }}>{r.secondary}</div>}
+                </li>
+              ))}
+            </ul>
+          )}
+        </div>
         <button
           type="button"
           onClick={runSearch}
@@ -120,7 +206,7 @@ export default function ListingMapPicker({ markerPosition, onMarkerChange, heigh
         </button>
       </div>
       <div style={{ fontSize: "11px", color: "#64748b", marginBottom: error ? "4px" : "8px" }}>
-        Search only moves the map — click the map to place or move the pin.
+        Pick a suggestion to drop the pin there — or click the map to place / move it.
       </div>
       {error ? (
         <div style={{ color: "#b91c1c", fontSize: "12px", marginBottom: "8px", fontWeight: 600 }}>{error}</div>

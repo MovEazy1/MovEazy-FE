@@ -34,8 +34,8 @@ export const DEFAULT_CONTACT_TEAM = [
 
 export const DEFAULT_SITE_PUBLIC = {
   contacts: DEFAULT_CONTACT_TEAM,
-  supportEmail: "support@moveazy.in",
-  privacyEmail: "privacy@moveazy.in",
+  supportEmail: "support@moveazy.co.in",
+  privacyEmail: "privacy@moveazy.co.in",
   legalPhoneDisplay: "+91 70559 54373",
   legalPhoneTel: "tel:+917055954373",
 };

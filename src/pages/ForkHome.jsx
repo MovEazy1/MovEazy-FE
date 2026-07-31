@@ -3,8 +3,8 @@
  * Hero matches the split dark/coral Figma; sections below match "Colour iteration 1"
  * (How the Magic happens → 3 Step Wonder → How It Works → Listing Advantage → Testimonials).
  */
-import { useState } from "react";
-import { Link, useNavigate } from "react-router-dom";
+import { useState, useEffect } from "react";
+import { Link, useNavigate, useSearchParams } from "react-router-dom";
 import { motion, AnimatePresence } from "framer-motion";
 import { useAuth } from "../context/AuthContext";
 import { useLoginModal } from "../context/LoginModalContext";
@@ -135,6 +135,19 @@ export default function ForkHome() {
   const navigate = useNavigate();
   const [showChatbot, setShowChatbot] = useState(false);
   const [showChoice, setShowChoice] = useState(false);
+
+  // "List my Flat" — auth-gate, then open the inventory listing form.
+  const listMyFlat = () => (user ? navigate("/list-my-flat") : openLogin(() => navigate("/list-my-flat")));
+
+  // Deep link from the post-publish "Find my next flat" pitch → open the agent.
+  const [searchParams, setSearchParams] = useSearchParams();
+  useEffect(() => {
+    if (searchParams.get("find") !== "1") return;
+    setSearchParams({}, { replace: true });
+    if (user) setShowChatbot(true);
+    else openLogin(() => setShowChatbot(true));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [searchParams, user]);
 
   // "Show me flats" — gate on sign-in first, then show the map-vs-agent choice.
   const startFlatSearch = () => {
@@ -390,12 +403,12 @@ export default function ForkHome() {
         <div className="fx-side fx-side-coral">
           <div className="fx-inner" style={{ marginLeft: "auto" }}>
             <div className="fx-eyebrow fx-coral-eyebrow">Passing your flat?</div>
-            <h1 className="fx-h1 fx-coral-h1">Find Your<br />next Occupant</h1>
-            <p className="fx-sub fx-coral-sub">From someone who actually lived there.</p>
+            <h1 className="fx-h1 fx-coral-h1">Find Your<br />Next Occupant</h1>
+            <p className="fx-sub fx-coral-sub">To someone who'll treat it like home.</p>
             <button
               type="button"
               className="fx-cta"
-              onClick={() => (user ? navigate("/profile") : openLogin(() => navigate("/profile")))}
+              onClick={listMyFlat}
             >
               List my Flat
             </button>
@@ -547,7 +560,7 @@ export default function ForkHome() {
               <div className="mz-sched">
                 <div className="mz-sched-panel">
                   <div className="mz-sched-head">
-                    <span>Saturday, July 5</span>
+                    <span>Saturday, 5 July</span>
                     <span>3 visits · 2.5 hrs total</span>
                   </div>
                   <div className="mz-visit">
@@ -711,7 +724,7 @@ export default function ForkHome() {
                 <div className="mz-footer-col-h">PRODUCT</div>
                 <a href="#how" className="mz-footer-link">How it works</a>
                 <button type="button" className="mz-footer-link" onClick={startFlatSearch}>Find a flat</button>
-                <button type="button" className="mz-footer-link" onClick={() => (user ? navigate("/profile") : openLogin(() => navigate("/profile")))}>List my flat</button>
+                <button type="button" className="mz-footer-link" onClick={listMyFlat}>List my flat</button>
               </div>
               <div>
                 <div className="mz-footer-col-h">ACCOUNT</div>
@@ -734,7 +747,7 @@ export default function ForkHome() {
             <h3 className="mz-footer-cta-h">Ready to find or pass your home?</h3>
             <div className="mz-footer-btns">
               <button type="button" className="mz-footer-btn-solid" onClick={startFlatSearch}>Show me flats</button>
-              <button type="button" className="mz-footer-btn-line" onClick={() => (user ? navigate("/profile") : openLogin(() => navigate("/profile")))}>List my Flat</button>
+              <button type="button" className="mz-footer-btn-line" onClick={listMyFlat}>List my Flat</button>
             </div>
           </div>
 

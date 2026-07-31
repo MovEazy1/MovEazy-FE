@@ -209,6 +209,12 @@ export default function PropertyModal({ property, onClose, listings = [], onSele
   };
   const amenities = property.amenities && property.amenities.length ? property.amenities : [];
   const furnishings = property.furnishings && property.furnishings.length ? property.furnishings : [];
+  // Who listed this home — shown consistently as a badge (owner / broker / tenant).
+  const listedByRaw = String(
+    property.postedBy || property.posted_by || property.listedBy || property.listerType || ""
+  ).toLowerCase();
+  const listedByLabel =
+    listedByRaw === "broker" ? "Broker" : listedByRaw === "tenant" ? "Tenant" : listedByRaw === "owner" ? "Owner" : "";
   const builtUpLabel = property.builtUpArea
     ? `${property.builtUpArea}${property.areaUnit ? ` ${property.areaUnit}` : ""}`
     : "—";
@@ -622,6 +628,18 @@ export default function PropertyModal({ property, onClose, listings = [], onSele
                   >
                     📅 {property.availability || "Immediate"}
                   </div>
+                  {listedByLabel && (
+                    <div
+                      style={{
+                        ...badgeStyles,
+                        border: "1px solid #fbcfc4",
+                        background: "#fff5f2",
+                        color: "#b23a28",
+                      }}
+                    >
+                      🏷️ Listed by {listedByLabel}
+                    </div>
+                  )}
                 </div>
 
                 <div style={{ background: "linear-gradient(135deg, #f0fdf4 0%, #eff6ff 100%)", padding: "20px", borderRadius: "12px", marginBottom: "24px", border: "1px solid #bbf7d0" }}>

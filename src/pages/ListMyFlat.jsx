@@ -1,34 +1,29 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { useNavigate } from "react-router-dom";
-import { collection, addDoc, serverTimestamp } from "firebase/firestore";
-import { db } from "../lib/firebase";
-import { uploadListingFiles } from "../lib/firestoreStore";
 import { useAuth } from "../context/AuthContext";
 import Navbar from "../components/layout/Navbar";
 import Footer from "../components/layout/Footer";
 import PageShell from "../components/layout/PageShell";
+import ListingMapPicker from "../components/ListingMapPicker";
+import { reverseGeocode, nearbyLandmarks } from "../lib/geocode";
+import { createInventoryItem, uploadInventoryPhotos, generatePropertyId } from "../lib/inventory";
+import { fetchAllUserRequirements } from "../lib/userRequirements";
+import { matchListingToRequirements } from "../lib/inventoryMatch";
+import {
+  ALL_LOCALITIES, FLAT_TYPES, FURNISHINGS, OCCUPANTS,
+  MUST_HAVES, LIFESTYLE,
+} from "../data/preferenceOptions";
 
 const BRAND_RED = "#ff3131";
-const AREAS = [
-  "Indiranagar","Koramangala","HSR Layout","Bellandur","Whitefield","Marathalli",
-  "BTM Layout","Hebbal","Electronic City","Hoodi","Sarjapur Road","Banaswadi",
-  "Frazer Town","Jayanagar","JP Nagar","Banashankari","Rajajinagar","Malleshwaram",
-  "Yelahanka","Thanisandra","Hennur","Kengeri","Bommanahalli","Domlur",
-  "Mahadevapura","KR Puram","Brookefield","Varthur","Other",
-];
-const AMENITY_OPTIONS = [
-  ["ac","AC"],["wifi","WiFi"],["parking","Parking"],["tv","TV"],
-  ["refrigerator","Fridge"],["washing_machine","Washing Machine"],
-  ["microwave","Microwave"],["sofa","Sofa"],["dining_table","Dining Table"],
-];
 const RULE_OPTIONS = [
-  "No Smoking","No Pets","No Alcohol","Vegetarians Only",
-  "Working Professionals Only","No Brokerage","Fully Furnished",
+  "No Smoking", "No Pets", "No Alcohol", "Vegetarians Only",
+  "Working Professionals Only", "No Brokerage", "Fully Furnished",
 ];
-
-function slugify(t) {
-  return t.toLowerCase().replace(/[^a-z0-9]+/g,"-").replace(/^-|-$/g,"");
-}
+const POSTER_ROLES = [
+  ["owner", "Owner", "I own this property"],
+  ["tenant", "Tenant", "I live here / passing it on"],
+  ["broker", "Broker / Agent", "I'm listing on behalf of an owner"],
+];
 
 const inp = "w-full px-4 py-3 rounded-xl border border-gray-200 bg-white text-[14px] text-gray-900 placeholder:text-gray-400 outline-none transition-all focus:border-red-400 focus:ring-2 focus:ring-red-100";
 
@@ -58,190 +53,364 @@ function Card({ children, className = "" }) {
   );
 }
 
-const STEPS = ["The Essentials", "Describe Your Space", "Photos & Publish"];
+/** A multi-select chip group backed by a string[] in state. */
+function ChipMulti({ options, selected, onToggle }) {
+  return (
+    <div className="flex flex-wrap gap-2">
+      {options.map((o) => (
+        <Chip key={o} label={o} active={selected.includes(o)} onClick={() => onToggle(o)} />
+      ))}
+    </div>
+  );
+}
+
+const STEPS = ["Who & Where", "The Home", "Publish"];
 
 export default function ListMyFlat() {
   const { user } = useAuth();
   const navigate = useNavigate();
   const [step, setStep] = useState(0);
   const [saving, setSaving] = useState(false);
-  const [msg, setMsg] = useState({ type:"", text:"" });
   const [errors, setErrors] = useState({});
+  const [published, setPublished] = useState(null); // { row, matches }
 
-  // Step 1
-  const [listingType, setListingType] = useState("room"); // "room" | "flat"
+  // Step 1 — who & where
+  const [postedBy, setPostedBy] = useState("owner");
+  const [phone, setPhone] = useState(user?.phone || "");
   const [area, setArea] = useState("");
-  const [locationDetails, setLocationDetails] = useState("");
+  const [fullAddress, setFullAddress] = useState("");
+  const [landmark, setLandmark] = useState("");
+  const [marker, setMarker] = useState(null); // [lat, lng]
+  const [resolvingAddr, setResolvingAddr] = useState(false);
+  const [landmarkOptions, setLandmarkOptions] = useState([]);
+
+  // Step 2 — the home (Train My Broker parity)
+  const [flatType, setFlatType] = useState("2 BHK");
+  const [bedrooms, setBedrooms] = useState(2);
+  const [bathrooms, setBathrooms] = useState(1);
+  const [furnishing, setFurnishing] = useState("Fully Furnished");
   const [rent, setRent] = useState("");
   const [deposit, setDeposit] = useState("");
   const [availableFrom, setAvailableFrom] = useState("");
-  const [isAgent, setIsAgent] = useState(false);
-  const [bedrooms, setBedrooms] = useState(2);
-  const [bathrooms, setBathrooms] = useState(1);
   const [maxFlatmates, setMaxFlatmates] = useState(1);
-  const [gender, setGender] = useState("any");
+  const [genderPref, setGenderPref] = useState("any");
+  const [occupantsAllowed, setOccupantsAllowed] = useState([...OCCUPANTS]);
+  const [amenities, setAmenities] = useState([]);
+  const [lifestyle, setLifestyle] = useState([]);
+  const [houseRules, setHouseRules] = useState([]);
 
-  // Step 2
+  // Step 3 — describe
   const [title, setTitle] = useState("");
   const [description, setDescription] = useState("");
-  const [isFurnished, setIsFurnished] = useState(true);
-  const [amenities, setAmenities] = useState({});
-  const [houseRules, setHouseRules] = useState({});
-  const [lat, setLat] = useState("");
-  const [lng, setLng] = useState("");
-
-  // Step 3
   const [photoFiles, setPhotoFiles] = useState([]);
   const [photoPreviews, setPhotoPreviews] = useState([]);
+  const [uploadMsg, setUploadMsg] = useState("");
+
+  const propertyId = useMemo(() => generatePropertyId(), []);
 
   useEffect(() => {
-    if (!user) navigate(`/login?next=${encodeURIComponent("/list-my-flat")}`, { replace: true });
+    if (!user) navigate(`/auth?next=${encodeURIComponent("/list-my-flat")}`, { replace: true });
   }, [user, navigate]);
 
-  // Auto-generate title whenever area or listing type changes
   useEffect(() => {
-    if (area) {
-      const prefix = listingType === "flat" ? "Flat Available" : "Flatmate Wanted";
-      setTitle(`${prefix} in ${area}`);
+    if (area) setTitle((t) => t || `${flatType} in ${area}`);
+  }, [area, flatType]);
+
+  const toggleIn = (setter) => (v) =>
+    setter((prev) => (prev.includes(v) ? prev.filter((x) => x !== v) : [...prev, v]));
+
+  // The map is the only source of the flat's exact address: whenever the pin
+  // moves (map click or address search), reverse-geocode it into a readable
+  // address and store both the address text and the coordinates.
+  const handleMarkerChange = async (pos) => {
+    setMarker(pos);
+    if (errors.fullAddress) setErrors((e) => ({ ...e, fullAddress: "" }));
+    if (!pos) { setFullAddress(""); setLandmarkOptions([]); setLandmark(""); return; }
+    setResolvingAddr(true);
+    // Resolve the exact address, and pull nearby named places to offer as landmarks.
+    try {
+      const [r, near] = await Promise.all([
+        reverseGeocode(pos[0], pos[1]),
+        nearbyLandmarks(pos[0], pos[1], { limit: 12 }),
+      ]);
+      setFullAddress(r?.display || "");
+      const opts = (near || []).map((n) => n.display);
+      setLandmarkOptions(opts);
+      // near is already sorted best-first (most prominent place within 1km), so
+      // pre-fill the landmark with the top pick; the user can still change it.
+      setLandmark(opts[0] || "");
+    } catch {
+      setFullAddress("");
+      setLandmarkOptions([]);
+      setLandmark("");
+    } finally {
+      setResolvingAddr(false);
     }
-  }, [area, listingType]);
-
-  const toggleAmenity = k => setAmenities(p => ({ ...p, [k]: !p[k] }));
-  const toggleRule   = k => setHouseRules(p => ({ ...p, [k]: !p[k] }));
-
-  const handlePhotos = (e) => {
-    const files = Array.from(e.target.files);
-    setPhotoFiles(p => [...p, ...files]);
-    setPhotoPreviews(p => [...p, ...files.map(f => URL.createObjectURL(f))]);
   };
-  const removePhoto = i => {
-    setPhotoFiles(p => p.filter((_,idx) => idx !== i));
-    setPhotoPreviews(p => p.filter((_,idx) => idx !== i));
+
+  // Bulk photo picker — accepts a multi-selection straight from the gallery.
+  const addPhotos = (fileList) => {
+    const files = Array.from(fileList || []).filter((f) => f.type.startsWith("image/"));
+    if (!files.length) return;
+    setPhotoFiles((prev) => [...prev, ...files]);
+    setPhotoPreviews((prev) => [...prev, ...files.map((f) => URL.createObjectURL(f))]);
+  };
+  const removePhoto = (i) => {
+    setPhotoPreviews((prev) => { URL.revokeObjectURL(prev[i]); return prev.filter((_, idx) => idx !== i); });
+    setPhotoFiles((prev) => prev.filter((_, idx) => idx !== i));
   };
 
   const validateStep = () => {
     const e = {};
     if (step === 0) {
-      if (!area)  e.area = "Please select an area";
-      if (!rent)  e.rent = "Please enter rent";
+      if (!phone.trim()) e.phone = "Add a contact number";
+      if (!area) e.area = "Select the flat's area";
+      if (!marker) e.fullAddress = "Drop a pin on the map to set the exact address";
     }
     if (step === 1) {
-      if (!title.trim()) e.title = "Please enter a title";
+      if (!rent) e.rent = "Enter the monthly rent";
     }
     setErrors(e);
     return Object.keys(e).length === 0;
   };
 
-  const next = () => { if (validateStep()) setStep(s => Math.min(s+1, 2)); };
-  const back = () => { setErrors({}); setStep(s => Math.max(s-1, 0)); };
+  const next = () => { if (validateStep()) setStep((s) => Math.min(s + 1, 2)); };
+  const back = () => { setErrors({}); setStep((s) => Math.max(s - 1, 0)); };
 
-  const handleSubmit = async (e) => {
-    e.preventDefault();
-    setSaving(true); setMsg({ type:"", text:"" });
+  const buildDraft = (images = []) => ({
+    propertyId,
+    postedBy,
+    phone,
+    area,
+    nearbyAreas: [],
+    fullAddress,
+    landmark,
+    latitude: marker?.[0] ?? null,
+    longitude: marker?.[1] ?? null,
+    rent,
+    deposit,
+    availableFrom,
+    flatType,
+    bedrooms,
+    bathrooms,
+    furnishing,
+    maxFlatmates,
+    genderPref,
+    occupantsAllowed,
+    amenities,
+    lifestyle,
+    houseRules,
+    title,
+    description,
+    images,
+  });
+
+  const handleSubmit = async () => {
+    if (!validateStep()) return;
+    setSaving(true);
+    setErrors({});
+    setUploadMsg("");
     try {
-      const id = crypto.randomUUID();
-      const now = new Date().toISOString();
-      const slug = `${slugify((title||"listing").slice(0,40))}-${Math.floor(Math.random()*9000000+1000000)}`;
+      // 1) Upload the gallery photos, then 2) store the inventory row in the DB.
       let images = [];
-      if (photoFiles.length) images = await uploadListingFiles(photoFiles, id);
-      const latN = parseFloat(lat) || 12.9716;
-      const lngN = parseFloat(lng) || 77.5946;
-
-      await addDoc(collection(db, "listings"), {
-        id,
-        slug,
-        display_title:       title.trim() || `Flatmate Wanted in ${area}`,
-        title:               title.trim() || `Flatmate Wanted in ${area}`,
-        description:         description.trim(),
-        monthly_rent:        String(Number(rent) || 0),
-        security_deposit:    deposit ? String(Number(deposit)) : "0",
-        bedroom_count:       Number(bedrooms),
-        bathroom_count:      Number(bathrooms),
-        is_furnished:        isFurnished,
-        amenities,
-        house_rules:         Object.fromEntries(Object.entries(houseRules).filter(([,v])=>v)),
-        gender_preference:   gender,
-        images,
-        cover_image_url:     images[0] || "",
-        totalImageCount:     images.length,
-        area,
-        city:                "bengaluru",
-        location_details:    locationDetails.trim(),
-        owner_name:          user.name || user.email?.split("@")[0] || "Owner",
-        owner_picture:       "",
-        is_verified:         false,
-        view_count:          0,
-        nearby_localities:   [],
-        created_at:          now,
-        bumped_at:           now,
-        max_flatmates:       Number(maxFlatmates),
-        current_flatmates:   0,
-        precise_coordinates: { x: lngN, y: latN },
-        listing_type:        listingType,
-        is_agent:            isAgent,
-        available_from:      availableFrom || null,
-        owner_uid:           user.uid,
-        owner_email:         user.email,
-        sellerEmail:         user.email?.toLowerCase().trim(),
-        marketStatus:        "published",
-        updatedAt:           serverTimestamp(),
-      });
-
-      setMsg({ type:"ok", text:"Your listing is live! Redirecting…" });
-      setTimeout(() => navigate("/new-listings"), 2000);
+      if (photoFiles.length) {
+        setUploadMsg(`Uploading ${photoFiles.length} photo${photoFiles.length > 1 ? "s" : ""}…`);
+        images = await uploadInventoryPhotos(photoFiles, propertyId, (d, t) => setUploadMsg(`Uploading photos… ${d}/${t}`));
+      }
+      setUploadMsg("");
+      const row = await createInventoryItem(buildDraft(images), user);
+      // Map the new flat against every active seeker requirement.
+      let matches = [];
+      try {
+        const requirements = await fetchAllUserRequirements();
+        matches = matchListingToRequirements(row, requirements, { min: 40 }).slice(0, 8);
+      } catch { /* matching is best-effort */ }
+      setPublished({ row, matches });
+      window.scrollTo({ top: 0, behavior: "smooth" });
     } catch (err) {
       console.error(err);
-      setMsg({ type:"err", text: err?.message || "Something went wrong." });
+      setErrors({ submit: err?.message || "Something went wrong while publishing." });
     } finally {
       setSaving(false);
+      setUploadMsg("");
     }
   };
 
   if (!user) return null;
 
+  /* ── Success / mapping screen ── */
+  if (published) {
+    const { row, matches } = published;
+    const isBroker = postedBy === "broker";
+    const roleLabel = postedBy === "broker" ? "Broker" : postedBy === "tenant" ? "Tenant" : "Owner";
+    return (
+      <PageShell variant="marketing" overlayOnly className="antialiased" style={{ background: "#f0ebe3" }}>
+        <Navbar variant="marketing" />
+        <main className="max-w-2xl mx-auto px-4 pb-16 pt-8">
+          {/* Published confirmation */}
+          <Card>
+            <div className="p-8 text-center">
+              <div className="w-16 h-16 rounded-full mx-auto mb-4 flex items-center justify-center" style={{ background: "#dcfce7" }}>
+                <svg className="w-8 h-8" viewBox="0 0 24 24" fill="none" stroke="#16a34a" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M20 6L9 17l-5-5" /></svg>
+              </div>
+              <h1 className="text-[24px] font-extrabold text-gray-900 mb-1">Your listing is published! 🎉</h1>
+              <p className="text-[13px] text-gray-500 mb-4">It's saved to MovEazy and visible to matching renters. Keep this Property ID for any enquiries.</p>
+              <div className="flex flex-wrap items-center justify-center gap-2">
+                <div className="inline-flex items-center gap-2 px-4 py-2 rounded-xl" style={{ background: "#1c1917" }}>
+                  <span className="text-[11px] font-bold uppercase tracking-wide" style={{ color: "rgba(255,255,255,0.5)" }}>Property ID</span>
+                  <span className="text-[16px] font-extrabold text-white tracking-wider">{row.property_id}</span>
+                </div>
+                <span className="inline-flex items-center px-3 py-2 rounded-xl text-[12px] font-bold" style={{ background: "#fff5f5", color: BRAND_RED }}>
+                  Listed by {roleLabel}
+                </span>
+              </div>
+            </div>
+          </Card>
+
+          {/* Ground-agent verification */}
+          <Card>
+            <div className="p-6 flex items-start gap-4">
+              <div className="w-11 h-11 rounded-xl shrink-0 flex items-center justify-center" style={{ background: "#fff5f5" }}>
+                <svg className="w-6 h-6" viewBox="0 0 24 24" fill="none" stroke={BRAND_RED} strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><path d="M9 11l3 3L22 4" /><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11" /></svg>
+              </div>
+              <div>
+                <p className="text-[15px] font-extrabold text-gray-900 mb-1">A ground agent will verify your property</p>
+                <p className="text-[13px] text-gray-600 leading-relaxed">
+                  One of our MovEazy ground agents will visit <span className="font-semibold">{row.full_address || row.area || "your flat"}</span> to verify the details and photos.
+                  We'll call you on <span className="font-semibold">{row.phone || "your number"}</span> to schedule a convenient time. Verified listings get a trust badge and far more enquiries.
+                </p>
+                <span className="inline-block mt-3 px-2.5 py-1 rounded-full text-[11px] font-bold" style={{ background: "#fef9c3", color: "#a16207" }}>
+                  Status: Pending verification
+                </span>
+              </div>
+            </div>
+          </Card>
+
+          {/* Pitch — brokers grow their portfolio; owners/tenants find their own next home */}
+          {isBroker ? (
+            <div className="rounded-2xl overflow-hidden mb-4" style={{ background: "linear-gradient(135deg,#1c1917,#3b2b28)" }}>
+              <div className="p-6">
+                <p className="text-[11px] font-bold uppercase tracking-wide mb-2" style={{ color: "#e0a83b" }}>Listing as a broker?</p>
+                <p className="text-[18px] font-extrabold text-white leading-snug mb-1">Add your <span style={{ color: "#ff6b57" }}>next property</span> in minutes.</p>
+                <p className="text-[13px] mb-4" style={{ color: "rgba(255,255,255,0.72)" }}>
+                  The more verified homes you list, the more renters we match you with. Post another property now, or manage everything from your broker dashboard.
+                </p>
+                <div className="flex flex-wrap gap-3">
+                  <button type="button" onClick={() => window.location.reload()}
+                    className="inline-flex items-center gap-2 px-5 py-3 rounded-xl text-[14px] font-bold text-white"
+                    style={{ background: `linear-gradient(135deg,${BRAND_RED},#ef4444)` }}>
+                    List another property
+                    <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" strokeWidth="2.4" aria-hidden><path d="M5 12h14M13 6l6 6-6 6" strokeLinecap="round" strokeLinejoin="round" /></svg>
+                  </button>
+                  <button type="button" onClick={() => navigate("/broker")}
+                    className="inline-flex items-center gap-2 px-5 py-3 rounded-xl text-[14px] font-bold"
+                    style={{ background: "rgba(255,255,255,0.12)", color: "#fff" }}>
+                    Go to broker dashboard
+                  </button>
+                </div>
+              </div>
+            </div>
+          ) : (
+            <div className="rounded-2xl overflow-hidden mb-4" style={{ background: "linear-gradient(135deg,#1c1917,#3b2b28)" }}>
+              <div className="p-6">
+                <p className="text-[11px] font-bold uppercase tracking-wide mb-2" style={{ color: "#e0a83b" }}>Moving out yourself?</p>
+                <p className="text-[18px] font-extrabold text-white leading-snug mb-1">Now let us find <span style={{ color: "#ff6b57" }}>your</span> next home.</p>
+                <p className="text-[13px] mb-4" style={{ color: "rgba(255,255,255,0.72)" }}>
+                  You're passing this flat on because you're moving somewhere new. Our AI broker learns exactly what you want and hands you a shortlist worth your time — not a search dump.
+                </p>
+                <button type="button" onClick={() => navigate("/?find=1")}
+                  className="inline-flex items-center gap-2 px-5 py-3 rounded-xl text-[14px] font-bold text-white"
+                  style={{ background: `linear-gradient(135deg,${BRAND_RED},#ef4444)` }}>
+                  Find my next flat
+                  <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" strokeWidth="2.4" aria-hidden><path d="M5 12h14M13 6l6 6-6 6" strokeLinecap="round" strokeLinejoin="round" /></svg>
+                </button>
+              </div>
+            </div>
+          )}
+
+          {/* Secondary: who this flat already matches */}
+          {matches.length > 0 && (
+            <Card>
+              <div className="p-6">
+                <p className="text-[14px] font-extrabold text-gray-900 mb-1">Already matches {matches.length} active seeker{matches.length > 1 ? "s" : ""}</p>
+                <p className="text-[12px] text-gray-500 mb-4">People whose Find My Flat requirements line up with your listing right now.</p>
+                <div className="space-y-2">
+                  {matches.map((m, i) => (
+                    <div key={i} className="flex items-center justify-between p-3 rounded-xl border border-gray-100 bg-gray-50">
+                      <div className="min-w-0">
+                        <p className="text-[13px] font-bold text-gray-800 truncate">
+                          {m.requirement.email || m.requirement.customer_name || m.requirement.name || `Seeker #${String(m.requirement.user_id || i + 1).slice(0, 6)}`}
+                        </p>
+                        <p className="text-[11px] text-gray-500 truncate">{m.reasons.join(" · ") || "Requirement match"}</p>
+                      </div>
+                      <span className="shrink-0 ml-3 px-2.5 py-1 rounded-full text-[12px] font-extrabold text-white" style={{ background: m.score >= 80 ? "#16a34a" : m.score >= 60 ? BRAND_RED : "#e0a83b" }}>
+                        {m.score}%
+                      </span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            </Card>
+          )}
+
+          <div className="flex gap-3">
+            <button type="button" onClick={() => navigate("/map")}
+              className="flex-1 py-3.5 rounded-2xl text-[14px] font-bold text-gray-700 border border-gray-200 bg-white">
+              View on map
+            </button>
+            <button type="button" onClick={() => window.location.reload()}
+              className="flex-1 py-3.5 rounded-2xl text-[14px] font-bold text-gray-700 border border-gray-200 bg-white">
+              {isBroker ? "List another property" : "List another flat"}
+            </button>
+          </div>
+        </main>
+        <Footer />
+      </PageShell>
+    );
+  }
+
   return (
-    <PageShell variant="marketing" overlayOnly className="antialiased" style={{ background:"#f0ebe3" }}>
+    <PageShell variant="marketing" overlayOnly className="antialiased" style={{ background: "#f0ebe3" }}>
       <Navbar variant="marketing" />
 
       <main className="max-w-2xl mx-auto px-4 pb-16 pt-8">
-
         {/* Step tabs */}
-        <div className="flex items-center rounded-full p-1 mb-8" style={{ background:"#1c1917" }}>
-          {STEPS.map((s,i) => (
+        <div className="flex items-center rounded-full p-1 mb-8" style={{ background: "#1c1917" }}>
+          {STEPS.map((s, i) => (
             <button key={s} type="button"
               onClick={() => i < step && setStep(i)}
               className="flex-1 py-2.5 rounded-full text-[13px] font-bold transition-all"
-              style={{ background: i===step?"white":"transparent", color: i===step?"#1c1917":"rgba(255,255,255,0.5)", cursor: i<step?"pointer":"default" }}>
+              style={{ background: i === step ? "white" : "transparent", color: i === step ? "#1c1917" : "rgba(255,255,255,0.5)", cursor: i < step ? "pointer" : "default" }}>
               {s}
             </button>
           ))}
         </div>
 
-        {/* ── STEP 1: The Essentials ── */}
+        {/* ── STEP 1: Who & Where ── */}
         {step === 0 && (
           <div>
             <Card>
               <div className="p-6">
-                <p className="text-[15px] font-extrabold text-gray-900 mb-4">What are you listing?</p>
-                <div className="grid grid-cols-2 gap-3">
-                  {[["room","Vacant Room","Looking for a flatmate"],["flat","Entire Flat","Rent out the whole property"]].map(([v,label,sub]) => (
-                    <button key={v} type="button" onClick={() => setListingType(v)}
-                      className="text-left p-4 rounded-xl border-2 transition-all"
-                      style={{ borderColor: listingType===v ? BRAND_RED : "#e2e8f0", background: listingType===v ? "#fff5f5" : "white" }}>
-                      <div className="flex items-center gap-2 mb-1">
-                        <div className="w-4 h-4 rounded-full border-2 flex items-center justify-center shrink-0"
-                          style={{ borderColor: listingType===v ? BRAND_RED : "#d1d5db" }}>
-                          {listingType===v && <div className="w-2 h-2 rounded-full" style={{ background:BRAND_RED }} />}
-                        </div>
-                        <span className="text-[14px] font-extrabold text-gray-900">{label}</span>
-                      </div>
-                      <p className="text-[12px] text-gray-500 ml-6">{sub}</p>
+                <p className="text-[15px] font-extrabold text-gray-900 mb-4">Who's posting this flat?</p>
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                  {POSTER_ROLES.map(([v, label, sub]) => (
+                    <button key={v} type="button" onClick={() => setPostedBy(v)}
+                      className="text-left p-3.5 rounded-xl border-2 transition-all"
+                      style={{ borderColor: postedBy === v ? BRAND_RED : "#e2e8f0", background: postedBy === v ? "#fff5f5" : "white" }}>
+                      <span className="text-[13px] font-extrabold text-gray-900 block mb-0.5">{label}</span>
+                      <span className="text-[11px] text-gray-500 leading-tight block">{sub}</span>
                     </button>
                   ))}
+                </div>
+                <div className="mt-4">
+                  <Label required>Contact Phone</Label>
+                  <input value={phone} onChange={(e) => setPhone(e.target.value)} placeholder="10-digit mobile number" className={inp} />
+                  {errors.phone && <p className="text-[11px] text-red-500 mt-1 font-semibold">{errors.phone}</p>}
                 </div>
               </div>
             </Card>
 
+            {/* 1 — Area */}
             <Card>
               <div className="p-6 grid grid-cols-2 gap-4">
                 <div>
@@ -250,33 +419,114 @@ export default function ListMyFlat() {
                 </div>
                 <div>
                   <Label required>Area</Label>
-                  <select value={area} onChange={e => setArea(e.target.value)} className={inp}>
-                    <option value="">Koramangala, BTM Layout…</option>
-                    {AREAS.map(a => <option key={a}>{a}</option>)}
+                  <select value={area} onChange={(e) => setArea(e.target.value)} className={inp}>
+                    <option value="">Select a locality…</option>
+                    {ALL_LOCALITIES.map((a) => <option key={a}>{a}</option>)}
+                    <option value="Other">Other</option>
                   </select>
                   {errors.area && <p className="text-[11px] text-red-500 mt-1 font-semibold">{errors.area}</p>}
                 </div>
-                <div className="col-span-2">
-                  <Label>Precise / Nearby Address</Label>
-                  <input value={locationDetails} onChange={e => setLocationDetails(e.target.value)}
-                    placeholder="e.g., Near Forum Mall, 100 Feet Road" className={inp} />
+              </div>
+            </Card>
+
+            {/* 2 — Exact address, map-based */}
+            <Card>
+              <div className="p-6">
+                <p className="text-[14px] font-extrabold text-gray-900 mb-1">
+                  Exact Address of the Flat <span className="text-red-500">*</span>
+                </p>
+                <p className="text-[12px] text-gray-400 mb-3">Search an address or tap the map to drop the pin. This is the flat's exact location — renters see it here on the map.</p>
+                <ListingMapPicker markerPosition={marker} onMarkerChange={handleMarkerChange} height={280} focusQuery={area && area !== "Other" ? `${area}, Bengaluru` : ""} />
+                {marker && (
+                  <div className="mt-3 p-3 rounded-xl border border-gray-100 bg-gray-50">
+                    <p className="text-[11px] font-bold uppercase tracking-wide text-gray-400 mb-0.5">Pinned address</p>
+                    <p className="text-[13px] font-semibold text-gray-800">
+                      {resolvingAddr ? "Looking up address…" : (fullAddress || "Address unavailable — the pin location is saved.")}
+                    </p>
+                    <p className="text-[11px] text-gray-400 mt-1">{marker[0].toFixed(5)}, {marker[1].toFixed(5)}</p>
+                  </div>
+                )}
+                {errors.fullAddress && <p className="text-[11px] text-red-500 mt-2 font-semibold">{errors.fullAddress}</p>}
+              </div>
+            </Card>
+
+            {/* 3 — Nearby landmark, pre-filled from the map (best place within 1km) */}
+            <Card>
+              <div className="p-6">
+                <Label>Nearby Landmark</Label>
+                <select value={landmark} onChange={(e) => setLandmark(e.target.value)}
+                  disabled={landmarkOptions.length === 0} className={inp + (landmarkOptions.length === 0 ? " bg-gray-50 cursor-not-allowed text-gray-400" : "")}>
+                  <option value="">
+                    {resolvingAddr ? "Finding the best landmark nearby…" : landmarkOptions.length === 0 ? "Drop a pin on the map above first…" : "Select a nearby landmark…"}
+                  </option>
+                  {landmarkOptions.map((o) => <option key={o} value={o}>{o}</option>)}
+                </select>
+                {landmark && landmarkOptions.length > 0 && (
+                  <p className="text-[11px] text-gray-400 mt-1.5">Auto-picked the most prominent spot within 1&nbsp;km — change it if you'd prefer another.</p>
+                )}
+              </div>
+            </Card>
+          </div>
+        )}
+
+        {/* ── STEP 2: The Home ── */}
+        {step === 1 && (
+          <div>
+            <Card>
+              <div className="p-6">
+                <p className="text-[14px] font-extrabold text-gray-900 mb-3">Home type</p>
+                <div className="flex flex-wrap gap-2 mb-4">
+                  {FLAT_TYPES.map((t) => (
+                    <Chip key={t} label={t} active={flatType === t} onClick={() => setFlatType(t)} />
+                  ))}
                 </div>
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <Label>Bedrooms</Label>
+                    <select value={bedrooms} onChange={(e) => setBedrooms(Number(e.target.value))} className={inp}>
+                      {[1, 2, 3, 4, 5].map((n) => <option key={n} value={n}>{n}</option>)}
+                    </select>
+                  </div>
+                  <div>
+                    <Label>Bathrooms</Label>
+                    <select value={bathrooms} onChange={(e) => setBathrooms(Number(e.target.value))} className={inp}>
+                      {[1, 2, 3, 4].map((n) => <option key={n} value={n}>{n}</option>)}
+                    </select>
+                  </div>
+                </div>
+              </div>
+            </Card>
+
+            <Card>
+              <div className="p-6 grid grid-cols-2 gap-4">
                 <div>
                   <Label required>Monthly Rent (₹)</Label>
-                  <input type="number" value={rent} onChange={e => setRent(e.target.value)} placeholder="25,000" min="0" className={inp} />
+                  <input type="number" min="0" value={rent} onChange={(e) => setRent(e.target.value)} placeholder="35,000" className={inp} />
                   {errors.rent && <p className="text-[11px] text-red-500 mt-1 font-semibold">{errors.rent}</p>}
                 </div>
                 <div>
-                  <Label>Security Deposit</Label>
-                  <input type="number" value={deposit} onChange={e => setDeposit(e.target.value)} placeholder="50,000" min="0" className={inp} />
+                  <Label>Security Deposit (₹)</Label>
+                  <input type="number" min="0" value={deposit} onChange={(e) => setDeposit(e.target.value)} placeholder="1,00,000" className={inp} />
                 </div>
                 <div>
                   <Label>Available From</Label>
-                  <input type="date" value={availableFrom} onChange={e => setAvailableFrom(e.target.value)} className={inp} />
+                  <input type="date" value={availableFrom} onChange={(e) => setAvailableFrom(e.target.value)} className={inp} />
                 </div>
                 <div>
-                  <Label>Looking For</Label>
-                  <select value={gender} onChange={e => setGender(e.target.value)} className={inp}>
+                  <Label>Furnishing</Label>
+                  <select value={furnishing} onChange={(e) => setFurnishing(e.target.value)} className={inp}>
+                    {FURNISHINGS.map((f) => <option key={f}>{f}</option>)}
+                  </select>
+                </div>
+                <div>
+                  <Label>Max Flatmates</Label>
+                  <select value={maxFlatmates} onChange={(e) => setMaxFlatmates(Number(e.target.value))} className={inp}>
+                    {[0, 1, 2, 3, 4, 5, 6].map((n) => <option key={n} value={n}>{n}</option>)}
+                  </select>
+                </div>
+                <div>
+                  <Label>Preferred Tenant Gender</Label>
+                  <select value={genderPref} onChange={(e) => setGenderPref(e.target.value)} className={inp}>
                     <option value="any">Co-ed / Any</option>
                     <option value="female">Girls Only</option>
                     <option value="male">Boys Only</option>
@@ -287,150 +537,82 @@ export default function ListMyFlat() {
 
             <Card>
               <div className="p-6">
-                <p className="text-[14px] font-extrabold text-gray-900 mb-3">Are you an Agent/Broker?</p>
-                {[["false","No, I'm the owner/existing tenant"],["true","Yes, I'm an agent/broker"]].map(([v,label]) => (
-                  <button key={v} type="button" onClick={() => setIsAgent(v==="true")}
-                    className="w-full flex items-center gap-3 p-3 rounded-xl mb-2 text-left border transition-all"
-                    style={{ borderColor: String(isAgent)===v ? BRAND_RED : "#e2e8f0", background: String(isAgent)===v ? "#fff5f5" : "white" }}>
-                    <div className="w-4 h-4 rounded-full border-2 shrink-0 flex items-center justify-center"
-                      style={{ borderColor: String(isAgent)===v ? BRAND_RED : "#d1d5db" }}>
-                      {String(isAgent)===v && <div className="w-2 h-2 rounded-full" style={{ background:BRAND_RED }} />}
-                    </div>
-                    <span className="text-[13px] font-medium text-gray-700">{label}</span>
-                  </button>
-                ))}
-                <p className="text-[11px] text-gray-400 mt-1">Being transparent builds trust with renters</p>
+                <p className="text-[14px] font-extrabold text-gray-900 mb-3">Who can live here?</p>
+                <ChipMulti options={OCCUPANTS} selected={occupantsAllowed} onToggle={toggleIn(setOccupantsAllowed)} />
               </div>
             </Card>
 
             <Card>
               <div className="p-6">
-                <p className="text-[14px] font-extrabold text-gray-900 mb-3">Your flat size <span className="text-red-500">*</span></p>
-                <div className="flex gap-2 flex-wrap mb-4">
-                  {[1,2,3,4].map(n => (
-                    <button key={n} type="button" onClick={() => setBedrooms(n)}
-                      className="px-5 py-2 rounded-xl text-[13px] font-bold border-2 transition-all"
-                      style={{ borderColor: bedrooms===n ? BRAND_RED : "#e2e8f0", background: bedrooms===n ? BRAND_RED : "white", color: bedrooms===n ? "white" : "#374151" }}>
-                      {n === 4 ? "4+ BHK" : `${n} BHK`}
-                    </button>
-                  ))}
-                </div>
-                <div className="grid grid-cols-2 gap-4">
-                  <div>
-                    <Label>Bathrooms</Label>
-                    <select value={bathrooms} onChange={e => setBathrooms(Number(e.target.value))} className={inp}>
-                      {[1,2,3,4].map(n => <option key={n} value={n}>{n}</option>)}
-                    </select>
-                  </div>
-                  <div>
-                    <Label>Max Flatmates Allowed</Label>
-                    <select value={maxFlatmates} onChange={e => setMaxFlatmates(Number(e.target.value))} className={inp}>
-                      {[1,2,3,4,5,6].map(n => <option key={n} value={n}>{n}</option>)}
-                    </select>
-                  </div>
-                </div>
-              </div>
-            </Card>
-          </div>
-        )}
-
-        {/* ── STEP 2: Describe Your Space ── */}
-        {step === 1 && (
-          <div>
-            <Card>
-              <div className="p-6">
-                <div className="mb-4">
-                  <Label required>Listing Title</Label>
-                  <input value={title} onChange={e => setTitle(e.target.value)}
-                    placeholder="e.g. Flatmate Wanted in Koramangala" className={inp} />
-                  {errors.title && <p className="text-[11px] text-red-500 mt-1 font-semibold">{errors.title}</p>}
-                </div>
-                <div>
-                  <Label>Description</Label>
-                  <textarea value={description} onChange={e => setDescription(e.target.value)}
-                    placeholder="Describe the flat, the vibe, what you're looking for in a flatmate…"
-                    rows={4} className={inp + " resize-none"} />
-                </div>
+                <p className="text-[14px] font-extrabold text-gray-900 mb-3">Amenities / Must-haves</p>
+                <ChipMulti options={MUST_HAVES} selected={amenities} onToggle={toggleIn(setAmenities)} />
               </div>
             </Card>
 
             <Card>
               <div className="p-6">
-                <p className="text-[14px] font-extrabold text-gray-900 mb-3">Furnishing</p>
-                <div className="flex gap-2">
-                  {[["true","Fully Furnished"],["false","Unfurnished"]].map(([v,l]) => (
-                    <Chip key={v} label={l} active={String(isFurnished)===v} onClick={() => setIsFurnished(v==="true")} />
-                  ))}
-                </div>
-              </div>
-            </Card>
-
-            <Card>
-              <div className="p-6">
-                <p className="text-[14px] font-extrabold text-gray-900 mb-3">Amenities</p>
-                <div className="flex flex-wrap gap-2">
-                  {AMENITY_OPTIONS.map(([key,label]) => (
-                    <Chip key={key} label={label} active={!!amenities[key]} onClick={() => toggleAmenity(key)} />
-                  ))}
-                </div>
+                <p className="text-[14px] font-extrabold text-gray-900 mb-3">Lifestyle nearby</p>
+                <ChipMulti options={LIFESTYLE} selected={lifestyle} onToggle={toggleIn(setLifestyle)} />
               </div>
             </Card>
 
             <Card>
               <div className="p-6">
                 <p className="text-[14px] font-extrabold text-gray-900 mb-3">House Rules / Tags</p>
-                <div className="flex flex-wrap gap-2">
-                  {RULE_OPTIONS.map(rule => (
-                    <Chip key={rule} label={rule} active={!!houseRules[rule]} onClick={() => toggleRule(rule)} />
-                  ))}
-                </div>
-              </div>
-            </Card>
-
-            <Card>
-              <div className="p-6">
-                <p className="text-[14px] font-extrabold text-gray-900 mb-1">Map Coordinates <span className="text-[12px] font-normal text-gray-400">(optional — helps renters find you on the map)</span></p>
-                <div className="grid grid-cols-2 gap-4 mt-3">
-                  <div>
-                    <Label>Latitude</Label>
-                    <input type="number" step="any" value={lat} onChange={e => setLat(e.target.value)} placeholder="12.9716" className={inp} />
-                  </div>
-                  <div>
-                    <Label>Longitude</Label>
-                    <input type="number" step="any" value={lng} onChange={e => setLng(e.target.value)} placeholder="77.5946" className={inp} />
-                  </div>
-                </div>
+                <ChipMulti options={RULE_OPTIONS} selected={houseRules} onToggle={toggleIn(setHouseRules)} />
               </div>
             </Card>
           </div>
         )}
 
-        {/* ── STEP 3: Photos & Publish ── */}
+        {/* ── STEP 3: Publish ── */}
         {step === 2 && (
           <div>
             <Card>
               <div className="p-6">
-                <p className="text-[15px] font-extrabold text-gray-900 mb-1">Upload Photos</p>
-                <p className="text-[12px] text-gray-400 mb-4">Good photos get 3× more enquiries. Add at least 3.</p>
+                <div className="mb-4">
+                  <Label>Listing Title</Label>
+                  <input value={title} onChange={(e) => setTitle(e.target.value)}
+                    placeholder="e.g. Bright 2 BHK in HSR" className={inp} />
+                </div>
+                <div>
+                  <Label>Description</Label>
+                  <textarea value={description} onChange={(e) => setDescription(e.target.value)}
+                    placeholder="Describe the flat, the vibe, and what makes it special…"
+                    rows={4} className={inp + " resize-none"} />
+                </div>
+              </div>
+            </Card>
+
+            {/* Photos — bulk upload straight from the gallery */}
+            <Card>
+              <div className="p-6">
+                <div className="flex items-center justify-between mb-1">
+                  <p className="text-[14px] font-extrabold text-gray-900">Photos</p>
+                  <span className="text-[11px] text-gray-400">{photoPreviews.length} added</span>
+                </div>
+                <p className="text-[12px] text-gray-400 mb-3">Add a few clear photos — you can select many at once from your gallery.</p>
+
                 <label className="block cursor-pointer">
-                  <div className="border-2 border-dashed border-gray-200 rounded-xl p-8 text-center bg-gray-50 hover:border-red-300 hover:bg-red-50 transition-all">
-                    <svg className="w-10 h-10 mx-auto mb-3 text-gray-300" fill="none" stroke="currentColor" strokeWidth="1.5" viewBox="0 0 24 24">
+                  <div className="border-2 border-dashed border-gray-200 rounded-xl px-4 py-7 text-center hover:border-red-300 hover:bg-red-50/40 transition-colors">
+                    <svg className="w-8 h-8 mx-auto mb-2 text-gray-300" fill="none" stroke="currentColor" strokeWidth="1.6" viewBox="0 0 24 24">
                       <path strokeLinecap="round" strokeLinejoin="round" d="M3 16.5v2.25A2.25 2.25 0 005.25 21h13.5A2.25 2.25 0 0021 18.75V16.5m-13.5-9L12 3m0 0l4.5 4.5M12 3v13.5" />
                     </svg>
-                    <p className="text-[14px] font-semibold text-gray-600">Click to upload photos</p>
-                    <p className="text-[12px] text-gray-400 mt-1">JPG, PNG, WEBP — multiple files</p>
+                    <p className="text-[13px] font-bold text-gray-700">Tap to upload photos</p>
+                    <p className="text-[11px] text-gray-400 mt-0.5">Select multiple from your gallery · JPG, PNG, WEBP</p>
                   </div>
-                  <input type="file" accept="image/*" multiple onChange={handlePhotos} className="hidden" />
+                  <input type="file" accept="image/*" multiple className="hidden"
+                    onChange={(e) => { addPhotos(e.target.files); e.target.value = ""; }} />
                 </label>
+
                 {photoPreviews.length > 0 && (
-                  <div className="flex flex-wrap gap-3 mt-4">
-                    {photoPreviews.map((src,i) => (
-                      <div key={i} className="relative w-24 h-24 rounded-xl overflow-hidden border border-gray-200">
+                  <div className="grid grid-cols-4 gap-2 mt-3">
+                    {photoPreviews.map((src, i) => (
+                      <div key={i} className="relative aspect-square rounded-lg overflow-hidden border border-gray-200">
                         <img src={src} alt="" className="w-full h-full object-cover" />
                         <button type="button" onClick={() => removePhoto(i)}
-                          className="absolute top-1 right-1 w-5 h-5 rounded-full bg-black/60 text-white text-[10px] flex items-center justify-center border-none cursor-pointer">
-                          ✕
-                        </button>
+                          className="absolute top-1 right-1 w-5 h-5 rounded-full bg-black/60 text-white text-[11px] leading-none flex items-center justify-center">×</button>
+                        {i === 0 && <span className="absolute bottom-1 left-1 px-1.5 py-0.5 rounded bg-black/60 text-white text-[9px] font-bold">COVER</span>}
                       </div>
                     ))}
                   </div>
@@ -438,31 +620,34 @@ export default function ListMyFlat() {
               </div>
             </Card>
 
-            {/* Summary */}
             <Card>
               <div className="p-6">
                 <p className="text-[14px] font-extrabold text-gray-900 mb-3">Listing Summary</p>
                 <div className="space-y-2 text-[13px] text-gray-600">
-                  <div className="flex justify-between"><span>Type</span><span className="font-semibold text-gray-900">{listingType === "room" ? "Vacant Room" : "Entire Flat"}</span></div>
-                  <div className="flex justify-between"><span>Area</span><span className="font-semibold text-gray-900">{area || "—"}</span></div>
-                  <div className="flex justify-between"><span>Rent</span><span className="font-semibold text-gray-900">₹{rent ? Number(rent).toLocaleString("en-IN") : "—"}</span></div>
-                  <div className="flex justify-between"><span>Size</span><span className="font-semibold text-gray-900">{bedrooms} BHK</span></div>
-                  <div className="flex justify-between"><span>For</span><span className="font-semibold text-gray-900 capitalize">{gender === "any" ? "Co-ed" : gender === "female" ? "Girls Only" : "Boys Only"}</span></div>
-                  <div className="flex justify-between"><span>Photos</span><span className="font-semibold text-gray-900">{photoPreviews.length}</span></div>
+                  <Row k="Property ID" v={propertyId} mono />
+                  <Row k="Posted by" v={postedBy[0].toUpperCase() + postedBy.slice(1)} />
+                  <Row k="Area" v={area || "—"} />
+                  <Row k="Address" v={fullAddress || "—"} />
+                  <Row k="Landmark" v={landmark || "—"} />
+                  <Row k="Type" v={flatType} />
+                  <Row k="Rent" v={rent ? `₹${Number(rent).toLocaleString("en-IN")}` : "—"} />
+                  <Row k="Location pin" v={marker ? `${marker[0].toFixed(4)}, ${marker[1].toFixed(4)}` : "Not set"} />
+                  <Row k="Amenities" v={amenities.length ? `${amenities.length} selected` : "—"} />
+                  <Row k="Photos" v={photoPreviews.length ? `${photoPreviews.length} added` : "None"} />
                 </div>
               </div>
             </Card>
 
-            {msg.text && (
-              <div className={`mb-4 p-4 rounded-xl text-[13px] font-medium border ${msg.type==="ok"?"bg-green-50 text-green-800 border-green-200":"bg-red-50 text-red-700 border-red-200"}`}>
-                {msg.text}
+            {errors.submit && (
+              <div className="mb-4 p-4 rounded-xl text-[13px] font-medium border bg-red-50 text-red-700 border-red-200">
+                {errors.submit}
               </div>
             )}
 
             <button type="button" onClick={handleSubmit} disabled={saving}
               className="w-full py-4 rounded-2xl text-[16px] font-bold text-white transition-opacity disabled:opacity-60"
-              style={{ background:`linear-gradient(135deg,${BRAND_RED},#ef4444)` }}>
-              {saving ? "Publishing your listing…" : "Publish Listing →"}
+              style={{ background: `linear-gradient(135deg,${BRAND_RED},#ef4444)` }}>
+              {saving ? (uploadMsg || "Publishing & matching…") : "Publish Listing →"}
             </button>
           </div>
         )}
@@ -474,19 +659,26 @@ export default function ListMyFlat() {
                 className="flex items-center gap-2 px-5 py-2.5 rounded-xl border border-gray-200 bg-white text-[13px] font-bold text-gray-700 hover:bg-gray-50 transition-colors">
                 ← Back
               </button>
-            : <div />
-          }
+            : <div />}
           {step < 2 && (
             <button type="button" onClick={next}
               className="flex items-center gap-2 px-6 py-2.5 rounded-xl text-[13px] font-bold text-white transition-opacity hover:opacity-90"
-              style={{ background:`linear-gradient(135deg,${BRAND_RED},#ef4444)` }}>
+              style={{ background: `linear-gradient(135deg,${BRAND_RED},#ef4444)` }}>
               Continue →
             </button>
           )}
         </div>
-
       </main>
       <Footer />
     </PageShell>
+  );
+}
+
+function Row({ k, v, mono }) {
+  return (
+    <div className="flex justify-between gap-4">
+      <span className="shrink-0">{k}</span>
+      <span className={`font-semibold text-gray-900 text-right truncate ${mono ? "tracking-wider" : ""}`}>{v}</span>
+    </div>
   );
 }

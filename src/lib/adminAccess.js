@@ -1,6 +1,6 @@
 import { supabase, isSupabaseConfigured } from "./supabase";
 
-const DEFAULT_BOOTSTRAP = "jiyanshudhaka20@gmail.com";
+const DEFAULT_BOOTSTRAP = "yatharth200018@gmail.com";
 
 /** Emails from VITE_ADMIN_EMAILS — always treated as admin even before the table exists. */
 export function getEnvAdminEmails() {
