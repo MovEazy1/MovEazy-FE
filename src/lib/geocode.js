@@ -65,13 +65,15 @@ export async function searchPlaces(query, { limit = 6, signal } = {}) {
   const raw = String(query || "").trim();
   if (raw.length < 3) return [];
 
+  // Bias to Bengaluru in the query text (Photon's `bbox` param is a hard filter
+  // that drops even valid local hits, so we over-fetch and box-filter below).
+  const q = /bangalore|bengaluru|karnataka/i.test(raw) ? raw : `${raw}, Bengaluru`;
   const url = new URL("https://photon.komoot.io/api/");
-  url.searchParams.set("q", raw);
-  url.searchParams.set("limit", String(limit));
+  url.searchParams.set("q", q);
+  url.searchParams.set("limit", String(Math.max(limit * 4, 20)));
   url.searchParams.set("lang", "en");
   url.searchParams.set("lat", String(BLR_CENTER.lat));
   url.searchParams.set("lon", String(BLR_CENTER.lon));
-  url.searchParams.set("bbox", BLR_BBOX);
 
   let data;
   try {
@@ -81,7 +83,11 @@ export async function searchPlaces(query, { limit = 6, signal } = {}) {
   } catch {
     return []; // aborted or network error — caller keeps previous results
   }
-  const feats = Array.isArray(data?.features) ? data.features : [];
+  const [minLon, minLat, maxLon, maxLat] = BLR_BBOX.split(",").map(Number);
+  const feats = (Array.isArray(data?.features) ? data.features : []).filter((f) => {
+    const c = f.geometry?.coordinates;
+    return c && c[0] >= minLon && c[0] <= maxLon && c[1] >= minLat && c[1] <= maxLat;
+  });
 
   return feats
     .map((f, i) => {
@@ -98,7 +104,8 @@ export async function searchPlaces(query, { limit = 6, signal } = {}) {
         lng: Number.isFinite(lng) ? lng : null,
       };
     })
-    .filter((x) => x.lat != null);
+    .filter((x) => x.lat != null)
+    .slice(0, limit);
 }
 
 /**
@@ -127,5 +134,81 @@ export async function reverseGeocode(lat, lng, { signal } = {}) {
     };
   } catch {
     return null;
+  }
+}
+
+// Metres between two lat/lng points (haversine).
+function distanceMeters(aLat, aLng, bLat, bLng) {
+  const R = 6371000;
+  const toRad = (d) => (d * Math.PI) / 180;
+  const dLat = toRad(bLat - aLat);
+  const dLng = toRad(bLng - aLng);
+  const s = Math.sin(dLat / 2) ** 2 +
+    Math.cos(toRad(aLat)) * Math.cos(toRad(bLat)) * Math.sin(dLng / 2) ** 2;
+  return 2 * R * Math.asin(Math.min(1, Math.sqrt(s)));
+}
+
+// OSM has no ratings, so approximate "most-rated / prominent" by category:
+// destinations people actually navigate by rank highest, plain roads lowest.
+const PROMINENCE = {
+  "railway:station": 100, "railway:subway": 100, "railway:halt": 80,
+  "aeroway:aerodrome": 100,
+  "shop:mall": 95, "shop:department_store": 80, "shop:supermarket": 70,
+  "tourism:attraction": 90, "tourism:hotel": 60, "tourism:museum": 75,
+  "amenity:hospital": 88, "amenity:university": 85, "amenity:college": 78,
+  "amenity:marketplace": 72, "amenity:place_of_worship": 68, "amenity:cinema": 70,
+  "amenity:stadium": 82, "leisure:stadium": 82, "leisure:park": 74,
+  "office:*": 66, "amenity:bank": 55, "amenity:restaurant": 45, "amenity:cafe": 42,
+  "amenity:*": 40, "shop:*": 40, "leisure:*": 45, "tourism:*": 50,
+  "place:suburb": 60, "place:neighbourhood": 55, "place:*": 50,
+  "highway:*": 8, "power:*": 2, "building:*": 15,
+};
+
+function prominenceOf(p) {
+  const key = p?.osm_key, val = p?.osm_value;
+  if (key && val && PROMINENCE[`${key}:${val}`] != null) return PROMINENCE[`${key}:${val}`];
+  if (key && PROMINENCE[`${key}:*`] != null) return PROMINENCE[`${key}:*`];
+  return 20;
+}
+
+/**
+ * Nearby named places/landmarks around a point, for a "pick a landmark" dropdown.
+ * Uses Photon reverse, keeps only named features within `maxMeters`, and sorts by
+ * prominence (most navigable landmark first), then by distance. Returns [] on failure.
+ * @returns {Promise<Array<{label,display,lat,lng,distanceMeters,prominence}>>}
+ */
+export async function nearbyLandmarks(lat, lng, { limit = 25, maxMeters = 1000, signal } = {}) {
+  const url = new URL("https://photon.komoot.io/reverse");
+  url.searchParams.set("lat", String(lat));
+  url.searchParams.set("lon", String(lng));
+  url.searchParams.set("lang", "en");
+  url.searchParams.set("limit", String(limit));
+  try {
+    const res = await fetch(url.toString(), { headers: { Accept: "application/json" }, signal });
+    if (!res.ok) return [];
+    const data = await res.json();
+    const features = Array.isArray(data?.features) ? data.features : [];
+    const seen = new Set();
+    const out = [];
+    for (const f of features) {
+      const props = f.properties || {};
+      // Only named points of interest make good landmarks — skip bare roads/streets.
+      if (!props.name) continue;
+      const { primary, secondary } = photonLabel(props, "");
+      if (!primary) continue;
+      const display = [primary, secondary.split(",")[0]].filter(Boolean).join(", ");
+      const key = display.toLowerCase();
+      if (seen.has(key)) continue;
+      const [flng, flat] = f.geometry?.coordinates || [lng, lat];
+      const dist = distanceMeters(lat, lng, flat, flng);
+      if (dist > maxMeters) continue;
+      seen.add(key);
+      out.push({ label: display, display, lat: flat, lng: flng, distanceMeters: Math.round(dist), prominence: prominenceOf(props) });
+    }
+    // Most prominent first; ties broken by proximity.
+    out.sort((a, b) => (b.prominence - a.prominence) || (a.distanceMeters - b.distanceMeters));
+    return out;
+  } catch {
+    return [];
   }
 }

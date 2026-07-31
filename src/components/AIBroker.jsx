@@ -17,8 +17,15 @@ import { motion, AnimatePresence, Reorder } from "framer-motion";
 import { MapContainer, TileLayer, Marker, useMap, useMapEvents, ZoomControl } from "react-leaflet";
 import L from "leaflet";
 import "leaflet/dist/leaflet.css";
-import { getListings } from "../lib/store";
 import { geocodePlace, searchPlaces, reverseGeocode } from "../lib/geocode";
+import { useAuth } from "../context/AuthContext";
+import { saveUserRequirement } from "../lib/userRequirements";
+import { fetchPublishedInventory } from "../lib/inventory";
+import { matchRequirementToListings } from "../lib/inventoryMatch";
+import {
+  LOCALITIES, LOCALITIES_MORE, OCCUPANTS, FLAT_TYPES, MUST_HAVES,
+  LIFESTYLE, DEALBREAKERS, OFFICE_CHIPS,
+} from "../data/preferenceOptions";
 
 const C = {
   ink: "#1C1A17", cream: "#FBF9F4", cream2: "#F3EEE4",
@@ -31,17 +38,10 @@ const EASE = [0.22, 1, 0.36, 1];
 const fmtINR = (n) => `₹${Number(n).toLocaleString("en-IN")}`;
 
 /* ── Question data ─────────────────────────────────────────────────────────── */
-const LOCALITIES = ["HSR", "Koramangala", "Indiranagar", "Bellandur", "Whitefield", "Electronic City", "Sarjapur", "BTM", "JP Nagar", "Marathahalli"];
-const LOCALITIES_MORE = ["Jayanagar", "Hebbal", "Mahadevpura", "Bannerghatta Rd", "Yelahanka", "Rajajinagar"];
-const OCCUPANTS = ["Bachelor", "Family", "Couple", "Working Professionals", "Students", "Pet Owner"];
-const FLAT_TYPES = ["1 RK", "1 BHK", "2 BHK", "3 BHK", "Villa", "Room in Preoccupied flat"];
-const MUST_HAVES = ["Balcony", "Gym", "Swimming Pool", "Lift", "Covered Parking", "Power Backup", "Security", "Terrace", "Garden", "Maid Room", "Modular Kitchen", "Study Room", "Pet Friendly", "Near Metro", "Near Office", "Gated Society", "Good Sunlight", "Quiet Area", "High Floor", "Low Floor"];
-const LIFESTYLE = ["Walkable cafes", "Nightlife", "Parks", "Running Track", "Office Commute", "Schools", "Hospitals", "Grocery Nearby", "Peaceful Area", "Young Crowd", "Community Living"];
-const DEALBREAKERS = ["No Sunlight", "Ground Floor", "Too Far From Metro", "Bachelor Restrictions", "Old Buildings", "Small Kitchen", "Traffic Heavy Roads", "Water Problems", "Poor Mobile Network"];
-const OFFICE_CHIPS = ["Manyata Tech Park", "Embassy Tech Village", "Bagmane Tech Park", "Electronic City", "RMZ Ecoworld", "Prestige Tech Park"];
-const AGES = ["18–24", "25–30", "31–35", "36–45", "46+"];
+/* Vocabulary now lives in ../data/preferenceOptions.js so the List my Flat
+   supply side describes homes with the identical option strings. */
 
-const ACKS = ["Perfect.", "That's helpful.", "Got it.", "Noted — I'll keep that in mind.", "Great, that saves us time.", "Lovely choice.", "Understood."];
+const ACKS =["Perfect.", "That's helpful.", "Got it.", "Noted — I'll keep that in mind.", "Great, that saves us time.", "Lovely choice.", "Understood."];
 
 const ROADMAP = [
   { key: "location", label: "Location", icon: "📍" },
@@ -195,25 +195,25 @@ function NoteField({ value, onChange, placeholder }) {
 /* ── Main ──────────────────────────────────────────────────────────────────── */
 const STEPS = [
   { id: "office", group: "location", type: "location" },
-  { id: "age", group: "location", type: "single", q: "And roughly how old are you?", sub: "Helps me judge the right neighbourhood vibe.", options: AGES },
   { id: "localities", group: "location", type: "multi", q: "Which localities are you considering?", sub: "Pick as many as you like — I'll focus my search here.", options: LOCALITIES, more: LOCALITIES_MORE },
-  { id: "budget", group: "budget", type: "budget", q: "What's your monthly rent range?", sub: "Drag both ends. I'll respect it — with one exception below." },
+  { id: "budget", group: "budget", type: "budget", q: "What's your monthly rent range?", sub: "Drag both ends to set your range." },
   { id: "occupants", group: "home", type: "multi", q: "Who'll be living there?", sub: "Select everyone who applies.", options: OCCUPANTS },
-  { id: "flatTypes", group: "home", type: "multi", q: "What kind of home works?", sub: "All selected by default — untick anything that's a no.", options: FLAT_TYPES, defaultAll: true },
+  { id: "flatTypes", group: "home", type: "multi", q: "What kind of home works?", sub: "All are selected by default — untick anything that won't work for you.", options: FLAT_TYPES, defaultAll: true },
   { id: "mustHaves", group: "amenities", type: "multi", q: "Any must-haves?", sub: "The things you'd really rather not compromise on.", options: MUST_HAVES },
   { id: "lifestyle", group: "lifestyle", type: "multi", q: "What matters most for your lifestyle?", sub: "Choose up to five.", options: LIFESTYLE, max: 5 },
-  { id: "dealBreakers", group: "dealbreakers", type: "multi", q: "What should I never recommend?", sub: "Your hard nos. I'll filter these out entirely.", options: DEALBREAKERS },
-  { id: "priority", group: "dealbreakers", type: "rank", q: "Finally — rank these by what matters most.", sub: "Drag to reorder, top = most important." },
+  { id: "dealBreakers", group: "dealbreakers", type: "multi", q: "What should I never recommend?", sub: "Your hard nos — I'll filter these out entirely.", options: DEALBREAKERS },
+  { id: "priority", group: "dealbreakers", type: "rank", q: "Finally — rank these by what matters most.", sub: "Drag to reorder — top = most important." },
 ];
 
 export default function AIBroker({ open, onClose }) {
   const navigate = useNavigate();
+  const { user } = useAuth();
   const [phase, setPhase] = useState("intro"); // intro | q | reveal
   const [stepIdx, setStepIdx] = useState(0);
   const [brokerState, setBrokerState] = useState("wave");
   const [ack, setAck] = useState("");
   const [prefs, setPrefs] = useState({
-    office: null, age: "", localities: [], budgetMin: 20000, budgetMax: 45000, stretch: false,
+    office: null, localities: [], budgetMin: 20000, budgetMax: 45000, stretch: false,
     occupants: [], flatTypes: [...FLAT_TYPES], mustHaves: [], lifestyle: [], dealBreakers: [],
     priority: ["Near to Office", "Good locality", "Budget fit", "Apartment over standalone", "Flat size", "Ventilation"],
     notes: {},
@@ -266,7 +266,12 @@ export default function AIBroker({ open, onClose }) {
     setTimeout(() => {
       setAck("");
       if (stepIdx + 1 >= STEPS.length) {
-        setPhase("reveal");
+        // Questionnaire complete — persist the requirement (best-effort) and take
+        // the user straight to the recommendations listings page (map + scored
+        // listings), instead of the in-modal reveal.
+        saveUserRequirement(user, prefs);
+        onClose?.();
+        navigate("/recommendations", { state: { prefs, justSubmitted: true } });
       } else {
         setStepIdx((i) => i + 1);
         setBrokerState("thinking");
@@ -764,8 +769,32 @@ function Reveal({ prefs, onBrokerPoint, navigate, onClose }) {
   const [conf, setConf] = useState(0);
   const [shown, setShown] = useState(0);
   const [thinking, setThinking] = useState(true);
+  const [matches, setMatches] = useState([]);
 
-  const matches = useMemo(() => scoreListings(prefs), [prefs]);
+  // Rank the real inventory against this user's requirement, best score first.
+  useEffect(() => {
+    let alive = true;
+    (async () => {
+      let cards = [];
+      try {
+        const inventory = await fetchPublishedInventory();
+        cards = matchRequirementToListings(prefs, inventory, { min: 30 })
+          .slice(0, 6)
+          .map((m) => ({
+            key: m.listing.property_id,
+            image: m.listing.cover_image_url || (m.listing.images && m.listing.images[0]) || "",
+            pct: m.score,
+            title: m.listing.title || `${m.listing.flat_type || "Home"} in ${m.listing.area || "Bengaluru"}`,
+            bhk: m.listing.flat_type || "",
+            addr: String(m.listing.area || "Bengaluru").split(",")[0].trim(),
+            rent: Number(m.listing.rent) || 0,
+            why: m.reasons && m.reasons.length ? m.reasons.slice(0, 2).join(" · ") : "",
+          }));
+      } catch { cards = []; }
+      if (alive) setMatches(cards);
+    })();
+    return () => { alive = false; };
+  }, [prefs]);
 
   useEffect(() => {
     const t0 = setTimeout(() => setThinking(false), 1400);
@@ -826,19 +855,19 @@ function Reveal({ prefs, onBrokerPoint, navigate, onClose }) {
         {matches.length === 0 && (
           <div className="brk-empty">I'll widen the net on the map — your exact match isn't in today's shortlist, but I know where to look.</div>
         )}
-        {matches.slice(0, shown).map((m, i) => (
-          <motion.div key={m.listing.id} className="brk-pcard" initial={{ opacity: 0, y: 24, scale: 0.97 }} animate={{ opacity: 1, y: 0, scale: 1 }} transition={{ duration: 0.5, ease: EASE }}>
+        {matches.slice(0, shown).map((m) => (
+          <motion.div key={m.key} className="brk-pcard" initial={{ opacity: 0, y: 24, scale: 0.97 }} animate={{ opacity: 1, y: 0, scale: 1 }} transition={{ duration: 0.5, ease: EASE }}>
             <div className="brk-pcard-img">
-              {m.listing.image && (
-                <img src={m.listing.image} alt="" loading="lazy" onError={(e) => { e.currentTarget.style.display = "none"; }} />
+              {m.image && (
+                <img src={m.image} alt="" loading="lazy" onError={(e) => { e.currentTarget.style.display = "none"; }} />
               )}
               <span className="brk-pcard-match">{m.pct}% match</span>
             </div>
             <div className="brk-pcard-body">
-              <div className="brk-pcard-title">{m.listing.title}</div>
-              <div className="brk-pcard-meta">{m.listing.bhk} · {shortAddr(m.listing)}</div>
+              <div className="brk-pcard-title">{m.title}</div>
+              <div className="brk-pcard-meta">{m.bhk}{m.bhk ? " · " : ""}{m.addr}</div>
               <div className="brk-pcard-foot">
-                <span className="brk-pcard-rent">{fmtINR(m.listing.monthlyRent)}<small>/mo</small></span>
+                <span className="brk-pcard-rent">{fmtINR(m.rent)}<small>/mo</small></span>
                 {m.why && <span className="brk-pcard-why">{m.why}</span>}
               </div>
             </div>
@@ -857,47 +886,6 @@ function Reveal({ prefs, onBrokerPoint, navigate, onClose }) {
       )}
     </div>
   );
-}
-
-function shortAddr(l) {
-  return String(l.area || l.address || l.location || "Bengaluru").split(",")[0].trim();
-}
-
-/* Score the real catalogue against the collected preferences. */
-function scoreListings(prefs) {
-  let pool;
-  try {
-    pool = getListings();
-  } catch {
-    return [];
-  }
-  const inBlr = (l) => /beng|bang/i.test(`${l.address} ${l.location || ""}`);
-  const locNeedles = prefs.localities.map((x) => x.toLowerCase().split(" ")[0]);
-  const bhkWanted = prefs.flatTypes.filter((f) => /BHK|RK/.test(f)).map((f) => f.toLowerCase());
-  const budgetCap = prefs.stretch ? prefs.budgetMax * 1.18 : prefs.budgetMax * 1.05;
-
-  const scored = pool
-    .filter(inBlr)
-    .map((l) => {
-      let s = 0;
-      const addr = `${l.address} ${l.location || ""} ${l.title}`.toLowerCase();
-      let why = "";
-      if (locNeedles.some((n) => n && addr.includes(n))) { s += 3; why = "In your area"; }
-      const rent = l.monthlyRent || 0;
-      if (rent > 0 && rent <= prefs.budgetMax) { s += 2.5; if (!why) why = "Within budget"; }
-      else if (rent > 0 && rent <= budgetCap) { s += 1; if (!why) why = "Near your budget"; }
-      else if (rent > budgetCap) { s -= 2; }
-      if (bhkWanted.length && bhkWanted.some((b) => String(l.bhk).toLowerCase().includes(b))) { s += 1.5; }
-      if (prefs.mustHaves.includes("Pet Friendly") && l.petFriendly) s += 0.5;
-      s += Math.random() * 0.4;
-      return { listing: l, s, why };
-    })
-    .filter((x) => x.s > 0)
-    .sort((a, b) => b.s - a.s)
-    .slice(0, 4);
-
-  const top = scored[0]?.s || 1;
-  return scored.map((x) => ({ ...x, pct: Math.max(82, Math.min(97, Math.round(82 + (x.s / top) * 15))) }));
 }
 
 /* ── Skyline ───────────────────────────────────────────────────────────────── */

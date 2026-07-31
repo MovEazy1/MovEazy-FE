@@ -9,7 +9,7 @@ import { useAuth } from "../context/AuthContext";
 import { useLoginModal } from "../context/LoginModalContext";
 import { isFirebaseConfigured } from "../lib/firebase";
 import { getListingsData, isListingPubliclyVisible } from "../lib/firestoreStore";
-import { geocodePlace } from "../lib/geocode";
+import { geocodePlace, searchPlaces, reverseGeocode } from "../lib/geocode";
 import { haversineKm } from "../lib/geo";
 import PropertyModal from "./PropertyModal";
 import AIBroker from "./AIBroker";
@@ -28,6 +28,28 @@ import SiteHeader from "./layout/SiteHeader";
 const MAP_NEARBY_KM = 12;
 /** Default max distance (km) from workplace / geocoded pin; user-adjustable in search panel. */
 const DEFAULT_COMMUTE_RADIUS_KM = 10;
+
+/**
+ * Approximate door-to-door drive time from a flat to the office.
+ * We can't fire an OSRM request per listing (dozens of pins), so we estimate from the
+ * straight-line distance using an effective ~20 km/h Bengaluru traffic speed. Labelled
+ * "~" everywhere so users read it as a guide, not a promise.
+ */
+function estimateDriveMinutes(km) {
+  const k = Number(km);
+  if (!Number.isFinite(k) || k < 0) return null;
+  return Math.max(3, Math.round(k * 3));
+}
+
+/** Human commute label, e.g. "~12 min" or "~1h 5m". Returns "" when distance is unknown. */
+function formatCommute(km) {
+  const mins = estimateDriveMinutes(km);
+  if (mins == null) return "";
+  if (mins < 60) return `~${mins} min`;
+  const h = Math.floor(mins / 60);
+  const m = mins % 60;
+  return m ? `~${h}h ${m}m` : `~${h}h`;
+}
 
 /**
  * On phones the map is a short strip above the listing drawer; centering the pin in the map pane
@@ -118,6 +140,23 @@ function makeBhkIcon(bhk) {
       "</div>",
     iconSize: [72, 30],
     iconAnchor: [36, 15],
+  });
+}
+
+/** Distinct draggable "office" pin so users can tell it apart from listing markers and know it's movable. */
+function makeOfficeIcon() {
+  return L.divIcon({
+    className: "",
+    html:
+      '<div style="position:relative;display:flex;flex-direction:column;align-items:center;filter:drop-shadow(0 4px 8px rgba(0,0,0,0.3))">' +
+      '<div style="background:#1C1A17;color:#fff;padding:4px 10px;border-radius:999px;font-size:11px;font-weight:800;white-space:nowrap;border:2px solid #fff;display:flex;align-items:center;gap:5px">' +
+      '<svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="#f3cd6a" stroke-width="2.4"><rect x="4" y="8" width="16" height="12" rx="1"/><path d="M9 8V5h6v3" stroke-linecap="round"/></svg>' +
+      'Office</div>' +
+      '<div style="width:2px;height:12px;background:#1C1A17"></div>' +
+      '<div style="width:10px;height:10px;border-radius:50%;background:#1C1A17;border:2px solid #fff;margin-top:-2px"></div>' +
+      "</div>",
+    iconSize: [80, 44],
+    iconAnchor: [40, 44],
   });
 }
 
@@ -504,7 +543,8 @@ export default function MapView() {
   const [mapState, setMapState] = useState({ center: [12.9716, 77.5946], zoom: 15 });
   const [selected, setSelected] = useState(null);
   const [viewingProperty, setViewingProperty] = useState(null);
-  const [showMobileFilters, setShowMobileFilters] = useState(false);
+  /** Single "all filters" panel — a dropdown on desktop, a bottom sheet on mobile. Never occupies map layout. */
+  const [showFilterPanel, setShowFilterPanel] = useState(false);
   /** "map" | "list" — replaces the old slide-up toggle; on mobile these are fully separate screens */
   const [mobileTab, setMobileTab] = useState("map");
   /** "all" | "flatmate" | "entire" */
@@ -517,8 +557,6 @@ export default function MapView() {
   const [mapSearchError, setMapSearchError] = useState("");
   const [placeAnchor, setPlaceAnchor] = useState(null);
   const [desktopMode, setDesktopMode] = useState("split");
-  /** Desktop: start collapsed so the map uses full width; use map search card + “Show Filters” for the panel. */
-  const [showDesktopFilters, setShowDesktopFilters] = useState(false);
   const [showDesktopListings, setShowDesktopListings] = useState(true);
   /** Search suggestions dropdown (campuses / employers / commute radius), anchored under the top-bar search box. */
   const [showMapSearchOverlay, setShowMapSearchOverlay] = useState(false);
@@ -537,17 +575,20 @@ export default function MapView() {
   const mapSearchOverlayBodyRef = useRef(null);
   /** [lat, lng][] from workplace → selected listing (OSRM driving line, or straight fallback). */
   const [commuteRoutePositions, setCommuteRoutePositions] = useState(null);
+  /** Live office-location autocomplete (Photon) results + open/active state for the top-bar search box. */
+  const [officeResults, setOfficeResults] = useState([]);
+  const [officeResultsOpen, setOfficeResultsOpen] = useState(false);
+  const [officeResultsLoading, setOfficeResultsLoading] = useState(false);
+  const [activeResult, setActiveResult] = useState(-1);
+  /** True while a dragged office pin is being reverse-geocoded to a readable address. */
+  const [officePinBusy, setOfficePinBusy] = useState(false);
+  /** Set right after picking a suggestion / preset so the debounced search effect doesn't re-open the list. */
+  const justPickedOffice = useRef(false);
 
   const openFullFilterPanel = useCallback(() => {
-    if (isMobile) {
-      setShowMobileFilters(true);
-      setMobileTab("list");
-    } else {
-      setShowDesktopFilters(true);
-      setShowDesktopListings(true);
-      setDesktopMode("split");
-    }
-  }, [isMobile]);
+    setShowFilterPanel(true);
+    setShowMapSearchOverlay(false);
+  }, []);
 
   useEffect(() => {
     let alive = true;
@@ -948,9 +989,77 @@ export default function MapView() {
     });
   };
 
+  /** Debounced live autocomplete for the office-location search box (Photon, Bangalore-biased). */
+  useEffect(() => {
+    const q = mapSearchInput.trim();
+    if (justPickedOffice.current) { justPickedOffice.current = false; return; }
+    if (q.length < 3) {
+      setOfficeResults([]);
+      setOfficeResultsOpen(false);
+      setOfficeResultsLoading(false);
+      return;
+    }
+    const ctrl = new AbortController();
+    setOfficeResultsLoading(true);
+    const t = setTimeout(async () => {
+      try {
+        const rows = await searchPlaces(q, { limit: 6, signal: ctrl.signal });
+        setOfficeResults(rows);
+        setActiveResult(-1);
+        setOfficeResultsOpen(true);
+      } catch {
+        /* aborted / network — keep prior results */
+      } finally {
+        setOfficeResultsLoading(false);
+      }
+    }, 220);
+    return () => { clearTimeout(t); ctrl.abort(); };
+  }, [mapSearchInput]);
+
+  /** Selecting an autocomplete suggestion drops the office pin there and recenters the map. */
+  const pickOfficeResult = useCallback((r) => {
+    if (!r || !Number.isFinite(Number(r.lat)) || !Number.isFinite(Number(r.lng))) return;
+    justPickedOffice.current = true;
+    setWorkplaceError("");
+    setMapSearchError("");
+    setPlaceAnchor(null);
+    setSelectedLocality("");
+    setWorkplaceAnchor({ lat: Number(r.lat), lng: Number(r.lng), label: r.display || r.label || r.primary || "Office" });
+    setMapState({ center: [Number(r.lat), Number(r.lng)], zoom: 16 });
+    setMapSearchInput(r.display || r.label || r.primary || "");
+    setOfficeResults([]);
+    setOfficeResultsOpen(false);
+    setActiveResult(-1);
+    setShowMapSearchOverlay(false);
+  }, []);
+
+  /** Dragging (or clicking) the office pin: move it immediately, then reverse-geocode a readable address. */
+  const moveOfficePin = useCallback(async (lat, lng) => {
+    const la = Number(lat);
+    const ln = Number(lng);
+    if (!Number.isFinite(la) || !Number.isFinite(ln)) return;
+    setPlaceAnchor(null);
+    setWorkplaceError("");
+    setWorkplaceAnchor((prev) => ({ lat: la, lng: ln, label: prev?.label || "Moving pin…" }));
+    setOfficePinBusy(true);
+    try {
+      const r = await reverseGeocode(la, ln);
+      const label = r?.label || r?.display || `Pinned office (${la.toFixed(4)}, ${ln.toFixed(4)})`;
+      setWorkplaceAnchor({ lat: la, lng: ln, label });
+      setMapSearchInput(label);
+    } catch {
+      setWorkplaceAnchor({ lat: la, lng: ln, label: `Pinned office (${la.toFixed(4)}, ${ln.toFixed(4)})` });
+    } finally {
+      setOfficePinBusy(false);
+    }
+  }, []);
+
   const applyWorkplaceFromList = useCallback((wp) => {
+    justPickedOffice.current = true;
     setWorkplaceError("");
     setPlaceAnchor(null);
+    setOfficeResults([]);
+    setOfficeResultsOpen(false);
     setWorkplaceAnchor({ lat: wp.lat, lng: wp.lng, label: wp.name });
     setMapState({ center: [wp.lat, wp.lng], zoom: 16 });
     requestAnimationFrame(() => {
@@ -958,11 +1067,150 @@ export default function MapView() {
     });
   }, []);
 
-  const mapLayoutKey = `${desktopMode}|${showDesktopFilters}|${showDesktopListings}|${showMapSearchOverlay}|${isMobile}`;
-  /** Map search card and desktop sidebar filters are mutually exclusive; overlay can also be dismissed for a clear map. */
-  const showMapSearchCard = showMapSearchOverlay && (isMobile || !showDesktopFilters);
+  const mapLayoutKey = `${desktopMode}|${showFilterPanel}|${showDesktopListings}|${showMapSearchOverlay}|${isMobile}`;
+  /** Campus/employer card hides while the live autocomplete list or the filter panel is open. */
+  const showMapSearchCard = showMapSearchOverlay && !officeResultsOpen && !showFilterPanel;
 
   const areaLabel = chipLabel(workplaceAnchor?.label || placeAnchor?.label || selectedLocality || "Bengaluru", 28);
+
+  /** Count of non-default filter selections — drives the badge on the "All filters" button. */
+  const activeFilterCount = useMemo(() => {
+    let n = 0;
+    n += (filters.bhkTypes?.length || 0);
+    n += (filters.neighborhoods?.length || 0);
+    n += (filters.availability?.length || 0);
+    n += (filters.preferredTenants?.length || 0);
+    n += (filters.propertyTypes?.length || 0);
+    n += (filters.furnishing?.length || 0);
+    n += (filters.parking?.length || 0);
+    if (Number(filters.minRent) > 10000) n += 1;
+    if (Number(filters.maxRent) < 100000) n += 1;
+    if (listingType !== "all") n += 1;
+    return n;
+  }, [filters, listingType]);
+
+  const clearAllFilters = useCallback(() => {
+    setFilters(getFiltersInitialState());
+    setListingType("all");
+  }, []);
+
+  /** Shared filter controls, rendered inside the dropdown (desktop) / bottom sheet (mobile). */
+  const filterSections = (
+    <>
+      <div style={{ marginBottom: "18px" }}>
+        <div style={{ fontWeight: 800, fontSize: "15px", marginBottom: "8px", color: "#0f172a" }}>Areas (tap — no typing)</div>
+        <div
+          style={{
+            display: "flex",
+            flexWrap: "wrap",
+            gap: "8px",
+            maxHeight: 200,
+            overflowY: "auto",
+            padding: "4px 2px",
+            borderRadius: "10px",
+            border: "1px solid #e2e8f0",
+            background: "#fff",
+          }}
+        >
+          {AREA_NAMES_SORTED.map((name) => {
+            const on = (filters.neighborhoods || []).includes(name);
+            return (
+              <button
+                key={name}
+                type="button"
+                onClick={() => toggleNeighborhood(name)}
+                style={{
+                  border: on ? "1px solid #EF5A45" : "1px solid #cbd5e1",
+                  background: on ? "#fff1f2" : "#ffffff",
+                  color: on ? "#EF5A45" : "#0f172a",
+                  borderRadius: "999px",
+                  padding: "6px 11px",
+                  fontSize: "13px",
+                  fontWeight: 700,
+                  cursor: "pointer",
+                }}
+              >
+                {name}
+              </button>
+            );
+          })}
+        </div>
+        {(filters.neighborhoods || []).length > 0 && (
+          <button
+            type="button"
+            onClick={() => setFilters((p) => ({ ...p, neighborhoods: [] }))}
+            style={{ marginTop: "8px", border: "none", background: "transparent", color: "#64748b", fontSize: "12px", fontWeight: 600, cursor: "pointer", textDecoration: "underline" }}
+          >
+            Clear selected areas
+          </button>
+        )}
+      </div>
+      <div style={{ marginBottom: "18px" }}>
+        <div style={{ fontWeight: 800, fontSize: "15px", marginBottom: "10px", color: "#0f172a" }}>Looking for</div>
+        <div style={{ display: "flex", gap: "8px", flexWrap: "wrap" }}>
+          {[["all", "All"], ["flatmate", "Flatmate"], ["entire", "Entire flat"]].map(([val, label]) => (
+            <button
+              key={val}
+              type="button"
+              onClick={() => setListingType(val)}
+              style={{
+                border: listingType === val ? "1px solid #EF5A45" : "1px solid #e2e8f0",
+                background: listingType === val ? "#EF5A45" : "#ffffff",
+                color: listingType === val ? "#ffffff" : "#334155",
+                borderRadius: "999px",
+                padding: "7px 16px",
+                fontSize: "13px",
+                fontWeight: 700,
+                cursor: "pointer",
+              }}
+            >
+              {label}
+            </button>
+          ))}
+        </div>
+      </div>
+
+      <div style={{ marginBottom: "18px" }}>
+        <div style={{ fontWeight: 800, fontSize: "15px", marginBottom: "10px", color: "#0f172a" }}>BHK Type</div>
+        <div style={{ display: "flex", flexWrap: "wrap", gap: "10px" }}>
+          {FILTER_OPTIONS.bhkTypes.map((item) => (
+            <ToggleOption
+              key={item}
+              label={item}
+              active={filters.bhkTypes.includes(item)}
+              onClick={() => toggleFilter("bhkTypes", item)}
+              activeColor={bhkColors[item] || "#EF5A45"}
+            />
+          ))}
+        </div>
+      </div>
+
+      <div style={{ marginBottom: "18px" }}>
+        <div style={{ fontWeight: 800, fontSize: "15px", marginBottom: "8px", color: "#0f172a" }}>Rent range: ₹ 10k to ₹ 1 Lakh</div>
+        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "10px" }}>
+          <input className="mv-filter-num" type="number" value={filters.minRent} onChange={(e) => setFilters((p) => ({ ...p, minRent: Number(e.target.value || 0) }))} placeholder="Min" />
+          <input className="mv-filter-num" type="number" value={filters.maxRent} onChange={(e) => setFilters((p) => ({ ...p, maxRent: Number(e.target.value || 0) }))} placeholder="Max" />
+        </div>
+      </div>
+
+      {[
+        ["availability", "Availability"],
+        ["preferredTenants", "Preferred tenants"],
+        ["propertyTypes", "Property type"],
+        ["furnishing", "Furnishing"],
+        ["parking", "Parking"],
+      ].map(([key, label]) => (
+        <div key={key} style={{ marginBottom: "18px" }}>
+          <div style={{ fontWeight: 800, fontSize: "15px", marginBottom: "10px", color: "#0f172a" }}>{label}</div>
+          <div style={{ display: "flex", flexWrap: "wrap", gap: "10px" }}>
+            {FILTER_OPTIONS[key].map((item) => (
+              <ToggleOption key={item} label={item} active={filters[key].includes(item)} onClick={() => toggleFilter(key, item)} />
+            ))}
+          </div>
+        </div>
+      ))}
+    </>
+  );
 
   // "Get My Free Agent" — gate on sign-in first, then open the AI preferences chat.
   const startAgentChat = () => {
@@ -979,21 +1227,7 @@ export default function MapView() {
       style={{ background: "#faf7f2", fontFamily: "'Plus Jakarta Sans', system-ui, sans-serif", color: "#171412" }}
     >
       <style>{`
-        .desktop-sidebar {
-          width: clamp(300px, 24vw, 440px);
-          overflow-y: auto;
-          border-right: 1px solid #e2e8f0;
-          background: #ffffff;
-          padding: 18px 20px;
-          flex-shrink: 0;
-          font-size: 15px;
-          transition: transform 0.3s ease-in-out;
-          position: relative;
-          z-index: 10;
-          isolation: isolate;
-          box-shadow: 1px 0 0 rgba(15, 23, 42, 0.06);
-        }
-        .desktop-sidebar input[type="number"] {
+        .mv-filter-num {
           width: 100%;
           padding: 10px 12px;
           font-size: 15px;
@@ -1004,24 +1238,7 @@ export default function MapView() {
         .mobile-filter-btn {
           display: none;
         }
-        .mobile-only-close {
-          display: none;
-        }
         @media (max-width: 768px) {
-          .desktop-sidebar {
-            position: fixed;
-            top: 0;
-            left: 0;
-            bottom: 0;
-            z-index: 10000;
-            width: 85vw;
-            max-width: 320px;
-            box-shadow: 4px 0 15px rgba(0,0,0,0.1);
-            transform: translateX(-100%);
-          }
-          .desktop-sidebar.open {
-            transform: translateX(0);
-          }
           .mobile-filter-btn {
             display: flex;
             align-items: center;
@@ -1036,14 +1253,6 @@ export default function MapView() {
             font-size: 13px;
             box-shadow: 0 4px 12px rgba(0,0,0,0.35);
             cursor: pointer;
-          }
-          .mobile-only-close {
-            display: block !important;
-            background: none;
-            border: none;
-            font-size: 24px;
-            cursor: pointer;
-            color: #64748b;
           }
         }
       `}</style>
@@ -1090,15 +1299,22 @@ export default function MapView() {
               <input
                 value={mapSearchInput}
                 onChange={(e) => setMapSearchInput(e.target.value)}
-                onFocus={() => setShowMapSearchOverlay(true)}
+                onFocus={() => { if (!officeResultsOpen) setShowMapSearchOverlay(true); }}
+                onBlur={() => setTimeout(() => setOfficeResultsOpen(false), 150)}
+                autoComplete="off"
+                aria-label="Enter your office location"
+                aria-autocomplete="list"
+                aria-expanded={officeResultsOpen}
                 onKeyDown={(e) => {
-                  if (e.key === "Enter") { submitMapSearch(); setShowMapSearchOverlay(false); }
+                  if (officeResultsOpen && officeResults.length) {
+                    if (e.key === "ArrowDown") { e.preventDefault(); setActiveResult((i) => Math.min(i + 1, officeResults.length - 1)); return; }
+                    if (e.key === "ArrowUp") { e.preventDefault(); setActiveResult((i) => Math.max(i - 1, 0)); return; }
+                    if (e.key === "Escape") { setOfficeResultsOpen(false); return; }
+                    if (e.key === "Enter") { e.preventDefault(); pickOfficeResult(officeResults[activeResult >= 0 ? activeResult : 0]); return; }
+                  }
+                  if (e.key === "Enter") { e.preventDefault(); submitMapSearch(); setShowMapSearchOverlay(false); }
                 }}
-                placeholder={
-                  searchMode === "place"
-                    ? "Search by metro, landmark, or company…"
-                    : "Search by area, society, or broker…"
-                }
+                placeholder="Enter your Office Location"
                 style={{
                   flex: 1,
                   minWidth: 0,
@@ -1142,6 +1358,64 @@ export default function MapView() {
             >
               {mapSearchLoading ? "…" : "Search"}
             </button>
+
+            {officeResultsOpen && mapSearchInput.trim().length >= 3 ? (
+              <div
+                role="listbox"
+                aria-label="Office location suggestions"
+                style={{
+                  position: "absolute",
+                  top: "calc(100% + 8px)",
+                  left: 0,
+                  right: 0,
+                  zIndex: 1006,
+                  background: "#fff",
+                  borderRadius: 16,
+                  boxShadow: "0 20px 50px rgba(20,18,16,0.18), 0 0 0 1px rgba(20,18,16,0.06)",
+                  overflow: "hidden",
+                }}
+              >
+                <div style={{ padding: "9px 16px 6px", fontSize: 10.5, fontWeight: 700, letterSpacing: "0.05em", textTransform: "uppercase", color: "#a39a8e" }}>
+                  {officeResultsLoading && !officeResults.length ? "Searching…" : "Select your office location"}
+                </div>
+                {officeResults.length === 0 ? (
+                  <div style={{ padding: "10px 16px 16px", fontSize: 13, color: "#8a857c" }}>
+                    {officeResultsLoading ? "Finding places…" : "No matches — try a nearby landmark, tech park, or full address."}
+                  </div>
+                ) : (
+                  <ul style={{ listStyle: "none", margin: 0, padding: "2px 6px 8px", maxHeight: "min(52vh, 360px)", overflowY: "auto" }}>
+                    {officeResults.map((r, i) => (
+                      <li
+                        key={r.id || i}
+                        role="option"
+                        aria-selected={i === activeResult}
+                        onMouseDown={(e) => { e.preventDefault(); pickOfficeResult(r); }}
+                        onMouseEnter={() => setActiveResult(i)}
+                        style={{
+                          display: "flex",
+                          alignItems: "flex-start",
+                          gap: 10,
+                          padding: "10px 12px",
+                          borderRadius: 11,
+                          cursor: "pointer",
+                          background: i === activeResult ? "#FBEAE0" : "transparent",
+                        }}
+                      >
+                        <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke={i === activeResult ? "#D8432E" : "#a39a8e"} strokeWidth="2" style={{ flexShrink: 0, marginTop: 2 }}>
+                          <path d="M12 22s7-7.8 7-13a7 7 0 10-14 0c0 5.2 7 13 7 13z" /><circle cx="12" cy="9" r="2.5" />
+                        </svg>
+                        <span style={{ minWidth: 0 }}>
+                          <span style={{ display: "block", fontSize: 13.5, fontWeight: 700, color: "#17140f", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{r.primary}</span>
+                          {r.secondary ? (
+                            <span style={{ display: "block", fontSize: 11.5, color: "#8a857c", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{r.secondary}</span>
+                          ) : null}
+                        </span>
+                      </li>
+                    ))}
+                  </ul>
+                )}
+              </div>
+            ) : null}
 
             {showMapSearchCard ? (
               <MapSearchSuggestions
@@ -1221,12 +1495,78 @@ export default function MapView() {
             ) : null}
           </div>
 
-          <button type="button" onClick={() => setShowDesktopFilters((v) => !v)} style={mtBar.filtersBtn}>
-            <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden>
-              <path d="M4 6h16M7 12h10M10 18h4" strokeLinecap="round" />
-            </svg>
-            {showDesktopFilters ? "Hide filters" : "More filters"}
-          </button>
+          <div style={{ position: "relative", flexShrink: 0 }}>
+            <button
+              type="button"
+              onClick={() => { setShowFilterPanel((v) => !v); setShowMapSearchOverlay(false); }}
+              style={{ ...mtBar.filtersBtn, ...(activeFilterCount > 0 ? { borderColor: "#EF5A45", color: "#B23A28", background: "#fdeee9" } : null) }}
+            >
+              <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden>
+                <path d="M4 6h16M7 12h10M10 18h4" strokeLinecap="round" />
+              </svg>
+              {showFilterPanel ? "Hide filters" : "All filters"}
+              {activeFilterCount > 0 ? (
+                <span style={{ display: "inline-flex", alignItems: "center", justifyContent: "center", minWidth: 18, height: 18, padding: "0 5px", borderRadius: 999, background: "#EF5A45", color: "#fff", fontSize: 11, fontWeight: 800 }}>
+                  {activeFilterCount}
+                </span>
+              ) : null}
+            </button>
+            {!isMobile && showFilterPanel ? (
+              <>
+                <button
+                  type="button"
+                  aria-hidden="true"
+                  tabIndex={-1}
+                  onClick={() => setShowFilterPanel(false)}
+                  style={{ position: "fixed", inset: 0, zIndex: 1004, background: "transparent", border: "none", cursor: "default" }}
+                />
+                <div
+                  role="dialog"
+                  aria-label="Filters"
+                  style={{
+                    position: "absolute",
+                    top: "calc(100% + 8px)",
+                    left: 0,
+                    zIndex: 1005,
+                    width: 400,
+                    maxWidth: "92vw",
+                    background: "#fff",
+                    borderRadius: 16,
+                    boxShadow: "0 24px 60px rgba(20,18,16,0.22), 0 0 0 1px rgba(20,18,16,0.06)",
+                    display: "flex",
+                    flexDirection: "column",
+                    maxHeight: "min(72vh, 620px)",
+                  }}
+                >
+                  <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 10, padding: "14px 16px", borderBottom: "1px solid #f1efe9" }}>
+                    <span style={{ fontSize: 16, fontWeight: 800, color: "#171412" }}>Filters</span>
+                    <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                      {activeFilterCount > 0 ? (
+                        <button type="button" onClick={clearAllFilters} style={{ border: "none", background: "none", color: "#B23A28", fontSize: 13, fontWeight: 700, cursor: "pointer" }}>
+                          Clear all
+                        </button>
+                      ) : null}
+                      <button type="button" onClick={() => setShowFilterPanel(false)} aria-label="Close filters" style={{ border: "1px solid #e4dfd6", background: "#fff", color: "#5c554e", width: 30, height: 30, borderRadius: 9, cursor: "pointer", fontSize: 18, lineHeight: 1 }}>
+                        ×
+                      </button>
+                    </div>
+                  </div>
+                  <div style={{ overflowY: "auto", padding: "16px", flex: 1 }}>
+                    {filterSections}
+                  </div>
+                  <div style={{ padding: "12px 16px", borderTop: "1px solid #f1efe9", background: "#faf8f4", borderRadius: "0 0 16px 16px" }}>
+                    <button
+                      type="button"
+                      onClick={() => setShowFilterPanel(false)}
+                      style={{ width: "100%", border: "none", borderRadius: 11, background: "#ee5b45", color: "#fff", fontSize: 14, fontWeight: 700, padding: "11px 18px", cursor: "pointer", boxShadow: "0 2px 8px rgba(238,91,69,.32)" }}
+                    >
+                      Show {sortedDisplayPins.length} home{sortedDisplayPins.length === 1 ? "" : "s"}
+                    </button>
+                  </div>
+                </div>
+              </>
+            ) : null}
+          </div>
 
           <div style={{ position: "relative", flexShrink: 0, marginLeft: isMobile ? 0 : "auto" }}>
             <button type="button" onClick={() => setShowBudgetMenu((v) => !v)} style={mtBar.filtersBtn}>
@@ -1313,7 +1653,7 @@ export default function MapView() {
                     type="button"
                     onClick={() => {
                       setDesktopMode(v);
-                      if (v === "map") { setShowDesktopListings(false); setShowDesktopFilters(false); }
+                      if (v === "map") { setShowDesktopListings(false); }
                     }}
                     style={{
                       border: "none",
@@ -1354,180 +1694,7 @@ export default function MapView() {
         )}
       </div>
 
-      {isMobile && showMobileFilters ? (
-        <button
-          type="button"
-          aria-label="Close filters"
-          onClick={() => setShowMobileFilters(false)}
-          style={{
-            position: "fixed",
-            inset: 0,
-            zIndex: 9998,
-            border: "none",
-            padding: 0,
-            margin: 0,
-            background: "rgba(15, 23, 42, 0.45)",
-            cursor: "pointer",
-          }}
-        />
-      ) : null}
-
       <div style={{ flex: 1, display: "flex", minHeight: 0 }}>
-        {(isMobile ||
-          (showDesktopFilters && (desktopMode === "split" || desktopMode === "map"))) && (
-        <aside className={`desktop-sidebar ${showMobileFilters ? "open" : ""}`}>
-          <h3 style={{ margin: "0 0 12px", color: "#0f172a", display: "flex", justifyContent: "space-between", alignItems: "center", fontSize: "18px", fontWeight: 800, gap: 10 }}>
-            Filters
-            <span style={{ display: "flex", alignItems: "center", gap: 8 }}>
-              {!isMobile ? (
-                <button
-                  type="button"
-                  onClick={() => setShowDesktopFilters(false)}
-                  style={{
-                    border: "1px solid #cbd5e1",
-                    background: "#fff",
-                    borderRadius: 10,
-                    padding: "6px 12px",
-                    fontSize: 13,
-                    fontWeight: 700,
-                    color: "#475569",
-                    cursor: "pointer",
-                  }}
-                >
-                  Close
-                </button>
-              ) : null}
-              <button type="button" onClick={() => setShowMobileFilters(false)} className="mobile-only-close" aria-label="Close filters">
-                ×
-              </button>
-            </span>
-          </h3>
-          <div style={{ marginBottom: "16px", paddingBottom: "14px", borderBottom: "1px solid #e2e8f0", fontSize: "14px", color: "#334155", lineHeight: 1.55, fontWeight: 500 }}>
-            {isMobile ? (
-              <>
-                Use the <strong style={{ color: "#0f172a" }}>search bar above</strong> for area, landmark, or workplace. Fine-tune rent and more here.
-              </>
-            ) : (
-              <>
-                Rent range, building type, and area chips. Use the <strong style={{ color: "#0f172a" }}>search bar above</strong> for area, landmark, or workplace.
-              </>
-            )}
-          </div>
-          <div style={{ marginBottom: "18px" }}>
-            <div style={{ fontWeight: 800, fontSize: "15px", marginBottom: "8px", color: "#0f172a" }}>Areas (tap — no typing)</div>
-            <div
-              style={{
-                display: "flex",
-                flexWrap: "wrap",
-                gap: "8px",
-                maxHeight: isMobile ? 200 : 240,
-                overflowY: "auto",
-                padding: "4px 2px",
-                borderRadius: "10px",
-                border: "1px solid #e2e8f0",
-                background: "#fff",
-              }}
-            >
-              {AREA_NAMES_SORTED.map((name) => {
-                const on = (filters.neighborhoods || []).includes(name);
-                return (
-                  <button
-                    key={name}
-                    type="button"
-                    onClick={() => toggleNeighborhood(name)}
-                    style={{
-                      border: on ? "1px solid #EF5A45" : "1px solid #cbd5e1",
-                      background: on ? "#fff1f2" : "#ffffff",
-                      color: on ? "#EF5A45" : "#0f172a",
-                      borderRadius: "999px",
-                      padding: "6px 11px",
-                      fontSize: "13px",
-                      fontWeight: 700,
-                      cursor: "pointer",
-                    }}
-                  >
-                    {name}
-                  </button>
-                );
-              })}
-            </div>
-            {(filters.neighborhoods || []).length > 0 && (
-              <button
-                type="button"
-                onClick={() => setFilters((p) => ({ ...p, neighborhoods: [] }))}
-                style={{ marginTop: "8px", border: "none", background: "transparent", color: "#64748b", fontSize: "12px", fontWeight: 600, cursor: "pointer", textDecoration: "underline" }}
-              >
-                Clear selected areas
-              </button>
-            )}
-          </div>
-          <div style={{ marginBottom: "18px" }}>
-            <div style={{ fontWeight: 800, fontSize: "15px", marginBottom: "10px", color: "#0f172a" }}>Looking for</div>
-            <div style={{ display: "flex", gap: "8px", flexWrap: "wrap" }}>
-              {[["all", "All"], ["flatmate", "Flatmate"], ["entire", "Entire flat"]].map(([val, label]) => (
-                <button
-                  key={val}
-                  type="button"
-                  onClick={() => setListingType(val)}
-                  style={{
-                    border: listingType === val ? "1px solid #EF5A45" : "1px solid #e2e8f0",
-                    background: listingType === val ? "#EF5A45" : "#ffffff",
-                    color: listingType === val ? "#ffffff" : "#334155",
-                    borderRadius: "999px",
-                    padding: "7px 16px",
-                    fontSize: "13px",
-                    fontWeight: 700,
-                    cursor: "pointer",
-                  }}
-                >
-                  {label}
-                </button>
-              ))}
-            </div>
-          </div>
-
-          <div style={{ marginBottom: "18px" }}>
-            <div style={{ fontWeight: 800, fontSize: "15px", marginBottom: "10px", color: "#0f172a" }}>BHK Type</div>
-            <div style={{ display: "flex", flexWrap: "wrap", gap: "10px" }}>
-              {FILTER_OPTIONS.bhkTypes.map((item) => (
-                <ToggleOption
-                  key={item}
-                  label={item}
-                  active={filters.bhkTypes.includes(item)}
-                  onClick={() => toggleFilter("bhkTypes", item)}
-                  activeColor={bhkColors[item] || "#EF5A45"}
-                />
-              ))}
-            </div>
-          </div>
-
-          <div style={{ marginBottom: "18px" }}>
-            <div style={{ fontWeight: 800, fontSize: "15px", marginBottom: "8px", color: "#0f172a" }}>Rent range: ₹ 10k to ₹ 1 Lakh</div>
-            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "10px" }}>
-              <input type="number" value={filters.minRent} onChange={(e) => setFilters((p) => ({ ...p, minRent: Number(e.target.value || 0) }))} placeholder="Min" />
-              <input type="number" value={filters.maxRent} onChange={(e) => setFilters((p) => ({ ...p, maxRent: Number(e.target.value || 0) }))} placeholder="Max" />
-            </div>
-          </div>
-
-          {[
-            ["availability", "Availability"],
-            ["preferredTenants", "Preferred tenants"],
-            ["propertyTypes", "Property type"],
-            ["furnishing", "Furnishing"],
-            ["parking", "Parking"],
-          ].map(([key, label]) => (
-            <div key={key} style={{ marginBottom: "18px" }}>
-              <div style={{ fontWeight: 800, fontSize: "15px", marginBottom: "10px", color: "#0f172a" }}>{label}</div>
-              <div style={{ display: "flex", flexWrap: "wrap", gap: "10px" }}>
-                {FILTER_OPTIONS[key].map((item) => (
-                  <ToggleOption key={item} label={item} active={filters[key].includes(item)} onClick={() => toggleFilter(key, item)} />
-                ))}
-              </div>
-            </div>
-          ))}
-        </aside>
-        )}
-
         <div style={{ flex: "1 1 0%", minWidth: isMobile ? 0 : 280, position: "relative", background: "#fff" }}>
           <MapContainer center={mapState.center} zoom={mapState.zoom} style={{ height: "100%", width: "100%" }}>
             <InvalidateMapSize layoutRevision={mapLayoutKey} />
@@ -1576,11 +1743,25 @@ export default function MapView() {
                   radius={commuteRadiusKm * 1000}
                   pathOptions={{ color: "#D8432E", fillColor: "#F6C6BC", fillOpacity: 0.14, weight: 2, dashArray: "6 6" }}
                 />
-                <Marker position={[workplaceAnchor.lat, workplaceAnchor.lng]}>
+                <Marker
+                  position={[workplaceAnchor.lat, workplaceAnchor.lng]}
+                  icon={makeOfficeIcon()}
+                  draggable
+                  autoPan
+                  eventHandlers={{
+                    dragend: (e) => {
+                      const { lat, lng } = e.target.getLatLng();
+                      moveOfficePin(lat, lng);
+                    },
+                  }}
+                >
                   <Popup autoPan={false} keepInView={false}>
                     <div style={{ backgroundColor: "#ffffff", color: "#0f172a", maxWidth: "240px" }}>
-                      <div style={{ fontSize: "13px", fontWeight: 600 }}>Workplace</div>
-                      <div style={{ fontSize: "12px", color: "#475569", marginTop: "4px" }}>{workplaceAnchor.label}</div>
+                      <div style={{ fontSize: "13px", fontWeight: 700 }}>Your office</div>
+                      <div style={{ fontSize: "12px", color: "#475569", marginTop: "4px" }}>
+                        {officePinBusy ? "Updating address…" : workplaceAnchor.label}
+                      </div>
+                      <div style={{ fontSize: "11px", color: "#94a3b8", marginTop: "6px" }}>Drag the pin to fine-tune the exact spot.</div>
                     </div>
                   </Popup>
                 </Marker>
@@ -1631,10 +1812,21 @@ export default function MapView() {
                     <div style={{ fontWeight: 800, fontSize: "16px", lineHeight: 1.35, letterSpacing: "-0.02em" }}>{l.title}</div>
                     <div style={{ fontSize: "13px", color: "#52525b", marginTop: "6px", lineHeight: 1.45 }}>{l.address}</div>
                     {(workplaceAnchor || placeAnchor) && Number.isFinite(Number(l.lat)) && Number.isFinite(Number(l.lng)) ? (
-                      <div style={{ fontSize: "12px", color: "#D8432E", fontWeight: 700, marginTop: "8px" }}>
-                        ~{haversineKm((workplaceAnchor || placeAnchor).lat, (workplaceAnchor || placeAnchor).lng, Number(l.lat), Number(l.lng)).toFixed(1)} km from{" "}
-                        {workplaceAnchor ? "workplace" : "search pin"}
-                      </div>
+                      (() => {
+                        const anchor = workplaceAnchor || placeAnchor;
+                        const km = haversineKm(anchor.lat, anchor.lng, Number(l.lat), Number(l.lng));
+                        return (
+                          <div style={{ fontSize: "12px", color: "#D8432E", fontWeight: 700, marginTop: "8px", display: "flex", alignItems: "center", gap: 6, flexWrap: "wrap" }}>
+                            {workplaceAnchor ? (
+                              <span style={{ display: "inline-flex", alignItems: "center", gap: 4 }}>
+                                <svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" strokeWidth="2.2"><circle cx="12" cy="12" r="9" /><path d="M12 7v5l3 2" strokeLinecap="round" /></svg>
+                                {formatCommute(km)} to office
+                              </span>
+                            ) : null}
+                            <span style={{ color: "#8a5c52", fontWeight: 600 }}>· {km.toFixed(1)} km {workplaceAnchor ? "away" : "from pin"}</span>
+                          </div>
+                        );
+                      })()
                     ) : null}
                     <div style={{ fontWeight: 800, color: "#1C1A17", fontSize: "18px", margin: "10px 0 6px" }}>{l.price}</div>
                     <div style={{ fontSize: "13px", color: "#3f3f46", lineHeight: 1.5, paddingBottom: "4px" }}>
@@ -1800,8 +1992,8 @@ export default function MapView() {
           
           {isMobile && (
             <div style={{ position: "absolute", top: 12, right: 12, zIndex: 1000, display: "flex", gap: "8px", flexWrap: "wrap", justifyContent: "flex-end", maxWidth: "calc(100% - 24px)" }}>
-              <button className="mobile-filter-btn" onClick={() => setShowMobileFilters(true)} style={{ position: "static", transform: "none", margin: 0 }}>
-                Filters
+              <button className="mobile-filter-btn" onClick={() => setShowFilterPanel(true)} style={{ position: "static", transform: "none", margin: 0 }}>
+                Filters{activeFilterCount > 0 ? ` · ${activeFilterCount}` : ""}
               </button>
             </div>
           )}
@@ -1928,9 +2120,11 @@ export default function MapView() {
           {sortedDisplayPins.map((l) => {
             const isFlatmate = l.bhk === "Roommate needed";
             const anchor = workplaceAnchor || placeAnchor;
-            const distanceKm = anchor && Number.isFinite(Number(l.lat)) && Number.isFinite(Number(l.lng))
-              ? haversineKm(anchor.lat, anchor.lng, Number(l.lat), Number(l.lng)).toFixed(1)
+            const distanceRaw = anchor && Number.isFinite(Number(l.lat)) && Number.isFinite(Number(l.lng))
+              ? haversineKm(anchor.lat, anchor.lng, Number(l.lat), Number(l.lng))
               : null;
+            const distanceKm = distanceRaw != null ? distanceRaw.toFixed(1) : null;
+            const commuteLabel = distanceRaw != null && workplaceAnchor ? formatCommute(distanceRaw) : null;
             const saved = isListingSaved(user, l.id);
             return (
               <article
@@ -1999,9 +2193,14 @@ export default function MapView() {
                 <div style={{ flex: 1, minWidth: 0, padding: "14px 16px", display: "flex", flexDirection: "column" }}>
                   <div style={{ display: "flex", alignItems: "baseline", justifyContent: "space-between", gap: 8, flexWrap: "wrap" }}>
                     <div style={{ fontWeight: 800, fontSize: 17, letterSpacing: "-0.01em", color: "#171412" }}>{l.price}</div>
-                    {distanceKm ? (
+                    {commuteLabel ? (
+                      <span style={{ display: "inline-flex", alignItems: "center", gap: 4, fontSize: 11, fontWeight: 700, color: "#ee5b45", background: "#fdeee9", padding: "3px 9px", borderRadius: 999, whiteSpace: "nowrap" }} title={`${commuteLabel} drive to office · ${distanceKm} km`}>
+                        <svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" strokeWidth="2.2" aria-hidden><circle cx="12" cy="12" r="9" /><path d="M12 7v5l3 2" strokeLinecap="round" /></svg>
+                        {commuteLabel} to office
+                      </span>
+                    ) : distanceKm ? (
                       <span style={{ fontSize: 11, fontWeight: 700, color: "#ee5b45", background: "#fdeee9", padding: "3px 8px", borderRadius: 999, whiteSpace: "nowrap" }}>
-                        ~{distanceKm} km {workplaceAnchor ? "away" : "from pin"}
+                        ~{distanceKm} km from pin
                       </span>
                     ) : (
                       <span style={{ fontSize: 11, fontWeight: 700, color: "#7c8c6b", background: "#eef1e9", padding: "3px 8px", borderRadius: 999, whiteSpace: "nowrap" }}>
@@ -2091,6 +2290,61 @@ export default function MapView() {
             </button>
           ))}
         </div>
+      )}
+
+      {/* Mobile: full-width bottom sheet for all filters (never covers the map on desktop) */}
+      {isMobile && showFilterPanel && (
+        <>
+          <button
+            type="button"
+            aria-label="Close filters"
+            onClick={() => setShowFilterPanel(false)}
+            style={{ position: "fixed", inset: 0, zIndex: 10000, border: "none", padding: 0, margin: 0, background: "rgba(15, 23, 42, 0.45)", cursor: "pointer" }}
+          />
+          <div
+            role="dialog"
+            aria-label="Filters"
+            style={{
+              position: "fixed",
+              left: 0,
+              right: 0,
+              bottom: 0,
+              zIndex: 10001,
+              background: "#fff",
+              borderRadius: "20px 20px 0 0",
+              boxShadow: "0 -12px 40px rgba(15, 23, 42, 0.24)",
+              display: "flex",
+              flexDirection: "column",
+              maxHeight: "86vh",
+            }}
+          >
+            <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 10, padding: "14px 16px", borderBottom: "1px solid #f1efe9" }}>
+              <span style={{ fontSize: 17, fontWeight: 800, color: "#171412" }}>Filters</span>
+              <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                {activeFilterCount > 0 ? (
+                  <button type="button" onClick={clearAllFilters} style={{ border: "none", background: "none", color: "#B23A28", fontSize: 13.5, fontWeight: 700, cursor: "pointer" }}>
+                    Clear all
+                  </button>
+                ) : null}
+                <button type="button" onClick={() => setShowFilterPanel(false)} aria-label="Close filters" style={{ border: "1px solid #e4dfd6", background: "#fff", color: "#5c554e", width: 32, height: 32, borderRadius: 9, cursor: "pointer", fontSize: 20, lineHeight: 1 }}>
+                  ×
+                </button>
+              </div>
+            </div>
+            <div style={{ overflowY: "auto", padding: "16px", flex: 1, WebkitOverflowScrolling: "touch" }}>
+              {filterSections}
+            </div>
+            <div style={{ padding: "12px 16px calc(12px + env(safe-area-inset-bottom))", borderTop: "1px solid #f1efe9", background: "#faf8f4" }}>
+              <button
+                type="button"
+                onClick={() => setShowFilterPanel(false)}
+                style={{ width: "100%", border: "none", borderRadius: 12, background: "#ee5b45", color: "#fff", fontSize: 15, fontWeight: 700, padding: "13px 18px", cursor: "pointer", boxShadow: "0 2px 8px rgba(238,91,69,.32)" }}
+              >
+                Show {sortedDisplayPins.length} home{sortedDisplayPins.length === 1 ? "" : "s"}
+              </button>
+            </div>
+          </div>
+        </>
       )}
 
       {viewingProperty && (

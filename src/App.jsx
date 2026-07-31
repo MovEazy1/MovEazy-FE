@@ -2,6 +2,7 @@ import { lazy, Suspense } from "react";
 import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
 import { AuthProvider, useAuth } from "./context/AuthContext";
 import { LoginModalProvider } from "./context/LoginModalContext";
+import { VisitCartProvider } from "./context/VisitCartContext";
 import ForkHome from "./pages/ForkHome";
 import ErrorBoundary from "./components/ErrorBoundary";
 
@@ -11,6 +12,10 @@ const BrokerDashboard = lazy(() => import("./pages/BrokerDashboard"));
 const MapPage = lazy(() => import("./pages/MapPage"));
 const HowItWorks = lazy(() => import("./pages/HowItWorks"));
 const About = lazy(() => import("./pages/About"));
+const ListMyFlat = lazy(() => import("./pages/ListMyFlat"));
+const AdminDatabase = lazy(() => import("./pages/AdminDatabase"));
+const Recommendations = lazy(() => import("./pages/Recommendations"));
+const Visits = lazy(() => import("./pages/Visits"));
 
 function PageLoader() {
   return (
@@ -51,6 +56,24 @@ function AppRoutes() {
         <Route path="/map" element={<MapPage />} />
         <Route path="/how-it-works" element={<HowItWorks />} />
         <Route path="/about" element={<About />} />
+        <Route
+          path="/list-my-flat"
+          element={
+            <ProfileRoute>
+              <ListMyFlat />
+            </ProfileRoute>
+          }
+        />
+        <Route path="/admin" element={<AdminDatabase />} />
+        <Route path="/recommendations" element={<Recommendations />} />
+        <Route
+          path="/visits"
+          element={
+            <ProfileRoute>
+              <Visits />
+            </ProfileRoute>
+          }
+        />
         <Route path="/auth" element={<SupabaseLogin />} />
         <Route path="/login" element={<Navigate to="/auth" replace />} />
         <Route
@@ -86,7 +109,9 @@ export default function App() {
       <ErrorBoundary>
         <AuthProvider>
           <LoginModalProvider>
-            <AppRoutes />
+            <VisitCartProvider>
+              <AppRoutes />
+            </VisitCartProvider>
           </LoginModalProvider>
         </AuthProvider>
       </ErrorBoundary>

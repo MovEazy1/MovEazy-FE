@@ -236,7 +236,7 @@ function LoginPopup({ onClose, onSuccess }) {
                 <form onSubmit={onLogin}>
                   <label className="block text-[12px] text-white/55 mb-1.5">Email</label>
                   <input type="email" value={email} onChange={e => setEmail(e.target.value)}
-                    required disabled={busy} autoFocus placeholder="mail@abc.com" className={inputCls} />
+                    required disabled={busy} autoFocus placeholder="you@example.com" className={inputCls} />
 
                   <label className="block text-[12px] text-white/55 mb-1.5 mt-4">Password</label>
                   <div className="relative">
@@ -299,7 +299,7 @@ function LoginPopup({ onClose, onSuccess }) {
                   </div>
 
                   <label className="block text-[12px] text-white/55 mb-1.5">Email</label>
-                  <input type="email" value={email} onChange={e => setEmail(e.target.value)} required disabled={busy} placeholder="mail@abc.com" className={inputCls} />
+                  <input type="email" value={email} onChange={e => setEmail(e.target.value)} required disabled={busy} placeholder="you@example.com" className={inputCls} />
 
                   <label className="block text-[12px] text-white/55 mb-1.5 mt-3">Full Name</label>
                   <input type="text" value={name} onChange={e => setName(e.target.value)} required disabled={busy} placeholder="Your name" className={inputCls} />
