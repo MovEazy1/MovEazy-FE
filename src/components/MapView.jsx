@@ -9,6 +9,7 @@ import { useAuth } from "../context/AuthContext";
 import { useLoginModal } from "../context/LoginModalContext";
 import { isFirebaseConfigured } from "../lib/firebase";
 import { getListingsData, isListingPubliclyVisible } from "../lib/firestoreStore";
+import { fetchInventoryAsListings } from "../lib/inventory";
 import { geocodePlace, searchPlaces, reverseGeocode } from "../lib/geocode";
 import { haversineKm } from "../lib/geo";
 import PropertyModal from "./PropertyModal";
@@ -603,13 +604,23 @@ export default function MapView() {
         maxRent
       };
 
-      const rows = isFirebaseConfigured ? await getListingsData(options) : [];
+      // Static/verified feed + user-uploaded inventory (Supabase), merged so newly
+      // listed homes show on the map. Both are fetched in parallel; either can be empty.
+      const [staticRows, inventoryRows] = await Promise.all([
+        isFirebaseConfigured ? getListingsData(options) : Promise.resolve([]),
+        fetchInventoryAsListings({ limit: isMobile ? 250 : 500 }).catch(() => []),
+      ]);
       if (alive) {
-        setListings(rows.filter(isListingPubliclyVisible));
+        const feed = staticRows.filter(isListingPubliclyVisible);
+        // De-dupe by id, letting uploaded inventory win over any static row with the same id.
+        const byId = new Map();
+        for (const l of feed) byId.set(String(l.id), l);
+        for (const l of inventoryRows) byId.set(String(l.id), l);
+        setListings(Array.from(byId.values()));
       }
     }
     loadListings().catch((err) => {
-      reportClientWarn("map_listings_query", "Firestore query failed (possibly missing index)", err);
+      reportClientWarn("map_listings_query", "Listings query failed", err);
       setListings([]);
     });
     return () => { alive = false; };

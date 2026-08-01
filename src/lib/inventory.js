@@ -138,6 +138,53 @@ export async function fetchPublishedInventory({ limit = 500 } = {}) {
   return data || [];
 }
 
+/**
+ * Adapt a published inventory row (snake_case DB shape) to the listing shape the
+ * map/discovery UI expects (l.bhk, l.price, l.seller, l.image, …), so user-uploaded
+ * homes appear on the map alongside the static feed.
+ */
+export function mapInventoryToListing(row) {
+  if (!row) return null;
+  const rent = num(row.rent, 0);
+  const images = list(row.images);
+  const cover = String(row.cover_image_url || images[0] || "").trim();
+  const address =
+    String(row.full_address || "").trim() ||
+    [row.landmark, row.area].filter(Boolean).join(", ") ||
+    String(row.area || "").trim();
+  const roleLabel =
+    row.posted_by === "broker" ? "Broker" : row.posted_by === "tenant" ? "Tenant" : "Owner";
+  return {
+    id: row.property_id,
+    lat: num(row.latitude),
+    lng: num(row.longitude),
+    bhk: String(row.flat_type || "").trim(),
+    monthlyRent: rent,
+    price: rent ? `₹${rent.toLocaleString("en-IN")}/mo` : "",
+    title: String(row.title || "").trim() || `${row.flat_type || "Home"} in ${row.area || "Bengaluru"}`,
+    address,
+    location: String(row.area || "").trim(),
+    seller: String(row.poster_name || "MovEazy").trim(),
+    sellerEmail: String(row.poster_email || "").trim(),
+    contact: String(row.phone || "").trim(),
+    company: roleLabel,
+    image: cover,
+    images,
+    furnishing: String(row.furnishing || "").trim(),
+    availability: row.available_from ? "Available soon" : "Immediate",
+    propertyType: "Apartment",
+    amenities: list(row.amenities),
+    postedBy: row.posted_by,
+    source: "inventory",
+  };
+}
+
+/** Published inventory already mapped to the map/discovery listing shape. */
+export async function fetchInventoryAsListings(opts = {}) {
+  const rows = await fetchPublishedInventory(opts);
+  return rows.map(mapInventoryToListing).filter((l) => l && Number.isFinite(l.lat) && Number.isFinite(l.lng));
+}
+
 /** Every saved customer search profile (the demand side) for matching. */
 export async function fetchAllSearchProfiles({ limit = 1000 } = {}) {
   if (!isSupabaseConfigured || !supabase) return [];

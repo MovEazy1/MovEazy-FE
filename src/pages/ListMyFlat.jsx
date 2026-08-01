@@ -9,6 +9,7 @@ import { reverseGeocode, nearbyLandmarks } from "../lib/geocode";
 import { createInventoryItem, uploadInventoryPhotos, generatePropertyId } from "../lib/inventory";
 import { fetchAllUserRequirements } from "../lib/userRequirements";
 import { matchListingToRequirements } from "../lib/inventoryMatch";
+import { fetchSlotsForProperty, addVisitSlot, deleteVisitSlot } from "../lib/visits";
 import {
   ALL_LOCALITIES, FLAT_TYPES, FURNISHINGS, OCCUPANTS,
   MUST_HAVES, LIFESTYLE,
@@ -24,6 +25,11 @@ const POSTER_ROLES = [
   ["tenant", "Tenant", "I live here / passing it on"],
   ["broker", "Broker / Agent", "I'm listing on behalf of an owner"],
 ];
+
+/** Compact / affordable homes earn a ₹10,000 wallet reward, credited on a successful sale. */
+const WALLET_REWARD_TYPES = ["1 RK", "1 BHK", "Room in Preoccupied flat"];
+const WALLET_REWARD_AMOUNT = 10000;
+const fmtWallet = (n) => `₹${Number(n || 0).toLocaleString("en-IN")}`;
 
 const inp = "w-full px-4 py-3 rounded-xl border border-gray-200 bg-white text-[14px] text-gray-900 placeholder:text-gray-400 outline-none transition-all focus:border-red-400 focus:ring-2 focus:ring-red-100";
 
@@ -73,6 +79,7 @@ export default function ListMyFlat() {
   const [saving, setSaving] = useState(false);
   const [errors, setErrors] = useState({});
   const [published, setPublished] = useState(null); // { row, matches }
+  const [showDashboard, setShowDashboard] = useState(false); // tenant: leads + visit-slots view
 
   // Step 1 — who & where
   const [postedBy, setPostedBy] = useState("owner");
@@ -242,14 +249,39 @@ export default function ListMyFlat() {
   if (published) {
     const { row, matches } = published;
     const isBroker = postedBy === "broker";
-    const roleLabel = postedBy === "broker" ? "Broker" : postedBy === "tenant" ? "Tenant" : "Owner";
+    const isOwner = postedBy === "owner";
+    const isTenant = postedBy === "tenant";
+    const roleLabel = isBroker ? "Broker" : isTenant ? "Tenant" : "Owner";
+    const rewardEligible = WALLET_REWARD_TYPES.includes(flatType);
+    const walletAmount = rewardEligible ? WALLET_REWARD_AMOUNT : 0;
+    const listingTitle = row.title || title || `${flatType} in ${area || "Bengaluru"}`;
+
     return (
       <PageShell variant="marketing" overlayOnly className="antialiased" style={{ background: "#f0ebe3" }}>
         <Navbar variant="marketing" />
         <main className="max-w-2xl mx-auto px-4 pb-16 pt-8">
-          {/* Published confirmation */}
+          {/* Published confirmation (owner & tenant get a wallet top-right) */}
           <Card>
-            <div className="p-8 text-center">
+            <div className="p-8 text-center relative">
+              {(isOwner || isTenant) && (
+                <button
+                  type="button"
+                  onClick={() => { if (isTenant) setShowDashboard((v) => !v); }}
+                  className="absolute top-4 right-4 inline-flex items-center gap-2 px-3 py-2 rounded-xl border transition-colors"
+                  style={{
+                    borderColor: rewardEligible ? "#86efac" : "#e5e7eb",
+                    background: rewardEligible ? "#ecfdf5" : "#f9fafb",
+                    cursor: isTenant ? "pointer" : "default",
+                  }}
+                  title={isTenant ? "Open your property dashboard" : "Your MovEazy wallet"}
+                >
+                  <svg className="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke={rewardEligible ? "#16a34a" : "#94a3b8"} strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><path d="M3 7h16a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h12" /><path d="M16 12h.01" /></svg>
+                  <span className="text-left leading-tight">
+                    <span className="block text-[9px] font-bold uppercase tracking-wide" style={{ color: "#94a3b8" }}>Wallet</span>
+                    <span className="block text-[14px] font-extrabold" style={{ color: rewardEligible ? "#15803d" : "#334155" }}>{fmtWallet(walletAmount)}</span>
+                  </span>
+                </button>
+              )}
               <div className="w-16 h-16 rounded-full mx-auto mb-4 flex items-center justify-center" style={{ background: "#dcfce7" }}>
                 <svg className="w-8 h-8" viewBox="0 0 24 24" fill="none" stroke="#16a34a" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M20 6L9 17l-5-5" /></svg>
               </div>
@@ -264,105 +296,153 @@ export default function ListMyFlat() {
                   Listed by {roleLabel}
                 </span>
               </div>
+              {rewardEligible && (isOwner || isTenant) && (
+                <p className="mt-4 text-[12px] font-semibold" style={{ color: "#15803d" }}>
+                  🎉 You've earned {fmtWallet(WALLET_REWARD_AMOUNT)} — credited to your wallet once this home is sold through a MovEazy on-ground executive.
+                </p>
+              )}
             </div>
           </Card>
 
-          {/* Ground-agent verification */}
-          <Card>
-            <div className="p-6 flex items-start gap-4">
-              <div className="w-11 h-11 rounded-xl shrink-0 flex items-center justify-center" style={{ background: "#fff5f5" }}>
-                <svg className="w-6 h-6" viewBox="0 0 24 24" fill="none" stroke={BRAND_RED} strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><path d="M9 11l3 3L22 4" /><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11" /></svg>
-              </div>
-              <div>
-                <p className="text-[15px] font-extrabold text-gray-900 mb-1">A ground agent will verify your property</p>
-                <p className="text-[13px] text-gray-600 leading-relaxed">
-                  One of our MovEazy ground agents will visit <span className="font-semibold">{row.full_address || row.area || "your flat"}</span> to verify the details and photos.
-                  We'll call you on <span className="font-semibold">{row.phone || "your number"}</span> to schedule a convenient time. Verified listings get a trust badge and far more enquiries.
-                </p>
-                <span className="inline-block mt-3 px-2.5 py-1 rounded-full text-[11px] font-bold" style={{ background: "#fef9c3", color: "#a16207" }}>
-                  Status: Pending verification
-                </span>
-              </div>
-            </div>
-          </Card>
-
-          {/* Pitch — brokers grow their portfolio; owners/tenants find their own next home */}
-          {isBroker ? (
-            <div className="rounded-2xl overflow-hidden mb-4" style={{ background: "linear-gradient(135deg,#1c1917,#3b2b28)" }}>
-              <div className="p-6">
-                <p className="text-[11px] font-bold uppercase tracking-wide mb-2" style={{ color: "#e0a83b" }}>Listing as a broker?</p>
-                <p className="text-[18px] font-extrabold text-white leading-snug mb-1">Add your <span style={{ color: "#ff6b57" }}>next property</span> in minutes.</p>
-                <p className="text-[13px] mb-4" style={{ color: "rgba(255,255,255,0.72)" }}>
-                  The more verified homes you list, the more renters we match you with. Post another property now, or manage everything from your broker dashboard.
-                </p>
-                <div className="flex flex-wrap gap-3">
-                  <button type="button" onClick={() => window.location.reload()}
-                    className="inline-flex items-center gap-2 px-5 py-3 rounded-xl text-[14px] font-bold text-white"
-                    style={{ background: `linear-gradient(135deg,${BRAND_RED},#ef4444)` }}>
-                    List another property
-                    <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" strokeWidth="2.4" aria-hidden><path d="M5 12h14M13 6l6 6-6 6" strokeLinecap="round" strokeLinejoin="round" /></svg>
-                  </button>
-                  <button type="button" onClick={() => navigate("/broker")}
-                    className="inline-flex items-center gap-2 px-5 py-3 rounded-xl text-[14px] font-bold"
-                    style={{ background: "rgba(255,255,255,0.12)", color: "#fff" }}>
-                    Go to broker dashboard
-                  </button>
-                </div>
-              </div>
-            </div>
+          {isTenant && showDashboard ? (
+            <PropertyLeadDashboard
+              propertyId={row.property_id}
+              listingTitle={listingTitle}
+              leads={matches}
+              walletAmount={walletAmount}
+              rewardEligible={rewardEligible}
+              onClose={() => setShowDashboard(false)}
+            />
           ) : (
-            <div className="rounded-2xl overflow-hidden mb-4" style={{ background: "linear-gradient(135deg,#1c1917,#3b2b28)" }}>
-              <div className="p-6">
-                <p className="text-[11px] font-bold uppercase tracking-wide mb-2" style={{ color: "#e0a83b" }}>Moving out yourself?</p>
-                <p className="text-[18px] font-extrabold text-white leading-snug mb-1">Now let us find <span style={{ color: "#ff6b57" }}>your</span> next home.</p>
-                <p className="text-[13px] mb-4" style={{ color: "rgba(255,255,255,0.72)" }}>
-                  You're passing this flat on because you're moving somewhere new. Our AI broker learns exactly what you want and hands you a shortlist worth your time — not a search dump.
-                </p>
-                <button type="button" onClick={() => navigate("/?find=1")}
-                  className="inline-flex items-center gap-2 px-5 py-3 rounded-xl text-[14px] font-bold text-white"
-                  style={{ background: `linear-gradient(135deg,${BRAND_RED},#ef4444)` }}>
-                  Find my next flat
-                  <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" strokeWidth="2.4" aria-hidden><path d="M5 12h14M13 6l6 6-6 6" strokeLinecap="round" strokeLinejoin="round" /></svg>
+            <>
+              {/* Ground-agent verification */}
+              <Card>
+                <div className="p-6 flex items-start gap-4">
+                  <div className="w-11 h-11 rounded-xl shrink-0 flex items-center justify-center" style={{ background: "#fff5f5" }}>
+                    <svg className="w-6 h-6" viewBox="0 0 24 24" fill="none" stroke={BRAND_RED} strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><path d="M9 11l3 3L22 4" /><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11" /></svg>
+                  </div>
+                  <div>
+                    <p className="text-[15px] font-extrabold text-gray-900 mb-1">A ground agent will verify your property</p>
+                    <p className="text-[13px] text-gray-600 leading-relaxed">
+                      One of our MovEazy ground agents will visit <span className="font-semibold">{row.full_address || row.area || "your flat"}</span> to verify the details and photos.
+                      We'll call you on <span className="font-semibold">{row.phone || "your number"}</span> to schedule a convenient time. Verified listings get a trust badge and far more enquiries.
+                    </p>
+                    <span className="inline-block mt-3 px-2.5 py-1 rounded-full text-[11px] font-bold" style={{ background: "#fef9c3", color: "#a16207" }}>
+                      Status: Pending verification
+                    </span>
+                  </div>
+                </div>
+              </Card>
+
+              {/* Role-specific next step */}
+              {isBroker && (
+                <>
+                  <div className="rounded-2xl overflow-hidden mb-4" style={{ background: "linear-gradient(135deg,#1c1917,#3b2b28)" }}>
+                    <div className="p-6">
+                      <p className="text-[11px] font-bold uppercase tracking-wide mb-2" style={{ color: "#e0a83b" }}>Listing as a broker?</p>
+                      <p className="text-[18px] font-extrabold text-white leading-snug mb-1">Add your <span style={{ color: "#ff6b57" }}>next property</span> in minutes.</p>
+                      <p className="text-[13px] mb-4" style={{ color: "rgba(255,255,255,0.72)" }}>
+                        The more verified homes you list, the more renters we match you with. Post another property now, or manage everything from your broker dashboard.
+                      </p>
+                      <div className="flex flex-wrap gap-3">
+                        <button type="button" onClick={() => window.location.reload()}
+                          className="inline-flex items-center gap-2 px-5 py-3 rounded-xl text-[14px] font-bold text-white"
+                          style={{ background: `linear-gradient(135deg,${BRAND_RED},#ef4444)` }}>
+                          List another property
+                          <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" strokeWidth="2.4" aria-hidden><path d="M5 12h14M13 6l6 6-6 6" strokeLinecap="round" strokeLinejoin="round" /></svg>
+                        </button>
+                        <button type="button" onClick={() => navigate("/broker")}
+                          className="inline-flex items-center gap-2 px-5 py-3 rounded-xl text-[14px] font-bold"
+                          style={{ background: "rgba(255,255,255,0.12)", color: "#fff" }}>
+                          Go to broker dashboard
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+                  <BrokerPlanCard />
+                </>
+              )}
+
+              {isOwner && (
+                <div className="rounded-2xl overflow-hidden mb-4" style={{ background: "linear-gradient(135deg,#1c1917,#3b2b28)" }}>
+                  <div className="p-6">
+                    <p className="text-[11px] font-bold uppercase tracking-wide mb-2" style={{ color: "#e0a83b" }}>Own more than one place?</p>
+                    <p className="text-[18px] font-extrabold text-white leading-snug mb-1">List <span style={{ color: "#ff6b57" }}>another property</span> and reach more renters.</p>
+                    <p className="text-[13px] mb-4" style={{ color: "rgba(255,255,255,0.72)" }}>
+                      Every home you list gets verified and matched to real seekers. Add your next one in a couple of minutes.
+                    </p>
+                    <button type="button" onClick={() => window.location.reload()}
+                      className="inline-flex items-center gap-2 px-5 py-3 rounded-xl text-[14px] font-bold text-white"
+                      style={{ background: `linear-gradient(135deg,${BRAND_RED},#ef4444)` }}>
+                      List another property
+                      <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" strokeWidth="2.4" aria-hidden><path d="M5 12h14M13 6l6 6-6 6" strokeLinecap="round" strokeLinejoin="round" /></svg>
+                    </button>
+                  </div>
+                </div>
+              )}
+
+              {isTenant && (
+                <div className="rounded-2xl overflow-hidden mb-4" style={{ background: "linear-gradient(135deg,#1c1917,#3b2b28)" }}>
+                  <div className="p-6">
+                    <p className="text-[11px] font-bold uppercase tracking-wide mb-2" style={{ color: "#e0a83b" }}>Moving out yourself?</p>
+                    <p className="text-[18px] font-extrabold text-white leading-snug mb-1">Now let us find <span style={{ color: "#ff6b57" }}>your</span> next home.</p>
+                    <p className="text-[13px] mb-4" style={{ color: "rgba(255,255,255,0.72)" }}>
+                      You're passing this flat on because you're moving somewhere new. Our AI broker learns exactly what you want and hands you a shortlist worth your time — not a search dump.
+                    </p>
+                    <div className="flex flex-wrap gap-3">
+                      <button type="button" onClick={() => navigate("/?find=1")}
+                        className="inline-flex items-center gap-2 px-5 py-3 rounded-xl text-[14px] font-bold text-white"
+                        style={{ background: `linear-gradient(135deg,${BRAND_RED},#ef4444)` }}>
+                        Find my next flat
+                        <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" strokeWidth="2.4" aria-hidden><path d="M5 12h14M13 6l6 6-6 6" strokeLinecap="round" strokeLinejoin="round" /></svg>
+                      </button>
+                      <button type="button" onClick={() => setShowDashboard(true)}
+                        className="inline-flex items-center gap-2 px-5 py-3 rounded-xl text-[14px] font-bold"
+                        style={{ background: "rgba(255,255,255,0.12)", color: "#fff" }}>
+                        Open property dashboard
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {/* Secondary: who this flat already matches */}
+              {matches.length > 0 && (
+                <Card>
+                  <div className="p-6">
+                    <p className="text-[14px] font-extrabold text-gray-900 mb-1">Already matches {matches.length} active seeker{matches.length > 1 ? "s" : ""}</p>
+                    <p className="text-[12px] text-gray-500 mb-4">People whose Find My Flat requirements line up with your listing right now.</p>
+                    <div className="space-y-2">
+                      {matches.map((m, i) => (
+                        <div key={i} className="flex items-center justify-between p-3 rounded-xl border border-gray-100 bg-gray-50">
+                          <div className="min-w-0">
+                            <p className="text-[13px] font-bold text-gray-800 truncate">
+                              {m.requirement.email || m.requirement.customer_name || m.requirement.name || `Seeker #${String(m.requirement.user_id || i + 1).slice(0, 6)}`}
+                            </p>
+                            <p className="text-[11px] text-gray-500 truncate">{m.reasons.join(" · ") || "Requirement match"}</p>
+                          </div>
+                          <span className="shrink-0 ml-3 px-2.5 py-1 rounded-full text-[12px] font-extrabold text-white" style={{ background: m.score >= 80 ? "#16a34a" : m.score >= 60 ? BRAND_RED : "#e0a83b" }}>
+                            {m.score}%
+                          </span>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                </Card>
+              )}
+
+              <div className="flex gap-3">
+                <button type="button" onClick={() => navigate("/map")}
+                  className="flex-1 py-3.5 rounded-2xl text-[14px] font-bold text-gray-700 border border-gray-200 bg-white">
+                  View on map
+                </button>
+                <button type="button" onClick={() => window.location.reload()}
+                  className="flex-1 py-3.5 rounded-2xl text-[14px] font-bold text-gray-700 border border-gray-200 bg-white">
+                  {isBroker ? "List another property" : "List another flat"}
                 </button>
               </div>
-            </div>
+            </>
           )}
-
-          {/* Secondary: who this flat already matches */}
-          {matches.length > 0 && (
-            <Card>
-              <div className="p-6">
-                <p className="text-[14px] font-extrabold text-gray-900 mb-1">Already matches {matches.length} active seeker{matches.length > 1 ? "s" : ""}</p>
-                <p className="text-[12px] text-gray-500 mb-4">People whose Find My Flat requirements line up with your listing right now.</p>
-                <div className="space-y-2">
-                  {matches.map((m, i) => (
-                    <div key={i} className="flex items-center justify-between p-3 rounded-xl border border-gray-100 bg-gray-50">
-                      <div className="min-w-0">
-                        <p className="text-[13px] font-bold text-gray-800 truncate">
-                          {m.requirement.email || m.requirement.customer_name || m.requirement.name || `Seeker #${String(m.requirement.user_id || i + 1).slice(0, 6)}`}
-                        </p>
-                        <p className="text-[11px] text-gray-500 truncate">{m.reasons.join(" · ") || "Requirement match"}</p>
-                      </div>
-                      <span className="shrink-0 ml-3 px-2.5 py-1 rounded-full text-[12px] font-extrabold text-white" style={{ background: m.score >= 80 ? "#16a34a" : m.score >= 60 ? BRAND_RED : "#e0a83b" }}>
-                        {m.score}%
-                      </span>
-                    </div>
-                  ))}
-                </div>
-              </div>
-            </Card>
-          )}
-
-          <div className="flex gap-3">
-            <button type="button" onClick={() => navigate("/map")}
-              className="flex-1 py-3.5 rounded-2xl text-[14px] font-bold text-gray-700 border border-gray-200 bg-white">
-              View on map
-            </button>
-            <button type="button" onClick={() => window.location.reload()}
-              className="flex-1 py-3.5 rounded-2xl text-[14px] font-bold text-gray-700 border border-gray-200 bg-white">
-              {isBroker ? "List another property" : "List another flat"}
-            </button>
-          </div>
         </main>
         <Footer />
       </PageShell>
@@ -544,7 +624,7 @@ export default function ListMyFlat() {
 
             <Card>
               <div className="p-6">
-                <p className="text-[14px] font-extrabold text-gray-900 mb-3">Amenities / Must-haves</p>
+                <p className="text-[14px] font-extrabold text-gray-900 mb-3">Amenities</p>
                 <ChipMulti options={MUST_HAVES} selected={amenities} onToggle={toggleIn(setAmenities)} />
               </div>
             </Card>
@@ -680,5 +760,179 @@ function Row({ k, v, mono }) {
       <span className="shrink-0">{k}</span>
       <span className={`font-semibold text-gray-900 text-right truncate ${mono ? "tracking-wider" : ""}`}>{v}</span>
     </div>
+  );
+}
+
+const fmtSlot = (iso) =>
+  iso ? new Date(iso).toLocaleString("en-IN", { weekday: "short", day: "numeric", month: "short", hour: "numeric", minute: "2-digit", hour12: true }) : "";
+
+/**
+ * Tenant "property dashboard" — shown after a tenant publishes. Leads at the top,
+ * a per-property visit-slot editor, and the wallet-credit note.
+ */
+function PropertyLeadDashboard({ propertyId, listingTitle, leads = [], walletAmount, rewardEligible, onClose }) {
+  const [slots, setSlots] = useState([]);
+  const [when, setWhen] = useState("");
+  const [capacity, setCapacity] = useState(5);
+  const [busy, setBusy] = useState(false);
+  const [msg, setMsg] = useState({ type: "", text: "" });
+
+  const loadSlots = async () => {
+    try { setSlots(await fetchSlotsForProperty(propertyId)); } catch { /* ignore */ }
+  };
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  useEffect(() => { if (propertyId) loadSlots(); }, [propertyId]);
+
+  const addSlot = async () => {
+    setMsg({ type: "", text: "" });
+    if (!when) { setMsg({ type: "err", text: "Pick a date & time first." }); return; }
+    setBusy(true);
+    try {
+      await addVisitSlot(propertyId, new Date(when).toISOString(), capacity);
+      setWhen("");
+      await loadSlots();
+      setMsg({ type: "ok", text: "Visit time added." });
+    } catch (e) {
+      setMsg({ type: "err", text: e?.message?.includes("row-level") ? "This account can't add slots yet — our team will set them up when they call you." : (e?.message || "Could not add this time.") });
+    } finally { setBusy(false); }
+  };
+
+  const removeSlot = async (id) => {
+    setBusy(true);
+    try { await deleteVisitSlot(id); await loadSlots(); } catch { /* ignore */ } finally { setBusy(false); }
+  };
+
+  return (
+    <>
+      <Card>
+        <div className="p-6">
+          <div className="flex items-center justify-between gap-3 mb-4">
+            <div className="min-w-0">
+              <p className="text-[11px] font-bold uppercase tracking-wide text-gray-400">Property dashboard</p>
+              <p className="text-[15px] font-extrabold text-gray-900 truncate">{listingTitle}</p>
+            </div>
+            <button type="button" onClick={onClose} className="shrink-0 text-[12px] font-bold text-gray-500 hover:text-gray-800">← Back to summary</button>
+          </div>
+
+          {/* Leads count */}
+          <div className="rounded-2xl p-5 mb-2" style={{ background: "linear-gradient(135deg,#fff5f5,#fef2f2)", border: "1px solid #fbcfc4" }}>
+            <p className="text-[11px] font-bold uppercase tracking-wide" style={{ color: BRAND_RED }}>Leads</p>
+            <div className="flex items-baseline gap-2">
+              <span className="text-[34px] font-extrabold text-gray-900 leading-none">{leads.length}</span>
+              <span className="text-[13px] text-gray-500">seeker{leads.length === 1 ? "" : "s"} matched to this home</span>
+            </div>
+          </div>
+          {leads.length > 0 && (
+            <div className="space-y-2 mt-3">
+              {leads.map((m, i) => (
+                <div key={i} className="flex items-center justify-between p-3 rounded-xl border border-gray-100 bg-gray-50">
+                  <div className="min-w-0">
+                    <p className="text-[13px] font-bold text-gray-800 truncate">
+                      {m.requirement?.email || m.requirement?.customer_name || m.requirement?.name || `Seeker #${String(m.requirement?.user_id || i + 1).slice(0, 6)}`}
+                    </p>
+                    <p className="text-[11px] text-gray-500 truncate">{(m.reasons || []).join(" · ") || "Requirement match"}</p>
+                  </div>
+                  {Number.isFinite(m.score) && (
+                    <span className="shrink-0 ml-3 px-2.5 py-1 rounded-full text-[12px] font-extrabold text-white" style={{ background: m.score >= 80 ? "#16a34a" : m.score >= 60 ? BRAND_RED : "#e0a83b" }}>{m.score}%</span>
+                  )}
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      </Card>
+
+      {/* Visit times */}
+      <Card>
+        <div className="p-6">
+          <p className="text-[14px] font-extrabold text-gray-900 mb-1">Visit times</p>
+          <p className="text-[12px] text-gray-500 mb-4">Add the slots when seekers can come see this home. They'll be able to book these.</p>
+          <div className="grid grid-cols-1 sm:grid-cols-[1fr_auto_auto] gap-3 items-end">
+            <div>
+              <Label>Date &amp; time</Label>
+              <input type="datetime-local" value={when} onChange={(e) => setWhen(e.target.value)} className={inp} />
+            </div>
+            <div>
+              <Label>Seats</Label>
+              <select value={capacity} onChange={(e) => setCapacity(Number(e.target.value))} className={inp}>
+                {[1, 2, 3, 4, 5, 8, 10].map((n) => <option key={n} value={n}>{n}</option>)}
+              </select>
+            </div>
+            <button type="button" onClick={addSlot} disabled={busy}
+              className="h-[46px] px-5 rounded-xl text-[13px] font-bold text-white disabled:opacity-60"
+              style={{ background: `linear-gradient(135deg,${BRAND_RED},#ef4444)` }}>
+              Add time
+            </button>
+          </div>
+          {msg.text && (
+            <p className={`text-[12px] mt-2 font-semibold ${msg.type === "ok" ? "text-green-600" : "text-red-500"}`}>{msg.text}</p>
+          )}
+          <div className="mt-4 space-y-2">
+            {slots.length === 0 ? (
+              <p className="text-[12px] text-gray-400">No visit times added yet.</p>
+            ) : (
+              slots.map((s) => (
+                <div key={s.id} className="flex items-center justify-between p-3 rounded-xl border border-gray-100 bg-gray-50">
+                  <span className="text-[13px] font-semibold text-gray-800">{fmtSlot(s.slot_at || s.slotAt || s.when)}</span>
+                  <button type="button" onClick={() => removeSlot(s.id)} disabled={busy} className="text-[12px] font-bold text-red-500 hover:text-red-700">Remove</button>
+                </div>
+              ))
+            )}
+          </div>
+        </div>
+      </Card>
+
+      {/* Wallet credit note */}
+      <div className="rounded-2xl p-5 mb-4" style={{ background: "#ecfdf5", border: "1px solid #a7f3d0" }}>
+        <div className="flex items-start gap-3">
+          <svg className="w-6 h-6 shrink-0" viewBox="0 0 24 24" fill="none" stroke="#16a34a" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><path d="M3 7h16a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h12" /><path d="M16 12h.01" /></svg>
+          <p className="text-[13px] leading-relaxed" style={{ color: "#065f46" }}>
+            {rewardEligible
+              ? <>Your <span className="font-extrabold">{fmtWallet(walletAmount)}</span> reward will be <span className="font-semibold">credited to your wallet once this property is sold through our on-ground executive.</span></>
+              : <>Cash rewards apply to 1 RK / 1 BHK / room listings. When this home is sold through our on-ground executive, any applicable reward is credited to your wallet.</>}
+          </p>
+        </div>
+      </div>
+
+      <button type="button" onClick={onClose}
+        className="w-full py-3.5 rounded-2xl text-[14px] font-bold text-gray-700 border border-gray-200 bg-white">
+        Back to summary
+      </button>
+    </>
+  );
+}
+
+/**
+ * Broker upsell — a ₹1,999/mo guaranteed-leads plan. No payment gateway is wired yet,
+ * so the CTA registers interest; the team activates and collects payment on confirmation.
+ */
+function BrokerPlanCard() {
+  const [requested, setRequested] = useState(false);
+  return (
+    <Card className="!mb-4" >
+      <div className="p-6">
+        <div className="flex items-center justify-between gap-3 mb-1 flex-wrap">
+          <p className="text-[15px] font-extrabold text-gray-900">Guaranteed Leads plan</p>
+          <span className="text-[20px] font-extrabold text-gray-900">₹1,999<span className="text-[12px] font-semibold text-gray-400">/month</span></span>
+        </div>
+        <ul className="text-[13px] text-gray-600 leading-relaxed mb-4 space-y-1.5 mt-2">
+          <li className="flex gap-2"><span style={{ color: "#16a34a" }}>✓</span> <span><span className="font-semibold text-gray-800">100 leads guaranteed</span> every month.</span></li>
+          <li className="flex gap-2"><span style={{ color: "#16a34a" }}>✓</span> <span>If we don't deliver 100 leads, your <span className="font-semibold text-gray-800">full amount is refunded</span>.</span></li>
+          <li className="flex gap-2"><span style={{ color: "#16a34a" }}>✓</span> <span>Priority matching across all your listed properties.</span></li>
+        </ul>
+        {requested ? (
+          <div className="p-3 rounded-xl text-[13px] font-semibold" style={{ background: "#ecfdf5", color: "#065f46", border: "1px solid #a7f3d0" }}>
+            Requested — our team will confirm your Guaranteed Leads plan and set up payment.
+          </div>
+        ) : (
+          <button type="button" onClick={() => setRequested(true)}
+            className="w-full py-3 rounded-xl text-[14px] font-bold text-white"
+            style={{ background: `linear-gradient(135deg,${BRAND_RED},#ef4444)` }}>
+            Get the ₹1,999 Guaranteed Leads plan
+          </button>
+        )}
+        <p className="text-[11px] text-gray-400 mt-2">Billed monthly · cancel anytime · 100-lead guarantee or full refund.</p>
+      </div>
+    </Card>
   );
 }
