@@ -4,7 +4,7 @@ import { useLocation, useNavigate } from "react-router-dom";
 import { useState, useEffect, useRef } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import MovEAZYLogo from "../branding/MovEAZYLogo";
-import MovEazyLogo from "../branding/MovEazyLogo";
+import MovEazyLogo from "../branding/MovEAZYLogo";
 import {
   HEADER_CTA,
   HEADER_SECONDARY_CTA,

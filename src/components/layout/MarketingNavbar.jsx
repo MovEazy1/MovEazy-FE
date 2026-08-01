@@ -1,6 +1,6 @@
 import { useNavigate, useLocation } from "react-router-dom";
 import { useState, useEffect } from "react";
-import MovEazyLogo from "../branding/MovEazyLogo";
+import MovEazyLogo from "../branding/MovEAZYLogo";
 import { HEADER_CTA, HEADER_SECONDARY_CTA, MARKETING_NAV_LINKS, isNavLinkActive } from "../../config/navLinks";
 
 /** Lightweight homepage nav — no framer-motion or auth (keeps first paint small). */
