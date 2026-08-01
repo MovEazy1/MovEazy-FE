@@ -1,4 +1,4 @@
-import MovEazyLogo from "./MovEazyLogo";
+import MovEazyLogo from "./MovEAZYLogo";
 
 /** Light-background MovEazy logo (official brand asset). */
 export default function MovEazyLogoLight({ className = "", size = "footer" }) {
