@@ -14,6 +14,7 @@ import { motion, AnimatePresence } from "framer-motion";
 import { useAuth } from "../context/AuthContext";
 import { useLoginModal } from "../context/LoginModalContext";
 import AIBroker from "../components/AIBroker";
+import MovEazyNav from "../components/layout/MovEazyNav";
 import { fetchUserRequirement } from "../lib/userRequirements";
 import livingRoomImg from "../assets/images/Cozy_modern_living_room.png";
 import keysImg from "../assets/images/guarentee-keyhandover.jpg";
@@ -46,20 +47,6 @@ function SparkleIcon() {
   );
 }
 
-/* ── mobile bottom-bar icons ────────────────────────────────────────────── */
-
-// An apartment block — "find my flat".
-function FlatIcon() {
-  return (
-    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" width="23" height="23">
-      <path d="M3.5 21V4.5a1 1 0 0 1 1-1h9a1 1 0 0 1 1 1V21" />
-      <path d="M14.5 10h5a1 1 0 0 1 1 1v10" />
-      <path d="M2 21h20" />
-      <path d="M6.5 7.5h1.5M10 7.5h1.5M6.5 11.5h1.5M10 11.5h1.5M6.5 15.5h1.5M10 15.5h1.5" />
-      <path d="M17 14h1M17 17.5h1" />
-    </svg>
-  );
-}
 
 // A person inside a house — the owner listing their own place.
 function OwnerIcon() {
@@ -111,25 +98,14 @@ const LINE_WORDS = [
 ];
 
 export default function ForkHome() {
-  const { user, logout } = useAuth();
+  const { user } = useAuth();
   const { openLogin } = useLoginModal();
   const navigate = useNavigate();
   const [showChatbot, setShowChatbot] = useState(false);
   const [showChoice, setShowChoice] = useState(false);
   const [checkingPrefs, setCheckingPrefs] = useState(false);
   const [pendingMatchCheck, setPendingMatchCheck] = useState(false);
-  const [menuOpen, setMenuOpen] = useState(false);
   const rootRef = useRef(null);
-
-  // Lock page scroll and allow Escape to dismiss while the mobile menu is open.
-  useEffect(() => {
-    if (!menuOpen) return;
-    const prev = document.body.style.overflow;
-    document.body.style.overflow = "hidden";
-    const onKey = (e) => e.key === "Escape" && setMenuOpen(false);
-    window.addEventListener("keydown", onKey);
-    return () => { document.body.style.overflow = prev; window.removeEventListener("keydown", onKey); };
-  }, [menuOpen]);
 
   // "List my Flat" — auth-gate, then open the inventory listing form.
   const listMyFlat = () => (user ? navigate("/list-my-flat") : openLogin(() => navigate("/list-my-flat")));
@@ -181,6 +157,16 @@ export default function ForkHome() {
     }
   };
 
+  // The shared nav's "Start your move" / "Find My Flat" on other pages routes
+  // here as `/?search=1`, so every entry point runs this one flow rather than
+  // each page reimplementing the preferences check.
+  useEffect(() => {
+    if (searchParams.get("search") !== "1") return;
+    setSearchParams({}, { replace: true });
+    startFlatSearch();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [searchParams, user]);
+
   const chooseMap = () => {
     setShowChoice(false);
     navigate("/map");
@@ -191,11 +177,6 @@ export default function ForkHome() {
     setShowChatbot(true);
   };
 
-  const registerOwner = () => listMyFlat();
-
-  // Menu-aware wrappers — every sheet action dismisses the sheet first, so the
-  // menu never stays open behind a login modal or a route change.
-  const closeThen = (fn) => () => { setMenuOpen(false); fn(); };
 
   /* ── ported scroll-animation script (progress bar, nav fade, hero parallax,
      data-reveal fades, word-by-word story, letter-flip line, timeline zigzag) —
@@ -211,8 +192,6 @@ export default function ForkHome() {
     const q = (s) => root.querySelector(s);
     const qa = (s) => Array.from(root.querySelectorAll(s));
 
-    const progress = q("[data-progress]");
-    const nav = q("[data-nav]");
     const hero = q("[data-hero]");
     const heroInner = q("[data-hero-inner]");
     const map = q("[data-map]");
@@ -310,19 +289,7 @@ export default function ForkHome() {
     const update = () => {
       ticking = false;
       const vh = window.innerHeight;
-      const total = document.documentElement.scrollHeight - vh;
       const sy = window.scrollY;
-      if (progress) progress.style.width = (total > 0 ? clamp(sy / total) * 100 : 0) + "%";
-
-      if (nav) {
-        const on = sy > 40;
-        nav.style.background = on ? "rgba(4,33,29,.86)" : "transparent";
-        nav.style.backdropFilter = on ? "blur(14px)" : "none";
-        nav.style.webkitBackdropFilter = on ? "blur(14px)" : "none";
-        nav.style.borderBottomColor = on ? "rgba(255,255,255,.08)" : "transparent";
-        nav.style.paddingTop = on ? "15px" : "24px";
-        nav.style.paddingBottom = on ? "15px" : "24px";
-      }
 
       // The hero's fade-and-drift is written for the design's 100vh desktop
       // hero, where the copy sits at the top and has scrolled away by the time
@@ -412,16 +379,8 @@ export default function ForkHome() {
         .mzn-root a:hover { color: #8ff3e4; }
         .mzn-root ::selection { background: #5EEAD4; color: #04211D; }
         @keyframes mznDashmove { to { stroke-dashoffset: -320; } }
-        @keyframes mznPinpulse { 0%, 100% { transform: scale(1); opacity: .9; } 50% { transform: scale(1.35); opacity: .25; } }
-        .mzn-badge-new { background: linear-gradient(135deg,#FFE1A6,#E8A33D 45%,#B9782A); box-shadow: 0 0 0 1px rgba(255,255,255,.35) inset, 0 1px 4px rgba(232,163,61,.5); color: #1B1204; font-size: 8px; font-weight: 800; letter-spacing: .02em; padding: 1.5px 6px; border-radius: 100px; line-height: 1.6; align-self: flex-start; margin-top: -4px; }
-        .mzn-root button { font-family: inherit; cursor: pointer; }
+        @keyframes mznPinpulse { 0%, 100% { transform: scale(1); opacity: .9; } 50% { transform: scale(1.35); opacity: .25; } }        .mzn-root button { font-family: inherit; cursor: pointer; }
         .mzn-root a[href^="#"]:focus-visible, .mzn-root button:focus-visible, .mzn-root a:focus-visible { outline: 2px solid #5EEAD4; outline-offset: 3px; border-radius: 4px; }
-
-        /* Mobile chrome — hidden entirely on desktop, which keeps the design's
-           original pill nav untouched. */
-        .mzn-burger { display: none; align-items: center; justify-content: center; width: 44px; height: 44px; border: none; background: rgba(255,255,255,.08); border-radius: 50%; color: #F1F6F4; flex: none; }
-        .mzn-burger svg { display: block; }
-        .mzn-sheet, .mzn-backdrop, .mzn-bottombar { display: none; }
 
         /* The design has no responsive handling of its own — everything below is
            added on top so the hero's absolutely-positioned map/route/pins/polaroid
@@ -429,156 +388,14 @@ export default function ForkHome() {
            headline and cards once mobile text height pushes the hero well past
            100vh, and the 3-column timeline grid stops squeezing into slivers. */
         @media (max-width: 900px) {
-          .mzn-nav { padding: 12px 14px !important; gap: 10px !important; }
-          /* The horizontally-scrolling pill can't fit on a phone — it collapses
-             into the hamburger sheet instead. */
-          .mzn-nav-links, .mzn-nav-cta { display: none !important; }
-          .mzn-burger { display: inline-flex; margin-left: auto; }
-
-          .mzn-backdrop {
-            display: block; position: fixed; inset: 0; z-index: 170;
-            background: rgba(2,16,14,.5); opacity: 0; pointer-events: none;
-            transition: opacity .25s ease;
-          }
-          .mzn-backdrop.is-open { opacity: 1; pointer-events: auto; }
-          .mzn-sheet {
-            display: flex; flex-direction: column; gap: 4px;
-            position: absolute; top: calc(100% + 6px); left: 14px; right: 14px; z-index: 185;
-            background: #062D27; border: 1px solid rgba(255,255,255,.10);
-            border-radius: 20px; padding: 10px;
-            box-shadow: 0 24px 60px rgba(0,0,0,.55);
-            transform: translateY(-10px) scale(.98); opacity: 0; pointer-events: none;
-            transform-origin: top center;
-            transition: transform .26s cubic-bezier(.22,1,.36,1), opacity .22s ease;
-          }
-          .mzn-sheet.is-open { transform: translateY(0) scale(1); opacity: 1; pointer-events: auto; }
-          /* Scoped with .mzn-root so these beat the page-wide mint anchor
-             colour — otherwise the Link rows and button rows in the same
-             list render in two different colours. */
-          .mzn-root .mzn-sheet-link {
-            display: flex; align-items: center; gap: 8px; min-height: 48px; padding: 0 16px;
-            border-radius: 12px; font-size: 15px; font-weight: 600; color: #CBD9D5;
-            background: none; border: none; width: 100%; text-align: left;
-          }
-          .mzn-root .mzn-sheet-link.is-active { background: #5EEAD4; color: #04211D; font-weight: 700; }
-          .mzn-root .mzn-sheet-link:active { background: rgba(255,255,255,.07); }
-          .mzn-root .mzn-sheet-link.is-active:active { background: #5EEAD4; }
-          /* The badge is top-aligned against the tiny desktop pill labels; in
-             the roomier sheet rows it should sit inline with the text. */
-          .mzn-sheet-link .mzn-badge-new { align-self: center; margin-top: 0; }
-          .mzn-sheet-cta {
-            display: flex; align-items: center; justify-content: center; gap: 6px;
-            min-height: 48px; margin-top: 2px; border: none; border-radius: 100px;
-            background: #5EEAD4; color: #04211D; font-size: 15px; font-weight: 700;
-          }
-          .mzn-sheet-divider { height: 1px; background: rgba(255,255,255,.10); margin: 6px 4px; }
-          .mzn-sheet-signin {
-            display: flex; align-items: center; justify-content: center; gap: 7px;
-            min-height: 48px; border-radius: 100px; border: 1px solid rgba(255,255,255,.22);
-            background: transparent; color: #F1F6F4; font-size: 15px; font-weight: 600;
-          }
-
-          /* Fixed bottom action bar. env(safe-area-inset-bottom) keeps it clear
-             of the iOS home indicator. */
-          .mzn-bottombar {
-            display: grid; grid-template-columns: repeat(3, 1fr);
-            position: fixed; left: 0; right: 0; bottom: 0; z-index: 190;
-            background: rgba(4,33,29,.95);
-            -webkit-backdrop-filter: blur(14px); backdrop-filter: blur(14px);
-            border-top: 1px solid rgba(255,255,255,.10);
-            padding: 8px 4px calc(8px + env(safe-area-inset-bottom, 0px));
-          }
-          .mzn-bottombar button {
-            display: flex; flex-direction: column; align-items: center; justify-content: flex-start;
-            gap: 5px; padding: 6px 2px; background: none; border: none;
-            color: #CBD9D5; font-size: 11px; font-weight: 700; line-height: 1.2;
-            text-align: center; letter-spacing: -.01em;
-          }
-          .mzn-bottombar button:active { color: #5EEAD4; }
-          .mzn-bottombar svg { flex: none; }
-
           .mzn-hero { flex-direction: column !important; min-height: auto !important; padding: 128px 20px 56px !important; }
           .mzn-hero-map, .mzn-hero-route-wrap { display: none !important; }
           .mzn-polaroid { position: relative !important; right: auto !important; left: auto !important; top: auto !important; width: min(260px, 78vw) !important; margin: 0 auto 32px !important; }
           .mzn-hero-cards { grid-template-columns: 1fr !important; }
-          .mzn-tl-step { grid-template-columns: 1fr !important; row-gap: 14px !important; }
-          /* Clear the fixed bottom bar so it never covers the last of the page. */
-          .mzn-footer { padding-bottom: calc(96px + env(safe-area-inset-bottom, 0px)) !important; }
-        }
+          .mzn-tl-step { grid-template-columns: 1fr !important; row-gap: 14px !important; }        }
       `}</style>
 
-      <div data-progress style={{ position: "fixed", top: 0, left: 0, height: 3, width: "0%", background: "linear-gradient(90deg,#5EEAD4,#E8A33D)", zIndex: 200 }} />
-
-      {/* ── NAV ── */}
-      <nav
-        data-nav
-        className="mzn-nav"
-        style={{ position: "fixed", top: 0, left: 0, width: "100%", zIndex: 180, display: "flex", alignItems: "center", justifyContent: "space-between", padding: "14px clamp(14px,3vw,50px)", transition: "background .3s ease, padding .3s ease, border-color .3s ease", borderBottom: "1px solid transparent", gap: "clamp(6px,1.4vw,20px)" }}
-      >
-        <Link to="/" style={{ fontWeight: 800, fontSize: "clamp(18px,2vw,24px)", letterSpacing: "-.02em", color: "#fff", flex: "none" }}>
-          mov<span style={{ color: "#5EEAD4" }}>EAZY</span>
-        </Link>
-        <div className="mzn-nav-links" style={{ display: "flex", alignItems: "center", gap: "clamp(2px,.6vw,8px)", background: "rgba(255,255,255,.06)", border: "1px solid rgba(255,255,255,.09)", borderRadius: 100, padding: 6, flex: 1, minWidth: 0, maxWidth: 780, overflowX: "auto", scrollbarWidth: "none", justifyContent: "center" }}>
-          <Link to="/" style={{ background: "#5EEAD4", color: "#04211D", fontWeight: 700, fontSize: "clamp(12px,1.05vw,14px)", padding: "10px clamp(14px,1.6vw,20px)", borderRadius: 100, whiteSpace: "nowrap", flex: "none" }}>Home</Link>
-          <Link to="/how-it-works" style={{ color: "#CBD9D5", fontWeight: 600, fontSize: "clamp(12px,1.05vw,14px)", padding: "10px clamp(12px,1.4vw,18px)", borderRadius: 100, whiteSpace: "nowrap", flex: "none" }}>How it Works</Link>
-          <Link to="/about" style={{ color: "#CBD9D5", fontWeight: 600, fontSize: "clamp(12px,1.05vw,14px)", padding: "10px clamp(12px,1.4vw,18px)", borderRadius: 100, whiteSpace: "nowrap", flex: "none" }}>About Us</Link>
-          <a href="#" onClick={(e) => { e.preventDefault(); registerOwner(); }} style={{ display: "flex", alignItems: "center", gap: 6, color: "#CBD9D5", fontWeight: 600, fontSize: "clamp(12px,1.05vw,14px)", padding: "10px clamp(12px,1.4vw,18px)", borderRadius: 100, whiteSpace: "nowrap", flex: "none" }}>
-            Register as an Owner<span className="mzn-badge-new">new</span>
-          </a>
-          <Link to="/register-broker" style={{ display: "flex", alignItems: "center", gap: 6, color: "#CBD9D5", fontWeight: 600, fontSize: "clamp(12px,1.05vw,14px)", padding: "10px clamp(12px,1.4vw,18px)", borderRadius: 100, whiteSpace: "nowrap", flex: "none" }}>
-            Register as a Broker<span className="mzn-badge-new">new</span>
-          </Link>
-        </div>
-        <a href="#" className="mzn-nav-cta" onClick={(e) => { e.preventDefault(); startFlatSearch(); }} style={{ display: "flex", alignItems: "center", gap: 6, background: "#5EEAD4", color: "#04211D", fontWeight: 700, fontSize: "clamp(12px,1.1vw,15px)", padding: "11px clamp(12px,1.6vw,22px)", borderRadius: 100, flex: "none", whiteSpace: "nowrap" }}>
-          Start your move <span style={{ fontSize: 13 }}>&#8599;</span>
-        </a>
-
-        {/* Mobile hamburger — desktop keeps the pill nav above. */}
-        <button
-          type="button"
-          className="mzn-burger"
-          aria-label={menuOpen ? "Close menu" : "Open menu"}
-          aria-expanded={menuOpen}
-          onClick={() => setMenuOpen((o) => !o)}
-        >
-          {menuOpen ? (
-            <svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round"><path d="M6 6l12 12M18 6L6 18" /></svg>
-          ) : (
-            <svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round"><path d="M4 7h16M4 12h16M4 17h16" /></svg>
-          )}
-        </button>
-
-        {/* Mobile slide-down menu — every nav destination plus sign-in at the end. */}
-        <div className={`mzn-sheet ${menuOpen ? "is-open" : ""}`} role="menu">
-          <Link to="/" className="mzn-sheet-link is-active" onClick={() => setMenuOpen(false)}>Home</Link>
-          <Link to="/how-it-works" className="mzn-sheet-link" onClick={() => setMenuOpen(false)}>How it Works</Link>
-          <Link to="/about" className="mzn-sheet-link" onClick={() => setMenuOpen(false)}>About Us</Link>
-          <button type="button" className="mzn-sheet-link" onClick={closeThen(registerOwner)}>
-            Register as an Owner<span className="mzn-badge-new">new</span>
-          </button>
-          <Link to="/register-broker" className="mzn-sheet-link" onClick={() => setMenuOpen(false)}>
-            Register as a Broker<span className="mzn-badge-new">new</span>
-          </Link>
-          <button type="button" className="mzn-sheet-cta" onClick={closeThen(startFlatSearch)}>
-            Start your move <span style={{ fontSize: 13 }}>&#8599;</span>
-          </button>
-          <div className="mzn-sheet-divider" />
-          {user ? (
-            <>
-              <button type="button" className="mzn-sheet-link" onClick={closeThen(() => navigate("/profile"))}>My Profile</button>
-              <button type="button" className="mzn-sheet-signin" onClick={closeThen(() => logout())}>Sign Out</button>
-            </>
-          ) : (
-            <button type="button" className="mzn-sheet-signin" onClick={closeThen(() => openLogin())}>
-              Sign In
-              <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
-                <path d="M15 3h4a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2h-4" /><path d="M10 17l5-5-5-5" /><path d="M15 12H3" />
-              </svg>
-            </button>
-          )}
-        </div>
-      </nav>
-      <div className={`mzn-backdrop ${menuOpen ? "is-open" : ""}`} onClick={() => setMenuOpen(false)} aria-hidden />
+      <MovEazyNav active="home" transparentAtTop onFindFlat={startFlatSearch} />
 
       {/* ── HERO ── */}
       <section data-hero className="mzn-hero" style={{ position: "relative", minHeight: "100vh", display: "flex", alignItems: "center", padding: "120px clamp(20px,4vw,60px) 60px", background: "radial-gradient(120% 100% at 85% 25%, #0A3A33 0%, #052723 45%, #04211D 100%)", overflow: "hidden" }}>
@@ -988,22 +805,6 @@ export default function ForkHome() {
           </motion.div>
         )}
       </AnimatePresence>
-
-      {/* ── Mobile bottom action bar — the three primary entry points ── */}
-      <nav className="mzn-bottombar" aria-label="Primary actions">
-        <button type="button" onClick={startFlatSearch}>
-          <FlatIcon />
-          <span>Find My Flat</span>
-        </button>
-        <button type="button" onClick={registerOwner}>
-          <OwnerIcon />
-          <span>List as Owner</span>
-        </button>
-        <button type="button" onClick={() => navigate("/register-broker")}>
-          <BrokerIcon />
-          <span>Register as Broker</span>
-        </button>
-      </nav>
 
       {/* ── AI Broker consultant ── */}
       <AIBroker open={showChatbot} onClose={() => setShowChatbot(false)} />

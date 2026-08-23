@@ -18,7 +18,7 @@ import {
   useMotionValue,
   useInView,
 } from "framer-motion";
-import SiteHeader from "../components/layout/SiteHeader";
+import MovEazyNav from "../components/layout/MovEazyNav";
 import AIBroker from "../components/AIBroker";
 import { useAuth } from "../context/AuthContext";
 import { useLoginModal } from "../context/LoginModalContext";
@@ -746,7 +746,7 @@ export default function HowItWorks() {
     <div className="hiw-root">
       <Styles />
       <motion.div className="hiw-progress" style={{ scaleX: barX }} aria-hidden />
-      <SiteHeader active="how" onGetAgent={openAgent} />
+      <MovEazyNav active="how" onGetAgent={openAgent} />
 
       <Hero onPrimary={startFinding} onScrollToEngine={scrollToEngine} />
       <BrokenSection />

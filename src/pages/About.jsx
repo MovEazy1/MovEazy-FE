@@ -22,7 +22,7 @@ import {
   useTransform,
   useMotionValue,
 } from "framer-motion";
-import SiteHeader from "../components/layout/SiteHeader";
+import MovEazyNav from "../components/layout/MovEazyNav";
 import AIBroker from "../components/AIBroker";
 import { useAuth } from "../context/AuthContext";
 import { useLoginModal } from "../context/LoginModalContext";
@@ -713,7 +713,7 @@ export default function About() {
     <div className="ab-root">
       <Styles />
       <motion.div className="ab-progress" style={{ scaleX: barX }} aria-hidden />
-      <SiteHeader active="about" onGetAgent={openAgent} />
+      <MovEazyNav active="about" onGetAgent={openAgent} />
 
       <Hero onScroll={scrollToStory} />
       <div ref={storyRef} />
