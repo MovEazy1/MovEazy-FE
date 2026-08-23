@@ -129,43 +129,6 @@ function formatBudget(v) {
   return v >= 100000 ? "₹1L+" : `₹${Math.round(v / 1000)}k`;
 }
 
-/**
- * Owner/tenant homes are surfaced as "MovEazy Assured" (Flipkart-Assured style) with a
- * brokerage-off highlight. Broker-listed homes appear as ordinary properties — no
- * "listed by" tag at all. (Find My Flat doc items f/h/i.)
- */
-function isAssuredListing(l) {
-  const r = String(l?.postedBy || l?.posted_by || "").toLowerCase();
-  return r === "owner" || r === "tenant";
-}
-
-/** The MovEazy Assured + 20% Brokerage Off badge pair, rendered on owner/tenant listings. */
-function AssuredBadges({ compact = false }) {
-  const base = {
-    display: "inline-flex",
-    alignItems: "center",
-    gap: 4,
-    borderRadius: 999,
-    fontWeight: 800,
-    whiteSpace: "nowrap",
-    fontSize: compact ? 10.5 : 11.5,
-    padding: compact ? "2px 8px" : "3px 9px",
-  };
-  return (
-    <>
-      <span style={{ ...base, background: "#eaf3ff", color: "#1554b4", border: "1px solid #bcd6ff" }}>
-        <svg viewBox="0 0 24 24" width="11" height="11" fill="#f5a623" aria-hidden>
-          <path d="M12 2l2.4 4.9 5.4.8-3.9 3.8.9 5.4L12 15.9 7.2 17.7l.9-5.4L4.2 7.7l5.4-.8z" />
-        </svg>
-        MovEazy Assured
-      </span>
-      <span style={{ ...base, background: "#e9f9ef", color: "#167a45", border: "1px solid #bfe9cf" }}>
-        20% Brokerage Off
-      </span>
-    </>
-  );
-}
-
 function makeBhkIcon(bhk) {
   const c = bhkColors[bhk] || "#6b7280";
   return L.divIcon({
@@ -1877,11 +1840,6 @@ export default function MapView() {
                       })()
                     ) : null}
                     <div style={{ fontWeight: 800, color: "#1C1A17", fontSize: "18px", margin: "10px 0 6px" }}>{l.price}</div>
-                    {isAssuredListing(l) && (
-                      <div style={{ display: "flex", flexWrap: "wrap", gap: 6, margin: "0 0 8px" }}>
-                        <AssuredBadges />
-                      </div>
-                    )}
                     <div style={{ fontSize: "13px", color: "#3f3f46", lineHeight: 1.5, paddingBottom: "4px" }}>
                       {l.seller}
                       {String(l.contact || "").trim() ? ` | ${l.contact}` : " · Broker phone not published on the map"}
@@ -2275,11 +2233,6 @@ export default function MapView() {
                     {l.furnishing ? <span>· {l.furnishing}</span> : null}
                     {l.availability ? <span>· {l.availability}</span> : null}
                   </div>
-                  {isAssuredListing(l) && (
-                    <div style={{ display: "flex", flexWrap: "wrap", gap: 6, marginTop: 8 }}>
-                      <AssuredBadges compact />
-                    </div>
-                  )}
                   <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginTop: 10, paddingTop: 10, borderTop: "1px solid #f1ece5" }}>
                     <span style={{ display: "flex", alignItems: "center", gap: 8, fontSize: 12, color: "#5c554e" }}>
                       <span style={{ width: 22, height: 22, borderRadius: "50%", background: "#fdeee9", color: "#d8412b", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 10.5, fontWeight: 800, flexShrink: 0 }}>

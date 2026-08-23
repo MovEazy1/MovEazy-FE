@@ -12,8 +12,6 @@ import { fetchReactions, setReaction } from "../lib/visits";
 
 const BLR = [12.9716, 77.5946];
 const fmtINR = (n) => `₹${Number(n || 0).toLocaleString("en-IN")}`;
-const PAGE_SIZE = 10;    // shown on first load
-const EXPLORE_STEP = 20; // revealed per "Explore more" click
 
 /** Teardrop pin — neutral coral (match score is intentionally not shown). Active enlarges + darkens. */
 function pinIcon(active) {
@@ -31,7 +29,7 @@ function pinIcon(active) {
   });
 }
 
-/** Fly the map when a listing is explicitly selected (click) — not on hover. */
+/** Fly the map when the active/selected listing changes. */
 function FlyTo({ center, zoom }) {
   const map = useMap();
   const lat = center?.[0];
@@ -39,22 +37,6 @@ function FlyTo({ center, zoom }) {
   useEffect(() => {
     if (Number.isFinite(lat) && Number.isFinite(lng)) map.flyTo([lat, lng], zoom, { duration: 0.5 });
   }, [map, lat, lng, zoom]);
-  return null;
-}
-
-/** Frame the map once so every matched property's pin is visible at load. */
-function FitAllBounds({ positions }) {
-  const map = useMap();
-  const key = positions.map((p) => p.join(",")).join("|");
-  useEffect(() => {
-    if (!positions.length) return;
-    if (positions.length === 1) {
-      map.setView(positions[0], 14, { animate: true });
-      return;
-    }
-    map.fitBounds(L.latLngBounds(positions), { padding: [48, 48], maxZoom: 15 });
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [map, key]);
   return null;
 }
 
@@ -70,10 +52,8 @@ export default function Recommendations() {
   const [reactions, setReactions] = useState({}); // { property_id: 'like'|'dislike' }
   const [results, setResults] = useState([]);
   const [loading, setLoading] = useState(true);
-  const [visibleCount, setVisibleCount] = useState(PAGE_SIZE);
-  const [activeId, setActiveId] = useState(null);   // selected via click — flies the map there
-  const [hoveredId, setHoveredId] = useState(null);  // hovered via card or pin — highlights only, no pan
-  const [flyCenter, setFlyCenter] = useState(null);  // null until a click asks the map to pan
+  const [activeId, setActiveId] = useState(null);
+  const [flyCenter, setFlyCenter] = useState(BLR);
   const [mobileView, setMobileView] = useState("list"); // list | map (mobile toggle)
   const cardRefs = useRef({});
 
@@ -91,31 +71,27 @@ export default function Recommendations() {
     return () => { alive = false; };
   }, [location.state, user]);
 
-  // Fetch results and this user's reactions together, so a listing they've
-  // already disliked is excluded from the very first render — "learning" from
-  // past sessions, not just hiding it live while they browse this one. Reactions
-  // clicked *during* this session still update the button state (see `react`
-  // below) but intentionally don't yank the card out from under the cursor —
-  // the exclusion applies on the next fetch (e.g. "Explore more flats").
   useEffect(() => {
     if (prefs == null) return;
     let alive = true;
     setLoading(true);
     (async () => {
-      const [r, reacts] = await Promise.all([
-        recommendInventory(prefs, { min: 20 }),
-        user ? fetchReactions(user.uid) : Promise.resolve({}),
-      ]);
+      const r = await recommendInventory(prefs, { min: 20 });
       if (!alive) return;
-      const notDisliked = r.filter((x) => reacts[x.listing?.property_id] !== "dislike");
-      setResults(notDisliked);
-      setReactions(reacts);
-      setVisibleCount(PAGE_SIZE); // fresh search → show the top 10 again
+      setResults(r);
       setLoading(false);
-      // Map framing for the full set is handled by <FitAllBounds>, not a fly-to.
+      const first = r.find((x) => x.listing?.latitude);
+      if (first) setFlyCenter([Number(first.listing.latitude), Number(first.listing.longitude)]);
     })();
     return () => { alive = false; };
-  }, [prefs, user]);
+  }, [prefs]);
+
+  useEffect(() => {
+    if (!user) return;
+    let alive = true;
+    fetchReactions(user.uid).then((r) => { if (alive) setReactions(r); });
+    return () => { alive = false; };
+  }, [user]);
 
   const react = async (propertyId, value) => {
     const current = reactions[propertyId] || null;
@@ -125,19 +101,9 @@ export default function Recommendations() {
     if (user) await setReaction(user.uid, propertyId, value, current);
   };
 
-  // The LIST is paginated (10, then +20 on "Explore more") — but the MAP always
-  // shows every matched property's pin, so the full picture is visible at once.
-  const visibleResults = useMemo(() => results.slice(0, visibleCount), [results, visibleCount]);
-  const hasMore = results.length > visibleCount;
-  const exploreMore = () => setVisibleCount((c) => Math.min(c + EXPLORE_STEP, results.length));
-
   const markers = useMemo(
     () => results.filter((r) => Number.isFinite(Number(r.listing?.latitude)) && Number.isFinite(Number(r.listing?.longitude))),
     [results]
-  );
-  const markerPositions = useMemo(
-    () => markers.map((r) => [Number(r.listing.latitude), Number(r.listing.longitude)]),
-    [markers]
   );
 
   const focusListing = (r) => {
@@ -146,11 +112,6 @@ export default function Recommendations() {
     const el = cardRefs.current[r.listing.property_id];
     if (el) el.scrollIntoView({ behavior: "smooth", block: "nearest" });
   };
-
-  // Hover previews the pin (highlight only) without moving the map, so all pins
-  // stay visible while browsing the list — Airbnb-style.
-  const hoverOn = (propertyId) => setHoveredId(propertyId);
-  const hoverOff = (propertyId) => setHoveredId((prev) => (prev === propertyId ? null : prev));
 
   return (
     <div className="rec-root">
@@ -174,9 +135,6 @@ export default function Recommendations() {
         .rec-name { font-size: 16px; font-weight: 800; letter-spacing: -0.01em; }
         .rec-meta { font-size: 12.5px; color: #7a7267; margin-top: 2px; }
         .rec-listedby { display: inline-block; margin-left: 8px; padding: 1px 8px; border-radius: 999px; background: #fff5f2; color: #b23a28; font-size: 11px; font-weight: 700; vertical-align: middle; }
-        .rec-assured { display: inline-flex; align-items: center; gap: 4px; margin-left: 8px; padding: 2px 9px; border-radius: 999px; background: #eaf3ff; color: #1554b4; font-size: 11px; font-weight: 800; vertical-align: middle; }
-        .rec-assured svg { color: #f5a623; }
-        .rec-brokeroff { display: inline-block; margin-left: 6px; padding: 2px 9px; border-radius: 999px; background: #e9f9ef; color: #167a45; font-size: 11px; font-weight: 800; vertical-align: middle; }
         .rec-reasons { display: flex; flex-wrap: wrap; gap: 5px; margin-top: 8px; }
         .rec-chip { font-size: 11px; font-weight: 600; color: #4a443d; background: #f3f0ea; border-radius: 999px; padding: 3px 9px; }
         .rec-foot { display: flex; align-items: baseline; justify-content: space-between; padding-top: 8px; }
@@ -193,8 +151,6 @@ export default function Recommendations() {
         .rec-add.is-added { background: #eaf6ee; color: #16a34a; border: 1px solid #bfe6ca; }
         .rec-empty { text-align: center; color: #7a7267; padding: 60px 20px; }
         .rec-refine { display: inline-flex; align-items: center; gap: 6px; padding: 9px 16px; border-radius: 999px; border: 1px solid #ded6c8; background: #fff; font-size: 13px; font-weight: 700; cursor: pointer; color: #2a2621; }
-        .rec-explore { width: 100%; min-height: 50px; margin-top: 16px; display: inline-flex; align-items: center; justify-content: center; gap: 8px; border-radius: 14px; border: 1.5px dashed #d3c9b8; background: #fff; color: #2a2621; font: 700 14px/1 'Plus Jakarta Sans', sans-serif; cursor: pointer; transition: all .15s ease; }
-        .rec-explore:hover { border-color: #ef5a45; color: #ef5a45; border-style: solid; }
         .rec-mobiletoggle { display: none; }
 
         .rec-confirm-overlay { position: fixed; inset: 0; z-index: 1400; background: rgba(20,18,16,0.55); backdrop-filter: blur(6px); display: flex; align-items: center; justify-content: center; padding: 20px; }
@@ -296,23 +252,15 @@ export default function Recommendations() {
         <div className="rec-map">
           <MapContainer center={BLR} zoom={12} scrollWheelZoom style={{ height: "100%", width: "100%" }}>
             <TileLayer url="https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png" attribution="&copy; OpenStreetMap &copy; CARTO" />
-            <FitAllBounds positions={markerPositions} />
             <FlyTo center={flyCenter} zoom={14} />
-            {markers.map((r) => {
-              const pid = r.listing.property_id;
-              return (
-                <Marker
-                  key={pid}
-                  position={[Number(r.listing.latitude), Number(r.listing.longitude)]}
-                  icon={pinIcon(activeId === pid || hoveredId === pid)}
-                  eventHandlers={{
-                    click: () => focusListing(r),
-                    mouseover: () => hoverOn(pid),
-                    mouseout: () => hoverOff(pid),
-                  }}
-                />
-              );
-            })}
+            {markers.map((r) => (
+              <Marker
+                key={r.listing.property_id}
+                position={[Number(r.listing.latitude), Number(r.listing.longitude)]}
+                icon={pinIcon(activeId === r.listing.property_id)}
+                eventHandlers={{ click: () => focusListing(r) }}
+              />
+            ))}
           </MapContainer>
         </div>
 
@@ -322,11 +270,7 @@ export default function Recommendations() {
             <div>
               <div className="rec-title">Homes matched to you</div>
               <div className="rec-sub">
-                {loading
-                  ? "Scoring homes against your preferences…"
-                  : results.length === 0
-                    ? ""
-                    : `Showing ${visibleResults.length} of ${results.length} home${results.length === 1 ? "" : "s"}, ranked by how well ${results.length === 1 ? "it fits" : "they fit"} — best first.`}
+                {loading ? "Scoring homes against your preferences…" : `${results.length} home${results.length === 1 ? "" : "s"} ranked by how well they fit — best first.`}
               </div>
             </div>
             <button type="button" className="rec-refine" onClick={() => navigate("/?find=1")}>
@@ -343,16 +287,15 @@ export default function Recommendations() {
           )}
 
           <div className="rec-cards">
-            {visibleResults.map((r) => {
+            {results.map((r) => {
               const l = r.listing;
               const cover = l.cover_image_url || (Array.isArray(l.images) && l.images[0]) || "";
               return (
                 <div
                   key={l.property_id}
                   ref={(el) => (cardRefs.current[l.property_id] = el)}
-                  className={`rec-card ${activeId === l.property_id || hoveredId === l.property_id ? "is-active" : ""}`}
-                  onMouseEnter={() => hoverOn(l.property_id)}
-                  onMouseLeave={() => hoverOff(l.property_id)}
+                  className={`rec-card ${activeId === l.property_id ? "is-active" : ""}`}
+                  onMouseEnter={() => { setActiveId(l.property_id); if (l.latitude) setFlyCenter([Number(l.latitude), Number(l.longitude)]); }}
                   onClick={() => focusListing(r)}
                 >
                   <div className="rec-thumb">
@@ -365,22 +308,9 @@ export default function Recommendations() {
                     <div className="rec-meta">
                       {[l.flat_type, l.area, l.furnishing].filter(Boolean).join(" · ")}
                       {(() => {
-                        // Owner/tenant homes are shown as "MovEazy Assured" (like Flipkart
-                        // Assured) with a brokerage-off highlight. Broker-listed homes appear
-                        // as ordinary properties — no tag.
                         const r = String(l.posted_by || l.postedBy || "").toLowerCase();
-                        if (r === "owner" || r === "tenant") {
-                          return (
-                            <>
-                              <span className="rec-assured">
-                                <svg viewBox="0 0 24 24" width="11" height="11" fill="currentColor" aria-hidden><path d="M12 2l2.4 4.9 5.4.8-3.9 3.8.9 5.4L12 15.9 7.2 17.7l.9-5.4L4.2 7.7l5.4-.8z"/></svg>
-                                MovEazy Assured
-                              </span>
-                              <span className="rec-brokeroff">20% Brokerage Off</span>
-                            </>
-                          );
-                        }
-                        return null;
+                        const label = r === "broker" ? "Broker" : r === "tenant" ? "Tenant" : r === "owner" ? "Owner" : "";
+                        return label ? <span className="rec-listedby">Listed by {label}</span> : null;
                       })()}
                     </div>
                     {r.reasons?.length > 0 && (
@@ -416,13 +346,6 @@ export default function Recommendations() {
               );
             })}
           </div>
-
-          {hasMore && (
-            <button type="button" className="rec-explore" onClick={exploreMore}>
-              Explore {Math.min(EXPLORE_STEP, results.length - visibleCount)} more homes
-              <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" aria-hidden><path d="M12 5v14M5 12l7 7 7-7" /></svg>
-            </button>
-          )}
         </div>
       </div>
 
