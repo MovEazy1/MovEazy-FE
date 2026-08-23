@@ -46,6 +46,46 @@ function SparkleIcon() {
   );
 }
 
+/* ── mobile bottom-bar icons ────────────────────────────────────────────── */
+
+// An apartment block — "find my flat".
+function FlatIcon() {
+  return (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" width="23" height="23">
+      <path d="M3.5 21V4.5a1 1 0 0 1 1-1h9a1 1 0 0 1 1 1V21" />
+      <path d="M14.5 10h5a1 1 0 0 1 1 1v10" />
+      <path d="M2 21h20" />
+      <path d="M6.5 7.5h1.5M10 7.5h1.5M6.5 11.5h1.5M10 11.5h1.5M6.5 15.5h1.5M10 15.5h1.5" />
+      <path d="M17 14h1M17 17.5h1" />
+    </svg>
+  );
+}
+
+// A person inside a house — the owner listing their own place.
+function OwnerIcon() {
+  return (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" width="23" height="23">
+      <path d="M3.5 10.6 12 4l8.5 6.6" />
+      <path d="M5.5 12.4V20a1 1 0 0 0 1 1h11a1 1 0 0 0 1-1v-7.6" />
+      <circle cx="12" cy="13.4" r="1.9" />
+      <path d="M8.9 20a3.1 3.1 0 0 1 6.2 0" />
+    </svg>
+  );
+}
+
+// A person wearing a tie — the broker.
+function BrokerIcon() {
+  return (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" width="23" height="23">
+      <circle cx="12" cy="5.2" r="3.1" />
+      <path d="M6 21v-1.3c0-2.3 1.9-4.1 4.3-4.5" />
+      <path d="M18 21v-1.3c0-2.3-1.9-4.1-4.3-4.5" />
+      <path d="M10.3 9.3 12 11.1l1.7-1.8" />
+      <path d="M12 11.1 10.9 14.6 12 17.6l1.1-3z" />
+    </svg>
+  );
+}
+
 /* ── word-by-word "old way" story copy ─────────────────────────────────── */
 const STORY_LINES = [
   { text: "You scroll through 100s of listings across a dozen websites.", size: "n" },
@@ -71,14 +111,25 @@ const LINE_WORDS = [
 ];
 
 export default function ForkHome() {
-  const { user } = useAuth();
+  const { user, logout } = useAuth();
   const { openLogin } = useLoginModal();
   const navigate = useNavigate();
   const [showChatbot, setShowChatbot] = useState(false);
   const [showChoice, setShowChoice] = useState(false);
   const [checkingPrefs, setCheckingPrefs] = useState(false);
   const [pendingMatchCheck, setPendingMatchCheck] = useState(false);
+  const [menuOpen, setMenuOpen] = useState(false);
   const rootRef = useRef(null);
+
+  // Lock page scroll and allow Escape to dismiss while the mobile menu is open.
+  useEffect(() => {
+    if (!menuOpen) return;
+    const prev = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+    const onKey = (e) => e.key === "Escape" && setMenuOpen(false);
+    window.addEventListener("keydown", onKey);
+    return () => { document.body.style.overflow = prev; window.removeEventListener("keydown", onKey); };
+  }, [menuOpen]);
 
   // "List my Flat" — auth-gate, then open the inventory listing form.
   const listMyFlat = () => (user ? navigate("/list-my-flat") : openLogin(() => navigate("/list-my-flat")));
@@ -141,6 +192,10 @@ export default function ForkHome() {
   };
 
   const registerOwner = () => listMyFlat();
+
+  // Menu-aware wrappers — every sheet action dismisses the sheet first, so the
+  // menu never stays open behind a login modal or a route change.
+  const closeThen = (fn) => () => { setMenuOpen(false); fn(); };
 
   /* ── ported scroll-animation script (progress bar, nav fade, hero parallax,
      data-reveal fades, word-by-word story, letter-flip line, timeline zigzag) —
@@ -269,11 +324,22 @@ export default function ForkHome() {
         nav.style.paddingBottom = on ? "15px" : "24px";
       }
 
+      // The hero's fade-and-drift is written for the design's 100vh desktop
+      // hero, where the copy sits at the top and has scrolled away by the time
+      // it fades. The mobile hero is ~2x taller and packed top-to-bottom
+      // (photo → headline → two stacked cards), so the same curve blanks the
+      // CTA cards while they're still on screen. Skip it below the breakpoint
+      // and let the hero scroll normally.
+      const isMobile = window.matchMedia("(max-width: 900px)").matches;
       const hp = hero ? clamp(sy / (hero.offsetHeight || vh)) : 0;
-      if (heroInner) { heroInner.style.transform = `translateY(${sy * 0.14}px)`; heroInner.style.opacity = clamp(1 - hp * 1.35); }
+      if (heroInner) {
+        heroInner.style.transform = isMobile ? "" : `translateY(${sy * 0.14}px)`;
+        heroInner.style.opacity = isMobile ? "" : clamp(1 - hp * 1.35);
+      }
       if (map) map.style.transform = `translateY(${sy * 0.06}px) scale(${1 + hp * 0.08})`;
       if (route && route.parentElement) route.parentElement.style.transform = `translateY(${sy * -0.05}px)`;
-      if (polaroid) polaroid.style.transform = `translateY(${sy * -0.11}px) rotate(${6 - hp * 5}deg)`;
+      // Keep the tilt on mobile, drop the parallax drift (it's in normal flow there).
+      if (polaroid) polaroid.style.transform = isMobile ? "rotate(6deg)" : `translateY(${sy * -0.11}px) rotate(${6 - hp * 5}deg)`;
 
       reveals.forEach((el) => {
         const r = el.getBoundingClientRect();
@@ -350,6 +416,95 @@ export default function ForkHome() {
         .mzn-badge-new { background: linear-gradient(135deg,#FFE1A6,#E8A33D 45%,#B9782A); box-shadow: 0 0 0 1px rgba(255,255,255,.35) inset, 0 1px 4px rgba(232,163,61,.5); color: #1B1204; font-size: 8px; font-weight: 800; letter-spacing: .02em; padding: 1.5px 6px; border-radius: 100px; line-height: 1.6; align-self: flex-start; margin-top: -4px; }
         .mzn-root button { font-family: inherit; cursor: pointer; }
         .mzn-root a[href^="#"]:focus-visible, .mzn-root button:focus-visible, .mzn-root a:focus-visible { outline: 2px solid #5EEAD4; outline-offset: 3px; border-radius: 4px; }
+
+        /* Mobile chrome — hidden entirely on desktop, which keeps the design's
+           original pill nav untouched. */
+        .mzn-burger { display: none; align-items: center; justify-content: center; width: 44px; height: 44px; border: none; background: rgba(255,255,255,.08); border-radius: 50%; color: #F1F6F4; flex: none; }
+        .mzn-burger svg { display: block; }
+        .mzn-sheet, .mzn-backdrop, .mzn-bottombar { display: none; }
+
+        /* The design has no responsive handling of its own — everything below is
+           added on top so the hero's absolutely-positioned map/route/pins/polaroid
+           (sized as percentages of the whole hero box) stop overlapping the
+           headline and cards once mobile text height pushes the hero well past
+           100vh, and the 3-column timeline grid stops squeezing into slivers. */
+        @media (max-width: 900px) {
+          .mzn-nav { padding: 12px 14px !important; gap: 10px !important; }
+          /* The horizontally-scrolling pill can't fit on a phone — it collapses
+             into the hamburger sheet instead. */
+          .mzn-nav-links, .mzn-nav-cta { display: none !important; }
+          .mzn-burger { display: inline-flex; margin-left: auto; }
+
+          .mzn-backdrop {
+            display: block; position: fixed; inset: 0; z-index: 170;
+            background: rgba(2,16,14,.5); opacity: 0; pointer-events: none;
+            transition: opacity .25s ease;
+          }
+          .mzn-backdrop.is-open { opacity: 1; pointer-events: auto; }
+          .mzn-sheet {
+            display: flex; flex-direction: column; gap: 4px;
+            position: absolute; top: calc(100% + 6px); left: 14px; right: 14px; z-index: 185;
+            background: #062D27; border: 1px solid rgba(255,255,255,.10);
+            border-radius: 20px; padding: 10px;
+            box-shadow: 0 24px 60px rgba(0,0,0,.55);
+            transform: translateY(-10px) scale(.98); opacity: 0; pointer-events: none;
+            transform-origin: top center;
+            transition: transform .26s cubic-bezier(.22,1,.36,1), opacity .22s ease;
+          }
+          .mzn-sheet.is-open { transform: translateY(0) scale(1); opacity: 1; pointer-events: auto; }
+          /* Scoped with .mzn-root so these beat the page-wide mint anchor
+             colour — otherwise the Link rows and button rows in the same
+             list render in two different colours. */
+          .mzn-root .mzn-sheet-link {
+            display: flex; align-items: center; gap: 8px; min-height: 48px; padding: 0 16px;
+            border-radius: 12px; font-size: 15px; font-weight: 600; color: #CBD9D5;
+            background: none; border: none; width: 100%; text-align: left;
+          }
+          .mzn-root .mzn-sheet-link.is-active { background: #5EEAD4; color: #04211D; font-weight: 700; }
+          .mzn-root .mzn-sheet-link:active { background: rgba(255,255,255,.07); }
+          .mzn-root .mzn-sheet-link.is-active:active { background: #5EEAD4; }
+          /* The badge is top-aligned against the tiny desktop pill labels; in
+             the roomier sheet rows it should sit inline with the text. */
+          .mzn-sheet-link .mzn-badge-new { align-self: center; margin-top: 0; }
+          .mzn-sheet-cta {
+            display: flex; align-items: center; justify-content: center; gap: 6px;
+            min-height: 48px; margin-top: 2px; border: none; border-radius: 100px;
+            background: #5EEAD4; color: #04211D; font-size: 15px; font-weight: 700;
+          }
+          .mzn-sheet-divider { height: 1px; background: rgba(255,255,255,.10); margin: 6px 4px; }
+          .mzn-sheet-signin {
+            display: flex; align-items: center; justify-content: center; gap: 7px;
+            min-height: 48px; border-radius: 100px; border: 1px solid rgba(255,255,255,.22);
+            background: transparent; color: #F1F6F4; font-size: 15px; font-weight: 600;
+          }
+
+          /* Fixed bottom action bar. env(safe-area-inset-bottom) keeps it clear
+             of the iOS home indicator. */
+          .mzn-bottombar {
+            display: grid; grid-template-columns: repeat(3, 1fr);
+            position: fixed; left: 0; right: 0; bottom: 0; z-index: 190;
+            background: rgba(4,33,29,.95);
+            -webkit-backdrop-filter: blur(14px); backdrop-filter: blur(14px);
+            border-top: 1px solid rgba(255,255,255,.10);
+            padding: 8px 4px calc(8px + env(safe-area-inset-bottom, 0px));
+          }
+          .mzn-bottombar button {
+            display: flex; flex-direction: column; align-items: center; justify-content: flex-start;
+            gap: 5px; padding: 6px 2px; background: none; border: none;
+            color: #CBD9D5; font-size: 11px; font-weight: 700; line-height: 1.2;
+            text-align: center; letter-spacing: -.01em;
+          }
+          .mzn-bottombar button:active { color: #5EEAD4; }
+          .mzn-bottombar svg { flex: none; }
+
+          .mzn-hero { flex-direction: column !important; min-height: auto !important; padding: 128px 20px 56px !important; }
+          .mzn-hero-map, .mzn-hero-route-wrap { display: none !important; }
+          .mzn-polaroid { position: relative !important; right: auto !important; left: auto !important; top: auto !important; width: min(260px, 78vw) !important; margin: 0 auto 32px !important; }
+          .mzn-hero-cards { grid-template-columns: 1fr !important; }
+          .mzn-tl-step { grid-template-columns: 1fr !important; row-gap: 14px !important; }
+          /* Clear the fixed bottom bar so it never covers the last of the page. */
+          .mzn-footer { padding-bottom: calc(96px + env(safe-area-inset-bottom, 0px)) !important; }
+        }
       `}</style>
 
       <div data-progress style={{ position: "fixed", top: 0, left: 0, height: 3, width: "0%", background: "linear-gradient(90deg,#5EEAD4,#E8A33D)", zIndex: 200 }} />
@@ -357,12 +512,13 @@ export default function ForkHome() {
       {/* ── NAV ── */}
       <nav
         data-nav
+        className="mzn-nav"
         style={{ position: "fixed", top: 0, left: 0, width: "100%", zIndex: 180, display: "flex", alignItems: "center", justifyContent: "space-between", padding: "14px clamp(14px,3vw,50px)", transition: "background .3s ease, padding .3s ease, border-color .3s ease", borderBottom: "1px solid transparent", gap: "clamp(6px,1.4vw,20px)" }}
       >
         <Link to="/" style={{ fontWeight: 800, fontSize: "clamp(18px,2vw,24px)", letterSpacing: "-.02em", color: "#fff", flex: "none" }}>
           mov<span style={{ color: "#5EEAD4" }}>EAZY</span>
         </Link>
-        <div style={{ display: "flex", alignItems: "center", gap: "clamp(2px,.6vw,8px)", background: "rgba(255,255,255,.06)", border: "1px solid rgba(255,255,255,.09)", borderRadius: 100, padding: 6, flex: 1, minWidth: 0, maxWidth: 780, overflowX: "auto", scrollbarWidth: "none", justifyContent: "center" }}>
+        <div className="mzn-nav-links" style={{ display: "flex", alignItems: "center", gap: "clamp(2px,.6vw,8px)", background: "rgba(255,255,255,.06)", border: "1px solid rgba(255,255,255,.09)", borderRadius: 100, padding: 6, flex: 1, minWidth: 0, maxWidth: 780, overflowX: "auto", scrollbarWidth: "none", justifyContent: "center" }}>
           <Link to="/" style={{ background: "#5EEAD4", color: "#04211D", fontWeight: 700, fontSize: "clamp(12px,1.05vw,14px)", padding: "10px clamp(14px,1.6vw,20px)", borderRadius: 100, whiteSpace: "nowrap", flex: "none" }}>Home</Link>
           <Link to="/how-it-works" style={{ color: "#CBD9D5", fontWeight: 600, fontSize: "clamp(12px,1.05vw,14px)", padding: "10px clamp(12px,1.4vw,18px)", borderRadius: 100, whiteSpace: "nowrap", flex: "none" }}>How it Works</Link>
           <Link to="/about" style={{ color: "#CBD9D5", fontWeight: 600, fontSize: "clamp(12px,1.05vw,14px)", padding: "10px clamp(12px,1.4vw,18px)", borderRadius: 100, whiteSpace: "nowrap", flex: "none" }}>About Us</Link>
@@ -373,15 +529,61 @@ export default function ForkHome() {
             Register as a Broker<span className="mzn-badge-new">new</span>
           </Link>
         </div>
-        <a href="#" onClick={(e) => { e.preventDefault(); startFlatSearch(); }} style={{ display: "flex", alignItems: "center", gap: 6, background: "#5EEAD4", color: "#04211D", fontWeight: 700, fontSize: "clamp(12px,1.1vw,15px)", padding: "11px clamp(12px,1.6vw,22px)", borderRadius: 100, flex: "none", whiteSpace: "nowrap" }}>
+        <a href="#" className="mzn-nav-cta" onClick={(e) => { e.preventDefault(); startFlatSearch(); }} style={{ display: "flex", alignItems: "center", gap: 6, background: "#5EEAD4", color: "#04211D", fontWeight: 700, fontSize: "clamp(12px,1.1vw,15px)", padding: "11px clamp(12px,1.6vw,22px)", borderRadius: 100, flex: "none", whiteSpace: "nowrap" }}>
           Start your move <span style={{ fontSize: 13 }}>&#8599;</span>
         </a>
+
+        {/* Mobile hamburger — desktop keeps the pill nav above. */}
+        <button
+          type="button"
+          className="mzn-burger"
+          aria-label={menuOpen ? "Close menu" : "Open menu"}
+          aria-expanded={menuOpen}
+          onClick={() => setMenuOpen((o) => !o)}
+        >
+          {menuOpen ? (
+            <svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round"><path d="M6 6l12 12M18 6L6 18" /></svg>
+          ) : (
+            <svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round"><path d="M4 7h16M4 12h16M4 17h16" /></svg>
+          )}
+        </button>
+
+        {/* Mobile slide-down menu — every nav destination plus sign-in at the end. */}
+        <div className={`mzn-sheet ${menuOpen ? "is-open" : ""}`} role="menu">
+          <Link to="/" className="mzn-sheet-link is-active" onClick={() => setMenuOpen(false)}>Home</Link>
+          <Link to="/how-it-works" className="mzn-sheet-link" onClick={() => setMenuOpen(false)}>How it Works</Link>
+          <Link to="/about" className="mzn-sheet-link" onClick={() => setMenuOpen(false)}>About Us</Link>
+          <button type="button" className="mzn-sheet-link" onClick={closeThen(registerOwner)}>
+            Register as an Owner<span className="mzn-badge-new">new</span>
+          </button>
+          <Link to="/register-broker" className="mzn-sheet-link" onClick={() => setMenuOpen(false)}>
+            Register as a Broker<span className="mzn-badge-new">new</span>
+          </Link>
+          <button type="button" className="mzn-sheet-cta" onClick={closeThen(startFlatSearch)}>
+            Start your move <span style={{ fontSize: 13 }}>&#8599;</span>
+          </button>
+          <div className="mzn-sheet-divider" />
+          {user ? (
+            <>
+              <button type="button" className="mzn-sheet-link" onClick={closeThen(() => navigate("/profile"))}>My Profile</button>
+              <button type="button" className="mzn-sheet-signin" onClick={closeThen(() => logout())}>Sign Out</button>
+            </>
+          ) : (
+            <button type="button" className="mzn-sheet-signin" onClick={closeThen(() => openLogin())}>
+              Sign In
+              <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+                <path d="M15 3h4a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2h-4" /><path d="M10 17l5-5-5-5" /><path d="M15 12H3" />
+              </svg>
+            </button>
+          )}
+        </div>
       </nav>
+      <div className={`mzn-backdrop ${menuOpen ? "is-open" : ""}`} onClick={() => setMenuOpen(false)} aria-hidden />
 
       {/* ── HERO ── */}
-      <section data-hero style={{ position: "relative", minHeight: "100vh", display: "flex", alignItems: "center", padding: "120px clamp(20px,4vw,60px) 60px", background: "radial-gradient(120% 100% at 85% 25%, #0A3A33 0%, #052723 45%, #04211D 100%)", overflow: "hidden" }}>
+      <section data-hero className="mzn-hero" style={{ position: "relative", minHeight: "100vh", display: "flex", alignItems: "center", padding: "120px clamp(20px,4vw,60px) 60px", background: "radial-gradient(120% 100% at 85% 25%, #0A3A33 0%, #052723 45%, #04211D 100%)", overflow: "hidden" }}>
 
-        <svg data-map viewBox="0 0 900 900" preserveAspectRatio="xMidYMid slice" style={{ position: "absolute", right: "-6%", top: 0, height: "100%", width: "70%", zIndex: 0, opacity: 0.5 }}>
+        <svg data-map className="mzn-hero-map" viewBox="0 0 900 900" preserveAspectRatio="xMidYMid slice" style={{ position: "absolute", right: "-6%", top: 0, height: "100%", width: "70%", zIndex: 0, opacity: 0.5 }}>
           <g stroke="#0f5a4d" strokeWidth="1.1" fill="none" opacity="0.85">
             <path d="M0 120 L900 60 M0 300 L900 250 M0 470 L900 430 M0 640 L900 610 M0 810 L900 790" />
             <path d="M110 0 L60 900 M290 0 L250 900 M470 0 L440 900 M650 0 L620 900 M830 0 L810 900" />
@@ -396,7 +598,7 @@ export default function ForkHome() {
           </g>
         </svg>
 
-        <div style={{ position: "absolute", right: "12%", top: "14%", height: "40%", width: "calc(40vh * 400 / 480)", zIndex: 1 }}>
+        <div className="mzn-hero-route-wrap" style={{ position: "absolute", right: "12%", top: "14%", height: "40%", width: "calc(40vh * 400 / 480)", zIndex: 1 }}>
           <svg data-route viewBox="0 0 400 480" style={{ position: "absolute", inset: 0, width: "100%", height: "100%", overflow: "visible" }}>
             <path d="M60 470 C150 415 30 350 130 300 C230 250 110 210 210 165 C290 130 240 75 340 40 C365 30 375 25 385 20" fill="none" stroke="#E8A33D" strokeWidth="2.6" strokeDasharray="9 11" strokeLinecap="round" strokeLinejoin="round" style={{ animation: "mznDashmove 9s linear infinite" }} />
           </svg>
@@ -414,7 +616,7 @@ export default function ForkHome() {
           </div>
         </div>
 
-        <div data-polaroid style={{ position: "absolute", right: "clamp(210px,17vw,320px)", top: "19%", width: "clamp(190px,16vw,250px)", zIndex: 3, transform: "rotate(6deg)", background: "#EFEAE1", padding: "10px 10px 0", borderRadius: 3, boxShadow: "0 30px 70px rgba(0,0,0,.5)" }}>
+        <div data-polaroid className="mzn-polaroid" style={{ position: "absolute", right: "clamp(210px,17vw,320px)", top: "19%", width: "clamp(190px,16vw,250px)", zIndex: 3, transform: "rotate(6deg)", background: "#EFEAE1", padding: "10px 10px 0", borderRadius: 3, boxShadow: "0 30px 70px rgba(0,0,0,.5)" }}>
           <div style={{ position: "absolute", top: -13, left: "24%", width: 70, height: 28, background: "rgba(94,234,212,.42)", transform: "rotate(-12deg)" }} />
           <div style={{ aspectRatio: "1/.84", borderRadius: 2, backgroundImage: `url(${livingRoomImg})`, backgroundSize: "cover", backgroundPosition: "center" }} />
           <div style={{ fontFamily: "'Caveat'", fontSize: 19, color: "#1b1a17", padding: "9px 3px 11px", transform: "rotate(-2deg)" }}>Home base. Found. &#9825;&#9825;</div>
@@ -432,7 +634,7 @@ export default function ForkHome() {
             We take care of the boring stuff, so you can focus on the big stuff.
           </p>
 
-          <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit,minmax(320px,1fr))", gap: "clamp(18px,2.2vw,32px)", marginTop: "clamp(40px,6vh,72px)", width: "100%" }}>
+          <div className="mzn-hero-cards" style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit,minmax(320px,1fr))", gap: "clamp(18px,2.2vw,32px)", marginTop: "clamp(40px,6vh,72px)", width: "100%" }}>
             <a href="#" data-card onClick={(e) => { e.preventDefault(); startFlatSearch(); }} style={{ border: "1px solid rgba(94,234,212,.28)", borderRadius: 20, padding: "clamp(26px,2.6vw,38px)", background: "rgba(6,45,39,.74)", backdropFilter: "blur(6px)", display: "flex", flexDirection: "column" }}>
               <div style={{ display: "flex", alignItems: "center", gap: 18 }}>
                 <span style={{ flex: "none", width: 60, height: 60, borderRadius: "50%", border: "1px solid rgba(94,234,212,.45)", background: "rgba(94,234,212,.08)", display: "flex", alignItems: "center", justifyContent: "center" }}>
@@ -573,7 +775,7 @@ export default function ForkHome() {
 
             <div style={{ position: "relative", zIndex: 1, display: "flex", flexDirection: "column", gap: "clamp(26px,4vh,50px)" }}>
 
-              <div data-step style={{ display: "grid", gridTemplateColumns: "1fr 76px 1fr", alignItems: "center" }}>
+              <div data-step className="mzn-tl-step" style={{ display: "grid", gridTemplateColumns: "1fr 76px 1fr", alignItems: "center" }}>
                 <div data-step-media style={{ borderRadius: 18, overflow: "hidden", background: "#0C1A18", boxShadow: "0 22px 50px rgba(0,0,0,.14)", position: "relative", aspectRatio: "16/11" }}>
                   <div style={{ position: "absolute", inset: 0, backgroundImage: `url(${timelinePhoneImg})`, backgroundSize: "cover", backgroundPosition: "center" }} />
                   <span style={{ position: "absolute", top: 16, left: 16, width: 34, height: 34, borderRadius: "50%", background: "#F4F2ED", display: "flex", alignItems: "center", justifyContent: "center" }}>
@@ -590,7 +792,7 @@ export default function ForkHome() {
                 </div>
               </div>
 
-              <div data-step style={{ display: "grid", gridTemplateColumns: "1fr 76px 1fr", alignItems: "center" }}>
+              <div data-step className="mzn-tl-step" style={{ display: "grid", gridTemplateColumns: "1fr 76px 1fr", alignItems: "center" }}>
                 <div data-step-text style={{ background: "#fff", border: "1px solid rgba(0,0,0,.07)", borderRadius: 18, padding: "clamp(22px,2.4vw,32px)" }}>
                   <h3 style={{ fontFamily: "'Manrope', sans-serif", color: "#0B1A17", fontWeight: 800, fontSize: "clamp(19px,1.9vw,25px)", lineHeight: 1.25, letterSpacing: "-.02em" }}>We guide you <span style={{ color: "#0E7C68" }}>everything</span> about the city</h3>
                   <p style={{ color: "#5C6B67", fontSize: 15, lineHeight: 1.55, marginTop: 12 }}>From traffic choke points to party areas to walking neighbourhoods, we tell you what others won't.</p>
@@ -605,7 +807,7 @@ export default function ForkHome() {
                 </div>
               </div>
 
-              <div data-step style={{ display: "grid", gridTemplateColumns: "1fr 76px 1fr", alignItems: "center" }}>
+              <div data-step className="mzn-tl-step" style={{ display: "grid", gridTemplateColumns: "1fr 76px 1fr", alignItems: "center" }}>
                 <div data-step-media style={{ borderRadius: 18, overflow: "hidden", background: "#0C1A18", boxShadow: "0 22px 50px rgba(0,0,0,.14)", position: "relative", aspectRatio: "16/11" }}>
                   <div style={{ position: "absolute", inset: 0, backgroundImage: `url(${keysImg})`, backgroundSize: "cover", backgroundPosition: "center" }} />
                   <span style={{ position: "absolute", top: 16, left: 16, width: 34, height: 34, borderRadius: "50%", background: "#F4F2ED", color: "#0E7C68", fontWeight: 800, fontSize: 14, display: "flex", alignItems: "center", justifyContent: "center" }}>3</span>
@@ -620,7 +822,7 @@ export default function ForkHome() {
                 </div>
               </div>
 
-              <div data-step style={{ display: "grid", gridTemplateColumns: "1fr 76px 1fr", alignItems: "center" }}>
+              <div data-step className="mzn-tl-step" style={{ display: "grid", gridTemplateColumns: "1fr 76px 1fr", alignItems: "center" }}>
                 <div data-step-text style={{ background: "#fff", border: "1px solid rgba(0,0,0,.07)", borderRadius: 18, padding: "clamp(22px,2.4vw,32px)" }}>
                   <h3 style={{ fontFamily: "'Manrope', sans-serif", color: "#0B1A17", fontWeight: 800, fontSize: "clamp(19px,1.9vw,25px)", lineHeight: 1.25, letterSpacing: "-.02em" }}>Weekly parties <span style={{ color: "#0E7C68" }}>in</span> neighbourhood</h3>
                   <p style={{ color: "#5C6B67", fontSize: 15, lineHeight: 1.55, marginTop: 12 }}>Exclusively for movEazy Generation. New city, new people, new stories.</p>
@@ -635,7 +837,7 @@ export default function ForkHome() {
                 </div>
               </div>
 
-              <div data-step style={{ display: "grid", gridTemplateColumns: "1fr 76px 1fr", alignItems: "center" }}>
+              <div data-step className="mzn-tl-step" style={{ display: "grid", gridTemplateColumns: "1fr 76px 1fr", alignItems: "center" }}>
                 <div data-step-media style={{ borderRadius: 18, overflow: "hidden", background: "#0C1A18", boxShadow: "0 22px 50px rgba(0,0,0,.14)", position: "relative", aspectRatio: "16/11" }}>
                   <div style={{ position: "absolute", inset: 0, backgroundImage: `url(${timelinePhoneImg})`, backgroundSize: "cover", backgroundPosition: "center" }} />
                   <span style={{ position: "absolute", top: 16, left: 16, width: 34, height: 34, borderRadius: "50%", background: "#F4F2ED", color: "#0E7C68", fontWeight: 800, fontSize: 14, display: "flex", alignItems: "center", justifyContent: "center" }}>5</span>
@@ -650,7 +852,7 @@ export default function ForkHome() {
                 </div>
               </div>
 
-              <div data-step style={{ display: "grid", gridTemplateColumns: "1fr 76px 1fr", alignItems: "center" }}>
+              <div data-step className="mzn-tl-step" style={{ display: "grid", gridTemplateColumns: "1fr 76px 1fr", alignItems: "center" }}>
                 <div data-step-text style={{ background: "#fff", border: "1px solid rgba(0,0,0,.07)", borderRadius: 18, padding: "clamp(22px,2.4vw,32px)" }}>
                   <h3 style={{ fontFamily: "'Manrope', sans-serif", color: "#0B1A17", fontWeight: 800, fontSize: "clamp(19px,1.9vw,25px)", lineHeight: 1.25, letterSpacing: "-.02em" }}>Our partners <span style={{ color: "#0E7C68" }}>furnish</span> the house according to your demand</h3>
                   <p style={{ color: "#5C6B67", fontSize: 15, lineHeight: 1.55, marginTop: 12 }}>From a work corner to a party-ready living room, you ask, we deliver.</p>
@@ -702,7 +904,7 @@ export default function ForkHome() {
       </section>
 
       {/* ── FOOTER ── */}
-      <footer style={{ background: "#031916", borderTop: "1px solid rgba(255,255,255,.08)", padding: "44px clamp(20px,4vw,60px)", display: "flex", flexWrap: "wrap", gap: 20, justifyContent: "space-between", alignItems: "center" }}>
+      <footer className="mzn-footer" style={{ background: "#031916", borderTop: "1px solid rgba(255,255,255,.08)", padding: "44px clamp(20px,4vw,60px)", display: "flex", flexWrap: "wrap", gap: 20, justifyContent: "space-between", alignItems: "center" }}>
         <div style={{ fontWeight: 800, fontSize: 20 }}>mov<span style={{ color: "#5EEAD4" }}>EAZY</span></div>
         <div style={{ color: "#6a8b84", fontSize: 14 }}>Redefining how people move into new cities.</div>
         <div style={{ display: "flex", gap: 22 }}>
@@ -786,6 +988,22 @@ export default function ForkHome() {
           </motion.div>
         )}
       </AnimatePresence>
+
+      {/* ── Mobile bottom action bar — the three primary entry points ── */}
+      <nav className="mzn-bottombar" aria-label="Primary actions">
+        <button type="button" onClick={startFlatSearch}>
+          <FlatIcon />
+          <span>Find My Flat</span>
+        </button>
+        <button type="button" onClick={registerOwner}>
+          <OwnerIcon />
+          <span>List as Owner</span>
+        </button>
+        <button type="button" onClick={() => navigate("/register-broker")}>
+          <BrokerIcon />
+          <span>Register as Broker</span>
+        </button>
+      </nav>
 
       {/* ── AI Broker consultant ── */}
       <AIBroker open={showChatbot} onClose={() => setShowChatbot(false)} />
