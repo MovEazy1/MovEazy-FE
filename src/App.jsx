@@ -16,6 +16,7 @@ const ListMyFlat = lazy(() => import("./pages/ListMyFlat"));
 const AdminDatabase = lazy(() => import("./pages/AdminDatabase"));
 const Recommendations = lazy(() => import("./pages/Recommendations"));
 const Visits = lazy(() => import("./pages/Visits"));
+const BrokerRegister = lazy(() => import("./pages/BrokerRegister"));
 
 function PageLoader() {
   return (
@@ -45,6 +46,8 @@ function BrokerRoute({ children }) {
   const { user, loading } = useAuth();
   if (loading) return <PageLoader />;
   if (!user) return <Navigate to="/auth?next=/broker" replace />;
+  // Broker CRM is for broker accounts only — everyone else is sent to register.
+  if (user.role !== "broker") return <Navigate to="/register-broker" replace />;
   return children;
 }
 
@@ -66,6 +69,7 @@ function AppRoutes() {
         />
         <Route path="/admin" element={<AdminDatabase />} />
         <Route path="/recommendations" element={<Recommendations />} />
+        <Route path="/register-broker" element={<BrokerRegister />} />
         <Route
           path="/visits"
           element={
