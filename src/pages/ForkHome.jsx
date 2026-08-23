@@ -1,38 +1,27 @@
 /**
  * Fork home — the "/" landing page.
- * Hero matches the split dark/coral Figma; sections below match "Colour iteration 1"
- * (How the Magic happens → 3 Step Wonder → How It Works → Listing Advantage → Testimonials).
+ * Ported 1:1 from the "MoveAzy Home" Claude Design canvas export (dark teal /
+ * mint / amber, Manrope + Caveat). Layout, copy, colors and scroll animations
+ * are a direct port of that design's markup + vanilla-JS scroll script into
+ * React (refs + useEffect in place of document.querySelector + a class
+ * component). Only the interactive buttons are re-wired to this app's real
+ * auth-gated flows (see the handlers below) instead of the design's same-page
+ * anchor links.
  */
-import { useState, useEffect } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Link, useNavigate, useSearchParams } from "react-router-dom";
 import { motion, AnimatePresence } from "framer-motion";
 import { useAuth } from "../context/AuthContext";
 import { useLoginModal } from "../context/LoginModalContext";
 import AIBroker from "../components/AIBroker";
-import SiteHeader from "../components/layout/SiteHeader";
+import { fetchUserRequirement } from "../lib/userRequirements";
 import livingRoomImg from "../assets/images/Cozy_modern_living_room.png";
 import keysImg from "../assets/images/guarentee-keyhandover.jpg";
-import cityImg from "../assets/images/city-bg.png";
 import sofaImg from "../assets/images/services/image1-sofa.png";
-import avatarA from "../assets/images/aman.png";
-import avatarB from "../assets/images/yatharth.png";
-import avatarC from "../assets/images/kuldeep.png";
+import timelineCityImg from "../assets/images/services/timeline1.png";
+import timelinePhoneImg from "../assets/images/services/timeline2.png";
 
-const EASE = [0.22, 1, 0.36, 1];
-
-function Reveal({ children, delay = 0, className = "" }) {
-  return (
-    <motion.div
-      initial={{ opacity: 0, y: 26 }}
-      whileInView={{ opacity: 1, y: 0 }}
-      viewport={{ once: true, margin: "-70px" }}
-      transition={{ duration: 0.6, delay, ease: EASE }}
-      className={className}
-    >
-      {children}
-    </motion.div>
-  );
-}
+const CHOICE_EASE = [0.22, 1, 0.36, 1];
 
 function ArrowIcon() {
   return (
@@ -41,7 +30,6 @@ function ArrowIcon() {
     </svg>
   );
 }
-
 function MapPinIcon() {
   return (
     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" width="20" height="20">
@@ -50,7 +38,6 @@ function MapPinIcon() {
     </svg>
   );
 }
-
 function SparkleIcon() {
   return (
     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" width="20" height="20">
@@ -59,82 +46,39 @@ function SparkleIcon() {
   );
 }
 
-/* ── Section chrome ─────────────────────────────────────────────────────────── */
+/* ── word-by-word "old way" story copy ─────────────────────────────────── */
+const STORY_LINES = [
+  { text: "You scroll through 100s of listings across a dozen websites.", size: "n" },
+  { text: "You call 10+ agents, hoping someone actually understands what you’re looking for.", size: "n" },
+  { text: "And they always say:", size: "n" },
+  { text: "“Bhaiya, aap visit karlo… main aur flats dikhaata hoon.”", size: "big" },
+  { text: "Renting shouldn’t run like it’s 1990.", size: "n" },
+  { text: "We believe tenants should be able to see every available flat that actually matches their preferences — all in one place.", size: "n" },
+  { text: "So you only visit the homes you’re most likely to choose, saving hours of scrolling, endless calls, unnecessary visits, and the hassle that comes with finding a home today.", size: "n" },
+];
 
-function RuleHeading({ children }) {
-  return (
-    <div className="mz-rule-heading">
-      <span className="mz-rule" />
-      <span className="mz-rule-label">{children}</span>
-      <span className="mz-rule" />
-    </div>
-  );
-}
+const LINE_WORDS = [
+  { text: "movEazy", accent: false },
+  { text: "Brings", accent: false },
+  { text: "you", accent: false },
+  { text: "the", accent: false },
+  { text: "New", accent: true },
+  { text: "Age", accent: true },
+  { text: "of", accent: true },
+  { text: "Renting", accent: true },
+  { text: "the", accent: true },
+  { text: "House", accent: true },
+];
 
-function Check({ children }) {
-  return (
-    <li className="mz-check">
-      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.6" width="11" height="11" aria-hidden>
-        <path d="M4 12l5 5L20 7" />
-      </svg>
-      {children}
-    </li>
-  );
-}
-
-/* ── How-It-Works card (text half) ──────────────────────────────────────────── */
-
-function HowCardText({ num, title, tagline, body, checks, statBig, statSmall }) {
-  return (
-    <div className="mz-how-text">
-      <div className="mz-how-titlerow">
-        <span className="mz-num-badge">{num}</span>
-        <h3 className="mz-how-title">{title}</h3>
-      </div>
-      <p className="mz-how-tagline">{tagline}</p>
-      <p className="mz-how-body">{body}</p>
-      <ul className="mz-checklist">
-        {checks.map((c) => <Check key={c}>{c}</Check>)}
-      </ul>
-      <div className="mz-how-statwrap">
-        <div className="mz-how-statline" />
-        <div className="mz-how-stat">
-          <span className="mz-stat-big">{statBig}</span>
-          <span className="mz-stat-small">{statSmall}</span>
-        </div>
-      </div>
-    </div>
-  );
-}
-
-/* ── Match row (card 2 visual) ──────────────────────────────────────────────── */
-
-function MatchRow({ img, pct, title, meta, price }) {
-  return (
-    <div className="mz-match-row">
-      <div className="mz-match-thumb" style={{ backgroundImage: `url(${img})` }}>
-        <span className="mz-match-pct">{pct} Match</span>
-      </div>
-      <div className="mz-match-mid">
-        <div className="mz-match-title">{title}</div>
-        <div className="mz-match-meta">{meta}</div>
-        <div className="mz-match-actions">
-          <button type="button" className="mz-btn-dark">View details</button>
-          <button type="button" className="mz-btn-line">Enquire</button>
-        </div>
-      </div>
-      <div className="mz-match-price">{price}<span>/mo</span></div>
-    </div>
-  );
-}
-
-/* ── Main page ──────────────────────────────────────────────────────────────── */
 export default function ForkHome() {
   const { user } = useAuth();
   const { openLogin } = useLoginModal();
   const navigate = useNavigate();
   const [showChatbot, setShowChatbot] = useState(false);
   const [showChoice, setShowChoice] = useState(false);
+  const [checkingPrefs, setCheckingPrefs] = useState(false);
+  const [pendingMatchCheck, setPendingMatchCheck] = useState(false);
+  const rootRef = useRef(null);
 
   // "List my Flat" — auth-gate, then open the inventory listing form.
   const listMyFlat = () => (user ? navigate("/list-my-flat") : openLogin(() => navigate("/list-my-flat")));
@@ -149,12 +93,40 @@ export default function ForkHome() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [searchParams, user]);
 
-  // "Show me flats" — gate on sign-in first, then show the map-vs-agent choice.
+  // "Show me flats" — gate on sign-in first. A returning user who has already set
+  // their preferences skips the map-vs-agent choice entirely and goes straight to
+  // their best-matched homes; only a first-timer (no saved requirement) sees the
+  // choice between browsing the map or talking to the AI broker.
+  const goToMatches = async (uid) => {
+    setCheckingPrefs(true);
+    try {
+      const saved = await fetchUserRequirement(uid);
+      if (saved) {
+        navigate("/recommendations", { state: { prefs: saved } });
+      } else {
+        setShowChoice(true);
+      }
+    } finally {
+      setCheckingPrefs(false);
+    }
+  };
+
+  // A callback handed to openLogin() is captured before the login completes, so
+  // `user` inside it is still stale (null). Defer via a flag + effect instead,
+  // so the check runs once AuthContext has the freshly-signed-in user.
+  useEffect(() => {
+    if (!pendingMatchCheck || !user) return;
+    setPendingMatchCheck(false);
+    goToMatches(user.uid);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [pendingMatchCheck, user]);
+
   const startFlatSearch = () => {
+    if (checkingPrefs) return;
     if (user) {
-      setShowChoice(true);
+      goToMatches(user.uid);
     } else {
-      openLogin(() => setShowChoice(true));
+      openLogin(() => setPendingMatchCheck(true));
     }
   };
 
@@ -168,597 +140,609 @@ export default function ForkHome() {
     setShowChatbot(true);
   };
 
-  // Header "Get My Free Agent" — gate on sign-in, then jump straight to the chat (skip the map-vs-agent choice).
-  const startAgentDirectly = () => {
-    if (user) {
-      setShowChatbot(true);
-    } else {
-      openLogin(() => setShowChatbot(true));
-    }
-  };
+  const registerOwner = () => listMyFlat();
+
+  /* ── ported scroll-animation script (progress bar, nav fade, hero parallax,
+     data-reveal fades, word-by-word story, letter-flip line, timeline zigzag) —
+     a direct translation of the design's componentDidMount, scoped to rootRef
+     instead of the whole document. ── */
+  useEffect(() => {
+    const root = rootRef.current;
+    if (!root) return;
+
+    const clamp = (x, a = 0, b = 1) => Math.max(a, Math.min(b, x));
+    const lerp = (a, b, t) => a + (b - a) * t;
+    const ease = (t) => (t < 0.5 ? 2 * t * t : 1 - Math.pow(-2 * t + 2, 2) / 2);
+    const q = (s) => root.querySelector(s);
+    const qa = (s) => Array.from(root.querySelectorAll(s));
+
+    const progress = q("[data-progress]");
+    const nav = q("[data-nav]");
+    const hero = q("[data-hero]");
+    const heroInner = q("[data-hero-inner]");
+    const map = q("[data-map]");
+    const route = q("[data-route]");
+    const polaroid = q("[data-polaroid]");
+    const pinA = q("[data-pin-a]");
+    const pinB = q("[data-pin-b]");
+    const reveals = qa("[data-reveal]");
+    reveals.forEach((el) => { el.style.willChange = "opacity, transform"; });
+
+    const storySec = q('[data-scene="story"]');
+    let words = qa("[data-word]");
+    words.forEach((w) => { w.style.transition = "color .3s ease"; if (!w.style.color) w.style.color = "#D7DEDC"; });
+
+    const lineSec = q('[data-scene="line"]');
+    const letters = qa("[data-letter]");
+    const SH_LIGHT = "0 1px 0 #b9cfca, 0 2px 0 #8fada7, 0 3px 0 #6c8f89, 0 4px 0 #4d726c, 0 5px 0 #325852, 0 6px 1px rgba(0,0,0,.35), 0 10px 20px rgba(0,0,0,.5)";
+    const SH_ACCENT = "0 1px 0 #3fbfaa, 0 2px 0 #2ea192, 0 3px 0 #22857a, 0 4px 0 #186c63, 0 5px 0 #10544d, 0 6px 1px rgba(0,0,0,.35), 0 10px 20px rgba(0,0,0,.5)";
+    letters.forEach((l) => {
+      l.style.display = "inline-block";
+      l.style.color = l.hasAttribute("data-accent") ? "#5EEAD4" : "#F1F6F4";
+      l.style.textShadow = l.hasAttribute("data-accent") ? SH_ACCENT : SH_LIGHT;
+      l.style.willChange = "transform, opacity";
+    });
+
+    const tlSec = q('[data-scene="timeline"]');
+    const tlPath = q("[data-tl-path]");
+    const steps = qa("[data-step]");
+
+    const intro = [
+      ...qa("[data-intro]").map((el, i) => [el, i * 90]),
+      ...qa("[data-card]").map((el, i) => [el, 280 + i * 110]),
+      [polaroid, 320, "rotate(6deg)"],
+      [route && route.parentElement, 520],
+    ];
+    intro.forEach(([el, delay, base]) => {
+      if (!el) return;
+      base = base || "";
+      el.style.opacity = "0";
+      el.style.transition = "opacity .8s cubic-bezier(.16,1,.3,1), transform .9s cubic-bezier(.16,1,.3,1)";
+      const origTransform = el.style.transform;
+      el.style.transform = `translateY(22px) ${base}`;
+      setTimeout(() => { el.style.opacity = "1"; el.style.transform = origTransform || `translateY(0) ${base}`; }, 60 + delay);
+    });
+    [pinA, pinB].forEach((el, i) => {
+      if (!el) return;
+      el.style.opacity = "0";
+      el.style.transition = "opacity .7s cubic-bezier(.16,1,.3,1)";
+      setTimeout(() => { el.style.opacity = "1"; }, 700 + i * 140);
+    });
+    const introTransitionClear = setTimeout(() => intro.forEach(([el]) => { if (el) el.style.transition = ""; }), 2400);
+
+    // speed-limited word reveal; completes before the section releases
+    let storyTarget = 0, storyShown = 0;
+    const MAX_STEP = 0.006;
+    const READ_END = 0.82;
+
+    const paintStory = (p) => {
+      if (!words.length || !words[0].isConnected) words = qa("[data-word]");
+      const wp = clamp(p / READ_END);
+      const total = words.length;
+      const lit = wp * (total + 4) - 2;
+      words.forEach((w, i) => {
+        const d = lit - i;
+        w.style.color = d >= 0 ? "#0B1A17" : d > -2.5 ? "#9DAAA6" : "#D7DEDC";
+      });
+    };
+
+    const paintTimeline = () => {
+      const vh = window.innerHeight;
+      let done = 0;
+      steps.forEach((st, i) => {
+        const r = st.getBoundingClientRect();
+        const p = clamp((vh * 0.9 - r.top) / (vh * 0.5));
+        const mediaEl = st.querySelector("[data-step-media]");
+        const textEl = st.querySelector("[data-step-text]");
+        const nodeEl = st.querySelector("[data-step-node]");
+        const dir = i % 2 === 0 ? -1 : 1;
+        if (mediaEl) { mediaEl.style.opacity = p; mediaEl.style.transform = `translateX(${(1 - ease(p)) * 46 * dir}px) translateY(${(1 - ease(p)) * 18}px)`; }
+        if (textEl) { textEl.style.opacity = p; textEl.style.transform = `translateX(${(1 - ease(p)) * 46 * -dir}px) translateY(${(1 - ease(p)) * 18}px)`; }
+        if (nodeEl) {
+          const on = p > 0.55;
+          nodeEl.style.background = on ? "#0E7C68" : "#F4F2ED";
+          nodeEl.style.color = on ? "#F4F2ED" : "#0E7C68";
+          nodeEl.style.borderColor = on ? "#0E7C68" : "rgba(14,124,104,.3)";
+          nodeEl.style.transform = `scale(${lerp(0.7, 1, ease(p))})`;
+          nodeEl.style.transition = "background .3s ease,color .3s ease,border-color .3s ease";
+        }
+        if (p > 0) done = (i + p) / steps.length;
+      });
+      if (tlPath) tlPath.style.strokeDasharray = `${clamp(done) * 1000} 1000`;
+    };
+
+    let ticking = false;
+    const update = () => {
+      ticking = false;
+      const vh = window.innerHeight;
+      const total = document.documentElement.scrollHeight - vh;
+      const sy = window.scrollY;
+      if (progress) progress.style.width = (total > 0 ? clamp(sy / total) * 100 : 0) + "%";
+
+      if (nav) {
+        const on = sy > 40;
+        nav.style.background = on ? "rgba(4,33,29,.86)" : "transparent";
+        nav.style.backdropFilter = on ? "blur(14px)" : "none";
+        nav.style.webkitBackdropFilter = on ? "blur(14px)" : "none";
+        nav.style.borderBottomColor = on ? "rgba(255,255,255,.08)" : "transparent";
+        nav.style.paddingTop = on ? "15px" : "24px";
+        nav.style.paddingBottom = on ? "15px" : "24px";
+      }
+
+      const hp = hero ? clamp(sy / (hero.offsetHeight || vh)) : 0;
+      if (heroInner) { heroInner.style.transform = `translateY(${sy * 0.14}px)`; heroInner.style.opacity = clamp(1 - hp * 1.35); }
+      if (map) map.style.transform = `translateY(${sy * 0.06}px) scale(${1 + hp * 0.08})`;
+      if (route && route.parentElement) route.parentElement.style.transform = `translateY(${sy * -0.05}px)`;
+      if (polaroid) polaroid.style.transform = `translateY(${sy * -0.11}px) rotate(${6 - hp * 5}deg)`;
+
+      reveals.forEach((el) => {
+        const r = el.getBoundingClientRect();
+        const p = clamp((vh - r.top) / (vh * 0.42));
+        el.style.opacity = clamp(p * 1.1);
+        el.style.transform = `translateY(${(1 - ease(p)) * 44}px)`;
+      });
+
+      if (storySec) {
+        const r = storySec.getBoundingClientRect();
+        storyTarget = clamp(-r.top / (r.height - vh));
+      }
+
+      if (lineSec && letters.length) {
+        const r = lineSec.getBoundingClientRect();
+        const p = clamp(-r.top / (r.height - vh));
+        const wp = clamp(p / 0.72);
+        const lit = wp * (letters.length + 8) - 4;
+        letters.forEach((l, i) => {
+          const t = ease(clamp(lit - i));
+          l.style.opacity = t;
+          l.style.transform = `translateY(${(1 - t) * 46}px) rotateX(${(1 - t) * -72}deg) scale(${lerp(0.86, 1, t)})`;
+        });
+      }
+
+      if (tlSec) {
+        const r = tlSec.getBoundingClientRect();
+        if (r.top < vh && r.bottom > 0) paintTimeline();
+      }
+    };
+
+    let raf;
+    let repaint = true;
+    const loop = () => {
+      const d = storyTarget - storyShown;
+      if (Math.abs(d) > 0.0002 || repaint) {
+        repaint = false;
+        storyShown += Math.sign(d) * Math.min(Math.abs(d) * 0.16 + 0.0008, MAX_STEP);
+        paintStory(clamp(storyShown));
+      }
+      raf = requestAnimationFrame(loop);
+    };
+
+    const onScroll = () => { if (!ticking) { ticking = true; requestAnimationFrame(update); } };
+    window.addEventListener("scroll", onScroll, { passive: true });
+    window.addEventListener("resize", onScroll);
+    requestAnimationFrame(update);
+    const updateTimer = setTimeout(update, 300);
+    paintStory(0);
+    loop();
+
+    return () => {
+      window.removeEventListener("scroll", onScroll);
+      window.removeEventListener("resize", onScroll);
+      cancelAnimationFrame(raf);
+      clearTimeout(introTransitionClear);
+      clearTimeout(updateTimer);
+    };
+  }, []);
 
   return (
-    <div style={{ background: "#F2F1EC", color: "#1A2421", fontFamily: "Inter, sans-serif", minHeight: "100dvh" }}>
-
-      {/* ── Figma design system (scoped to this page) ── */}
+    <div
+      ref={rootRef}
+      className="mzn-root"
+      style={{ background: "#04211D", color: "#F1F6F4", fontFamily: "'Manrope', sans-serif", WebkitFontSmoothing: "antialiased", overflowX: "clip" }}
+    >
       <style>{`
-
-        .fx-hero { position: relative; width: 100%; height: 82vh; min-height: 560px; max-height: 780px; overflow: hidden; background: #2e2b28; }
-        .fx-side { position: absolute; inset: 0; display: flex; align-items: center; }
-        .fx-side-dark { background: #2e2b28; clip-path: polygon(0 0, 43% 0, 35% 100%, 0 100%); justify-content: flex-start; }
-        .fx-side-coral { background: #f26a5b; clip-path: polygon(65% 0, 100% 0, 100% 100%, 57% 100%); justify-content: flex-end; }
-        .fx-band { position: absolute; inset: 0; display: flex; clip-path: polygon(43% 0, 65% 0, 57% 100%, 35% 100%); }
-        .fx-band-img { flex: 1; background-size: cover; background-position: center; }
-        .fx-inner { max-width: 44%; padding: 40px clamp(24px, 6vw, 92px) 0; }
-        .fx-side-coral .fx-inner { max-width: 42%; padding-left: clamp(48px, 10vw, 150px); }
-        .fx-eyebrow { font-size: 12px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.16em; margin-bottom: 18px; }
-        .fx-h1 { font-family: 'Playfair Display', Georgia, serif; font-weight: 600; font-size: clamp(38px, 5.2vw, 68px); line-height: 1.04; letter-spacing: -0.015em; margin: 0 0 20px; }
-        .fx-sub { font-size: 15px; line-height: 1.5; margin: 0 0 30px; max-width: 320px; }
-        .fx-cta { display: inline-flex; align-items: center; gap: 8px; background: #fff; color: #1c1a17; border: none; border-radius: 999px; padding: 15px 30px; font-size: 15px; font-weight: 600; cursor: pointer; font-family: inherit; box-shadow: 0 8px 24px rgba(0,0,0,0.14); transition: transform 0.15s ease; }
-        .fx-cta:hover { transform: translateY(-2px); }
-        .fx-textlink { display: inline-flex; align-items: center; gap: 8px; margin-top: 20px; color: #3a1f1a; font-size: 14.5px; font-weight: 600; text-decoration: underline; text-underline-offset: 3px; background: none; border: none; cursor: pointer; font-family: inherit; }
-
-        .fx-dark-eyebrow { color: rgba(255,255,255,0.5); }
-        .fx-dark-h1 { color: #ffffff; }
-        .fx-dark-sub { color: rgba(255,255,255,0.72); }
-        .fx-coral-eyebrow { color: rgba(58,31,26,0.62); }
-        .fx-coral-h1 { color: #2a1512; }
-        .fx-coral-sub { color: rgba(42,21,18,0.78); }
-
-        /* ── Colour-iteration sections ── */
-        .mz-wrap { max-width: 1180px; margin: 0 auto; padding: 0 24px; }
-
-        .mz-magic-h { font-size: clamp(24px, 3vw, 34px); font-weight: 700; letter-spacing: 0.06em; margin: 0 0 10px; color: #141210; }
-        .mz-magic-h em { font-family: 'Playfair Display', Georgia, serif; font-style: italic; font-weight: 700; letter-spacing: 0.01em; }
-        .mz-magic-sub { font-family: Georgia, serif; font-size: 14px; letter-spacing: 0.12em; color: #3d3a34; margin: 0; }
-
-        .mz-rule-heading { display: flex; align-items: center; gap: 18px; margin: 0 0 44px; }
-        .mz-rule { height: 1px; flex: 1; background: #cfccc2; }
-        .mz-rule-label { font-size: 15px; font-weight: 600; letter-spacing: 0.22em; color: #57534b; white-space: nowrap; }
-
-        .mz-steps { display: grid; grid-template-columns: repeat(3, 1fr); gap: clamp(20px, 4vw, 56px); }
-        .mz-step-card { position: relative; border-radius: 18px; overflow: hidden; aspect-ratio: 3/4.1; max-width: 300px; margin: 0 auto; width: 100%; box-shadow: 0 16px 34px rgba(20,18,16,0.22); background-size: cover; background-position: center; }
-        .mz-step-card::after { content: ""; position: absolute; inset: 0; background: linear-gradient(180deg, rgba(0,0,0,0.32) 0%, rgba(0,0,0,0.05) 35%, rgba(0,0,0,0.55) 100%); }
-        .mz-step-num { position: absolute; top: 18px; right: 22px; z-index: 2; color: #fff; font-family: 'Playfair Display', Georgia, serif; font-size: 20px; letter-spacing: 0.28em; }
-        .mz-step-title { position: absolute; left: 20px; bottom: 18px; z-index: 2; color: #fff; font-family: 'Playfair Display', Georgia, serif; font-size: 21px; line-height: 1.45; letter-spacing: 0.14em; font-weight: 600; }
-
-        .mz-how-card { display: grid; grid-template-columns: 1fr 1.05fr; border-radius: 28px; overflow: hidden; background: #B04A42; box-shadow: 0 22px 44px rgba(120,32,26,0.25); margin-bottom: 44px; }
-        .mz-how-text { padding: clamp(26px, 3.4vw, 44px); background: linear-gradient(155deg, rgba(255,255,255,0.16) 0%, rgba(255,255,255,0.05) 34%, rgba(255,255,255,0) 62%); color: #fff; display: flex; flex-direction: column; }
-        .mz-how-visual { background: #A63E37; padding: clamp(22px, 3vw, 40px); display: flex; align-items: center; justify-content: center; }
-        .mz-how-titlerow { display: flex; align-items: center; gap: 12px; margin-bottom: 10px; }
-        .mz-num-badge { width: 26px; height: 26px; border-radius: 50%; background: #CB2B24; color: #fff; display: inline-flex; align-items: center; justify-content: center; font-size: 13px; font-weight: 700; flex-shrink: 0; box-shadow: 0 2px 8px rgba(0,0,0,0.25); }
-        .mz-how-title { font-family: 'Playfair Display', Georgia, serif; font-size: clamp(24px, 2.4vw, 30px); font-weight: 700; margin: 0; letter-spacing: 0.01em; }
-        .mz-how-tagline { font-family: 'Playfair Display', Georgia, serif; font-style: italic; font-weight: 600; font-size: 14px; margin: 0 0 12px; color: rgba(255,255,255,0.95); }
-        .mz-how-body { font-size: 13.5px; line-height: 1.6; color: rgba(255,255,255,0.92); margin: 0 0 18px; max-width: 400px; }
-        .mz-checklist { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 9px; }
-        .mz-check { display: flex; align-items: center; gap: 9px; font-size: 12.5px; color: rgba(255,255,255,0.9); }
-        .mz-check svg { color: rgba(255,255,255,0.75); flex-shrink: 0; }
-        .mz-how-statwrap { margin-top: auto; padding-top: 26px; }
-        .mz-how-statline { width: min(230px, 70%); height: 1px; background: rgba(255,255,255,0.55); margin-bottom: 14px; }
-        .mz-stat-big { font-family: 'Playfair Display', Georgia, serif; font-size: 24px; font-weight: 700; margin-right: 8px; }
-        .mz-stat-small { font-size: 12px; color: rgba(255,255,255,0.8); }
-
-        /* visual 1 — AI assistant chat */
-        .mz-chat-wrap { display: flex; gap: 16px; align-items: flex-start; justify-content: center; flex-wrap: wrap; }
-        .mz-chat { width: min(300px, 100%); background: #fff; border-radius: 18px; overflow: hidden; box-shadow: 0 14px 30px rgba(0,0,0,0.25); }
-        .mz-chat-head { background: #111; color: #fff; padding: 12px 14px; display: flex; align-items: center; gap: 9px; }
-        .mz-chat-avatar { width: 26px; height: 26px; border-radius: 50%; background: #CB2B24; display: flex; align-items: center; justify-content: center; font-size: 12px; }
-        .mz-chat-name { font-size: 12.5px; font-weight: 700; }
-        .mz-chat-status { font-size: 10px; color: #9be29b; }
-        .mz-chat-body { padding: 14px; display: flex; flex-direction: column; gap: 10px; }
-        .mz-bubble { max-width: 85%; padding: 9px 12px; border-radius: 12px; font-size: 11.5px; line-height: 1.45; }
-        .mz-bubble-bot { background: #f2f1ec; color: #24211d; border-top-left-radius: 4px; align-self: flex-start; }
-        .mz-bubble-user { background: #1c1a17; color: #fff; border-top-right-radius: 4px; align-self: flex-end; }
-        .mz-pills { display: flex; flex-wrap: wrap; gap: 6px; }
-        .mz-pill { border: 1px solid #e3b1ac; color: #b03a32; border-radius: 999px; padding: 3px 10px; font-size: 10.5px; font-weight: 600; }
-        .mz-gathered { width: min(200px, 100%); background: #141210; color: #fff; border-radius: 14px; padding: 14px; box-shadow: 0 14px 30px rgba(0,0,0,0.3); }
-        .mz-gathered-title { font-size: 11px; font-weight: 700; text-align: center; margin-bottom: 10px; line-height: 1.4; }
-        .mz-gathered-row { display: flex; justify-content: space-between; font-size: 10.5px; padding: 5px 0; border-bottom: 1px dashed rgba(255,255,255,0.16); }
-        .mz-gathered-row span:first-child { color: rgba(255,255,255,0.6); }
-        .mz-gathered-row span:last-child { color: #ff8478; font-weight: 600; }
-        .mz-gathered-btn { margin-top: 12px; width: 100%; background: #fff; color: #141210; border: none; border-radius: 999px; padding: 7px 0; font-size: 10.5px; font-weight: 700; }
-
-        /* visual 2 — matches */
-        .mz-matches { width: 100%; display: flex; flex-direction: column; gap: 12px; }
-        .mz-match-label { font-family: 'Playfair Display', Georgia, serif; font-size: 15px; font-weight: 700; color: #fff; margin: 2px 0 6px; }
-        .mz-match-row { background: #fff; border-radius: 10px; display: flex; align-items: stretch; overflow: hidden; box-shadow: 0 10px 22px rgba(0,0,0,0.18); }
-        .mz-match-thumb { width: 86px; flex-shrink: 0; background-size: cover; background-position: center; position: relative; }
-        .mz-match-pct { position: absolute; top: 6px; left: 6px; background: #CB2B24; color: #fff; font-size: 8.5px; font-weight: 700; border-radius: 999px; padding: 2px 7px; }
-        .mz-match-mid { flex: 1; padding: 9px 12px; min-width: 0; }
-        .mz-match-title { font-family: 'Playfair Display', Georgia, serif; font-size: 14px; font-weight: 700; color: #17140f; }
-        .mz-match-meta { font-size: 9.5px; color: #8a857c; margin: 2px 0 8px; }
-        .mz-match-actions { display: flex; gap: 6px; }
-        .mz-btn-dark { background: #1c1a17; color: #fff; border: none; border-radius: 999px; font-size: 9px; font-weight: 600; padding: 4px 11px; }
-        .mz-btn-line { background: #fff; color: #1c1a17; border: 1px solid #d8d5cc; border-radius: 999px; font-size: 9px; font-weight: 600; padding: 4px 11px; }
-        .mz-match-price { padding: 10px 12px 0 0; font-family: 'Playfair Display', Georgia, serif; font-size: 14.5px; font-weight: 700; color: #17140f; white-space: nowrap; }
-        .mz-match-price span { font-size: 10px; color: #8a857c; font-family: Inter, sans-serif; font-weight: 500; }
-
-        /* visual 3 — schedule */
-        .mz-sched { width: min(420px, 100%); }
-        .mz-sched-panel { background: #F6E3DF; border-radius: 14px; padding: 14px; }
-        .mz-sched-head { display: flex; justify-content: space-between; align-items: center; background: #efd6d1; border-radius: 8px; padding: 8px 12px; margin-bottom: 12px; font-size: 11px; font-weight: 700; color: #4a2320; }
-        .mz-sched-head span:last-child { font-weight: 600; color: #8c5750; }
-        .mz-visit { background: #141210; border-radius: 10px; padding: 10px 12px; display: flex; gap: 11px; align-items: center; margin-bottom: 9px; }
-        .mz-visit-date { width: 34px; height: 34px; border-radius: 8px; background: #CB2B24; color: #fff; display: flex; flex-direction: column; align-items: center; justify-content: center; font-size: 8.5px; font-weight: 700; line-height: 1.15; flex-shrink: 0; }
-        .mz-visit-date b { font-size: 13px; }
-        .mz-visit-info { min-width: 0; }
-        .mz-visit-title { color: #fff; font-size: 11.5px; font-weight: 700; }
-        .mz-visit-sub { color: rgba(255,255,255,0.65); font-size: 10px; margin: 1px 0 2px; }
-        .mz-visit-link { color: #ff8478; font-size: 9.5px; font-weight: 700; }
-        .mz-sched-note { margin-top: 11px; background: #fff; border-radius: 999px; padding: 7px 13px; font-size: 10px; color: #57534b; display: flex; align-items: center; gap: 6px; }
-
-        /* visual 4 — move-in */
-        .mz-movein { width: min(400px, 100%); display: flex; flex-direction: column; gap: 12px; }
-        .mz-allset { background: #141210; color: #fff; border-radius: 14px; padding: 16px; }
-        .mz-allset-title { font-size: 14px; font-weight: 700; margin: 6px 0 3px; }
-        .mz-allset-sub { font-size: 10.5px; color: rgba(255,255,255,0.6); }
-        .mz-checkcard { background: #fff; border-radius: 14px; padding: 14px 16px; }
-        .mz-checkcard-label { font-size: 10px; font-weight: 700; letter-spacing: 0.14em; color: #8a857c; margin-bottom: 9px; }
-        .mz-checkcard-row { display: flex; align-items: center; gap: 8px; font-size: 11.5px; color: #24211d; padding: 5px 0; }
-        .mz-checkcard-row svg { color: #2D6A4F; flex-shrink: 0; }
-        .mz-verified-pill { background: #fff; border: 1px solid #d8d5cc; border-radius: 999px; padding: 8px 14px; font-size: 10.5px; font-weight: 600; color: #57534b; display: inline-flex; align-items: center; gap: 7px; align-self: flex-start; }
-
-        /* Listing advantage */
-        .mz-adv-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 22px; }
-        .mz-adv-card { border-radius: 20px; color: #fff; padding: clamp(24px, 2.6vw, 36px); min-height: 190px; display: flex; flex-direction: column; box-shadow: 0 16px 34px rgba(90,22,17,0.22); }
-        .mz-adv-title { font-family: 'Playfair Display', Georgia, serif; font-size: 22px; font-weight: 700; margin: 0 0 10px; }
-        .mz-adv-body { font-size: 13px; line-height: 1.6; color: rgba(255,255,255,0.88); margin: 0; max-width: 420px; }
-
-        /* Testimonials */
-        .mz-testi-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 22px; }
-        .mz-testi-card { background: #F8ECE9; border-radius: 18px; padding: 24px; box-shadow: 0 12px 26px rgba(20,18,16,0.08); }
-        .mz-testi-head { display: flex; align-items: center; gap: 12px; margin-bottom: 12px; }
-        .mz-testi-avatar { width: 44px; height: 44px; border-radius: 50%; object-fit: cover; background: #e0d7d2; }
-        .mz-testi-name { font-family: 'Playfair Display', Georgia, serif; font-size: 15.5px; font-weight: 700; color: #17140f; }
-        .mz-testi-stars { color: #CB2B24; font-size: 12px; letter-spacing: 2px; }
-        .mz-testi-quote { font-size: 13px; line-height: 1.65; color: #4a443d; margin: 0; }
-
-        /* Footer */
-        .mz-footer { background: #141210; color: #fff; margin-top: 96px; }
-        .mz-footer-inner { max-width: 1180px; margin: 0 auto; padding: 56px 24px 30px; }
-        .mz-footer-top { display: flex; justify-content: space-between; gap: 40px; flex-wrap: wrap; padding-bottom: 36px; border-bottom: 1px solid rgba(255,255,255,0.12); }
-        .mz-footer-brand { font-family: 'Playfair Display', Georgia, serif; font-size: 24px; font-weight: 700; }
-        .mz-footer-tag { font-size: 13px; color: rgba(255,255,255,0.55); margin-top: 8px; max-width: 300px; line-height: 1.6; }
-        .mz-footer-cols { display: flex; gap: clamp(28px, 5vw, 72px); flex-wrap: wrap; }
-        .mz-footer-col-h { font-size: 11.5px; font-weight: 700; letter-spacing: 0.14em; color: rgba(255,255,255,0.45); margin-bottom: 12px; }
-        .mz-footer-link { display: block; font-size: 13.5px; color: rgba(255,255,255,0.85); text-decoration: none; margin-bottom: 9px; background: none; border: none; padding: 0; cursor: pointer; font-family: inherit; text-align: left; }
-        .mz-footer-link:hover { color: #fff; }
-        .mz-footer-cta { display: flex; align-items: center; justify-content: space-between; gap: 20px; flex-wrap: wrap; padding: 30px 0 0; }
-        .mz-footer-cta-h { font-family: 'Playfair Display', Georgia, serif; font-size: clamp(20px, 2.4vw, 27px); font-weight: 700; margin: 0; }
-        .mz-footer-btns { display: flex; gap: 12px; flex-wrap: wrap; }
-        .mz-footer-btn-solid { background: #fff; color: #141210; border: none; border-radius: 999px; padding: 13px 26px; font-size: 14px; font-weight: 600; cursor: pointer; font-family: inherit; }
-        .mz-footer-btn-line { background: transparent; color: #fff; border: 1px solid rgba(255,255,255,0.4); border-radius: 999px; padding: 13px 26px; font-size: 14px; font-weight: 600; cursor: pointer; font-family: inherit; }
-        .mz-footer-base { display: flex; justify-content: space-between; gap: 14px; flex-wrap: wrap; margin-top: 40px; font-size: 11.5px; color: rgba(255,255,255,0.4); }
-
-        /* ── "Show me flats" choice popup ── */
-        .mz-choice-card { position: relative; width: 100%; max-width: 640px; background: #FFFEFB; border-radius: 24px; padding: clamp(28px, 4vw, 44px); box-shadow: 0 24px 70px rgba(0,0,0,0.3); }
-        .mz-choice-close { position: absolute; top: 16px; right: 16px; width: 34px; height: 34px; border-radius: 50%; border: 1px solid #e4dfd6; background: #fff; color: #8a857c; display: flex; align-items: center; justify-content: center; cursor: pointer; font-size: 18px; }
-        .mz-choice-eyebrow { font-size: 11.5px; font-weight: 700; letter-spacing: 0.16em; text-transform: uppercase; color: #b03a32; margin-bottom: 10px; }
-        .mz-choice-title { font-family: 'Playfair Display', Georgia, serif; font-size: clamp(22px, 3vw, 28px); font-weight: 700; color: #17140f; margin: 0 0 8px; }
-        .mz-choice-sub { font-size: 13.5px; color: #6b6459; margin: 0 0 26px; }
-        .mz-choice-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
-        .mz-choice-opt { position: relative; text-align: left; border-radius: 18px; padding: 22px 20px; cursor: pointer; font-family: inherit; display: flex; flex-direction: column; gap: 10px; transition: transform 0.15s ease, box-shadow 0.15s ease; }
-        .mz-choice-opt:hover { transform: translateY(-3px); }
-        .mz-choice-opt-plain { background: #fff; border: 1.5px solid #e4dfd6; color: #17140f; }
-        .mz-choice-opt-plain:hover { border-color: #cfc8ba; }
-        .mz-choice-opt-hero { background: linear-gradient(155deg, #f26a5b 0%, #cb2b24 100%); border: 1.5px solid transparent; color: #fff; box-shadow: 0 14px 32px rgba(203,43,36,0.35); transform: scale(1.03); }
-        .mz-choice-opt-hero:hover { transform: scale(1.03) translateY(-3px); }
-        .mz-choice-badge { position: absolute; top: -11px; right: 16px; background: #17140f; color: #fff; font-size: 10px; font-weight: 700; letter-spacing: 0.08em; text-transform: uppercase; padding: 5px 12px; border-radius: 999px; box-shadow: 0 4px 10px rgba(0,0,0,0.25); }
-        .mz-choice-icon { width: 42px; height: 42px; border-radius: 12px; display: flex; align-items: center; justify-content: center; }
-        .mz-choice-opt-plain .mz-choice-icon { background: #f3f0ea; color: #b03a32; }
-        .mz-choice-opt-hero .mz-choice-icon { background: rgba(255,255,255,0.2); color: #fff; }
-        .mz-choice-opt-title { font-family: 'Playfair Display', Georgia, serif; font-size: 17px; font-weight: 700; }
-        .mz-choice-opt-body { font-size: 12.5px; line-height: 1.55; }
-        .mz-choice-opt-plain .mz-choice-opt-body { color: #6b6459; }
-        .mz-choice-opt-hero .mz-choice-opt-body { color: rgba(255,255,255,0.9); }
-        .mz-choice-opt-cta { margin-top: 4px; font-size: 12.5px; font-weight: 700; display: inline-flex; align-items: center; gap: 6px; }
-        .mz-choice-opt-plain .mz-choice-opt-cta { color: #b03a32; }
-        .mz-choice-opt-hero .mz-choice-opt-cta { color: #fff; }
-
-        @media (max-width: 640px) {
-          .mz-choice-grid { grid-template-columns: 1fr; }
-          .mz-choice-opt-hero { transform: none; }
-          .mz-choice-opt-hero:hover { transform: translateY(-3px); }
-        }
-
-        @media (max-width: 900px) {
-          .fx-hero { display: flex; flex-direction: column; height: auto; min-height: 0; max-height: none; }
-          .fx-side, .fx-band { position: relative; inset: auto; clip-path: none !important; width: 100%; }
-          .fx-side-dark { padding: 32px 22px 44px; }
-          .fx-side-coral { padding: 44px 22px 52px; }
-          .fx-band { height: 200px; order: 0; }
-          .fx-inner, .fx-side-coral .fx-inner { max-width: 100%; padding: 0; margin-left: 0; }
-          .fx-sub { max-width: none; }
-
-          .mz-steps { grid-template-columns: 1fr; gap: 22px; }
-          .mz-how-card { grid-template-columns: 1fr; }
-          .mz-adv-grid { grid-template-columns: 1fr; }
-          .mz-testi-grid { grid-template-columns: 1fr; }
-        }
+        .mzn-root, .mzn-root *, .mzn-root *::before, .mzn-root *::after { margin: 0; padding: 0; box-sizing: border-box; }
+        .mzn-root a { color: #5EEAD4; text-decoration: none; }
+        .mzn-root a:hover { color: #8ff3e4; }
+        .mzn-root ::selection { background: #5EEAD4; color: #04211D; }
+        @keyframes mznDashmove { to { stroke-dashoffset: -320; } }
+        @keyframes mznPinpulse { 0%, 100% { transform: scale(1); opacity: .9; } 50% { transform: scale(1.35); opacity: .25; } }
+        .mzn-badge-new { background: linear-gradient(135deg,#FFE1A6,#E8A33D 45%,#B9782A); box-shadow: 0 0 0 1px rgba(255,255,255,.35) inset, 0 1px 4px rgba(232,163,61,.5); color: #1B1204; font-size: 8px; font-weight: 800; letter-spacing: .02em; padding: 1.5px 6px; border-radius: 100px; line-height: 1.6; align-self: flex-start; margin-top: -4px; }
+        .mzn-root button { font-family: inherit; cursor: pointer; }
+        .mzn-root a[href^="#"]:focus-visible, .mzn-root button:focus-visible, .mzn-root a:focus-visible { outline: 2px solid #5EEAD4; outline-offset: 3px; border-radius: 4px; }
       `}</style>
 
-      <SiteHeader active="home" onGetAgent={startAgentDirectly} />
+      <div data-progress style={{ position: "fixed", top: 0, left: 0, height: 3, width: "0%", background: "linear-gradient(90deg,#5EEAD4,#E8A33D)", zIndex: 200 }} />
 
-      {/* ── Split hero (Figma) ── */}
-      <section className="fx-hero">
-        {/* Left — seeker */}
-        <div className="fx-side fx-side-dark">
-          <div className="fx-inner">
-            <div className="fx-eyebrow fx-dark-eyebrow">Looking for a flat?</div>
-            <h1 className="fx-h1 fx-dark-h1">Find Your<br />Next Home</h1>
-            <p className="fx-sub fx-dark-sub">From someone who actually lived there.</p>
-            <button type="button" className="fx-cta" onClick={startFlatSearch}>
-              Show me flats
-            </button>
+      {/* ── NAV ── */}
+      <nav
+        data-nav
+        style={{ position: "fixed", top: 0, left: 0, width: "100%", zIndex: 180, display: "flex", alignItems: "center", justifyContent: "space-between", padding: "14px clamp(14px,3vw,50px)", transition: "background .3s ease, padding .3s ease, border-color .3s ease", borderBottom: "1px solid transparent", gap: "clamp(6px,1.4vw,20px)" }}
+      >
+        <Link to="/" style={{ fontWeight: 800, fontSize: "clamp(18px,2vw,24px)", letterSpacing: "-.02em", color: "#fff", flex: "none" }}>
+          mov<span style={{ color: "#5EEAD4" }}>EAZY</span>
+        </Link>
+        <div style={{ display: "flex", alignItems: "center", gap: "clamp(2px,.6vw,8px)", background: "rgba(255,255,255,.06)", border: "1px solid rgba(255,255,255,.09)", borderRadius: 100, padding: 6, flex: 1, minWidth: 0, maxWidth: 780, overflowX: "auto", scrollbarWidth: "none", justifyContent: "center" }}>
+          <Link to="/" style={{ background: "#5EEAD4", color: "#04211D", fontWeight: 700, fontSize: "clamp(12px,1.05vw,14px)", padding: "10px clamp(14px,1.6vw,20px)", borderRadius: 100, whiteSpace: "nowrap", flex: "none" }}>Home</Link>
+          <Link to="/how-it-works" style={{ color: "#CBD9D5", fontWeight: 600, fontSize: "clamp(12px,1.05vw,14px)", padding: "10px clamp(12px,1.4vw,18px)", borderRadius: 100, whiteSpace: "nowrap", flex: "none" }}>How it Works</Link>
+          <Link to="/about" style={{ color: "#CBD9D5", fontWeight: 600, fontSize: "clamp(12px,1.05vw,14px)", padding: "10px clamp(12px,1.4vw,18px)", borderRadius: 100, whiteSpace: "nowrap", flex: "none" }}>About Us</Link>
+          <a href="#" onClick={(e) => { e.preventDefault(); registerOwner(); }} style={{ display: "flex", alignItems: "center", gap: 6, color: "#CBD9D5", fontWeight: 600, fontSize: "clamp(12px,1.05vw,14px)", padding: "10px clamp(12px,1.4vw,18px)", borderRadius: 100, whiteSpace: "nowrap", flex: "none" }}>
+            Register as an Owner<span className="mzn-badge-new">new</span>
+          </a>
+          <Link to="/register-broker" style={{ display: "flex", alignItems: "center", gap: 6, color: "#CBD9D5", fontWeight: 600, fontSize: "clamp(12px,1.05vw,14px)", padding: "10px clamp(12px,1.4vw,18px)", borderRadius: 100, whiteSpace: "nowrap", flex: "none" }}>
+            Register as a Broker<span className="mzn-badge-new">new</span>
+          </Link>
+        </div>
+        <a href="#" onClick={(e) => { e.preventDefault(); startFlatSearch(); }} style={{ display: "flex", alignItems: "center", gap: 6, background: "#5EEAD4", color: "#04211D", fontWeight: 700, fontSize: "clamp(12px,1.1vw,15px)", padding: "11px clamp(12px,1.6vw,22px)", borderRadius: 100, flex: "none", whiteSpace: "nowrap" }}>
+          Start your move <span style={{ fontSize: 13 }}>&#8599;</span>
+        </a>
+      </nav>
+
+      {/* ── HERO ── */}
+      <section data-hero style={{ position: "relative", minHeight: "100vh", display: "flex", alignItems: "center", padding: "120px clamp(20px,4vw,60px) 60px", background: "radial-gradient(120% 100% at 85% 25%, #0A3A33 0%, #052723 45%, #04211D 100%)", overflow: "hidden" }}>
+
+        <svg data-map viewBox="0 0 900 900" preserveAspectRatio="xMidYMid slice" style={{ position: "absolute", right: "-6%", top: 0, height: "100%", width: "70%", zIndex: 0, opacity: 0.5 }}>
+          <g stroke="#0f5a4d" strokeWidth="1.1" fill="none" opacity="0.85">
+            <path d="M0 120 L900 60 M0 300 L900 250 M0 470 L900 430 M0 640 L900 610 M0 810 L900 790" />
+            <path d="M110 0 L60 900 M290 0 L250 900 M470 0 L440 900 M650 0 L620 900 M830 0 L810 900" />
+            <path d="M0 200 L340 0 M300 900 L900 350 M0 700 L520 900" />
+          </g>
+          <g stroke="#9a7a2e" strokeWidth="2.4" fill="none" opacity="0.55">
+            <path d="M-20 640 C180 600 250 470 430 430 C620 388 700 240 900 210" />
+            <path d="M700 900 C740 660 820 520 900 470" />
+          </g>
+          <g stroke="#0d4c42" strokeWidth="4" fill="none" opacity="0.5">
+            <path d="M0 520 C220 500 300 330 560 300 C740 280 800 150 900 130" />
+          </g>
+        </svg>
+
+        <div style={{ position: "absolute", right: "12%", top: "14%", height: "40%", width: "calc(40vh * 400 / 480)", zIndex: 1 }}>
+          <svg data-route viewBox="0 0 400 480" style={{ position: "absolute", inset: 0, width: "100%", height: "100%", overflow: "visible" }}>
+            <path d="M60 470 C150 415 30 350 130 300 C230 250 110 210 210 165 C290 130 240 75 340 40 C365 30 375 25 385 20" fill="none" stroke="#E8A33D" strokeWidth="2.6" strokeDasharray="9 11" strokeLinecap="round" strokeLinejoin="round" style={{ animation: "mznDashmove 9s linear infinite" }} />
+          </svg>
+          <div data-pin-a style={{ position: "absolute", left: "96%", top: "4.2%", transform: "translate(-50%,-92%)", zIndex: 2 }}>
+            <svg width="30" height="40" viewBox="0 0 24 32" fill="none">
+              <path d="M12 1c5.5 0 10 4.4 10 9.9C22 18.6 12 31 12 31S2 18.6 2 10.9C2 5.4 6.5 1 12 1z" stroke="#E8A33D" strokeWidth="1.8" fill="rgba(232,163,61,.10)" />
+              <circle cx="12" cy="11" r="3.2" fill="#E8A33D" style={{ animation: "mznPinpulse 2.6s ease-in-out infinite", transformOrigin: "12px 11px" }} />
+            </svg>
+          </div>
+          <div data-pin-b style={{ position: "absolute", left: "15%", top: "97.9%", transform: "translate(-50%,-92%)", zIndex: 2 }}>
+            <svg width="26" height="35" viewBox="0 0 24 32" fill="none">
+              <path d="M12 1c5.5 0 10 4.4 10 9.9C22 18.6 12 31 12 31S2 18.6 2 10.9C2 5.4 6.5 1 12 1z" stroke="#5EEAD4" strokeWidth="1.8" fill="rgba(94,234,212,.10)" />
+              <circle cx="12" cy="11" r="3" fill="#5EEAD4" style={{ animation: "mznPinpulse 2.6s ease-in-out infinite", transformOrigin: "12px 11px" }} />
+            </svg>
           </div>
         </div>
 
-        {/* Center — image band */}
-        <div className="fx-band" aria-hidden>
-          <div className="fx-band-img" style={{ backgroundImage: `url(${livingRoomImg})` }} />
-          <div className="fx-band-img" style={{ backgroundImage: `url(${keysImg})`, backgroundColor: "#f26a5b" }} />
+        <div data-polaroid style={{ position: "absolute", right: "clamp(210px,17vw,320px)", top: "19%", width: "clamp(190px,16vw,250px)", zIndex: 3, transform: "rotate(6deg)", background: "#EFEAE1", padding: "10px 10px 0", borderRadius: 3, boxShadow: "0 30px 70px rgba(0,0,0,.5)" }}>
+          <div style={{ position: "absolute", top: -13, left: "24%", width: 70, height: 28, background: "rgba(94,234,212,.42)", transform: "rotate(-12deg)" }} />
+          <div style={{ aspectRatio: "1/.84", borderRadius: 2, backgroundImage: `url(${livingRoomImg})`, backgroundSize: "cover", backgroundPosition: "center" }} />
+          <div style={{ fontFamily: "'Caveat'", fontSize: 19, color: "#1b1a17", padding: "9px 3px 11px", transform: "rotate(-2deg)" }}>Home base. Found. &#9825;&#9825;</div>
         </div>
 
-        {/* Right — vacating */}
-        <div className="fx-side fx-side-coral">
-          <div className="fx-inner" style={{ marginLeft: "auto" }}>
-            <div className="fx-eyebrow fx-coral-eyebrow">Passing your flat?</div>
-            <h1 className="fx-h1 fx-coral-h1">Find Your<br />Next Occupant</h1>
-            <p className="fx-sub fx-coral-sub">To someone who'll treat it like home.</p>
-            <button
-              type="button"
-              className="fx-cta"
-              onClick={listMyFlat}
-            >
-              List my Flat
-            </button>
+        <div data-hero-inner style={{ position: "relative", zIndex: 4, maxWidth: 1240, margin: "0 auto", width: "100%" }}>
+          <div data-intro style={{ display: "flex", alignItems: "center", gap: 12 }}>
+            <span style={{ fontFamily: "'Caveat'", fontSize: "clamp(22px,2.2vw,30px)", color: "#5EEAD4" }}>Your adventure begins here</span>
+            <svg width="34" height="34" viewBox="0 0 24 24" fill="none" stroke="#5EEAD4" strokeWidth="1.5"><path d="M2 12l19-8-7 19-3-8-9-3z" strokeLinejoin="round" /></svg>
+          </div>
+          <h1 data-intro style={{ fontFamily: "'Manrope', sans-serif", color: "#F1F6F4", fontWeight: 800, fontSize: "clamp(38px,5.8vw,80px)", lineHeight: 1.03, letterSpacing: "-.035em", margin: "16px 0 0", maxWidth: "14ch" }}>
+            New city on the map. New home in <span style={{ color: "#5EEAD4" }}>your story.</span>
+          </h1>
+          <p data-intro style={{ maxWidth: 420, margin: "22px 0 0", fontSize: "clamp(16px,1.4vw,20px)", lineHeight: 1.5, color: "#B7CBC6" }}>
+            We take care of the boring stuff, so you can focus on the big stuff.
+          </p>
+
+          <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit,minmax(320px,1fr))", gap: "clamp(18px,2.2vw,32px)", marginTop: "clamp(40px,6vh,72px)", width: "100%" }}>
+            <a href="#" data-card onClick={(e) => { e.preventDefault(); startFlatSearch(); }} style={{ border: "1px solid rgba(94,234,212,.28)", borderRadius: 20, padding: "clamp(26px,2.6vw,38px)", background: "rgba(6,45,39,.74)", backdropFilter: "blur(6px)", display: "flex", flexDirection: "column" }}>
+              <div style={{ display: "flex", alignItems: "center", gap: 18 }}>
+                <span style={{ flex: "none", width: 60, height: 60, borderRadius: "50%", border: "1px solid rgba(94,234,212,.45)", background: "rgba(94,234,212,.08)", display: "flex", alignItems: "center", justifyContent: "center" }}>
+                  <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="#5EEAD4" strokeWidth="1.6"><path d="M3 10.5 12 3l9 7.5V21H3z" strokeLinejoin="round" /><path d="M9 14l2.2 2.2L15.5 12" strokeLinecap="round" /></svg>
+                </span>
+                <span style={{ flex: 1 }}>
+                  <span style={{ display: "block", color: "#DCE8E5", fontSize: 16, fontWeight: 500 }}>Moving in?</span>
+                  <span style={{ display: "block", color: "#5EEAD4", fontSize: "clamp(21px,2vw,28px)", fontWeight: 800, letterSpacing: "-.02em", marginTop: 2 }}>Find your perfect home</span>
+                </span>
+                <span style={{ flex: "none", width: 44, height: 44, borderRadius: "50%", background: "#5EEAD4", color: "#04211D", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 18, fontWeight: 700 }}>&#8594;</span>
+              </div>
+              <div style={{ color: "#9FB5B0", fontSize: 16, lineHeight: 1.5, marginTop: 20 }}>Curated homes matched to how you actually live, with real photos and same-day visits. <span style={{ color: "#5EEAD4" }}>Hassle-free.</span></div>
+              <div style={{ display: "flex", flexWrap: "wrap", gap: 10, marginTop: 22 }}>
+                <span style={{ border: "1px solid rgba(94,234,212,.22)", color: "#CBE4DF", fontSize: 13, fontWeight: 600, padding: "8px 14px", borderRadius: 100 }}>Curated homes</span>
+                <span style={{ border: "1px solid rgba(94,234,212,.22)", color: "#CBE4DF", fontSize: 13, fontWeight: 600, padding: "8px 14px", borderRadius: 100 }}>Deposit protection</span>
+                <span style={{ border: "1px solid rgba(94,234,212,.22)", color: "#CBE4DF", fontSize: 13, fontWeight: 600, padding: "8px 14px", borderRadius: 100 }}>Move in within 7 days</span>
+              </div>
+            </a>
+            <a href="#" data-card onClick={(e) => { e.preventDefault(); listMyFlat(); }} style={{ border: "1px solid rgba(232,163,61,.30)", borderRadius: 20, padding: "clamp(26px,2.6vw,38px)", background: "rgba(6,45,39,.74)", backdropFilter: "blur(6px)", display: "flex", flexDirection: "column" }}>
+              <div style={{ display: "flex", alignItems: "center", gap: 18 }}>
+                <span style={{ flex: "none", width: 60, height: 60, borderRadius: "50%", border: "1px solid rgba(232,163,61,.48)", background: "rgba(232,163,61,.08)", display: "flex", alignItems: "center", justifyContent: "center" }}>
+                  <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="#E8A33D" strokeWidth="1.6"><path d="M20.5 13.2 13.2 20.5a2 2 0 0 1-2.8 0l-7-7V3.5H11l9.5 9.7z" strokeLinejoin="round" /><circle cx="7.6" cy="7.6" r="1.5" /></svg>
+                </span>
+                <span style={{ flex: 1 }}>
+                  <span style={{ display: "block", color: "#DCE8E5", fontSize: 16, fontWeight: 500 }}>Moving out?</span>
+                  <span style={{ display: "block", color: "#E8A33D", fontSize: "clamp(21px,2vw,28px)", fontWeight: 800, letterSpacing: "-.02em", marginTop: 2 }}>List your flat now</span>
+                </span>
+                <span style={{ flex: "none", width: 44, height: 44, borderRadius: "50%", background: "#5EEAD4", color: "#04211D", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 18, fontWeight: 700 }}>&#8594;</span>
+              </div>
+              <div style={{ color: "#9FB5B0", fontSize: 16, lineHeight: 1.5, marginTop: 20 }}>Reach genuine, move-ready tenants while we handle visits and coordination. Zero <span style={{ color: "#E8A33D" }}>hassle.</span></div>
+              <div style={{ display: "flex", flexWrap: "wrap", gap: 10, marginTop: 22 }}>
+                <span style={{ border: "1px solid rgba(232,163,61,.24)", color: "#EBDCC2", fontSize: 13, fontWeight: 600, padding: "8px 14px", borderRadius: 100 }}>Verified tenants</span>
+                <span style={{ border: "1px solid rgba(232,163,61,.24)", color: "#EBDCC2", fontSize: 13, fontWeight: 600, padding: "8px 14px", borderRadius: 100 }}>Visits handled</span>
+                <span style={{ border: "1px solid rgba(232,163,61,.24)", color: "#EBDCC2", fontSize: 13, fontWeight: 600, padding: "8px 14px", borderRadius: 100 }}>No hidden fees</span>
+              </div>
+            </a>
+          </div>
+        </div>
+      </section>
+
+      {/* ── TRUST BAND ── */}
+      <section style={{ background: "#F4F2ED", color: "#12211E", padding: "clamp(36px,6vh,64px) clamp(20px,4vw,60px)" }}>
+        <div style={{ maxWidth: 1240, margin: "0 auto", display: "flex", flexWrap: "wrap", gap: 36, alignItems: "center", justifyContent: "space-between" }}>
+          <div data-reveal style={{ display: "flex", alignItems: "center", gap: 34, flexWrap: "wrap" }}>
             <div>
-              <a href="#how" className="fx-textlink">
-                Get paid to pass it on <ArrowIcon />
-              </a>
+              <div style={{ fontSize: 13, letterSpacing: ".18em", color: "#6C7A77", fontWeight: 700 }}>TRUSTED BY</div>
+              <div style={{ fontWeight: 800, fontSize: "clamp(32px,3.4vw,44px)", color: "#0E7C68", lineHeight: 1.05, margin: "4px 0" }}>100+</div>
+              <div style={{ fontSize: 13, letterSpacing: ".18em", color: "#6C7A77", fontWeight: 700 }}>HAPPY MOVERS</div>
+              <div style={{ fontSize: 14, color: "#6C7A77", fontWeight: 600, marginTop: 6 }}>within 2 months of operations</div>
+            </div>
+            <div style={{ display: "flex" }}>
+              {[0, 1, 2, 3, 4].map((i) => (
+                <span key={i} style={{ width: 56, height: 56, borderRadius: "50%", border: "3px solid #F4F2ED", background: "repeating-linear-gradient(45deg,rgba(0,0,0,.10) 0 8px,rgba(0,0,0,.04) 8px 16px)", marginLeft: i === 0 ? 0 : -14 }} />
+              ))}
+            </div>
+          </div>
+          <div data-reveal style={{ display: "flex", gap: 16, maxWidth: 520, borderLeft: "1px solid rgba(0,0,0,.12)", paddingLeft: 32 }}>
+            <span style={{ fontSize: 44, lineHeight: 0.8, color: "#0E7C68", fontWeight: 800 }}>&#8220;</span>
+            <span>
+              <span style={{ display: "block", fontSize: 17, lineHeight: 1.5, color: "#22322E" }}>"movEazy made my move to Bangalore smooth and stress-free."</span>
+              <span style={{ display: "block", fontSize: 15, color: "#6C7A77", marginTop: 8 }}>&#8211; <strong style={{ color: "#12211E" }}>Ananya</strong>, moved in July '26</span>
+            </span>
+          </div>
+        </div>
+      </section>
+
+      {/* ── SCENE: WORD-BY-WORD STORY ── */}
+      <section data-scene="story" style={{ position: "relative", height: "640vh", background: "#FFFFFF" }}>
+        <div data-inner style={{ position: "sticky", top: 0, height: "100vh", overflow: "hidden", background: "#FFFFFF", display: "flex", flexDirection: "column", justifyContent: "center", padding: "0 clamp(20px,4vw,60px)" }}>
+          <div style={{ maxWidth: 1000, margin: "0 auto", width: "100%", display: "flex", flexDirection: "column", gap: "clamp(10px,1.6vh,20px)" }}>
+            <div style={{ fontSize: 13, letterSpacing: ".18em", color: "#0E7C68", fontWeight: 700, marginBottom: "clamp(6px,1.4vh,16px)" }}>THE OLD WAY OF MOVING</div>
+            {STORY_LINES.map((line, li) => (
+              <p
+                key={li}
+                data-words
+                style={{
+                  fontWeight: 800,
+                  fontStyle: line.size === "big" ? "italic" : "normal",
+                  fontSize: line.size === "big" ? "clamp(22px,2.9vw,44px)" : "clamp(16px,1.85vw,28px)",
+                  lineHeight: line.size === "big" ? 1.32 : 1.42,
+                  letterSpacing: "-.018em",
+                  color: "#D7DEDC",
+                  textWrap: "pretty",
+                  margin: 0,
+                }}
+              >
+                {line.text.split(" ").map((w, wi) => (
+                  <span key={wi} data-word>{w}{wi < line.text.split(" ").length - 1 ? " " : ""}</span>
+                ))}
+              </p>
+            ))}
+          </div>
+        </div>
+      </section>
+
+      {/* ── SCENE: THE LINE ── */}
+      <section data-scene="line" style={{ position: "relative", height: "200vh", background: "#04211D" }}>
+        <div data-inner style={{ position: "sticky", top: 0, height: "100vh", overflow: "hidden", display: "flex", alignItems: "center", justifyContent: "center", padding: "0 clamp(20px,4vw,60px)", background: "radial-gradient(110% 90% at 50% 40%, #0A3A33 0%, #052723 48%, #04211D 100%)" }}>
+          <h2 data-line-head style={{ fontFamily: "'Manrope', sans-serif", maxWidth: 1150, textAlign: "center", fontWeight: 800, fontSize: "clamp(34px,6.4vw,100px)", lineHeight: 1.14, letterSpacing: "-.035em", color: "#F1F6F4", perspective: 900 }}>
+            {LINE_WORDS.map((w, wi) => (
+              <span key={wi} style={{ display: "inline-block", whiteSpace: "nowrap" }}>
+                {w.text.split("").map((ch, ci) => (
+                  <span key={ci} data-letter {...(w.accent ? { "data-accent": "" } : {})}>{ch}</span>
+                ))}
+                {wi < LINE_WORDS.length - 1 ? " " : ""}
+              </span>
+            ))}
+          </h2>
+        </div>
+      </section>
+
+      {/* ── TIMELINE: MOVING MADE EASY ── */}
+      <section data-scene="timeline" id="how" style={{ position: "relative", background: "#F4F2ED", color: "#0B1A17", padding: "clamp(70px,11vh,130px) clamp(20px,4vw,60px) clamp(80px,12vh,150px)" }}>
+        <div style={{ maxWidth: 1080, margin: "0 auto" }}>
+          <div data-reveal style={{ display: "flex", flexWrap: "wrap", gap: 30, justifyContent: "space-between", alignItems: "flex-start" }}>
+            <div>
+              <div style={{ fontFamily: "'Caveat'", fontSize: "clamp(20px,2vw,26px)", color: "#0E7C68" }}>We've got your back</div>
+              <h2 style={{ fontFamily: "'Manrope', sans-serif", color: "#0B1A17", fontWeight: 800, fontSize: "clamp(30px,4.4vw,60px)", lineHeight: 1.05, letterSpacing: "-.03em", marginTop: 8 }}>
+                Moving made <span style={{ color: "#0E7C68" }}>easy.</span><br />Here's how we do it.
+              </h2>
+            </div>
+            <div style={{ display: "flex", alignItems: "flex-start", gap: 14, paddingTop: 10 }}>
+              <span style={{ fontFamily: "'Caveat'", fontSize: "clamp(17px,1.6vw,21px)", color: "#5C6B67", lineHeight: 1.3, textAlign: "right" }}>all in one,<br />so you can chill.</span>
+              <svg width="46" height="46" viewBox="0 0 46 46" fill="none" stroke="#5C6B67" strokeWidth="1.4">
+                <path d="M8 6c-2 14 4 26 18 32" strokeLinecap="round" />
+                <path d="M20 32l6 6-8 2" strokeLinecap="round" strokeLinejoin="round" />
+                <circle cx="37" cy="14" r="7" />
+                <path d="M34.4 12.4h.01M39.6 12.4h.01M34 16.4c.8 1 1.8 1.5 3 1.5s2.2-.5 3-1.5" strokeLinecap="round" />
+              </svg>
+            </div>
+          </div>
+
+          <div style={{ position: "relative", marginTop: "clamp(48px,7vh,84px)" }}>
+            <svg viewBox="0 0 100 1000" preserveAspectRatio="none" style={{ position: "absolute", left: "50%", top: 0, transform: "translateX(-50%)", width: 120, height: "100%", overflow: "visible", zIndex: 0 }}>
+              <path d="M50 0 C78 90 22 180 50 280 C78 380 22 470 50 570 C78 670 22 760 50 860 C70 925 45 965 50 1000" fill="none" stroke="rgba(14,124,104,.20)" strokeWidth="2" strokeDasharray="7 9" />
+              <path data-tl-path d="M50 0 C78 90 22 180 50 280 C78 380 22 470 50 570 C78 670 22 760 50 860 C70 925 45 965 50 1000" pathLength="1000" fill="none" stroke="#0E7C68" strokeWidth="2.4" strokeDasharray="0 1000" />
+            </svg>
+
+            <div style={{ position: "relative", zIndex: 1, display: "flex", flexDirection: "column", gap: "clamp(26px,4vh,50px)" }}>
+
+              <div data-step style={{ display: "grid", gridTemplateColumns: "1fr 76px 1fr", alignItems: "center" }}>
+                <div data-step-media style={{ borderRadius: 18, overflow: "hidden", background: "#0C1A18", boxShadow: "0 22px 50px rgba(0,0,0,.14)", position: "relative", aspectRatio: "16/11" }}>
+                  <div style={{ position: "absolute", inset: 0, backgroundImage: `url(${timelinePhoneImg})`, backgroundSize: "cover", backgroundPosition: "center" }} />
+                  <span style={{ position: "absolute", top: 16, left: 16, width: 34, height: 34, borderRadius: "50%", background: "#F4F2ED", display: "flex", alignItems: "center", justifyContent: "center" }}>
+                    <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="#0E7C68" strokeWidth="1.8"><path d="M21 12a8 8 0 0 1-8 8H8l-5 3 1.4-4.6A8 8 0 0 1 13 4a8 8 0 0 1 8 8z" strokeLinejoin="round" /></svg>
+                  </span>
+                  <span style={{ position: "absolute", bottom: 16, left: 16, width: 46, height: 46, borderRadius: "50%", background: "rgba(4,33,29,.72)", border: "1px solid rgba(94,234,212,.35)", display: "flex", alignItems: "center", justifyContent: "center" }}>
+                    <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#5EEAD4" strokeWidth="1.6"><path d="M20 11a7 7 0 0 1-7 7H9l-4 2.5 1-3.6A7 7 0 0 1 13 4a7 7 0 0 1 7 7z" strokeLinejoin="round" /></svg>
+                  </span>
+                </div>
+                <div style={{ display: "flex", justifyContent: "center" }}><span data-step-node style={{ width: 36, height: 36, borderRadius: "50%", border: "2px solid rgba(14,124,104,.3)", background: "#F4F2ED", color: "#0E7C68", fontWeight: 800, fontSize: 14, display: "flex", alignItems: "center", justifyContent: "center" }}>1</span></div>
+                <div data-step-text style={{ background: "#fff", border: "1px solid rgba(0,0,0,.07)", borderRadius: 18, padding: "clamp(22px,2.4vw,32px)" }}>
+                  <h3 style={{ fontFamily: "'Manrope', sans-serif", color: "#0B1A17", fontWeight: 800, fontSize: "clamp(19px,1.9vw,25px)", lineHeight: 1.25, letterSpacing: "-.02em" }}>You tell us your <span style={{ color: "#0E7C68" }}>requirements</span></h3>
+                  <p style={{ color: "#5C6B67", fontSize: 15, lineHeight: 1.55, marginTop: 12 }}>Share your needs, deal breakers, preferences and everything in between.</p>
+                </div>
+              </div>
+
+              <div data-step style={{ display: "grid", gridTemplateColumns: "1fr 76px 1fr", alignItems: "center" }}>
+                <div data-step-text style={{ background: "#fff", border: "1px solid rgba(0,0,0,.07)", borderRadius: 18, padding: "clamp(22px,2.4vw,32px)" }}>
+                  <h3 style={{ fontFamily: "'Manrope', sans-serif", color: "#0B1A17", fontWeight: 800, fontSize: "clamp(19px,1.9vw,25px)", lineHeight: 1.25, letterSpacing: "-.02em" }}>We guide you <span style={{ color: "#0E7C68" }}>everything</span> about the city</h3>
+                  <p style={{ color: "#5C6B67", fontSize: 15, lineHeight: 1.55, marginTop: 12 }}>From traffic choke points to party areas to walking neighbourhoods, we tell you what others won't.</p>
+                </div>
+                <div style={{ display: "flex", justifyContent: "center" }}><span data-step-node style={{ width: 36, height: 36, borderRadius: "50%", border: "2px solid rgba(14,124,104,.3)", background: "#F4F2ED", color: "#0E7C68", fontWeight: 800, fontSize: 14, display: "flex", alignItems: "center", justifyContent: "center" }}>2</span></div>
+                <div data-step-media style={{ borderRadius: 18, overflow: "hidden", background: "#0C1A18", boxShadow: "0 22px 50px rgba(0,0,0,.14)", position: "relative", aspectRatio: "16/11" }}>
+                  <div style={{ position: "absolute", inset: 0, backgroundImage: `url(${timelineCityImg})`, backgroundSize: "cover", backgroundPosition: "center" }} />
+                  <span style={{ position: "absolute", top: 16, right: 16, width: 34, height: 34, borderRadius: "50%", background: "#F4F2ED", color: "#0E7C68", fontWeight: 800, fontSize: 14, display: "flex", alignItems: "center", justifyContent: "center" }}>2</span>
+                  <span style={{ position: "absolute", bottom: 16, left: 16, width: 46, height: 46, borderRadius: "50%", background: "rgba(4,33,29,.72)", border: "1px solid rgba(94,234,212,.35)", display: "flex", alignItems: "center", justifyContent: "center" }}>
+                    <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#5EEAD4" strokeWidth="1.6"><path d="M12 2c3.9 0 7 3 7 6.9C19 14 12 22 12 22S5 14 5 8.9C5 5 8.1 2 12 2z" strokeLinejoin="round" /><circle cx="12" cy="9" r="2.2" /></svg>
+                  </span>
+                </div>
+              </div>
+
+              <div data-step style={{ display: "grid", gridTemplateColumns: "1fr 76px 1fr", alignItems: "center" }}>
+                <div data-step-media style={{ borderRadius: 18, overflow: "hidden", background: "#0C1A18", boxShadow: "0 22px 50px rgba(0,0,0,.14)", position: "relative", aspectRatio: "16/11" }}>
+                  <div style={{ position: "absolute", inset: 0, backgroundImage: `url(${keysImg})`, backgroundSize: "cover", backgroundPosition: "center" }} />
+                  <span style={{ position: "absolute", top: 16, left: 16, width: 34, height: 34, borderRadius: "50%", background: "#F4F2ED", color: "#0E7C68", fontWeight: 800, fontSize: 14, display: "flex", alignItems: "center", justifyContent: "center" }}>3</span>
+                  <span style={{ position: "absolute", bottom: 16, left: 16, width: 46, height: 46, borderRadius: "50%", background: "rgba(4,33,29,.72)", border: "1px solid rgba(94,234,212,.35)", display: "flex", alignItems: "center", justifyContent: "center" }}>
+                    <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#5EEAD4" strokeWidth="1.6"><circle cx="12" cy="4.6" r="2.2" /><path d="M12 7.4v5l3.4 3.2 1.6 5.4M12 12.4 8.4 15l-1.8 5.4M8.6 10.2 12 8.6l3.6 1.8" strokeLinecap="round" strokeLinejoin="round" /></svg>
+                  </span>
+                </div>
+                <div style={{ display: "flex", justifyContent: "center" }}><span data-step-node style={{ width: 36, height: 36, borderRadius: "50%", border: "2px solid rgba(14,124,104,.3)", background: "#F4F2ED", color: "#0E7C68", fontWeight: 800, fontSize: 14, display: "flex", alignItems: "center", justifyContent: "center" }}>3</span></div>
+                <div data-step-text style={{ background: "#fff", border: "1px solid rgba(0,0,0,.07)", borderRadius: 18, padding: "clamp(22px,2.4vw,32px)" }}>
+                  <h3 style={{ fontFamily: "'Manrope', sans-serif", color: "#0B1A17", fontWeight: 800, fontSize: "clamp(19px,1.9vw,25px)", lineHeight: 1.25, letterSpacing: "-.02em" }}>We help you move in to your perfect home within <span style={{ color: "#0E7C68" }}>7 days</span></h3>
+                  <p style={{ color: "#5C6B67", fontSize: 15, lineHeight: 1.55, marginTop: 12 }}>Our on ground agent handles everything, so you don't have to lift a finger.</p>
+                </div>
+              </div>
+
+              <div data-step style={{ display: "grid", gridTemplateColumns: "1fr 76px 1fr", alignItems: "center" }}>
+                <div data-step-text style={{ background: "#fff", border: "1px solid rgba(0,0,0,.07)", borderRadius: 18, padding: "clamp(22px,2.4vw,32px)" }}>
+                  <h3 style={{ fontFamily: "'Manrope', sans-serif", color: "#0B1A17", fontWeight: 800, fontSize: "clamp(19px,1.9vw,25px)", lineHeight: 1.25, letterSpacing: "-.02em" }}>Weekly parties <span style={{ color: "#0E7C68" }}>in</span> neighbourhood</h3>
+                  <p style={{ color: "#5C6B67", fontSize: 15, lineHeight: 1.55, marginTop: 12 }}>Exclusively for movEazy Generation. New city, new people, new stories.</p>
+                </div>
+                <div style={{ display: "flex", justifyContent: "center" }}><span data-step-node style={{ width: 36, height: 36, borderRadius: "50%", border: "2px solid rgba(14,124,104,.3)", background: "#F4F2ED", color: "#0E7C68", fontWeight: 800, fontSize: 14, display: "flex", alignItems: "center", justifyContent: "center" }}>4</span></div>
+                <div data-step-media style={{ borderRadius: 18, overflow: "hidden", background: "#150C22", boxShadow: "0 22px 50px rgba(0,0,0,.14)", position: "relative", aspectRatio: "16/11" }}>
+                  <div style={{ position: "absolute", inset: 0, backgroundImage: `url(${sofaImg})`, backgroundSize: "cover", backgroundPosition: "center" }} />
+                  <span style={{ position: "absolute", top: 16, right: 16, width: 34, height: 34, borderRadius: "50%", background: "#F4F2ED", color: "#0E7C68", fontWeight: 800, fontSize: 14, display: "flex", alignItems: "center", justifyContent: "center" }}>4</span>
+                  <span style={{ position: "absolute", bottom: 16, left: 16, width: 46, height: 46, borderRadius: "50%", background: "rgba(21,12,34,.72)", border: "1px solid rgba(94,234,212,.35)", display: "flex", alignItems: "center", justifyContent: "center" }}>
+                    <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#5EEAD4" strokeWidth="1.6"><path d="M3 21l6.5-13L21 19.5 3 21z" strokeLinejoin="round" /><path d="M14 4.5v.01M18.5 8v.01M20.5 3.5v.01" strokeLinecap="round" /></svg>
+                  </span>
+                </div>
+              </div>
+
+              <div data-step style={{ display: "grid", gridTemplateColumns: "1fr 76px 1fr", alignItems: "center" }}>
+                <div data-step-media style={{ borderRadius: 18, overflow: "hidden", background: "#0C1A18", boxShadow: "0 22px 50px rgba(0,0,0,.14)", position: "relative", aspectRatio: "16/11" }}>
+                  <div style={{ position: "absolute", inset: 0, backgroundImage: `url(${timelinePhoneImg})`, backgroundSize: "cover", backgroundPosition: "center" }} />
+                  <span style={{ position: "absolute", top: 16, left: 16, width: 34, height: 34, borderRadius: "50%", background: "#F4F2ED", color: "#0E7C68", fontWeight: 800, fontSize: 14, display: "flex", alignItems: "center", justifyContent: "center" }}>5</span>
+                  <span style={{ position: "absolute", bottom: 16, left: 16, width: 46, height: 46, borderRadius: "50%", background: "rgba(4,33,29,.72)", border: "1px solid rgba(94,234,212,.35)", display: "flex", alignItems: "center", justifyContent: "center" }}>
+                    <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#5EEAD4" strokeWidth="1.6"><path d="M7 4h9M7 8.4h9M13.5 4c2.4 0 3.6 1.6 3.6 3.4 0 2.2-1.7 3.6-4.4 3.6H7.6l7.6 9" strokeLinecap="round" strokeLinejoin="round" /></svg>
+                  </span>
+                </div>
+                <div style={{ display: "flex", justifyContent: "center" }}><span data-step-node style={{ width: 36, height: 36, borderRadius: "50%", border: "2px solid rgba(14,124,104,.3)", background: "#F4F2ED", color: "#0E7C68", fontWeight: 800, fontSize: 14, display: "flex", alignItems: "center", justifyContent: "center" }}>5</span></div>
+                <div data-step-text style={{ background: "#fff", border: "1px solid rgba(0,0,0,.07)", borderRadius: 18, padding: "clamp(22px,2.4vw,32px)" }}>
+                  <h3 style={{ fontFamily: "'Manrope', sans-serif", color: "#0B1A17", fontWeight: 800, fontSize: "clamp(19px,1.9vw,25px)", lineHeight: 1.25, letterSpacing: "-.02em" }}>Easy monthly rent payment on <span style={{ color: "#0E7C68" }}>autopay</span></h3>
+                  <p style={{ color: "#5C6B67", fontSize: 15, lineHeight: 1.55, marginTop: 12 }}>Set it once and relax. Never miss a rent payment again.</p>
+                </div>
+              </div>
+
+              <div data-step style={{ display: "grid", gridTemplateColumns: "1fr 76px 1fr", alignItems: "center" }}>
+                <div data-step-text style={{ background: "#fff", border: "1px solid rgba(0,0,0,.07)", borderRadius: 18, padding: "clamp(22px,2.4vw,32px)" }}>
+                  <h3 style={{ fontFamily: "'Manrope', sans-serif", color: "#0B1A17", fontWeight: 800, fontSize: "clamp(19px,1.9vw,25px)", lineHeight: 1.25, letterSpacing: "-.02em" }}>Our partners <span style={{ color: "#0E7C68" }}>furnish</span> the house according to your demand</h3>
+                  <p style={{ color: "#5C6B67", fontSize: 15, lineHeight: 1.55, marginTop: 12 }}>From a work corner to a party-ready living room, you ask, we deliver.</p>
+                </div>
+                <div style={{ display: "flex", justifyContent: "center" }}><span data-step-node style={{ width: 36, height: 36, borderRadius: "50%", border: "2px solid rgba(14,124,104,.3)", background: "#F4F2ED", color: "#0E7C68", fontWeight: 800, fontSize: 14, display: "flex", alignItems: "center", justifyContent: "center" }}>6</span></div>
+                <div data-step-media style={{ borderRadius: 18, overflow: "hidden", background: "#150C22", boxShadow: "0 22px 50px rgba(0,0,0,.14)", position: "relative", aspectRatio: "16/11" }}>
+                  <div style={{ position: "absolute", inset: 0, backgroundImage: `url(${livingRoomImg})`, backgroundSize: "cover", backgroundPosition: "center" }} />
+                  <span style={{ position: "absolute", top: 16, right: 16, width: 34, height: 34, borderRadius: "50%", background: "#F4F2ED", color: "#0E7C68", fontWeight: 800, fontSize: 14, display: "flex", alignItems: "center", justifyContent: "center" }}>6</span>
+                  <span style={{ position: "absolute", bottom: 16, left: 16, width: 46, height: 46, borderRadius: "50%", background: "rgba(21,12,34,.72)", border: "1px solid rgba(94,234,212,.35)", display: "flex", alignItems: "center", justifyContent: "center" }}>
+                    <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#5EEAD4" strokeWidth="1.6"><path d="M4 13v5h16v-5M5.5 13V9a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v4M3 13h18" strokeLinejoin="round" /></svg>
+                  </span>
+                </div>
+              </div>
+
             </div>
           </div>
         </div>
       </section>
 
-      {/* ── How the Magic happens ── */}
-      <section className="mz-wrap" style={{ paddingTop: 72 }}>
-        <Reveal>
-          <h2 className="mz-magic-h">How the <em>Magic</em> happens</h2>
-          <p className="mz-magic-sub">MovEazy understands you first, before finding your dream home</p>
-        </Reveal>
+      {/* ── STATS BAND ── */}
+      <section style={{ background: "#5EEAD4", color: "#04211D", padding: "clamp(56px,8vh,100px) clamp(20px,4vw,60px)" }}>
+        <div style={{ maxWidth: 1240, margin: "0 auto", display: "grid", gridTemplateColumns: "repeat(auto-fit,minmax(210px,1fr))", gap: "40px 28px" }}>
+          {[
+            { h: "1 Day", body: "to finalize a home, not a month" },
+            { h: "1 Agent", body: "personalized, to guide you everything in and around the city" },
+            { h: "Auto-Pay", body: "rent on autopay and no manual hassle" },
+            { h: "Your vibe", body: "personalized furnishing touch based on your vibe" },
+          ].map((s) => (
+            <div data-reveal key={s.h}>
+              <div style={{ fontWeight: 800, fontSize: "clamp(36px,4.6vw,66px)", lineHeight: 0.94, letterSpacing: "-.035em" }}>{s.h}</div>
+              <div style={{ fontWeight: 600, fontSize: 16, marginTop: 12, color: "#0B4A40", lineHeight: 1.4 }}>{s.body}</div>
+            </div>
+          ))}
+        </div>
       </section>
 
-      {/* ── The 3 Step Wonder ── */}
-      <section className="mz-wrap" style={{ paddingTop: 64 }}>
-        <Reveal><RuleHeading>The 3 Step Wonder</RuleHeading></Reveal>
-        <Reveal delay={0.08}>
-          <div className="mz-steps">
-            <div className="mz-step-card" style={{ backgroundImage: `url(${livingRoomImg})` }}>
-              <span className="mz-step-num">01</span>
-              <div className="mz-step-title">AI<br />Understands<br />You</div>
-            </div>
-            <div className="mz-step-card" style={{ backgroundImage: `url(${cityImg})` }}>
-              <span className="mz-step-num">02</span>
-              <div className="mz-step-title">Shortlist<br />Smart<br />Matches</div>
-            </div>
-            <div className="mz-step-card" style={{ backgroundImage: `url(${keysImg})` }}>
-              <span className="mz-step-num">03</span>
-              <div className="mz-step-title">Schedule<br />Smart<br />Visits</div>
-            </div>
+      {/* ── FINAL CTA ── */}
+      <section id="start" style={{ position: "relative", background: "#04211D", padding: "clamp(100px,17vh,200px) clamp(20px,4vw,60px)", textAlign: "center", overflow: "hidden" }}>
+        <div style={{ position: "absolute", inset: 0, background: "radial-gradient(80% 70% at 50% 20%, rgba(94,234,212,.16), transparent 60%)", zIndex: 0 }} />
+        <div data-reveal style={{ position: "relative", zIndex: 1, maxWidth: 900, margin: "0 auto" }}>
+          <div style={{ fontFamily: "'Caveat'", fontSize: "clamp(24px,2.4vw,32px)", color: "#E8A33D", marginBottom: 10 }}>Your adventure begins here</div>
+          <h2 style={{ fontFamily: "'Manrope', sans-serif", color: "#F1F6F4", fontWeight: 800, fontSize: "clamp(38px,7.4vw,112px)", lineHeight: 0.96, letterSpacing: "-.035em" }}>Your move<br />starts here.</h2>
+          <p style={{ color: "#9FB5B0", fontSize: "clamp(17px,1.6vw,21px)", margin: "26px auto 0", maxWidth: 560 }}>Whether you're listing a flat or looking for one, tell us where you're headed and we'll take it from there.</p>
+          <div style={{ display: "flex", flexWrap: "wrap", gap: 14, justifyContent: "center", marginTop: 38 }}>
+            <a href="#" onClick={(e) => { e.preventDefault(); startFlatSearch(); }} style={{ background: "#5EEAD4", color: "#04211D", fontWeight: 700, fontSize: 18, padding: "18px 36px", borderRadius: 100 }}>Start your move</a>
+            <a href="#" onClick={(e) => { e.preventDefault(); listMyFlat(); }} style={{ border: "1px solid rgba(255,255,255,.22)", color: "#F1F6F4", fontWeight: 600, fontSize: 18, padding: "18px 36px", borderRadius: 100 }}>List your flat</a>
           </div>
-        </Reveal>
+        </div>
       </section>
 
-      {/* ── How It Works ── */}
-      <section id="how" className="mz-wrap" style={{ paddingTop: 88, scrollMarginTop: 90 }}>
-        <Reveal><RuleHeading>How It Works</RuleHeading></Reveal>
-
-        {/* 1 — Create your profile */}
-        <Reveal>
-          <div className="mz-how-card">
-            <HowCardText
-              num="1"
-              title="Create your profile"
-              tagline="Tell us who you are — not just what you want."
-              body="Fill a 2-minute brief. Our AI goes deeper than filters: commute patterns, sunlight preferences, dealbreakers, and who you're moving in with."
-              checks={[
-                "AI learns from your answers in real time",
-                "Lifestyle preferences, not just bedroom count",
-                "Dealbreaker toggles so nothing slips through",
-                "Updates anytime — your profile grows with you",
-              ]}
-              statBig="1 min"
-              statSmall="to complete"
-            />
-            <div className="mz-how-visual">
-              <div className="mz-chat-wrap">
-                <div className="mz-chat">
-                  <div className="mz-chat-head">
-                    <span className="mz-chat-avatar">🏠</span>
-                    <div>
-                      <div className="mz-chat-name">AI Assistant</div>
-                      <div className="mz-chat-status">Online · Ready to help</div>
-                    </div>
-                  </div>
-                  <div className="mz-chat-body">
-                    <div className="mz-bubble mz-bubble-bot">How furnished should it be when you walk in?</div>
-                    <div className="mz-pills">
-                      <span className="mz-pill">Unfurnished</span>
-                      <span className="mz-pill">Semi-furnished</span>
-                      <span className="mz-pill">Fully furnished</span>
-                    </div>
-                    <div className="mz-bubble mz-bubble-user">Fully furnished</div>
-                    <div className="mz-bubble mz-bubble-bot">Who's this home for, and is a pet joining you?</div>
-                    <div className="mz-bubble mz-bubble-user">Bachelor(s)</div>
-                    <div className="mz-bubble mz-bubble-bot">What's your upper limit on rent?</div>
-                    <div className="mz-bubble mz-bubble-user">₹40,000</div>
-                  </div>
-                </div>
-                <div className="mz-gathered">
-                  <div className="mz-gathered-title">This is What I Gathered From Your Inputs!</div>
-                  <div className="mz-gathered-row"><span>Area</span><span>HSR Layout</span></div>
-                  <div className="mz-gathered-row"><span>Home Size</span><span>2 BHK</span></div>
-                  <div className="mz-gathered-row"><span>Furnishing</span><span>Fully Furnished</span></div>
-                  <div className="mz-gathered-row"><span>Who's moving in?</span><span>Bachelors</span></div>
-                  <div className="mz-gathered-row"><span>Budget</span><span>₹40,000</span></div>
-                  <div className="mz-gathered-row"><span>Move-in</span><span>30 June 2026</span></div>
-                  <button type="button" className="mz-gathered-btn">View Matched Listings →</button>
-                </div>
-              </div>
-            </div>
-          </div>
-        </Reveal>
-
-        {/* 2 — Get AI Recommendations */}
-        <Reveal>
-          <div className="mz-how-card">
-            <HowCardText
-              num="2"
-              title="Get AI Recommendations"
-              tagline="Around 6 homes we'd stake our reputation on"
-              body="Our AI scores every listing on the several parameters set stringently by our users. We stay true and loyal to the criteria."
-              checks={[
-                "HomeScore breakdown for every property",
-                "No irrelevant listings, ever",
-                "Photos, rent split, and honest observations",
-                "Refreshed as new properties go live",
-              ]}
-              statBig="3 min"
-              statSmall="to complete"
-            />
-            <div className="mz-how-visual">
-              <div className="mz-matches">
-                <div className="mz-match-label">High Matches</div>
-                <MatchRow img={livingRoomImg} pct="97%" title="Sunny 2BHK, 9th floor" meta="HSR Layout, 6th Block, Bengaluru" price="₹28,000" />
-                <div className="mz-match-label">Mid Matches</div>
-                <MatchRow img={sofaImg} pct="82%" title="2BHK in gated society" meta="HSR Layout, 7th Block, Bengaluru" price="₹66,000" />
-                <div className="mz-match-label">Low Matches</div>
-                <MatchRow img={keysImg} pct="71%" title="Cosy 1BHK, west-facing" meta="Indiranagar, 4th Cross, Bengaluru" price="₹19,000" />
-              </div>
-            </div>
-          </div>
-        </Reveal>
-
-        {/* 3 — Schedule Smart Visits */}
-        <Reveal>
-          <div className="mz-how-card">
-            <HowCardText
-              num="3"
-              title="Schedule Smart Visits"
-              tagline="See your top picks in four hours"
-              body="We coordinate with agents and build a smart route so you visit all your shortlisted homes back-to-back. No back-and-forth, no wasted weekends."
-              checks={[
-                "Visit as per your date and time of convenience",
-                "Visit notes captured automatically",
-                "Reschedule in seconds if plans change",
-              ]}
-              statBig="1 trip"
-              statSmall="all visits"
-            />
-            <div className="mz-how-visual">
-              <div className="mz-sched">
-                <div className="mz-sched-panel">
-                  <div className="mz-sched-head">
-                    <span>Saturday, 5 July</span>
-                    <span>3 visits · 2.5 hrs total</span>
-                  </div>
-                  <div className="mz-visit">
-                    <div className="mz-visit-date">JUL<b>5</b></div>
-                    <div className="mz-visit-info">
-                      <div className="mz-visit-title">Viewing Today</div>
-                      <div className="mz-visit-sub">Bannerghatta flat at 3:00 PM</div>
-                      <div className="mz-visit-link">Add to calendar ›</div>
-                    </div>
-                  </div>
-                  <div className="mz-visit">
-                    <div className="mz-visit-date">JUL<b>5</b></div>
-                    <div className="mz-visit-info">
-                      <div className="mz-visit-title">Viewing Today</div>
-                      <div className="mz-visit-sub">Grand Villa, Whitefield at 3:00 PM</div>
-                      <div className="mz-visit-link">Add to calendar ›</div>
-                    </div>
-                  </div>
-                  <div className="mz-visit" style={{ marginBottom: 0 }}>
-                    <div className="mz-visit-date">JUL<b>6</b></div>
-                    <div className="mz-visit-info">
-                      <div className="mz-visit-title">Viewing Tomorrow</div>
-                      <div className="mz-visit-sub">3 BHK, JP Nagar at 3:00 PM</div>
-                      <div className="mz-visit-link">Add to calendar ›</div>
-                    </div>
-                  </div>
-                </div>
-                <div className="mz-sched-note">📍 Smart route optimised : see all 3 in one afternoon</div>
-              </div>
-            </div>
-          </div>
-        </Reveal>
-
-        {/* 4 — Move in happy */}
-        <Reveal>
-          <div className="mz-how-card" style={{ marginBottom: 0 }}>
-            <HowCardText
-              num="4"
-              title="Move in happy"
-              tagline="Tenant to tenant agreement and trust. Safe and no drama."
-              body="The process ends with the trust between two verified tenants, where there is no mal intentions involved; just honest reviews and tips to make your story in your new home!"
-              checks={[
-                "Verified Tenants",
-                "Verified listings through broker/tenant",
-                "Seamless move in",
-                "Calculated decision",
-              ]}
-              statBig="0"
-              statSmall="Confusion"
-            />
-            <div className="mz-how-visual">
-              <div className="mz-movein">
-                <div className="mz-allset">
-                  <div style={{ fontSize: 16 }}>🎉</div>
-                  <div className="mz-allset-title">You're all set!</div>
-                  <div className="mz-allset-sub">Move-in date: 15 July 2026</div>
-                </div>
-                <div className="mz-checkcard">
-                  <div className="mz-checkcard-label">HANDOVER CHECKLIST</div>
-                  {[
-                    "Everything is as shown on platform",
-                    "Previous tenant verified",
-                    "Keys handed over",
-                    "Move-in checklist shared",
-                  ].map((row) => (
-                    <div key={row} className="mz-checkcard-row">
-                      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.6" width="12" height="12"><path d="M4 12l5 5L20 7" /></svg>
-                      {row}
-                    </div>
-                  ))}
-                </div>
-                <div className="mz-verified-pill">🛡️ Verified tenant-to-tenant handover</div>
-              </div>
-            </div>
-          </div>
-        </Reveal>
-      </section>
-
-      {/* ── The Listing Advantage ── */}
-      <section className="mz-wrap" style={{ paddingTop: 88 }}>
-        <Reveal><RuleHeading>The Listing Advantage</RuleHeading></Reveal>
-        <Reveal delay={0.06}>
-          <div className="mz-adv-grid">
-            <div className="mz-adv-card" style={{ background: "#8E2F28" }}>
-              <h3 className="mz-adv-title">You list your flat</h3>
-              <p className="mz-adv-body">Post your home in minutes with photos, rent split, and honest notes — your Trust Passport verification carries straight over.</p>
-            </div>
-            <div className="mz-adv-card" style={{ background: "#C0473F" }}>
-              <h3 className="mz-adv-title">We find your match</h3>
-              <p className="mz-adv-body">Our AI matches your flat to verified seekers whose preferences actually fit — no broker spam, no strangers at the door.</p>
-            </div>
-            <div className="mz-adv-card" style={{ background: "#A93E37" }}>
-              <h3 className="mz-adv-title">Instant Credits</h3>
-              <p className="mz-adv-body">Get rewarded for passing your flat forward. Earn credits the moment your verified handover completes.</p>
-            </div>
-            <div className="mz-adv-card" style={{ background: "#701F1A" }}>
-              <h3 className="mz-adv-title">We share your profile</h3>
-              <p className="mz-adv-body">Your verified tenant profile travels with you — landlords and societies see your history upfront, so approvals move faster.</p>
-            </div>
-          </div>
-        </Reveal>
-      </section>
-
-      {/* ── Testimonials ── */}
-      <section className="mz-wrap" style={{ paddingTop: 88 }}>
-        <Reveal><RuleHeading>Hear Testimonials</RuleHeading></Reveal>
-        <Reveal delay={0.06}>
-          <div className="mz-testi-grid">
-            <div className="mz-testi-card">
-              <div className="mz-testi-head">
-                <img className="mz-testi-avatar" src={avatarA} alt="" />
-                <div>
-                  <div className="mz-testi-name">Aditi R.</div>
-                  <div className="mz-testi-stars">★★★★★</div>
-                </div>
-              </div>
-              <p className="mz-testi-quote">
-                Found my 2BHK in HSR in a single afternoon. The AI shortlist was scarily accurate — every home matched what I actually asked for.
-              </p>
-            </div>
-            <div className="mz-testi-card">
-              <div className="mz-testi-head">
-                <img className="mz-testi-avatar" src={avatarB} alt="" />
-                <div>
-                  <div className="mz-testi-name">Karthik S.</div>
-                  <div className="mz-testi-stars">★★★★★</div>
-                </div>
-              </div>
-              <p className="mz-testi-quote">
-                Passed my flat to a verified tenant in a week — no broker, no relisting. The handover checklist made move-out completely painless.
-              </p>
-            </div>
-            <div className="mz-testi-card">
-              <div className="mz-testi-head">
-                <img className="mz-testi-avatar" src={avatarC} alt="" />
-                <div>
-                  <div className="mz-testi-name">Sneha M.</div>
-                  <div className="mz-testi-stars">★★★★☆</div>
-                </div>
-              </div>
-              <p className="mz-testi-quote">
-                The smart visit route saved my weekend — saw all three shortlisted homes back-to-back and signed the same evening.
-              </p>
-            </div>
-          </div>
-        </Reveal>
-      </section>
-
-      {/* ── Footer ── */}
-      <footer id="footer" className="mz-footer" style={{ scrollMarginTop: 90 }}>
-        <div className="mz-footer-inner">
-          <div className="mz-footer-top">
-            <div>
-              <div className="mz-footer-brand">Mov<span style={{ color: "#ef5a45" }}>Eazy</span></div>
-              <p className="mz-footer-tag">
-                Bangalore rentals, verified both ways — so nobody has to guess who they're renting from, or to.
-              </p>
-            </div>
-            <div className="mz-footer-cols">
-              <div>
-                <div className="mz-footer-col-h">PRODUCT</div>
-                <a href="#how" className="mz-footer-link">How it works</a>
-                <button type="button" className="mz-footer-link" onClick={startFlatSearch}>Find a flat</button>
-                <button type="button" className="mz-footer-link" onClick={listMyFlat}>List my flat</button>
-              </div>
-              <div>
-                <div className="mz-footer-col-h">ACCOUNT</div>
-                {user ? (
-                  <Link to="/profile" className="mz-footer-link">My profile</Link>
-                ) : (
-                  <button type="button" className="mz-footer-link" onClick={() => openLogin()}>Sign in</button>
-                )}
-                <button type="button" className="mz-footer-link" onClick={() => (user ? navigate("/profile") : openLogin(() => navigate("/profile")))}>Dashboard</button>
-              </div>
-              <div>
-                <div className="mz-footer-col-h">COMPANY</div>
-                <a href="#footer" className="mz-footer-link">About us</a>
-                <a href="mailto:hello@moveeazy.in" className="mz-footer-link">Contact</a>
-              </div>
-            </div>
-          </div>
-
-          <div className="mz-footer-cta">
-            <h3 className="mz-footer-cta-h">Ready to find or pass your home?</h3>
-            <div className="mz-footer-btns">
-              <button type="button" className="mz-footer-btn-solid" onClick={startFlatSearch}>Show me flats</button>
-              <button type="button" className="mz-footer-btn-line" onClick={listMyFlat}>List my Flat</button>
-            </div>
-          </div>
-
-          <div className="mz-footer-base">
-            <span>© 2026 MovEazy · Bengaluru</span>
-            <span>Verified both ways.</span>
-          </div>
+      {/* ── FOOTER ── */}
+      <footer style={{ background: "#031916", borderTop: "1px solid rgba(255,255,255,.08)", padding: "44px clamp(20px,4vw,60px)", display: "flex", flexWrap: "wrap", gap: 20, justifyContent: "space-between", alignItems: "center" }}>
+        <div style={{ fontWeight: 800, fontSize: 20 }}>mov<span style={{ color: "#5EEAD4" }}>EAZY</span></div>
+        <div style={{ color: "#6a8b84", fontSize: 14 }}>Redefining how people move into new cities.</div>
+        <div style={{ display: "flex", gap: 22 }}>
+          <a href="#" onClick={(e) => { e.preventDefault(); startFlatSearch(); }} style={{ color: "#9FB5B0", fontSize: 14 }}>Find a home</a>
+          <a href="#" onClick={(e) => { e.preventDefault(); listMyFlat(); }} style={{ color: "#9FB5B0", fontSize: 14 }}>List a flat</a>
+          <Link to="/how-it-works" style={{ color: "#9FB5B0", fontSize: 14 }}>How it works</Link>
         </div>
       </footer>
 
-      {/* ── "How do you want to search?" choice popup ── */}
+      {/* ── "How do you want to search?" choice popup (app flow, recoloured to the new palette) ── */}
+      <style>{`
+        .mzn-choice-card { position: relative; width: 100%; max-width: 640px; background: #fff; border-radius: 28px; padding: clamp(28px,4vw,44px); box-shadow: 0 24px 60px rgba(0,15,21,0.24); font-family: 'Manrope', sans-serif; }
+        .mzn-choice-close { position: absolute; top: 16px; right: 16px; width: 34px; height: 34px; border-radius: 50%; border: 1px solid #D5D8DA; background: #fff; color: #6C7A77; display: flex; align-items: center; justify-content: center; cursor: pointer; font-size: 18px; }
+        .mzn-choice-eyebrow { font-size: 11.5px; font-weight: 700; letter-spacing: 0.16em; text-transform: uppercase; color: #0E7C68; margin-bottom: 10px; }
+        .mzn-choice-title { font-size: clamp(22px,3vw,28px); font-weight: 800; color: #0B1A17; margin: 0 0 8px; }
+        .mzn-choice-sub { font-size: 13.5px; color: #6C7A77; margin: 0 0 26px; }
+        .mzn-choice-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+        .mzn-choice-opt { position: relative; text-align: left; border-radius: 20px; padding: 22px 20px; cursor: pointer; font-family: inherit; display: flex; flex-direction: column; gap: 10px; transition: transform 0.15s ease, box-shadow 0.15s ease; border: none; }
+        .mzn-choice-opt:hover { transform: translateY(-3px); }
+        .mzn-choice-opt-plain { background: #fff; border: 1.5px solid #D5D8DA; color: #0B1A17; }
+        .mzn-choice-opt-plain:hover { border-color: #6C7A77; }
+        .mzn-choice-opt-hero { background: linear-gradient(155deg, #0E7C68 0%, #031916 100%); border: 1.5px solid transparent; color: #F1F6F4; box-shadow: 0 12px 32px rgba(0,15,21,0.16); transform: scale(1.03); }
+        .mzn-choice-opt-hero:hover { transform: scale(1.03) translateY(-3px); }
+        .mzn-choice-badge { position: absolute; top: -11px; right: 16px; background: #5EEAD4; color: #04211D; font-size: 10px; font-weight: 700; letter-spacing: 0.08em; text-transform: uppercase; padding: 5px 12px; border-radius: 999px; box-shadow: 0 4px 10px rgba(0,0,0,0.25); }
+        .mzn-choice-icon { width: 42px; height: 42px; border-radius: 12px; display: flex; align-items: center; justify-content: center; }
+        .mzn-choice-opt-plain .mzn-choice-icon { background: #E4FBF6; color: #0E7C68; }
+        .mzn-choice-opt-hero .mzn-choice-icon { background: rgba(255,255,255,0.2); color: #F1F6F4; }
+        .mzn-choice-opt-title { font-size: 17px; font-weight: 700; }
+        .mzn-choice-opt-body { font-size: 12.5px; line-height: 1.55; }
+        .mzn-choice-opt-plain .mzn-choice-opt-body { color: #6C7A77; }
+        .mzn-choice-opt-hero .mzn-choice-opt-body { color: rgba(255,255,255,0.9); }
+        .mzn-choice-opt-cta { margin-top: 4px; font-size: 12.5px; font-weight: 700; display: inline-flex; align-items: center; gap: 6px; }
+        .mzn-choice-opt-plain .mzn-choice-opt-cta { color: #0E7C68; }
+        .mzn-choice-opt-hero .mzn-choice-opt-cta { color: #F1F6F4; }
+        @media (max-width: 640px) {
+          .mzn-choice-grid { grid-template-columns: 1fr; }
+          .mzn-choice-opt-hero { transform: none; }
+          .mzn-choice-opt-hero:hover { transform: translateY(-3px); }
+        }
+      `}</style>
       <AnimatePresence>
         {showChoice && (
           <motion.div
@@ -767,40 +751,35 @@ export default function ForkHome() {
             exit={{ opacity: 0 }}
             transition={{ duration: 0.2 }}
             onClick={() => setShowChoice(false)}
-            style={{
-              position: "fixed", inset: 0,
-              background: "rgba(20, 20, 16, 0.6)",
-              display: "flex", alignItems: "center", justifyContent: "center",
-              zIndex: 1000, padding: 16,
-            }}
+            style={{ position: "fixed", inset: 0, background: "rgba(4,33,29,0.6)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 1000, padding: 16 }}
           >
             <motion.div
               initial={{ opacity: 0, scale: 0.94, y: 18 }}
               animate={{ opacity: 1, scale: 1, y: 0 }}
               exit={{ opacity: 0, scale: 0.94, y: 18 }}
-              transition={{ duration: 0.22, ease: EASE }}
-              className="mz-choice-card"
+              transition={{ duration: 0.22, ease: CHOICE_EASE }}
+              className="mzn-choice-card"
               onClick={(e) => e.stopPropagation()}
             >
-              <button type="button" className="mz-choice-close" onClick={() => setShowChoice(false)} aria-label="Close">×</button>
-              <div className="mz-choice-eyebrow">Find your next home</div>
-              <h2 className="mz-choice-title">How do you want to search?</h2>
-              <p className="mz-choice-sub">Pick whichever fits how you like to look for a place.</p>
+              <button type="button" className="mzn-choice-close" onClick={() => setShowChoice(false)} aria-label="Close">&times;</button>
+              <div className="mzn-choice-eyebrow">Find your next home</div>
+              <h2 className="mzn-choice-title">How do you want to search?</h2>
+              <p className="mzn-choice-sub">Pick whichever fits how you like to look for a place.</p>
 
-              <div className="mz-choice-grid">
-                <button type="button" className="mz-choice-opt mz-choice-opt-plain" onClick={chooseMap}>
-                  <span className="mz-choice-icon"><MapPinIcon /></span>
-                  <span className="mz-choice-opt-title">Explore map-based listings</span>
-                  <span className="mz-choice-opt-body">Browse verified flats on a live map and filter by area yourself.</span>
-                  <span className="mz-choice-opt-cta">Open map <ArrowIcon /></span>
+              <div className="mzn-choice-grid">
+                <button type="button" className="mzn-choice-opt mzn-choice-opt-plain" onClick={chooseMap}>
+                  <span className="mzn-choice-icon"><MapPinIcon /></span>
+                  <span className="mzn-choice-opt-title">Explore map-based listings</span>
+                  <span className="mzn-choice-opt-body">Browse verified flats on a live map and filter by area yourself.</span>
+                  <span className="mzn-choice-opt-cta">Open map <ArrowIcon /></span>
                 </button>
 
-                <button type="button" className="mz-choice-opt mz-choice-opt-hero" onClick={chooseAgent}>
-                  <span className="mz-choice-badge">Recommended</span>
-                  <span className="mz-choice-icon"><SparkleIcon /></span>
-                  <span className="mz-choice-opt-title">Get my free online agent</span>
-                  <span className="mz-choice-opt-body">Answer a few quick questions and let our AI match you to the best verified homes — free.</span>
-                  <span className="mz-choice-opt-cta">Start free <ArrowIcon /></span>
+                <button type="button" className="mzn-choice-opt mzn-choice-opt-hero" onClick={chooseAgent}>
+                  <span className="mzn-choice-badge">Recommended</span>
+                  <span className="mzn-choice-icon"><SparkleIcon /></span>
+                  <span className="mzn-choice-opt-title">Get my free online agent</span>
+                  <span className="mzn-choice-opt-body">Answer a few quick questions and let our AI match you to the best verified homes — free.</span>
+                  <span className="mzn-choice-opt-cta">Start free <ArrowIcon /></span>
                 </button>
               </div>
             </motion.div>
