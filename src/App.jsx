@@ -17,6 +17,7 @@ const AdminDatabase = lazy(() => import("./pages/AdminDatabase"));
 const Recommendations = lazy(() => import("./pages/Recommendations"));
 const Visits = lazy(() => import("./pages/Visits"));
 const BrokerRegister = lazy(() => import("./pages/BrokerRegister"));
+const MyProperties = lazy(() => import("./pages/MyProperties"));
 
 function PageLoader() {
   return (
@@ -70,6 +71,7 @@ function AppRoutes() {
         <Route path="/admin" element={<AdminDatabase />} />
         <Route path="/recommendations" element={<Recommendations />} />
         <Route path="/register-broker" element={<BrokerRegister />} />
+        <Route path="/my-properties" element={<MyProperties />} />
         <Route
           path="/visits"
           element={

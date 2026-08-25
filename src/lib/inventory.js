@@ -139,6 +139,36 @@ export async function fetchPublishedInventory({ limit = 500 } = {}) {
 }
 
 /**
+ * Every property the signed-in user has posted, newest first — whatever role they
+ * posted as (owner / tenant / broker) and whatever its status.
+ *
+ * No extra grants are needed: the inventory read policy already allows
+ * `poster_id = auth.uid()`, so a poster sees their own rows even while paused or
+ * rented, and still cannot see anyone else's unpublished stock.
+ */
+export async function fetchMyInventory(uid) {
+  if (!isSupabaseConfigured || !supabase || !uid) return [];
+  const { data, error } = await supabase
+    .from("inventory")
+    .select("*")
+    .eq("poster_id", uid)
+    .order("created_at", { ascending: false });
+  if (error) return [];
+  return data || [];
+}
+
+/** Cheap count for deciding whether to surface "My Properties" in the nav. */
+export async function countMyInventory(uid) {
+  if (!isSupabaseConfigured || !supabase || !uid) return 0;
+  const { count, error } = await supabase
+    .from("inventory")
+    .select("property_id", { count: "exact", head: true })
+    .eq("poster_id", uid);
+  if (error) return 0;
+  return count || 0;
+}
+
+/**
  * Adapt a published inventory row (snake_case DB shape) to the listing shape the
  * map/discovery UI expects (l.bhk, l.price, l.seller, l.image, …), so user-uploaded
  * homes appear on the map alongside the static feed.
@@ -183,6 +213,25 @@ export function mapInventoryToListing(row) {
 export async function fetchInventoryAsListings(opts = {}) {
   const rows = await fetchPublishedInventory(opts);
   return rows.map(mapInventoryToListing).filter((l) => l && Number.isFinite(l.lat) && Number.isFinite(l.lng));
+}
+
+/**
+ * Change a listing's status. RLS ("posters update own inventory") lets the poster
+ * (or an admin) do this. Setting anything other than 'published' removes it from the
+ * public map/discovery (which read `status = 'published'`).
+ */
+export async function setInventoryStatus(propertyId, status) {
+  if (!isSupabaseConfigured || !supabase) throw new Error("Supabase is not configured");
+  const { error } = await supabase
+    .from("inventory")
+    .update({ status, updated_at: new Date().toISOString() })
+    .eq("property_id", propertyId);
+  if (error) throw error;
+}
+
+/** Mark a property as sold/closed — removes it from the public platform. Reversible via setInventoryStatus(id, 'published'). */
+export async function markInventorySold(propertyId) {
+  return setInventoryStatus(propertyId, "sold");
 }
 
 /** Every saved customer search profile (the demand side) for matching. */

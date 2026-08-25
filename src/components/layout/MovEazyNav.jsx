@@ -5,7 +5,7 @@
  * Every page renders this so the navigation is identical site-wide. It carries
  * its own <style> block and scroll listener, so a page only has to drop it in.
  *
- * @param {"home"|"how"|"about"|"register-broker"|""} active — link to highlight
+ * @param {"home"|"how"|"about"|"register-broker"|"my-properties"|""} active — link to highlight
  * @param {boolean} transparentAtTop — true only on the dark hero home page, where
  *   the bar starts see-through and fades in a background as you scroll. Every
  *   other page keeps the solid bar so the light-background pages stay readable.
@@ -21,6 +21,7 @@ import { Link, useNavigate, useLocation } from "react-router-dom";
 import { useAuth } from "../../context/AuthContext";
 import { useLoginModal } from "../../context/LoginModalContext";
 import { useVisitCart } from "../../context/VisitCartContext";
+import { countMyInventory } from "../../lib/inventory";
 import logoMint from "../../assets/logo/moveazy-logo-mint-dark.png";
 
 const LINK_BASE = {
@@ -75,6 +76,7 @@ export default function MovEazyNav({ active = "", transparentAtTop = false, onFi
   const [scrolled, setScrolled] = useState(false);
   const navRef = useRef(null);
   const [navH, setNavH] = useState(72);
+  const [hasProperties, setHasProperties] = useState(false);
 
   // Close the sheet whenever the route changes.
   useEffect(() => { setMenuOpen(false); }, [location.pathname]);
@@ -103,6 +105,13 @@ export default function MovEazyNav({ active = "", transparentAtTop = false, onFi
     window.addEventListener("resize", onScroll);
     return () => { window.removeEventListener("scroll", onScroll); window.removeEventListener("resize", onScroll); };
   }, []);
+
+  useEffect(() => {
+    let alive = true;
+    if (!user?.uid) { setHasProperties(false); return undefined; }
+    countMyInventory(user.uid).then((n) => { if (alive) setHasProperties(n > 0); });
+    return () => { alive = false; };
+  }, [user]);
 
   useEffect(() => {
     const el = navRef.current;
@@ -235,6 +244,9 @@ export default function MovEazyNav({ active = "", transparentAtTop = false, onFi
             <Link to="/register-broker" className="mzn-nav-link" style={{ ...(active === "register-broker" ? LINK_ACTIVE : LINK_BASE), display: "flex", alignItems: "center", gap: 6 }}>
               Register as a Broker<span className="mzn-badge-new">new</span>
             </Link>
+            {hasProperties && (
+              <Link to="/my-properties" className="mzn-nav-link" style={active === "my-properties" ? LINK_ACTIVE : LINK_BASE}>My Properties</Link>
+            )}
           </div>
 
           <div className="mzn-nav-account" style={{ display: "flex", alignItems: "center", gap: 10, flex: "none" }}>
@@ -293,6 +305,9 @@ export default function MovEazyNav({ active = "", transparentAtTop = false, onFi
             <Link to="/register-broker" className={`mzn-sheet-link ${active === "register-broker" ? "is-active" : ""}`}>
               Register as a Broker<span className="mzn-badge-new">new</span>
             </Link>
+            {hasProperties && (
+              <Link to="/my-properties" className={`mzn-sheet-link ${active === "my-properties" ? "is-active" : ""}`}>My Properties</Link>
+            )}
             {cartCount > 0 && (
               <button type="button" className="mzn-sheet-link" onClick={closeThen(() => navigate("/visits"))}>Site visits ({cartCount})</button>
             )}
