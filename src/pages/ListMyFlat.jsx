@@ -763,6 +763,33 @@ function Row({ k, v, mono }) {
   );
 }
 
+const toMin = (hhmm) => {
+  // Number("") is 0, so an empty <input type="time"> would otherwise read as
+  // midnight and silently generate a full day of slots — demand real HH:MM.
+  const m = /^(\d{1,2}):(\d{2})$/.exec(String(hhmm ?? "").trim());
+  if (!m) return NaN;
+  const h = Number(m[1]), min = Number(m[2]);
+  return h > 23 || min > 59 ? NaN : h * 60 + min;
+};
+const toHHMM = (mins) => `${String(Math.floor(mins / 60)).padStart(2, "0")}:${String(mins % 60).padStart(2, "0")}`;
+
+/**
+ * property_visit_slots stores one timestamp per bookable slot (no end column),
+ * so a "10:00-13:00" window is saved as the individual start times inside it.
+ * That keeps seekers booking a precise time instead of a vague range.
+ */
+function buildTimes(from, to, stepMin) {
+  const a = toMin(from), b = toMin(to);
+  if (!Number.isFinite(a) || !Number.isFinite(b) || !stepMin || b <= a) return [];
+  const out = [];
+  for (let t = a; t + stepMin <= b; t += stepMin) out.push(toHHMM(t));
+  return out;
+}
+const fmtDateChip = (ymd) =>
+  ymd ? new Date(`${ymd}T00:00`).toLocaleDateString("en-IN", { weekday: "short", day: "numeric", month: "short" }) : "";
+const fmtTimeOnly = (iso) =>
+  iso ? new Date(iso).toLocaleTimeString("en-IN", { hour: "numeric", minute: "2-digit", hour12: true }) : "";
+
 const fmtSlot = (iso) =>
   iso ? new Date(iso).toLocaleString("en-IN", { weekday: "short", day: "numeric", month: "short", hour: "numeric", minute: "2-digit", hour12: true }) : "";
 
@@ -772,8 +799,12 @@ const fmtSlot = (iso) =>
  */
 function PropertyLeadDashboard({ propertyId, listingTitle, leads = [], walletAmount, rewardEligible, onClose }) {
   const [slots, setSlots] = useState([]);
-  const [when, setWhen] = useState("");
+  const [fromT, setFromT] = useState("10:00");
+  const [toT, setToT] = useState("13:00");
+  const [every, setEvery] = useState(60);
   const [capacity, setCapacity] = useState(5);
+  const [dates, setDates] = useState([]);
+  const [dateDraft, setDateDraft] = useState("");
   const [busy, setBusy] = useState(false);
   const [msg, setMsg] = useState({ type: "", text: "" });
 
@@ -783,19 +814,61 @@ function PropertyLeadDashboard({ propertyId, listingTitle, leads = [], walletAmo
   // eslint-disable-next-line react-hooks/exhaustive-deps
   useEffect(() => { if (propertyId) loadSlots(); }, [propertyId]);
 
-  const addSlot = async () => {
+  const times = useMemo(() => buildTimes(fromT, toT, every), [fromT, toT, every]);
+  const willCreate = times.length * dates.length;
+  const todayYMD = new Date().toISOString().slice(0, 10);
+
+  const addDate = () => {
+    if (!dateDraft) return;
+    setDates((d) => (d.includes(dateDraft) ? d : [...d, dateDraft].sort()));
+    setDateDraft("");
+  };
+
+  // One time window applied across every date the poster picked, then the form
+  // resets so another window can be added on top.
+  const addSlotGroup = async () => {
     setMsg({ type: "", text: "" });
-    if (!when) { setMsg({ type: "err", text: "Pick a date & time first." }); return; }
+    if (!times.length) { setMsg({ type: "err", text: "The end time needs to be later than the start time." }); return; }
+    if (!dates.length) { setMsg({ type: "err", text: "Add at least one date for this time slot." }); return; }
     setBusy(true);
+    let added = 0, skipped = 0;
     try {
-      await addVisitSlot(propertyId, new Date(when).toISOString(), capacity);
-      setWhen("");
+      for (const d of dates) {
+        for (const t of times) {
+          try {
+            await addVisitSlot(propertyId, new Date(`${d}T${t}`).toISOString(), capacity);
+            added += 1;
+          } catch (e) {
+            // (property_id, slot_at) is unique - a time that already exists is
+            // not a failure, just nothing to do.
+            const m = String(e?.message || "").toLowerCase();
+            if (m.includes("duplicate") || m.includes("unique")) skipped += 1;
+            else throw e;
+          }
+        }
+      }
       await loadSlots();
-      setMsg({ type: "ok", text: "Visit time added." });
+      setDates([]);
+      setMsg({ type: "ok", text: `Added ${added} visit time${added === 1 ? "" : "s"}${skipped ? ` · ${skipped} already existed` : ""}. Add another time slot below if you like.` });
     } catch (e) {
-      setMsg({ type: "err", text: e?.message?.includes("row-level") ? "This account can't add slots yet — our team will set them up when they call you." : (e?.message || "Could not add this time.") });
+      setMsg({ type: "err", text: e?.message?.includes("row-level") ? "This account can't add slots yet — our team will set them up when they call you." : (e?.message || "Could not add these times.") });
     } finally { setBusy(false); }
   };
+
+  const grouped = useMemo(() => {
+    const byDay = new Map();
+    for (const s of slots) {
+      const iso = s.slot_at || s.slotAt || s.when;
+      if (!iso) continue;
+      const d = new Date(iso);
+      const key = d.toISOString().slice(0, 10);
+      if (!byDay.has(key)) byDay.set(key, []);
+      byDay.get(key).push({ ...s, _iso: iso, _t: d.getTime() });
+    }
+    return [...byDay.entries()]
+      .map(([key, items]) => ({ key, items: items.sort((a, b) => a._t - b._t) }))
+      .sort((a, b) => a.items[0]._t - b.items[0]._t);
+  }, [slots]);
 
   const removeSlot = async (id) => {
     setBusy(true);
@@ -847,36 +920,110 @@ function PropertyLeadDashboard({ propertyId, listingTitle, leads = [], walletAmo
         <div className="p-6">
           <p className="text-[14px] font-extrabold text-gray-900 mb-1">Visit times</p>
           <p className="text-[12px] text-gray-500 mb-4">Add the slots when seekers can come see this home. They'll be able to book these.</p>
-          <div className="grid grid-cols-1 sm:grid-cols-[1fr_auto_auto] gap-3 items-end">
-            <div>
-              <Label>Date &amp; time</Label>
-              <input type="datetime-local" value={when} onChange={(e) => setWhen(e.target.value)} className={inp} />
+          <div className="rounded-2xl border border-gray-200 p-4 sm:p-5">
+            <p className="text-[12px] font-bold uppercase tracking-wide text-gray-400 mb-3">Add a time slot</p>
+
+            <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+              <div>
+                <Label>From</Label>
+                <input type="time" value={fromT} onChange={(e) => setFromT(e.target.value)} className={inp} />
+              </div>
+              <div>
+                <Label>To</Label>
+                <input type="time" value={toT} onChange={(e) => setToT(e.target.value)} className={inp} />
+              </div>
+              <div>
+                <Label>Each visit</Label>
+                <select value={every} onChange={(e) => setEvery(Number(e.target.value))} className={inp}>
+                  {[15, 30, 45, 60, 90, 120].map((n) => (
+                    <option key={n} value={n}>{n < 60 ? `${n} min` : n === 60 ? "1 hour" : `${n / 60} hours`}</option>
+                  ))}
+                </select>
+              </div>
+              <div>
+                <Label>Seats</Label>
+                <select value={capacity} onChange={(e) => setCapacity(Number(e.target.value))} className={inp}>
+                  {[1, 2, 3, 4, 5, 8, 10].map((n) => <option key={n} value={n}>{n}</option>)}
+                </select>
+              </div>
             </div>
-            <div>
-              <Label>Seats</Label>
-              <select value={capacity} onChange={(e) => setCapacity(Number(e.target.value))} className={inp}>
-                {[1, 2, 3, 4, 5, 8, 10].map((n) => <option key={n} value={n}>{n}</option>)}
-              </select>
+
+            <div className="mt-4">
+              <Label>Dates for this time slot</Label>
+              <div className="flex gap-2">
+                <input
+                  type="date"
+                  min={todayYMD}
+                  value={dateDraft}
+                  onChange={(e) => setDateDraft(e.target.value)}
+                  onKeyDown={(e) => { if (e.key === "Enter") { e.preventDefault(); addDate(); } }}
+                  className={inp}
+                />
+                <button type="button" onClick={addDate} disabled={!dateDraft}
+                  className="h-[46px] shrink-0 px-4 rounded-xl text-[13px] font-bold border border-gray-200 text-gray-700 hover:bg-gray-50 disabled:opacity-50">
+                  + Add date
+                </button>
+              </div>
+
+              {dates.length > 0 && (
+                <div className="flex flex-wrap gap-2 mt-3">
+                  {dates.map((d) => (
+                    <span key={d} className="inline-flex items-center gap-2 pl-3 pr-2 py-1.5 rounded-full text-[12px] font-bold bg-gray-100 text-gray-700">
+                      {fmtDateChip(d)}
+                      <button type="button" onClick={() => setDates((x) => x.filter((v) => v !== d))}
+                        aria-label={`Remove ${fmtDateChip(d)}`}
+                        className="w-4 h-4 rounded-full flex items-center justify-center text-gray-500 hover:bg-gray-300 hover:text-gray-900">×</button>
+                    </span>
+                  ))}
+                  <button type="button" onClick={() => setDates([])} className="text-[12px] font-bold text-gray-400 hover:text-gray-600 px-1">Clear all</button>
+                </div>
+              )}
             </div>
-            <button type="button" onClick={addSlot} disabled={busy}
-              className="h-[46px] px-5 rounded-xl text-[13px] font-bold text-white disabled:opacity-60"
-              style={{ background: `linear-gradient(135deg,${BRAND_RED},#ef4444)` }}>
-              Add time
-            </button>
+
+            <div className="flex flex-wrap items-center justify-between gap-3 mt-4 pt-4 border-t border-gray-100">
+              <p className="text-[12px] text-gray-500">
+                {times.length === 0
+                  ? "Set an end time later than the start time."
+                  : dates.length === 0
+                    ? <>{times.length} visit{times.length === 1 ? "" : "s"} per day — add the dates to use them on.</>
+                    : <>Creates <span className="font-extrabold text-gray-800">{willCreate}</span> visit time{willCreate === 1 ? "" : "s"} · {times[0]}–{toT} on {dates.length} date{dates.length === 1 ? "" : "s"}</>}
+              </p>
+              <button type="button" onClick={addSlotGroup} disabled={busy || !willCreate}
+                className="h-[46px] px-5 rounded-xl text-[13px] font-bold text-white disabled:opacity-60"
+                style={{ background: `linear-gradient(135deg,${BRAND_RED},#ef4444)` }}>
+                {busy ? "Adding…" : "Add these times"}
+              </button>
+            </div>
           </div>
           {msg.text && (
             <p className={`text-[12px] mt-2 font-semibold ${msg.type === "ok" ? "text-green-600" : "text-red-500"}`}>{msg.text}</p>
           )}
-          <div className="mt-4 space-y-2">
+          <div className="mt-5">
             {slots.length === 0 ? (
               <p className="text-[12px] text-gray-400">No visit times added yet.</p>
             ) : (
-              slots.map((s) => (
-                <div key={s.id} className="flex items-center justify-between p-3 rounded-xl border border-gray-100 bg-gray-50">
-                  <span className="text-[13px] font-semibold text-gray-800">{fmtSlot(s.slot_at || s.slotAt || s.when)}</span>
-                  <button type="button" onClick={() => removeSlot(s.id)} disabled={busy} className="text-[12px] font-bold text-red-500 hover:text-red-700">Remove</button>
+              <>
+                <p className="text-[12px] font-bold uppercase tracking-wide text-gray-400 mb-2">
+                  Added times ({slots.length})
+                </p>
+                <div className="space-y-3">
+                  {grouped.map((g) => (
+                    <div key={g.key} className="rounded-xl border border-gray-100 bg-gray-50 p-3">
+                      <p className="text-[12px] font-extrabold text-gray-700 mb-2">{fmtDateChip(g.key)}</p>
+                      <div className="flex flex-wrap gap-2">
+                        {g.items.map((s) => (
+                          <span key={s.id} className="inline-flex items-center gap-2 pl-3 pr-2 py-1.5 rounded-full bg-white border border-gray-200 text-[12px] font-bold text-gray-800">
+                            {fmtTimeOnly(s._iso)}
+                            <button type="button" onClick={() => removeSlot(s.id)} disabled={busy}
+                              aria-label={`Remove ${fmtSlot(s._iso)}`}
+                              className="w-4 h-4 rounded-full flex items-center justify-center text-gray-400 hover:bg-red-100 hover:text-red-600 disabled:opacity-50">×</button>
+                          </span>
+                        ))}
+                      </div>
+                    </div>
+                  ))}
                 </div>
-              ))
+              </>
             )}
           </div>
         </div>
