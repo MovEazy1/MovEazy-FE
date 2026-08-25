@@ -247,6 +247,9 @@ export default function MovEazyNav({ active = "", transparentAtTop = false, onFi
             {hasProperties && (
               <Link to="/my-properties" className="mzn-nav-link" style={active === "my-properties" ? LINK_ACTIVE : LINK_BASE}>My Properties</Link>
             )}
+            {user?.role === "admin" && (
+              <Link to="/admin-panel" className="mzn-nav-link" style={active === "admin" ? LINK_ACTIVE : LINK_BASE}>Admin</Link>
+            )}
           </div>
 
           <div className="mzn-nav-account" style={{ display: "flex", alignItems: "center", gap: 10, flex: "none" }}>
@@ -307,6 +310,9 @@ export default function MovEazyNav({ active = "", transparentAtTop = false, onFi
             </Link>
             {hasProperties && (
               <Link to="/my-properties" className={`mzn-sheet-link ${active === "my-properties" ? "is-active" : ""}`}>My Properties</Link>
+            )}
+            {user?.role === "admin" && (
+              <Link to="/admin-panel" className={`mzn-sheet-link ${active === "admin" ? "is-active" : ""}`}>Admin</Link>
             )}
             {cartCount > 0 && (
               <button type="button" className="mzn-sheet-link" onClick={closeThen(() => navigate("/visits"))}>Site visits ({cartCount})</button>
