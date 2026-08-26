@@ -68,7 +68,7 @@ function BrokerIcon() {
 }
 
 export default function MovEazyNav({ active = "", transparentAtTop = false, onFindFlat, onGetAgent }) {
-  const { user, logout } = useAuth();
+  const { user, logout, loading: authLoading } = useAuth();
   const { openLogin } = useLoginModal();
   const { count: cartCount } = useVisitCart();
   const navigate = useNavigate();
@@ -135,9 +135,9 @@ export default function MovEazyNav({ active = "", transparentAtTop = false, onFi
     return () => { document.removeEventListener("mousedown", onDown); window.removeEventListener("keydown", onKey); };
   }, [acctOpen]);
 
-  const listMyFlat = () => (user ? navigate("/list-my-flat") : openLogin(() => navigate("/list-my-flat")));
-  const findFlat = () => (onFindFlat ? onFindFlat() : navigate("/?search=1"));
-  const getAgent = () => (onGetAgent ? onGetAgent() : navigate("/?find=1"));
+  const listMyFlat = () => { if (authLoading) return; user ? navigate("/list-my-flat") : openLogin(() => navigate("/list-my-flat")); };
+  const findFlat = () => { if (authLoading) return; onFindFlat ? onFindFlat() : navigate("/?search=1"); };
+  const getAgent = () => { if (authLoading) return; onGetAgent ? onGetAgent() : navigate("/?find=1"); };
   const closeThen = (fn) => () => { setMenuOpen(false); fn(); };
 
   // Solid whenever the page isn't a dark hero, or once the reader scrolls.
@@ -303,7 +303,12 @@ export default function MovEazyNav({ active = "", transparentAtTop = false, onFi
                 Preferences
               </button>
             )}
-            {user ? (
+            {authLoading ? (
+              // Persisted session still restoring — a neutral placeholder here,
+              // not "Sign In", so a signed-in visitor never sees (or can click)
+              // a false logged-out state on page load.
+              <div style={{ width: 38, height: 38, borderRadius: "50%", background: "rgba(255,255,255,.06)" }} aria-hidden />
+            ) : user ? (
               <div ref={acctRef} style={{ position: "relative", flex: "none" }}>
                 <button type="button" onClick={() => setAcctOpen((o) => !o)} aria-label="Account menu" aria-haspopup="menu" aria-expanded={acctOpen}
                   style={{ width: 38, height: 38, borderRadius: "50%", border: "1px solid rgba(255,255,255,.25)", background: "rgba(255,255,255,.10)", color: "#F1F6F4", fontWeight: 800, fontSize: 13, flex: "none" }}>
@@ -358,7 +363,7 @@ export default function MovEazyNav({ active = "", transparentAtTop = false, onFi
               Start your move <span style={{ fontSize: 13 }}>&#8599;</span>
             </button>
             <div className="mzn-sheet-divider" />
-            {user ? (
+            {authLoading ? null : user ? (
               <>
                 <button type="button" className="mzn-sheet-link" onClick={closeThen(getAgent)}>Modify my Preferences</button>
                 <button type="button" className="mzn-sheet-link" onClick={closeThen(() => navigate("/profile"))}>My Profile</button>

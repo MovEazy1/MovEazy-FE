@@ -98,7 +98,7 @@ const LINE_WORDS = [
 ];
 
 export default function ForkHome() {
-  const { user } = useAuth();
+  const { user, loading: authLoading } = useAuth();
   const { openLogin } = useLoginModal();
   const navigate = useNavigate();
   const [showChatbot, setShowChatbot] = useState(false);
@@ -108,17 +108,20 @@ export default function ForkHome() {
   const rootRef = useRef(null);
 
   // "List my Flat" — auth-gate, then open the inventory listing form.
-  const listMyFlat = () => (user ? navigate("/list-my-flat") : openLogin(() => navigate("/list-my-flat")));
+  // Wait out the persisted-session restore before deciding: without this, a
+  // signed-in visitor who clicks right after page load can see a false
+  // "please sign in" prompt while their real session is still loading.
+    const listMyFlat = () => { if (authLoading) return; user ? navigate("/list-my-flat") : openLogin(() => navigate("/list-my-flat")); };
 
   // Deep link from the post-publish "Find my next flat" pitch → open the agent.
   const [searchParams, setSearchParams] = useSearchParams();
   useEffect(() => {
-    if (searchParams.get("find") !== "1") return;
+    if (searchParams.get("find") !== "1" || authLoading) return;
     setSearchParams({}, { replace: true });
     if (user) setShowChatbot(true);
     else openLogin(() => setShowChatbot(true));
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [searchParams, user]);
+  }, [searchParams, user, authLoading]);
 
   // "Show me flats" — gate on sign-in first. A returning user who has already set
   // their preferences skips the map-vs-agent choice entirely and goes straight to
@@ -149,7 +152,7 @@ export default function ForkHome() {
   }, [pendingMatchCheck, user]);
 
   const startFlatSearch = () => {
-    if (checkingPrefs) return;
+    if (checkingPrefs || authLoading) return;
     if (user) {
       goToMatches(user.uid);
     } else {
@@ -161,11 +164,15 @@ export default function ForkHome() {
   // here as `/?search=1`, so every entry point runs this one flow rather than
   // each page reimplementing the preferences check.
   useEffect(() => {
-    if (searchParams.get("search") !== "1") return;
+    // Also wait out authLoading here — otherwise this effect would consume the
+    // ?search=1 param immediately (even while auth is still resolving), then
+    // startFlatSearch()'s own guard would no-op and the param is already gone,
+    // silently dropping the deep link instead of just delaying it.
+    if (searchParams.get("search") !== "1" || authLoading) return;
     setSearchParams({}, { replace: true });
     startFlatSearch();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [searchParams, user]);
+  }, [searchParams, user, authLoading]);
 
   const chooseMap = () => {
     setShowChoice(false);
