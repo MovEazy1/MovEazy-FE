@@ -26,12 +26,12 @@ import { isSuperAdminEmail } from "../../lib/adminAccess";
 import logoMint from "../../assets/logo/moveazy-logo-mint-dark.png";
 
 const LINK_BASE = {
-  color: "#CBD9D5", fontWeight: 600, fontSize: "clamp(12px,1.05vw,14px)",
-  padding: "10px clamp(12px,1.4vw,18px)", borderRadius: 100, whiteSpace: "nowrap", flex: "none",
+  color: "#CBD9D5", fontWeight: 600, fontSize: "clamp(12px,1vw,14px)",
+  padding: "10px clamp(9px,1.1vw,18px)", borderRadius: 100, whiteSpace: "nowrap", flex: "none",
 };
 const LINK_ACTIVE = {
   ...LINK_BASE, background: "#5EEAD4", color: "#04211D", fontWeight: 700,
-  padding: "10px clamp(14px,1.6vw,20px)",
+  padding: "10px clamp(11px,1.3vw,20px)",
 };
 
 function FlatIcon() {
@@ -262,16 +262,25 @@ export default function MovEazyNav({ active = "", transparentAtTop = false, onFi
             <img src={logoMint} alt="movEAZY" draggable={false} style={{ height: "clamp(26px,2.4vw,34px)", width: "auto", display: "block" }} />
           </Link>
 
-          <div className="mzn-nav-links" style={{ display: "flex", alignItems: "center", gap: "clamp(2px,.6vw,8px)", background: "rgba(255,255,255,.06)", border: "1px solid rgba(255,255,255,.09)", borderRadius: 100, padding: 6, flex: 1, minWidth: 0, maxWidth: 780, overflowX: "auto", scrollbarWidth: "none", justifyContent: "center" }}>
+          <div className="mzn-nav-links" style={{ display: "flex", alignItems: "center", gap: "clamp(1px,.3vw,6px)", background: "rgba(255,255,255,.06)", border: "1px solid rgba(255,255,255,.09)", borderRadius: 100, padding: 4, flex: 1, minWidth: 0, maxWidth: 780, overflowX: "auto", scrollbarWidth: "none", justifyContent: "center", WebkitMaskImage: "linear-gradient(to right, transparent 0, black 14px, black calc(100% - 14px), transparent 100%)", maskImage: "linear-gradient(to right, transparent 0, black 14px, black calc(100% - 14px), transparent 100%)" }}>
             <Link to="/" className="mzn-nav-link" style={active === "home" ? LINK_ACTIVE : LINK_BASE}>Home</Link>
             <Link to="/how-it-works" className="mzn-nav-link" style={active === "how" ? LINK_ACTIVE : LINK_BASE}>How it Works</Link>
             <Link to="/about" className="mzn-nav-link" style={active === "about" ? LINK_ACTIVE : LINK_BASE}>About Us</Link>
-            <button type="button" className="mzn-nav-link" onClick={listMyFlat} style={{ ...LINK_BASE, display: "flex", alignItems: "center", gap: 6, background: "none", border: "none" }}>
-              Register as an Owner<span className="mzn-badge-new">new</span>
-            </button>
-            <Link to="/register-broker" className="mzn-nav-link" style={{ ...(active === "register-broker" ? LINK_ACTIVE : LINK_BASE), display: "flex", alignItems: "center", gap: 6 }}>
-              Register as a Broker<span className="mzn-badge-new">new</span>
-            </Link>
+            {/* Redundant with the avatar dropdown's "Post my Existing Flat" once
+               signed in, and the pill row is tight — only a logged-out visitor
+               needs this as a top-level acquisition link. */}
+            {!user && (
+              <button type="button" className="mzn-nav-link" onClick={listMyFlat} style={{ ...LINK_BASE, display: "flex", alignItems: "center", gap: 6, background: "none", border: "none" }}>
+                Register as an Owner<span className="mzn-badge-new">new</span>
+              </button>
+            )}
+            {/* Restores the old SiteHeader's behaviour: no point pitching "become
+               a broker" to someone who already is one. */}
+            {user?.role !== "broker" && (
+              <Link to="/register-broker" className="mzn-nav-link" style={{ ...(active === "register-broker" ? LINK_ACTIVE : LINK_BASE), display: "flex", alignItems: "center", gap: 6 }}>
+                Register as a Broker<span className="mzn-badge-new">new</span>
+              </Link>
+            )}
             {hasProperties && (
               <Link to="/my-properties" className="mzn-nav-link" style={active === "my-properties" ? LINK_ACTIVE : LINK_BASE}>My Properties</Link>
             )}
@@ -294,15 +303,6 @@ export default function MovEazyNav({ active = "", transparentAtTop = false, onFi
             <a href="#" className="mzn-nav-cta" onClick={(e) => { e.preventDefault(); findFlat(); }} style={{ display: "flex", alignItems: "center", gap: 6, background: "#5EEAD4", color: "#04211D", fontWeight: 700, fontSize: "clamp(12px,1.1vw,15px)", padding: "11px clamp(12px,1.6vw,22px)", borderRadius: 100, flex: "none", whiteSpace: "nowrap" }}>
               Start your move <span style={{ fontSize: 13 }}>&#8599;</span>
             </a>
-            {user && (
-              <button type="button" onClick={getAgent} title="Modify my Preferences" aria-label="Modify my Preferences"
-                style={{ display: "flex", alignItems: "center", gap: 6, background: "rgba(255,255,255,.08)", border: "1px solid rgba(255,255,255,.14)", color: "#CBD9D5", fontWeight: 600, fontSize: "clamp(12px,1.05vw,14px)", padding: "10px clamp(12px,1.4vw,16px)", borderRadius: 100, whiteSpace: "nowrap" }}>
-                <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" strokeWidth="1.9" strokeLinecap="round" aria-hidden>
-                  <path d="M12 3v4M12 17v4M3 12h4M17 12h4M5.6 5.6l2.8 2.8M15.6 15.6l2.8 2.8M18.4 5.6l-2.8 2.8M8.4 15.6l-2.8 2.8" />
-                </svg>
-                Preferences
-              </button>
-            )}
             {authLoading ? (
               // Persisted session still restoring — a neutral placeholder here,
               // not "Sign In", so a signed-in visitor never sees (or can click)
