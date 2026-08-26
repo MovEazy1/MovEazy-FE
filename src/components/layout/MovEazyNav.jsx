@@ -78,6 +78,8 @@ export default function MovEazyNav({ active = "", transparentAtTop = false, onFi
   const navRef = useRef(null);
   const [navH, setNavH] = useState(72);
   const [hasProperties, setHasProperties] = useState(false);
+  const [acctOpen, setAcctOpen] = useState(false);
+  const acctRef = useRef(null);
 
   // Close the sheet whenever the route changes.
   useEffect(() => { setMenuOpen(false); }, [location.pathname]);
@@ -124,6 +126,15 @@ export default function MovEazyNav({ active = "", transparentAtTop = false, onFi
     return () => ro.disconnect();
   }, []);
 
+  useEffect(() => {
+    if (!acctOpen) return;
+    const onDown = (e) => { if (acctRef.current && !acctRef.current.contains(e.target)) setAcctOpen(false); };
+    const onKey = (e) => e.key === "Escape" && setAcctOpen(false);
+    document.addEventListener("mousedown", onDown);
+    window.addEventListener("keydown", onKey);
+    return () => { document.removeEventListener("mousedown", onDown); window.removeEventListener("keydown", onKey); };
+  }, [acctOpen]);
+
   const listMyFlat = () => (user ? navigate("/list-my-flat") : openLogin(() => navigate("/list-my-flat")));
   const findFlat = () => (onFindFlat ? onFindFlat() : navigate("/?search=1"));
   const getAgent = () => (onGetAgent ? onGetAgent() : navigate("/?find=1"));
@@ -139,6 +150,22 @@ export default function MovEazyNav({ active = "", transparentAtTop = false, onFi
         .mzn-nav-root button { font-family: inherit; cursor: pointer; }
         .mzn-nav-root button:focus-visible, .mzn-nav-root a:focus-visible { outline: 2px solid #5EEAD4; outline-offset: 3px; border-radius: 4px; }
         .mzn-nav-link:hover { color: #FFFFFF; background: rgba(255,255,255,.06); }
+        .mzn-acct-menu {
+          position: absolute; top: calc(100% + 8px); right: 0; z-index: 190; min-width: 210px;
+          background: #062D27; border: 1px solid rgba(255,255,255,.10); border-radius: 14px;
+          padding: 6px; box-shadow: 0 20px 48px rgba(0,0,0,.5);
+          transform: translateY(-6px) scale(.97); opacity: 0; pointer-events: none;
+          transform-origin: top right; transition: transform .18s cubic-bezier(.22,1,.36,1), opacity .15s ease;
+        }
+        .mzn-acct-menu.is-open { transform: translateY(0) scale(1); opacity: 1; pointer-events: auto; }
+        .mzn-acct-item {
+          display: block; width: 100%; text-align: left; padding: 10px 12px; border-radius: 9px;
+          background: none; border: none; color: #CBD9D5; font-size: 13px; font-weight: 600;
+        }
+        .mzn-acct-item:hover { background: rgba(255,255,255,.07); color: #F1F6F4; }
+        .mzn-acct-item-danger { color: #FCA5A5; }
+        .mzn-acct-item-danger:hover { background: rgba(252,165,165,.10); color: #FCA5A5; }
+        .mzn-acct-divider { height: 1px; background: rgba(255,255,255,.10); margin: 5px 6px; }
         .mzn-badge-new { background: linear-gradient(135deg,#FFE1A6,#E8A33D 45%,#B9782A); box-shadow: 0 0 0 1px rgba(255,255,255,.35) inset, 0 1px 4px rgba(232,163,61,.5); color: #1B1204; font-size: 8px; font-weight: 800; letter-spacing: .02em; padding: 1.5px 6px; border-radius: 100px; line-height: 1.6; align-self: flex-start; margin-top: -4px; }
         .mzn-burger { display: none; align-items: center; justify-content: center; width: 44px; height: 44px; border: none; background: rgba(255,255,255,.08); border-radius: 50%; color: #F1F6F4; flex: none; }
         .mzn-burger svg { display: block; }
@@ -277,10 +304,19 @@ export default function MovEazyNav({ active = "", transparentAtTop = false, onFi
               </button>
             )}
             {user ? (
-              <button type="button" onClick={() => navigate("/profile")} aria-label="My profile"
-                style={{ width: 38, height: 38, borderRadius: "50%", border: "1px solid rgba(255,255,255,.25)", background: "rgba(255,255,255,.10)", color: "#F1F6F4", fontWeight: 800, fontSize: 13, flex: "none" }}>
-                {(user.name || user.email || "?").trim().charAt(0).toUpperCase()}
-              </button>
+              <div ref={acctRef} style={{ position: "relative", flex: "none" }}>
+                <button type="button" onClick={() => setAcctOpen((o) => !o)} aria-label="Account menu" aria-haspopup="menu" aria-expanded={acctOpen}
+                  style={{ width: 38, height: 38, borderRadius: "50%", border: "1px solid rgba(255,255,255,.25)", background: "rgba(255,255,255,.10)", color: "#F1F6F4", fontWeight: 800, fontSize: 13, flex: "none" }}>
+                  {(user.name || user.email || "?").trim().charAt(0).toUpperCase()}
+                </button>
+                <div className={`mzn-acct-menu ${acctOpen ? "is-open" : ""}`} role="menu">
+                  <button type="button" role="menuitem" className="mzn-acct-item" onClick={() => { setAcctOpen(false); getAgent(); }}>View My Preferences</button>
+                  <button type="button" role="menuitem" className="mzn-acct-item" onClick={() => { setAcctOpen(false); listMyFlat(); }}>Post my Existing Flat</button>
+                  <button type="button" role="menuitem" className="mzn-acct-item" onClick={() => { setAcctOpen(false); navigate("/profile"); }}>My Profile</button>
+                  <div className="mzn-acct-divider" />
+                  <button type="button" role="menuitem" className="mzn-acct-item mzn-acct-item-danger" onClick={() => { setAcctOpen(false); logout(); }}>Sign Out</button>
+                </div>
+              </div>
             ) : (
               <button type="button" onClick={() => openLogin()}
                 style={{ display: "flex", alignItems: "center", gap: 6, background: "transparent", border: "1px solid rgba(255,255,255,.22)", color: "#F1F6F4", fontWeight: 600, fontSize: "clamp(12px,1.05vw,14px)", padding: "10px clamp(12px,1.4vw,18px)", borderRadius: 100, whiteSpace: "nowrap" }}>
