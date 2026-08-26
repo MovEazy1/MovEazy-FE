@@ -399,7 +399,22 @@ export default function ForkHome() {
           .mzn-hero-map, .mzn-hero-route-wrap { display: none !important; }
           .mzn-polaroid { position: relative !important; right: auto !important; left: auto !important; top: auto !important; width: min(260px, 78vw) !important; margin: 0 auto 32px !important; }
           .mzn-hero-cards { grid-template-columns: 1fr !important; }
-          .mzn-tl-step { grid-template-columns: 1fr !important; row-gap: 14px !important; }        }
+          .mzn-tl-step { grid-template-columns: 1fr !important; row-gap: 14px !important; }
+          /* The desktop zigzag alternates media-first/text-first per step (for
+             visual rhythm in a 2-column grid) and labels media blocks with a
+             small corner number to stand in for the far-away timeline node.
+             Linearized as-is on mobile, that reads as: the step order flips
+             unpredictably every other step, and the step number renders
+             twice (corner badge + the real node). Force one consistent
+             photo -> number -> text order for every step via order (source
+             order is untouched, so desktop is unaffected), and hide the
+             now-redundant corner badge -- the connecting-line node already
+             carries the number.
+           */
+          .mzn-tl-numbadge { display: none !important; }
+          .mzn-tl-step [data-step-media] { order: 1 !important; }
+          .mzn-tl-step .mzn-tl-node-wrap { order: 2 !important; margin: 2px 0 !important; }
+          .mzn-tl-step [data-step-text] { order: 3 !important; }        }
       `}</style>
 
       <MovEazyNav active="home" transparentAtTop onFindFlat={startFlatSearch} />
@@ -613,7 +628,7 @@ export default function ForkHome() {
                     <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#5EEAD4" strokeWidth="1.6"><path d="M20 11a7 7 0 0 1-7 7H9l-4 2.5 1-3.6A7 7 0 0 1 13 4a7 7 0 0 1 7 7z" strokeLinejoin="round" /></svg>
                   </span>
                 </div>
-                <div style={{ display: "flex", justifyContent: "center" }}><span data-step-node style={{ width: 36, height: 36, borderRadius: "50%", border: "2px solid rgba(14,124,104,.3)", background: "#F4F2ED", color: "#0E7C68", fontWeight: 800, fontSize: 14, display: "flex", alignItems: "center", justifyContent: "center" }}>1</span></div>
+                <div className="mzn-tl-node-wrap" style={{ display: "flex", justifyContent: "center" }}><span data-step-node style={{ width: 36, height: 36, borderRadius: "50%", border: "2px solid rgba(14,124,104,.3)", background: "#F4F2ED", color: "#0E7C68", fontWeight: 800, fontSize: 14, display: "flex", alignItems: "center", justifyContent: "center" }}>1</span></div>
                 <div data-step-text style={{ background: "#fff", border: "1px solid rgba(0,0,0,.07)", borderRadius: 18, padding: "clamp(22px,2.4vw,32px)" }}>
                   <h3 style={{ fontFamily: "'Manrope', sans-serif", color: "#0B1A17", fontWeight: 800, fontSize: "clamp(19px,1.9vw,25px)", lineHeight: 1.25, letterSpacing: "-.02em" }}>You tell us your <span style={{ color: "#0E7C68" }}>requirements</span></h3>
                   <p style={{ color: "#5C6B67", fontSize: 15, lineHeight: 1.55, marginTop: 12 }}>Share your needs, deal breakers, preferences and everything in between.</p>
@@ -625,10 +640,10 @@ export default function ForkHome() {
                   <h3 style={{ fontFamily: "'Manrope', sans-serif", color: "#0B1A17", fontWeight: 800, fontSize: "clamp(19px,1.9vw,25px)", lineHeight: 1.25, letterSpacing: "-.02em" }}>We guide you <span style={{ color: "#0E7C68" }}>everything</span> about the city</h3>
                   <p style={{ color: "#5C6B67", fontSize: 15, lineHeight: 1.55, marginTop: 12 }}>From traffic choke points to party areas to walking neighbourhoods, we tell you what others won't.</p>
                 </div>
-                <div style={{ display: "flex", justifyContent: "center" }}><span data-step-node style={{ width: 36, height: 36, borderRadius: "50%", border: "2px solid rgba(14,124,104,.3)", background: "#F4F2ED", color: "#0E7C68", fontWeight: 800, fontSize: 14, display: "flex", alignItems: "center", justifyContent: "center" }}>2</span></div>
+                <div className="mzn-tl-node-wrap" style={{ display: "flex", justifyContent: "center" }}><span data-step-node style={{ width: 36, height: 36, borderRadius: "50%", border: "2px solid rgba(14,124,104,.3)", background: "#F4F2ED", color: "#0E7C68", fontWeight: 800, fontSize: 14, display: "flex", alignItems: "center", justifyContent: "center" }}>2</span></div>
                 <div data-step-media style={{ borderRadius: 18, overflow: "hidden", background: "#0C1A18", boxShadow: "0 22px 50px rgba(0,0,0,.14)", position: "relative", aspectRatio: "16/11" }}>
                   <div style={{ position: "absolute", inset: 0, backgroundImage: `url(${timelineCityImg})`, backgroundSize: "cover", backgroundPosition: "center" }} />
-                  <span style={{ position: "absolute", top: 16, right: 16, width: 34, height: 34, borderRadius: "50%", background: "#F4F2ED", color: "#0E7C68", fontWeight: 800, fontSize: 14, display: "flex", alignItems: "center", justifyContent: "center" }}>2</span>
+                  <span className="mzn-tl-numbadge" style={{ position: "absolute", top: 16, right: 16, width: 34, height: 34, borderRadius: "50%", background: "#F4F2ED", color: "#0E7C68", fontWeight: 800, fontSize: 14, display: "flex", alignItems: "center", justifyContent: "center" }}>2</span>
                   <span style={{ position: "absolute", bottom: 16, left: 16, width: 46, height: 46, borderRadius: "50%", background: "rgba(4,33,29,.72)", border: "1px solid rgba(94,234,212,.35)", display: "flex", alignItems: "center", justifyContent: "center" }}>
                     <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#5EEAD4" strokeWidth="1.6"><path d="M12 2c3.9 0 7 3 7 6.9C19 14 12 22 12 22S5 14 5 8.9C5 5 8.1 2 12 2z" strokeLinejoin="round" /><circle cx="12" cy="9" r="2.2" /></svg>
                   </span>
@@ -638,12 +653,12 @@ export default function ForkHome() {
               <div data-step className="mzn-tl-step" style={{ display: "grid", gridTemplateColumns: "1fr 76px 1fr", alignItems: "center" }}>
                 <div data-step-media style={{ borderRadius: 18, overflow: "hidden", background: "#0C1A18", boxShadow: "0 22px 50px rgba(0,0,0,.14)", position: "relative", aspectRatio: "16/11" }}>
                   <div style={{ position: "absolute", inset: 0, backgroundImage: `url(${keysImg})`, backgroundSize: "cover", backgroundPosition: "center" }} />
-                  <span style={{ position: "absolute", top: 16, left: 16, width: 34, height: 34, borderRadius: "50%", background: "#F4F2ED", color: "#0E7C68", fontWeight: 800, fontSize: 14, display: "flex", alignItems: "center", justifyContent: "center" }}>3</span>
+                  <span className="mzn-tl-numbadge" style={{ position: "absolute", top: 16, left: 16, width: 34, height: 34, borderRadius: "50%", background: "#F4F2ED", color: "#0E7C68", fontWeight: 800, fontSize: 14, display: "flex", alignItems: "center", justifyContent: "center" }}>3</span>
                   <span style={{ position: "absolute", bottom: 16, left: 16, width: 46, height: 46, borderRadius: "50%", background: "rgba(4,33,29,.72)", border: "1px solid rgba(94,234,212,.35)", display: "flex", alignItems: "center", justifyContent: "center" }}>
                     <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#5EEAD4" strokeWidth="1.6"><circle cx="12" cy="4.6" r="2.2" /><path d="M12 7.4v5l3.4 3.2 1.6 5.4M12 12.4 8.4 15l-1.8 5.4M8.6 10.2 12 8.6l3.6 1.8" strokeLinecap="round" strokeLinejoin="round" /></svg>
                   </span>
                 </div>
-                <div style={{ display: "flex", justifyContent: "center" }}><span data-step-node style={{ width: 36, height: 36, borderRadius: "50%", border: "2px solid rgba(14,124,104,.3)", background: "#F4F2ED", color: "#0E7C68", fontWeight: 800, fontSize: 14, display: "flex", alignItems: "center", justifyContent: "center" }}>3</span></div>
+                <div className="mzn-tl-node-wrap" style={{ display: "flex", justifyContent: "center" }}><span data-step-node style={{ width: 36, height: 36, borderRadius: "50%", border: "2px solid rgba(14,124,104,.3)", background: "#F4F2ED", color: "#0E7C68", fontWeight: 800, fontSize: 14, display: "flex", alignItems: "center", justifyContent: "center" }}>3</span></div>
                 <div data-step-text style={{ background: "#fff", border: "1px solid rgba(0,0,0,.07)", borderRadius: 18, padding: "clamp(22px,2.4vw,32px)" }}>
                   <h3 style={{ fontFamily: "'Manrope', sans-serif", color: "#0B1A17", fontWeight: 800, fontSize: "clamp(19px,1.9vw,25px)", lineHeight: 1.25, letterSpacing: "-.02em" }}>We help you move in to your perfect home within <span style={{ color: "#0E7C68" }}>7 days</span></h3>
                   <p style={{ color: "#5C6B67", fontSize: 15, lineHeight: 1.55, marginTop: 12 }}>Our on ground agent handles everything, so you don't have to lift a finger.</p>
@@ -655,10 +670,10 @@ export default function ForkHome() {
                   <h3 style={{ fontFamily: "'Manrope', sans-serif", color: "#0B1A17", fontWeight: 800, fontSize: "clamp(19px,1.9vw,25px)", lineHeight: 1.25, letterSpacing: "-.02em" }}>Weekly parties <span style={{ color: "#0E7C68" }}>in</span> neighbourhood</h3>
                   <p style={{ color: "#5C6B67", fontSize: 15, lineHeight: 1.55, marginTop: 12 }}>Exclusively for movEazy Generation. New city, new people, new stories.</p>
                 </div>
-                <div style={{ display: "flex", justifyContent: "center" }}><span data-step-node style={{ width: 36, height: 36, borderRadius: "50%", border: "2px solid rgba(14,124,104,.3)", background: "#F4F2ED", color: "#0E7C68", fontWeight: 800, fontSize: 14, display: "flex", alignItems: "center", justifyContent: "center" }}>4</span></div>
+                <div className="mzn-tl-node-wrap" style={{ display: "flex", justifyContent: "center" }}><span data-step-node style={{ width: 36, height: 36, borderRadius: "50%", border: "2px solid rgba(14,124,104,.3)", background: "#F4F2ED", color: "#0E7C68", fontWeight: 800, fontSize: 14, display: "flex", alignItems: "center", justifyContent: "center" }}>4</span></div>
                 <div data-step-media style={{ borderRadius: 18, overflow: "hidden", background: "#150C22", boxShadow: "0 22px 50px rgba(0,0,0,.14)", position: "relative", aspectRatio: "16/11" }}>
                   <div style={{ position: "absolute", inset: 0, backgroundImage: `url(${sofaImg})`, backgroundSize: "cover", backgroundPosition: "center" }} />
-                  <span style={{ position: "absolute", top: 16, right: 16, width: 34, height: 34, borderRadius: "50%", background: "#F4F2ED", color: "#0E7C68", fontWeight: 800, fontSize: 14, display: "flex", alignItems: "center", justifyContent: "center" }}>4</span>
+                  <span className="mzn-tl-numbadge" style={{ position: "absolute", top: 16, right: 16, width: 34, height: 34, borderRadius: "50%", background: "#F4F2ED", color: "#0E7C68", fontWeight: 800, fontSize: 14, display: "flex", alignItems: "center", justifyContent: "center" }}>4</span>
                   <span style={{ position: "absolute", bottom: 16, left: 16, width: 46, height: 46, borderRadius: "50%", background: "rgba(21,12,34,.72)", border: "1px solid rgba(94,234,212,.35)", display: "flex", alignItems: "center", justifyContent: "center" }}>
                     <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#5EEAD4" strokeWidth="1.6"><path d="M3 21l6.5-13L21 19.5 3 21z" strokeLinejoin="round" /><path d="M14 4.5v.01M18.5 8v.01M20.5 3.5v.01" strokeLinecap="round" /></svg>
                   </span>
@@ -668,12 +683,12 @@ export default function ForkHome() {
               <div data-step className="mzn-tl-step" style={{ display: "grid", gridTemplateColumns: "1fr 76px 1fr", alignItems: "center" }}>
                 <div data-step-media style={{ borderRadius: 18, overflow: "hidden", background: "#0C1A18", boxShadow: "0 22px 50px rgba(0,0,0,.14)", position: "relative", aspectRatio: "16/11" }}>
                   <div style={{ position: "absolute", inset: 0, backgroundImage: `url(${timelinePhoneImg})`, backgroundSize: "cover", backgroundPosition: "center" }} />
-                  <span style={{ position: "absolute", top: 16, left: 16, width: 34, height: 34, borderRadius: "50%", background: "#F4F2ED", color: "#0E7C68", fontWeight: 800, fontSize: 14, display: "flex", alignItems: "center", justifyContent: "center" }}>5</span>
+                  <span className="mzn-tl-numbadge" style={{ position: "absolute", top: 16, left: 16, width: 34, height: 34, borderRadius: "50%", background: "#F4F2ED", color: "#0E7C68", fontWeight: 800, fontSize: 14, display: "flex", alignItems: "center", justifyContent: "center" }}>5</span>
                   <span style={{ position: "absolute", bottom: 16, left: 16, width: 46, height: 46, borderRadius: "50%", background: "rgba(4,33,29,.72)", border: "1px solid rgba(94,234,212,.35)", display: "flex", alignItems: "center", justifyContent: "center" }}>
                     <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#5EEAD4" strokeWidth="1.6"><path d="M7 4h9M7 8.4h9M13.5 4c2.4 0 3.6 1.6 3.6 3.4 0 2.2-1.7 3.6-4.4 3.6H7.6l7.6 9" strokeLinecap="round" strokeLinejoin="round" /></svg>
                   </span>
                 </div>
-                <div style={{ display: "flex", justifyContent: "center" }}><span data-step-node style={{ width: 36, height: 36, borderRadius: "50%", border: "2px solid rgba(14,124,104,.3)", background: "#F4F2ED", color: "#0E7C68", fontWeight: 800, fontSize: 14, display: "flex", alignItems: "center", justifyContent: "center" }}>5</span></div>
+                <div className="mzn-tl-node-wrap" style={{ display: "flex", justifyContent: "center" }}><span data-step-node style={{ width: 36, height: 36, borderRadius: "50%", border: "2px solid rgba(14,124,104,.3)", background: "#F4F2ED", color: "#0E7C68", fontWeight: 800, fontSize: 14, display: "flex", alignItems: "center", justifyContent: "center" }}>5</span></div>
                 <div data-step-text style={{ background: "#fff", border: "1px solid rgba(0,0,0,.07)", borderRadius: 18, padding: "clamp(22px,2.4vw,32px)" }}>
                   <h3 style={{ fontFamily: "'Manrope', sans-serif", color: "#0B1A17", fontWeight: 800, fontSize: "clamp(19px,1.9vw,25px)", lineHeight: 1.25, letterSpacing: "-.02em" }}>Easy monthly rent payment on <span style={{ color: "#0E7C68" }}>autopay</span></h3>
                   <p style={{ color: "#5C6B67", fontSize: 15, lineHeight: 1.55, marginTop: 12 }}>Set it once and relax. Never miss a rent payment again.</p>
@@ -685,10 +700,10 @@ export default function ForkHome() {
                   <h3 style={{ fontFamily: "'Manrope', sans-serif", color: "#0B1A17", fontWeight: 800, fontSize: "clamp(19px,1.9vw,25px)", lineHeight: 1.25, letterSpacing: "-.02em" }}>Our partners <span style={{ color: "#0E7C68" }}>furnish</span> the house according to your demand</h3>
                   <p style={{ color: "#5C6B67", fontSize: 15, lineHeight: 1.55, marginTop: 12 }}>From a work corner to a party-ready living room, you ask, we deliver.</p>
                 </div>
-                <div style={{ display: "flex", justifyContent: "center" }}><span data-step-node style={{ width: 36, height: 36, borderRadius: "50%", border: "2px solid rgba(14,124,104,.3)", background: "#F4F2ED", color: "#0E7C68", fontWeight: 800, fontSize: 14, display: "flex", alignItems: "center", justifyContent: "center" }}>6</span></div>
+                <div className="mzn-tl-node-wrap" style={{ display: "flex", justifyContent: "center" }}><span data-step-node style={{ width: 36, height: 36, borderRadius: "50%", border: "2px solid rgba(14,124,104,.3)", background: "#F4F2ED", color: "#0E7C68", fontWeight: 800, fontSize: 14, display: "flex", alignItems: "center", justifyContent: "center" }}>6</span></div>
                 <div data-step-media style={{ borderRadius: 18, overflow: "hidden", background: "#150C22", boxShadow: "0 22px 50px rgba(0,0,0,.14)", position: "relative", aspectRatio: "16/11" }}>
                   <div style={{ position: "absolute", inset: 0, backgroundImage: `url(${livingRoomImg})`, backgroundSize: "cover", backgroundPosition: "center" }} />
-                  <span style={{ position: "absolute", top: 16, right: 16, width: 34, height: 34, borderRadius: "50%", background: "#F4F2ED", color: "#0E7C68", fontWeight: 800, fontSize: 14, display: "flex", alignItems: "center", justifyContent: "center" }}>6</span>
+                  <span className="mzn-tl-numbadge" style={{ position: "absolute", top: 16, right: 16, width: 34, height: 34, borderRadius: "50%", background: "#F4F2ED", color: "#0E7C68", fontWeight: 800, fontSize: 14, display: "flex", alignItems: "center", justifyContent: "center" }}>6</span>
                   <span style={{ position: "absolute", bottom: 16, left: 16, width: 46, height: 46, borderRadius: "50%", background: "rgba(21,12,34,.72)", border: "1px solid rgba(94,234,212,.35)", display: "flex", alignItems: "center", justifyContent: "center" }}>
                     <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#5EEAD4" strokeWidth="1.6"><path d="M4 13v5h16v-5M5.5 13V9a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v4M3 13h18" strokeLinejoin="round" /></svg>
                   </span>
