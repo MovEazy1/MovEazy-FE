@@ -14,6 +14,19 @@ export function normalizeAdminEmail(email) {
   return String(email || "").toLowerCase().trim();
 }
 
+/**
+ * The superadmin panel (client/flat leads, owners, brokers) is intentionally
+ * gated on this one hardcoded email, NOT on role "admin" or admin_allowlist —
+ * adding someone else to that table (e.g. via AdminAccessPanel) must never
+ * grant them this panel. Change this constant, not the check sites, if that
+ * email ever changes.
+ */
+export const SUPERADMIN_EMAIL = "yatharth200018@gmail.com";
+
+export function isSuperAdminEmail(email) {
+  return normalizeAdminEmail(email) === SUPERADMIN_EMAIL;
+}
+
 let allowlistCache = null;
 let allowlistCacheAt = 0;
 const CACHE_TTL_MS = 45_000;

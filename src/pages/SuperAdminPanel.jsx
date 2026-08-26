@@ -1,14 +1,19 @@
 /**
- * Admin panel — demand (client leads), supply (flat leads) and the people
- * behind them (owners, brokers).
+ * Superadmin panel — demand (client leads), supply (flat leads) and the
+ * people behind them (owners, brokers).
  *
- * Gated on the signed-in user's admin role, but the real gate is Postgres:
- * every table here is RLS'd to "own rows or is_admin_allowlisted()", so the
- * numbers only fill in for an email present in public.admin_allowlist.
+ * Access is hardcoded to SUPERADMIN_EMAIL (see lib/adminAccess.js) — deliberately
+ * NOT the general role==="admin"/admin_allowlist system, so adding someone else
+ * as a regular admin can never grant them this panel.
+ *
+ * Once in, the data itself is still gated by Postgres: every table here is
+ * RLS'd to "own rows or is_admin_allowlisted()", so the numbers only fill in
+ * if this email is also present in public.admin_allowlist.
  */
 import { useEffect, useMemo, useState } from "react";
 import { Link } from "react-router-dom";
 import { useAuth } from "../context/AuthContext";
+import { isSuperAdminEmail } from "../lib/adminAccess";
 import MovEazyNav from "../components/layout/MovEazyNav";
 import {
   fetchProfiles, fetchSearchProfiles, fetchRequirements, fetchBookings,
@@ -73,9 +78,9 @@ function Table({ cols, rows, empty }) {
   );
 }
 
-export default function AdminPanel() {
+export default function SuperAdminPanel() {
   const { user, loading: authLoading } = useAuth();
-  const isAdmin = user?.role === "admin";
+  const isAdmin = isSuperAdminEmail(user?.email);
 
   const [tab, setTab] = useState("clients");
   const [loading, setLoading] = useState(true);
@@ -152,8 +157,8 @@ export default function AdminPanel() {
       <div style={{ background: "#f3f4f6", minHeight: "100dvh", fontFamily: "'Manrope', system-ui, sans-serif" }}>
         <MovEazyNav active="" />
         <main className="max-w-2xl mx-auto px-4 py-16 text-center">
-          <h1 className="text-[22px] font-extrabold text-gray-900 mb-2">Admin only</h1>
-          <p className="text-[13px] text-gray-500 mb-6">This panel is limited to MovEazy admins.</p>
+          <h1 className="text-[22px] font-extrabold text-gray-900 mb-2">Superadmin only</h1>
+          <p className="text-[13px] text-gray-500 mb-6">This panel is limited to the MovEazy founder account.</p>
           <Link to="/" className="text-[13px] font-bold" style={{ color: "#ff3131" }}>← Back to home</Link>
         </main>
       </div>
@@ -169,7 +174,7 @@ export default function AdminPanel() {
       <main className="max-w-6xl mx-auto px-4 sm:px-6 py-8">
         <div className="flex flex-wrap items-end justify-between gap-3 mb-5">
           <div>
-            <h1 className="text-[24px] sm:text-[30px] font-extrabold text-gray-900">Admin panel</h1>
+            <h1 className="text-[24px] sm:text-[30px] font-extrabold text-gray-900">Superadmin panel</h1>
             <p className="text-[13px] text-gray-500 mt-1">Demand, supply and the people behind them.</p>
           </div>
           <Link to="/admin" className="text-[12px] font-bold text-gray-500 hover:text-gray-800">Raw tables →</Link>

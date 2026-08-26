@@ -5,7 +5,7 @@
  * Every page renders this so the navigation is identical site-wide. It carries
  * its own <style> block and scroll listener, so a page only has to drop it in.
  *
- * @param {"home"|"how"|"about"|"register-broker"|"my-properties"|""} active — link to highlight
+ * @param {"home"|"how"|"about"|"register-broker"|"my-properties"|"superadmin"|""} active — link to highlight
  * @param {boolean} transparentAtTop — true only on the dark hero home page, where
  *   the bar starts see-through and fades in a background as you scroll. Every
  *   other page keeps the solid bar so the light-background pages stay readable.
@@ -22,6 +22,7 @@ import { useAuth } from "../../context/AuthContext";
 import { useLoginModal } from "../../context/LoginModalContext";
 import { useVisitCart } from "../../context/VisitCartContext";
 import { countMyInventory } from "../../lib/inventory";
+import { isSuperAdminEmail } from "../../lib/adminAccess";
 import logoMint from "../../assets/logo/moveazy-logo-mint-dark.png";
 
 const LINK_BASE = {
@@ -247,8 +248,8 @@ export default function MovEazyNav({ active = "", transparentAtTop = false, onFi
             {hasProperties && (
               <Link to="/my-properties" className="mzn-nav-link" style={active === "my-properties" ? LINK_ACTIVE : LINK_BASE}>My Properties</Link>
             )}
-            {user?.role === "admin" && (
-              <Link to="/admin-panel" className="mzn-nav-link" style={active === "admin" ? LINK_ACTIVE : LINK_BASE}>Admin</Link>
+            {isSuperAdminEmail(user?.email) && (
+              <Link to="/superadmin" className="mzn-nav-link" style={active === "superadmin" ? LINK_ACTIVE : LINK_BASE}>Superadmin</Link>
             )}
           </div>
 
@@ -311,8 +312,8 @@ export default function MovEazyNav({ active = "", transparentAtTop = false, onFi
             {hasProperties && (
               <Link to="/my-properties" className={`mzn-sheet-link ${active === "my-properties" ? "is-active" : ""}`}>My Properties</Link>
             )}
-            {user?.role === "admin" && (
-              <Link to="/admin-panel" className={`mzn-sheet-link ${active === "admin" ? "is-active" : ""}`}>Admin</Link>
+            {isSuperAdminEmail(user?.email) && (
+              <Link to="/superadmin" className={`mzn-sheet-link ${active === "superadmin" ? "is-active" : ""}`}>Superadmin</Link>
             )}
             {cartCount > 0 && (
               <button type="button" className="mzn-sheet-link" onClick={closeThen(() => navigate("/visits"))}>Site visits ({cartCount})</button>
