@@ -262,7 +262,7 @@ export default function MovEazyNav({ active = "", transparentAtTop = false, onFi
             <img src={logoMint} alt="movEAZY" draggable={false} style={{ height: "clamp(26px,2.4vw,34px)", width: "auto", display: "block" }} />
           </Link>
 
-          <div className="mzn-nav-links" style={{ display: "flex", alignItems: "center", gap: "clamp(1px,.3vw,6px)", background: "rgba(255,255,255,.06)", border: "1px solid rgba(255,255,255,.09)", borderRadius: 100, padding: 4, flex: 1, minWidth: 0, maxWidth: 780, overflowX: "auto", scrollbarWidth: "none", justifyContent: "center", WebkitMaskImage: "linear-gradient(to right, transparent 0, black 14px, black calc(100% - 14px), transparent 100%)", maskImage: "linear-gradient(to right, transparent 0, black 14px, black calc(100% - 14px), transparent 100%)" }}>
+          <div className="mzn-nav-links" style={{ display: "flex", alignItems: "center", gap: "clamp(1px,.3vw,6px)", background: "rgba(255,255,255,.06)", border: "1px solid rgba(255,255,255,.09)", borderRadius: 100, padding: 4, flex: "0 1 auto", minWidth: 0, maxWidth: 780, overflowX: "auto", scrollbarWidth: "none", justifyContent: "center", WebkitMaskImage: "linear-gradient(to right, transparent 0, black 14px, black calc(100% - 14px), transparent 100%)", maskImage: "linear-gradient(to right, transparent 0, black 14px, black calc(100% - 14px), transparent 100%)" }}>
             <Link to="/" className="mzn-nav-link" style={active === "home" ? LINK_ACTIVE : LINK_BASE}>Home</Link>
             <Link to="/how-it-works" className="mzn-nav-link" style={active === "how" ? LINK_ACTIVE : LINK_BASE}>How it Works</Link>
             <Link to="/about" className="mzn-nav-link" style={active === "about" ? LINK_ACTIVE : LINK_BASE}>About Us</Link>
