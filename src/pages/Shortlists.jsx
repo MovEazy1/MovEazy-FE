@@ -2,10 +2,12 @@
  * "View Shortlists" — everything the signed-in user has shown interest in,
  * split into two segments: their site-visit list, and homes they've liked
  * (♥) but not necessarily added for a visit yet. Each card's one action is
- * scheduling a visit — picking a published slot, or (if none are published
- * yet) asking to join the next open one. Scheduling a liked-only home also
- * adds it to the site-visit list, since a booking only shows up on /visits
- * for homes that are actually in the cart.
+ * scheduling a visit, always by picking a slot from the dropdown first —
+ * there's no one-tap "book" that fires without an explicit slot chosen, so
+ * nothing gets scheduled by accident. If a property has no published slots
+ * yet, the dropdown just says so and the button stays disabled. Scheduling
+ * a liked-only home also adds it to the site-visit list, since a booking
+ * only shows up on /visits for homes that are actually in the cart.
  */
 import { useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
@@ -191,21 +193,19 @@ export default function Shortlists() {
                         Waiting for the next open visit
                       </div>
                     )}
-                    {!b && options.length > 0 && (
+                    {!b && (
                       <div className="sl-row">
-                        <select className="sl-select" value={chosen[it.property_id] || ""} onChange={(e) => setChosen((c) => ({ ...c, [it.property_id]: e.target.value }))}>
-                          <option value="">Pick a visit slot…</option>
+                        <select
+                          className="sl-select"
+                          value={chosen[it.property_id] || ""}
+                          disabled={options.length === 0}
+                          onChange={(e) => setChosen((c) => ({ ...c, [it.property_id]: e.target.value }))}
+                        >
+                          <option value="">{options.length ? "Pick a visit slot…" : "No slots published yet"}</option>
                           {options.map((s) => <option key={s.id} value={s.slot_at}>{fmtSlot(s.slot_at)}</option>)}
                         </select>
                         <button type="button" className="sl-btn" disabled={!chosen[it.property_id] || busy === it.property_id} onClick={() => scheduleVisit(it, chosen[it.property_id])}>
                           {busy === it.property_id ? "Booking…" : "Schedule visit"}
-                        </button>
-                      </div>
-                    )}
-                    {!b && options.length === 0 && (
-                      <div className="sl-row">
-                        <button type="button" className="sl-btn" disabled={busy === it.property_id} onClick={() => scheduleVisit(it)}>
-                          {busy === it.property_id ? "Joining…" : "Schedule visit"}
                         </button>
                       </div>
                     )}

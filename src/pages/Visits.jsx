@@ -55,9 +55,15 @@ export default function Visits() {
   const bookingByPid = useMemo(() => Object.fromEntries(bookings.map((b) => [b.property_id, b])), [bookings]);
   const toSchedule = useMemo(() => cart.items.filter((i) => !bookingByPid[i.property_id]), [cart.items, bookingByPid]);
   // A booking without a slot_at was submitted as a preference ("join the next
-  // open visit"), not an actual scheduled time — onlyScheduled excludes those.
+  // open visit"), not an actual finalised time — onlyScheduled excludes those,
+  // checking both the status flag and the slot_at itself so a property only
+  // counts as "scheduled" once a real visit time has been settled on.
   const scheduled = useMemo(
-    () => cart.items.filter((i) => bookingByPid[i.property_id] && (!onlyScheduled || bookingByPid[i.property_id].status !== "preference")),
+    () => cart.items.filter((i) => {
+      const b = bookingByPid[i.property_id];
+      if (!b) return false;
+      return !onlyScheduled || (b.status !== "preference" && !!b.slot_at);
+    }),
     [cart.items, bookingByPid, onlyScheduled]
   );
 
