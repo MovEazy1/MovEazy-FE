@@ -18,3 +18,20 @@ export async function fetchMyListingStats() {
   }
   return data || [];
 }
+
+/**
+ * Individual timestamped events (likes, visit requests, visit bookings) on the
+ * signed-in user's own properties — the data behind the notification bell in
+ * MovEazyNav.jsx. Backed by public.my_recent_activity() (see
+ * MovEazy-BE/supabase/owner_notifications.sql), which is scoped server-side to
+ * the caller's own poster_id.
+ */
+export async function fetchRecentActivity({ days = 14, limit = 50 } = {}) {
+  if (!isSupabaseConfigured || !supabase) return [];
+  const { data, error } = await supabase.rpc("my_recent_activity", { days, limit_n: limit });
+  if (error) {
+    console.error("my_recent_activity failed:", error.message);
+    return [];
+  }
+  return data || [];
+}

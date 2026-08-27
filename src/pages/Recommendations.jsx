@@ -9,6 +9,7 @@ import { useVisitCart } from "../context/VisitCartContext";
 import { recommendInventory } from "../lib/recommend";
 import { fetchUserRequirement } from "../lib/userRequirements";
 import { fetchReactions, setReaction } from "../lib/visits";
+import { recordListingView } from "../lib/inventory";
 import { haversineKm } from "../lib/geo";
 
 const BLR = [12.9716, 77.5946];
@@ -197,6 +198,7 @@ export default function Recommendations() {
   // already visible beside the list, so keep the existing fly-to-it behaviour.
   const openCard = (r) => {
     focusListing(r);
+    recordListingView(r.listing.property_id); // counts toward the owner's "Views" stat on My Properties
     if (typeof window !== "undefined" && window.matchMedia("(max-width: 640px)").matches) {
       setDetailListing(r);
     }

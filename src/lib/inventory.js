@@ -261,6 +261,28 @@ export async function markInventorySold(propertyId) {
   return setInventoryStatus(propertyId, "sold");
 }
 
+const VIEWED_THIS_SESSION = new Set();
+
+/**
+ * Record that a renter opened a listing's detail view — bumps inventory.view_count
+ * via the increment_listing_view() RPC (see MovEazy-BE/supabase/owner_dashboard_stats.sql),
+ * since the poster-only "update own inventory" RLS policy can't let a random viewer
+ * touch someone else's row directly. Best-effort and silent: a failed/blocked view
+ * count should never interrupt browsing. De-duped per propertyId per browser tab
+ * (sessionStorage-backed via an in-memory Set) so re-opening the same card a few
+ * times in one visit doesn't inflate the count.
+ */
+export async function recordListingView(propertyId) {
+  if (!isSupabaseConfigured || !supabase || !propertyId) return;
+  if (VIEWED_THIS_SESSION.has(propertyId)) return;
+  VIEWED_THIS_SESSION.add(propertyId);
+  try {
+    await supabase.rpc("increment_listing_view", { pid: propertyId });
+  } catch {
+    /* best-effort — a view count is never worth surfacing an error for */
+  }
+}
+
 /** Every saved customer search profile (the demand side) for matching. */
 export async function fetchAllSearchProfiles({ limit = 1000 } = {}) {
   if (!isSupabaseConfigured || !supabase) return [];

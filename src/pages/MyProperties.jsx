@@ -107,9 +107,10 @@ export function PropertyCard({ p, slotCount, onStatus, busy, onSlotCountChange }
         </div>
       </div>
 
-      <div className="grid grid-cols-3 sm:grid-cols-5 gap-2 px-4">
+      <div className="grid grid-cols-3 sm:grid-cols-6 gap-2 px-4">
         <Stat label="Views" value={p.view_count ?? 0} />
         <Stat label="Shortlisted" value={p.shortlist_count ?? 0} />
+        <Stat label="Visits" value={p.visit_count ?? 0} />
         <Stat label="Visit slots" value={slotCount} />
         <Stat label="Photos" value={(p.images || []).length} />
         <Stat label="Verified" value={p.is_verified ? "Yes" : "No"} />
@@ -228,8 +229,15 @@ export default function MyProperties() {
         fetchMyInventory(uid),
         fetchMyListingStats(), // per-property shortlist count; already scoped server-side to this poster
       ]);
-      const shortlistsByProperty = new Map(statRows.map((s) => [s.property_id, s.shortlist_count]));
-      const merged = list.map((r) => ({ ...r, shortlist_count: shortlistsByProperty.get(r.property_id) || 0 }));
+      const statsByProperty = new Map(statRows.map((s) => [s.property_id, s]));
+      const merged = list.map((r) => {
+        const s = statsByProperty.get(r.property_id);
+        return {
+          ...r,
+          shortlist_count: s?.shortlist_count || 0,
+          visit_count: (s?.visit_request_count || 0) + (s?.visit_booking_count || 0),
+        };
+      });
       setRows(merged);
       const ids = list.map((r) => r.property_id);
       if (ids.length) {
@@ -280,6 +288,7 @@ export default function MyProperties() {
     rented: rows.filter((r) => isClosed(r.status)).length,
     views: rows.reduce((n, r) => n + (r.view_count || 0), 0),
     shortlisted: rows.reduce((n, r) => n + (r.shortlist_count || 0), 0),
+    visits: rows.reduce((n, r) => n + (r.visit_count || 0), 0),
   }), [rows]);
 
   return (
@@ -316,12 +325,13 @@ export default function MyProperties() {
           </div>
         ) : (
           <>
-            <div className="grid grid-cols-3 sm:grid-cols-5 gap-2 sm:gap-3 mb-6">
+            <div className="grid grid-cols-3 sm:grid-cols-6 gap-2 sm:gap-3 mb-6">
               <Stat label="Listed" value={totals.all} />
               <Stat label="Live" value={totals.live} />
               <Stat label="Rented" value={totals.rented} />
               <Stat label="Views" value={totals.views} />
               <Stat label="Shortlisted" value={totals.shortlisted} />
+              <Stat label="Visits" value={totals.visits} />
             </div>
 
             {err && <p className="text-[12px] font-semibold text-red-500 mb-3">{err}</p>}

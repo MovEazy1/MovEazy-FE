@@ -25,6 +25,7 @@ import { countMyInventory, hasOwnerListing, fetchMyInventory } from "../../lib/i
 import { hasAnyOpenSlot } from "../../lib/visits";
 import { fetchUserRequirement } from "../../lib/userRequirements";
 import { isSuperAdminEmail } from "../../lib/adminAccess";
+import { fetchRecentActivity } from "../../lib/ownerDashboard";
 import logoMint from "../../assets/logo/moveazy-logo-mint-dark.png";
 
 const LINK_BASE = {
@@ -120,6 +121,36 @@ function RentIcon() {
     </svg>
   );
 }
+function BellIcon() {
+  return (
+    <svg viewBox="0 0 24 24" width="19" height="19" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+      <path d="M6 9a6 6 0 1 1 12 0c0 4 1.5 5.5 1.5 5.5H4.5S6 13 6 9z" />
+      <path d="M10 19a2 2 0 0 0 4 0" />
+    </svg>
+  );
+}
+function activityIcon(type) {
+  if (type === "like") return "♥";
+  if (type === "visit_booking") return "✓";
+  return "◷"; // visit_request — asked to join the next open visit, no slot picked yet
+}
+function activityLabel(type) {
+  if (type === "like") return "shortlisted";
+  if (type === "visit_booking") return "booked a visit for";
+  return "asked about a visit for";
+}
+/** Compact "Xm/h/d ago" — good enough for a notification list, no library needed. */
+function timeAgo(iso) {
+  const ms = Date.now() - new Date(iso).getTime();
+  const min = Math.floor(ms / 60000);
+  if (min < 1) return "just now";
+  if (min < 60) return `${min}m ago`;
+  const hr = Math.floor(min / 60);
+  if (hr < 24) return `${hr}h ago`;
+  const day = Math.floor(hr / 24);
+  return `${day}d ago`;
+}
+const NOTIF_SEEN_KEY = (uid) => `moveazy_notif_seen_${uid}`;
 
 export default function MovEazyNav({ active = "", transparentAtTop = false, onFindFlat, onGetAgent }) {
   const { user, logout, loading: authLoading } = useAuth();
@@ -137,6 +168,10 @@ export default function MovEazyNav({ active = "", transparentAtTop = false, onFi
   const [needsVisitTiming, setNeedsVisitTiming] = useState(false);
   const [acctOpen, setAcctOpen] = useState(false);
   const acctRef = useRef(null);
+  const [activity, setActivity] = useState([]);
+  const [notifOpen, setNotifOpen] = useState(false);
+  const [lastSeen, setLastSeen] = useState(null);
+  const notifRef = useRef(null);
 
   // Close the sheet whenever the route changes.
   useEffect(() => { setMenuOpen(false); }, [location.pathname]);
@@ -230,6 +265,47 @@ export default function MovEazyNav({ active = "", transparentAtTop = false, onFi
     return () => { document.removeEventListener("mousedown", onDown); window.removeEventListener("keydown", onKey); };
   }, [acctOpen]);
 
+  // Notification bell — "fresh leads / visits to your properties", owner-only.
+  // The seen checkpoint is a plain localStorage timestamp per user (this browser
+  // only, matching the recurring-slot pattern elsewhere in this file) — no
+  // server-side "read" state to keep in sync.
+  useEffect(() => {
+    if (!user?.uid) { setLastSeen(null); return; }
+    try { setLastSeen(localStorage.getItem(NOTIF_SEEN_KEY(user.uid))); } catch { setLastSeen(null); }
+  }, [user]);
+
+  useEffect(() => {
+    let alive = true;
+    if (!isOwner || !user?.uid) { setActivity([]); return undefined; }
+    const load = () => fetchRecentActivity({ days: 14 }).then((rows) => { if (alive) setActivity(rows); });
+    load();
+    const iv = window.setInterval(load, 90000); // light poll so the badge doesn't need a refresh to update
+    return () => { alive = false; window.clearInterval(iv); };
+  }, [isOwner, user]);
+
+  useEffect(() => {
+    if (!notifOpen) return;
+    const onDown = (e) => { if (notifRef.current && !notifRef.current.contains(e.target)) setNotifOpen(false); };
+    const onKey = (e) => e.key === "Escape" && setNotifOpen(false);
+    document.addEventListener("mousedown", onDown);
+    window.addEventListener("keydown", onKey);
+    return () => { document.removeEventListener("mousedown", onDown); window.removeEventListener("keydown", onKey); };
+  }, [notifOpen]);
+
+  const unseenCount = lastSeen ? activity.filter((a) => a.occurred_at > lastSeen).length : activity.length;
+
+  const toggleNotif = () => {
+    setNotifOpen((o) => {
+      const next = !o;
+      if (next && user?.uid) {
+        const now = new Date().toISOString();
+        try { localStorage.setItem(NOTIF_SEEN_KEY(user.uid), now); } catch { /* best-effort */ }
+        setLastSeen(now);
+      }
+      return next;
+    });
+  };
+
   const listMyFlat = () => { if (authLoading) return; user ? navigate("/list-my-flat") : openLogin(() => navigate("/list-my-flat")); };
   const findFlat = () => { if (authLoading) return; onFindFlat ? onFindFlat() : navigate("/?search=1"); };
   const getAgent = () => { if (authLoading) return; onGetAgent ? onGetAgent() : navigate("/?find=1"); };
@@ -261,6 +337,33 @@ export default function MovEazyNav({ active = "", transparentAtTop = false, onFi
         .mzn-acct-item-danger { color: #FCA5A5; }
         .mzn-acct-item-danger:hover { background: rgba(252,165,165,.10); color: #FCA5A5; }
         .mzn-acct-divider { height: 1px; background: rgba(255,255,255,.10); margin: 5px 6px; }
+        .mzn-bell {
+          position: relative; display: inline-flex; align-items: center; justify-content: center;
+          width: 38px; height: 38px; border-radius: 50%; flex: none;
+          border: 1px solid rgba(255,255,255,.20); background: rgba(255,255,255,.08); color: #F1F6F4;
+        }
+        .mzn-bell-badge {
+          position: absolute; top: -3px; right: -3px; min-width: 16px; height: 16px; padding: 0 4px;
+          border-radius: 100px; background: #DC2626; color: #fff; font-size: 10px; font-weight: 800;
+          display: flex; align-items: center; justify-content: center; line-height: 1;
+          border: 2px solid #04211D;
+        }
+        .mzn-notif-menu {
+          position: absolute; top: calc(100% + 8px); right: 0; z-index: 190; width: 320px; max-width: 88vw;
+          background: #062D27; border: 1px solid rgba(255,255,255,.10); border-radius: 14px;
+          padding: 6px; box-shadow: 0 20px 48px rgba(0,0,0,.5); max-height: 70vh; overflow-y: auto;
+          transform: translateY(-6px) scale(.97); opacity: 0; pointer-events: none;
+          transform-origin: top right; transition: transform .18s cubic-bezier(.22,1,.36,1), opacity .15s ease;
+        }
+        .mzn-notif-menu.is-open { transform: translateY(0) scale(1); opacity: 1; pointer-events: auto; }
+        .mzn-notif-title { padding: 8px 10px 6px; font-size: 11px; font-weight: 800; letter-spacing: .04em; text-transform: uppercase; color: #7FA69E; }
+        .mzn-notif-empty { padding: 18px 12px; text-align: center; font-size: 13px; color: #7FA69E; }
+        .mzn-notif-item { display: flex; align-items: flex-start; gap: 9px; padding: 9px 10px; border-radius: 10px; }
+        .mzn-notif-item:hover { background: rgba(255,255,255,.06); }
+        .mzn-notif-ico { flex: none; width: 26px; height: 26px; border-radius: 50%; background: rgba(94,234,212,.14); color: #5EEAD4; display: flex; align-items: center; justify-content: center; font-size: 13px; }
+        .mzn-notif-text { font-size: 12.5px; color: #E5F1EE; line-height: 1.4; }
+        .mzn-notif-text b { color: #F1F6F4; }
+        .mzn-notif-time { font-size: 11px; color: #7FA69E; margin-top: 1px; }
         .mzn-badge-new { background: linear-gradient(135deg,#FFE1A6,#E8A33D 45%,#B9782A); box-shadow: 0 0 0 1px rgba(255,255,255,.35) inset, 0 1px 4px rgba(232,163,61,.5); color: #1B1204; font-size: 8px; font-weight: 800; letter-spacing: .02em; padding: 1.5px 6px; border-radius: 100px; line-height: 1.6; align-self: flex-start; margin-top: -4px; }
         .mzn-burger { display: none; align-items: center; justify-content: center; width: 44px; height: 44px; border: none; background: rgba(255,255,255,.08); border-radius: 50%; color: #F1F6F4; flex: none; }
         .mzn-burger svg { display: block; }
@@ -435,6 +538,34 @@ export default function MovEazyNav({ active = "", transparentAtTop = false, onFi
               </button>
             )}
           </div>
+
+          {/* Notification bell — fresh leads/visits on the owner's own properties.
+              Rendered outside .mzn-nav-account so it stays visible on mobile too,
+              where that whole block collapses into the hamburger sheet. */}
+          {isOwner && (
+            <div ref={notifRef} style={{ position: "relative", flex: "none" }}>
+              <button type="button" className="mzn-bell" onClick={toggleNotif} aria-label={`Notifications${unseenCount ? `, ${unseenCount} unseen` : ""}`} aria-haspopup="menu" aria-expanded={notifOpen}>
+                <BellIcon />
+                {unseenCount > 0 && <span className="mzn-bell-badge">{unseenCount > 9 ? "9+" : unseenCount}</span>}
+              </button>
+              <div className={`mzn-notif-menu ${notifOpen ? "is-open" : ""}`} role="menu">
+                <p className="mzn-notif-title">Recent activity</p>
+                {activity.length === 0 ? (
+                  <p className="mzn-notif-empty">No fresh leads yet — likes and visit requests on your properties will show up here.</p>
+                ) : (
+                  activity.map((a, i) => (
+                    <div key={`${a.property_id}-${a.occurred_at}-${i}`} className="mzn-notif-item">
+                      <span className="mzn-notif-ico" aria-hidden>{activityIcon(a.event_type)}</span>
+                      <div>
+                        <p className="mzn-notif-text">Someone {activityLabel(a.event_type)} <b>{a.title || a.property_id}</b></p>
+                        <p className="mzn-notif-time">{timeAgo(a.occurred_at)}</p>
+                      </div>
+                    </div>
+                  ))
+                )}
+              </div>
+            </div>
+          )}
 
           {/* Mobile hamburger — desktop keeps the pill nav above. */}
           <button type="button" className="mzn-burger" aria-label={menuOpen ? "Close menu" : "Open menu"} aria-expanded={menuOpen} onClick={() => setMenuOpen((o) => !o)}>
