@@ -12,6 +12,8 @@ import { useLoginModal } from "../context/LoginModalContext";
 import MovEazyNav from "../components/layout/MovEazyNav";
 import { fetchMyInventory, setInventoryStatus } from "../lib/inventory";
 import { fetchSlotsFor } from "../lib/visits";
+import { fetchMyListingStats } from "../lib/ownerDashboard";
+import PropertyVisitSlots from "../components/PropertyVisitSlots";
 
 const inr = (n) =>
   Number.isFinite(Number(n)) && Number(n) > 0
@@ -29,11 +31,11 @@ const STATUS = {
 };
 const isClosed = (status) => status === "rented" || status === "sold";
 
-function Stat({ label, value }) {
+export function Stat({ label, value }) {
   return (
-    <div className="rounded-xl bg-gray-50 border border-gray-100 px-3 py-2 text-center">
+    <div className="rounded-xl bg-gray-50 border border-gray-100 px-2 py-2 text-center">
       <p className="text-[15px] font-extrabold text-gray-900 leading-none">{value}</p>
-      <p className="text-[10px] font-bold uppercase tracking-wide text-gray-400 mt-1">{label}</p>
+      <p className="text-[10px] font-bold uppercase tracking-wide text-gray-400 mt-1 leading-tight break-words">{label}</p>
     </div>
   );
 }
@@ -48,7 +50,7 @@ function Row({ label, value }) {
   );
 }
 
-function PropertyCard({ p, slotCount, onStatus, busy }) {
+export function PropertyCard({ p, slotCount, onStatus, busy, onSlotCountChange }) {
   const [open, setOpen] = useState(false);
   const st = STATUS[p.status] || STATUS.published;
   const cover = p.cover_image_url || (p.images || [])[0] || "";
@@ -94,8 +96,9 @@ function PropertyCard({ p, slotCount, onStatus, busy }) {
         </div>
       </div>
 
-      <div className="grid grid-cols-4 gap-2 px-4">
+      <div className="grid grid-cols-3 sm:grid-cols-5 gap-2 px-4">
         <Stat label="Views" value={p.view_count ?? 0} />
+        <Stat label="Shortlisted" value={p.shortlist_count ?? 0} />
         <Stat label="Visit slots" value={slotCount} />
         <Stat label="Photos" value={(p.images || []).length} />
         <Stat label="Verified" value={p.is_verified ? "Yes" : "No"} />
@@ -171,6 +174,14 @@ function PropertyCard({ p, slotCount, onStatus, busy }) {
               <Row label="Posted by" value={p.poster_name} />
             </div>
           </div>
+
+          {!isClosed(p.status) && (
+            <PropertyVisitSlots
+              propertyId={p.property_id}
+              hideMarkSold
+              onSlotsChanged={(count) => onSlotCountChange?.(p.property_id, count)}
+            />
+          )}
         </div>
       )}
     </div>
@@ -190,8 +201,13 @@ export default function MyProperties() {
   const load = async (uid) => {
     setLoading(true);
     try {
-      const list = await fetchMyInventory(uid);
-      setRows(list);
+      const [list, statRows] = await Promise.all([
+        fetchMyInventory(uid),
+        fetchMyListingStats(), // per-property shortlist count; already scoped server-side to this poster
+      ]);
+      const shortlistsByProperty = new Map(statRows.map((s) => [s.property_id, s.shortlist_count]));
+      const merged = list.map((r) => ({ ...r, shortlist_count: shortlistsByProperty.get(r.property_id) || 0 }));
+      setRows(merged);
       const ids = list.map((r) => r.property_id);
       if (ids.length) {
         const slots = await fetchSlotsFor(ids);
@@ -228,11 +244,18 @@ export default function MyProperties() {
     }
   };
 
+  // PropertyVisitSlots reports its own live count after each add/remove, so the
+  // "Visit slots" stat doesn't go stale until the next full reload.
+  const handleSlotCountChange = (propertyId, count) => {
+    setSlotCounts((prev) => ({ ...prev, [propertyId]: count }));
+  };
+
   const totals = useMemo(() => ({
     all: rows.length,
     live: rows.filter((r) => r.status === "published").length,
     rented: rows.filter((r) => isClosed(r.status)).length,
     views: rows.reduce((n, r) => n + (r.view_count || 0), 0),
+    shortlisted: rows.reduce((n, r) => n + (r.shortlist_count || 0), 0),
   }), [rows]);
 
   return (
@@ -269,11 +292,12 @@ export default function MyProperties() {
           </div>
         ) : (
           <>
-            <div className="grid grid-cols-4 gap-2 sm:gap-3 mb-6">
+            <div className="grid grid-cols-3 sm:grid-cols-5 gap-2 sm:gap-3 mb-6">
               <Stat label="Listed" value={totals.all} />
               <Stat label="Live" value={totals.live} />
               <Stat label="Rented" value={totals.rented} />
               <Stat label="Views" value={totals.views} />
+              <Stat label="Shortlisted" value={totals.shortlisted} />
             </div>
 
             {err && <p className="text-[12px] font-semibold text-red-500 mb-3">{err}</p>}
@@ -286,6 +310,7 @@ export default function MyProperties() {
                   slotCount={slotCounts[p.property_id] || 0}
                   onStatus={changeStatus}
                   busy={busy}
+                  onSlotCountChange={handleSlotCountChange}
                 />
               ))}
             </div>

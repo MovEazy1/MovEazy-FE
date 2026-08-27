@@ -21,7 +21,7 @@ import { Link, useNavigate, useLocation } from "react-router-dom";
 import { useAuth } from "../../context/AuthContext";
 import { useLoginModal } from "../../context/LoginModalContext";
 import { useVisitCart } from "../../context/VisitCartContext";
-import { countMyInventory } from "../../lib/inventory";
+import { countMyInventory, hasOwnerListing } from "../../lib/inventory";
 import { fetchUserRequirement } from "../../lib/userRequirements";
 import { isSuperAdminEmail } from "../../lib/adminAccess";
 import logoMint from "../../assets/logo/moveazy-logo-mint-dark.png";
@@ -91,6 +91,34 @@ function ScheduledIcon() {
     </svg>
   );
 }
+function PropertiesIcon() {
+  return (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" width="23" height="23">
+      <path d="M4 21V9.5L12 4l8 5.5V21" />
+      <path d="M9 21v-6h6v6" />
+      <path d="M4 21h16" />
+    </svg>
+  );
+}
+function TenantIcon() {
+  return (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" width="23" height="23">
+      <circle cx="8.5" cy="7.5" r="3" />
+      <path d="M2.5 20v-1.2c0-2.6 2.2-4.6 6-4.6s6 2 6 4.6V20" />
+      <circle cx="17" cy="8.5" r="2.4" />
+      <path d="M15.3 13.6c2.9.4 4.7 2.1 4.7 4.3V19" />
+    </svg>
+  );
+}
+function RentIcon() {
+  return (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" width="23" height="23">
+      <rect x="3.5" y="5.5" width="17" height="13" rx="2" />
+      <circle cx="12" cy="12" r="2.6" />
+      <path d="M6.5 8.5v0M17.5 15.5v0" />
+    </svg>
+  );
+}
 
 export default function MovEazyNav({ active = "", transparentAtTop = false, onFindFlat, onGetAgent }) {
   const { user, logout, loading: authLoading } = useAuth();
@@ -104,6 +132,7 @@ export default function MovEazyNav({ active = "", transparentAtTop = false, onFi
   const [navH, setNavH] = useState(72);
   const [hasProperties, setHasProperties] = useState(false);
   const [hasSubmittedPrefs, setHasSubmittedPrefs] = useState(false);
+  const [isOwner, setIsOwner] = useState(false);
   const [acctOpen, setAcctOpen] = useState(false);
   const acctRef = useRef(null);
 
@@ -139,6 +168,18 @@ export default function MovEazyNav({ active = "", transparentAtTop = false, onFi
     let alive = true;
     if (!user?.uid) { setHasProperties(false); return undefined; }
     countMyInventory(user.uid).then((n) => { if (alive) setHasProperties(n > 0); });
+    return () => { alive = false; };
+  }, [user]);
+
+  // Someone who has posted at least one property specifically as an owner gets
+  // the owner-focused bottom bar (Home / My Properties / Tenant Management /
+  // Rent Management) instead of the renter one — takes priority over
+  // hasSubmittedPrefs below, since managing a live listing is the more
+  // pressing set of tools once you're doing it.
+  useEffect(() => {
+    let alive = true;
+    if (!user?.uid) { setIsOwner(false); return undefined; }
+    hasOwnerListing(user.uid).then((v) => { if (alive) setIsOwner(v); });
     return () => { alive = false; };
   }, [user]);
 
@@ -422,12 +463,21 @@ export default function MovEazyNav({ active = "", transparentAtTop = false, onFi
             its first section would start beneath the bar. */}
         {!transparentAtTop && <div aria-hidden style={{ height: navH }} />}
 
-        {/* Mobile bottom action bar. Before "Find My Flat" is ever submitted,
-            it's the three signup-focused entry points; once someone has a
-            saved requirement, those aren't useful anymore — swap in the four
-            a returning renter actually needs. */}
+        {/* Mobile bottom action bar — three variants. Before "Find My Flat" is
+            ever submitted, it's the three signup-focused entry points. Once
+            someone has a saved requirement, those aren't useful anymore —
+            swap in the four a returning renter actually needs. And once
+            someone has posted a property specifically as an owner, their
+            own management tools take priority over the renter set. */}
         <nav className="mzn-bottombar" aria-label="Primary actions">
-          {hasSubmittedPrefs ? (
+          {isOwner ? (
+            <>
+              <button type="button" onClick={() => navigate("/")}><HomeIcon /><span>Home</span></button>
+              <button type="button" onClick={() => navigate("/my-properties")}><PropertiesIcon /><span>My Properties</span></button>
+              <button type="button" onClick={() => navigate("/tenant-management")}><TenantIcon /><span>Tenant Management</span></button>
+              <button type="button" onClick={() => navigate("/rent-management")}><RentIcon /><span>Rent Management</span></button>
+            </>
+          ) : hasSubmittedPrefs ? (
             <>
               <button type="button" onClick={() => navigate("/")}><HomeIcon /><span>Home</span></button>
               <button type="button" onClick={findFlat}><FlatIcon /><span>Find My Flat</span></button>

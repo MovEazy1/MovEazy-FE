@@ -180,6 +180,21 @@ export async function countMyInventory(uid) {
   return count || 0;
 }
 
+/** Whether this user has posted at least one property specifically as an owner
+ * (posted_by = "owner", not tenant/broker) — decides whether the mobile bottom
+ * bar switches to the owner-focused set (Home / My Properties / Tenant
+ * Management / Rent Management). */
+export async function hasOwnerListing(uid) {
+  if (!isSupabaseConfigured || !supabase || !uid) return false;
+  const { count, error } = await supabase
+    .from("inventory")
+    .select("property_id", { count: "exact", head: true })
+    .eq("poster_id", uid)
+    .eq("posted_by", "owner");
+  if (error) return false;
+  return (count || 0) > 0;
+}
+
 /**
  * Adapt a published inventory row (snake_case DB shape) to the listing shape the
  * map/discovery UI expects (l.bhk, l.price, l.seller, l.image, …), so user-uploaded
