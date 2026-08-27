@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
-import { MapContainer, TileLayer, Marker, useMap } from "react-leaflet";
+import { MapContainer, TileLayer, Marker, Popup, useMap } from "react-leaflet";
 import L from "leaflet";
 import "leaflet/dist/leaflet.css";
 import MovEazyNav from "../components/layout/MovEazyNav";
@@ -37,9 +37,15 @@ function localityScore(listing, prefs) {
   return { pct: 30, label: "Outside the localities you named" };
 }
 
-/** Teardrop pin — neutral coral (match score is intentionally not shown). Active enlarges + darkens. */
-function pinIcon(active) {
-  const c = active ? "#d8412b" : "#ef5a45";
+/** Teardrop pin — colour reflects the seeker's own reaction, so the map
+ * doubles as a visual record of what they've already decided: green once
+ * it's on their site-visit list, gold once liked, plain coral otherwise.
+ * Disliked listings aren't muted here — they're dropped from `markers`
+ * entirely (see below), so their pin just isn't on the map at all. */
+function pinIcon(active, reactionState) {
+  const base = reactionState === "visit" ? "#16a34a" : reactionState === "liked" ? "#e0a83b" : "#ef5a45";
+  const activeShade = reactionState === "visit" ? "#0f7a34" : reactionState === "liked" ? "#b9861f" : "#d8412b";
+  const c = active ? activeShade : base;
   const size = active ? 40 : 32;
   return L.divIcon({
     className: "rec-pin",
@@ -163,9 +169,19 @@ export default function Recommendations() {
     if (user) await setReaction(user.uid, propertyId, value, current);
   };
 
+  /** visit (site-visit list) > liked > plain — the strongest signal wins the pin colour. */
+  const reactionStateFor = (propertyId) => {
+    if (cart.has(propertyId)) return "visit";
+    if (reactions[propertyId] === "like") return "liked";
+    return null;
+  };
+
   const markers = useMemo(
-    () => results.filter((r) => Number.isFinite(Number(r.listing?.latitude)) && Number.isFinite(Number(r.listing?.longitude))),
-    [results]
+    () => results.filter((r) =>
+      Number.isFinite(Number(r.listing?.latitude)) && Number.isFinite(Number(r.listing?.longitude)) &&
+      reactions[r.listing?.property_id] !== "dislike"
+    ),
+    [results, reactions]
   );
 
   const focusListing = (r) => {
@@ -290,6 +306,19 @@ export default function Recommendations() {
         .rec-detail-actbtn.on-like { background: #fdeceb; border-color: #f4b8ae; color: #ef5a45; }
         .rec-detail-actbtn.on-dislike { background: #eef0f2; border-color: #cfd4da; color: #566072; }
         .rec-detail-toast { position: absolute; left: 50%; bottom: 24px; transform: translateX(-50%); background: #1c1a17; color: #fff; font: 700 13.5px/1.3 'Plus Jakarta Sans', sans-serif; padding: 13px 20px; border-radius: 14px; box-shadow: 0 14px 34px rgba(0,0,0,.3); max-width: calc(100% - 40px); text-align: center; }
+
+        /* Map pin popup — pricing/BHK/thumb mini-card, tap through to the full detail */
+        .rec-pinpop-wrap .leaflet-popup-content-wrapper { padding: 0; border-radius: 16px; overflow: hidden; box-shadow: 0 16px 40px rgba(0,0,0,.22); }
+        .rec-pinpop-wrap .leaflet-popup-content { margin: 0; width: auto !important; }
+        .rec-pinpop-wrap .leaflet-popup-tip { background: #fff; }
+        .rec-pinpop { display: flex; gap: 10px; padding: 10px; cursor: pointer; align-items: center; }
+        .rec-pinpop-thumb { flex-shrink: 0; width: 52px; height: 52px; border-radius: 10px; overflow: hidden; background: linear-gradient(135deg,#f3ded9,#efe3c8); display: flex; align-items: center; justify-content: center; color: #c8b79b; }
+        .rec-pinpop-thumb img { width: 100%; height: 100%; object-fit: cover; display: block; }
+        .rec-pinpop-body { min-width: 0; }
+        .rec-pinpop-bhk { font-size: 11.5px; color: #7a7267; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+        .rec-pinpop-rent { font-size: 15px; font-weight: 800; color: #1c1a17; }
+        .rec-pinpop-rent small { font-size: 11px; font-weight: 600; color: #9a9186; }
+        .rec-pinpop-link { font-size: 11px; font-weight: 700; color: #ef5a45; margin-top: 1px; }
       `}</style>
 
       <MovEazyNav active="" />
@@ -353,14 +382,33 @@ export default function Recommendations() {
             <TileLayer url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png" attribution="&copy; OpenStreetMap contributors" subdomains="abc" maxZoom={19} />
             <SyncSizeOnShow shown={mobileView === "map"} />
             <FlyTo center={flyCenter} zoom={14} />
-            {markers.map((r) => (
-              <Marker
-                key={r.listing.property_id}
-                position={[Number(r.listing.latitude), Number(r.listing.longitude)]}
-                icon={pinIcon(activeId === r.listing.property_id)}
-                eventHandlers={{ click: () => focusListing(r) }}
-              />
-            ))}
+            {markers.map((r) => {
+              const l = r.listing;
+              const cover = l.cover_image_url || (Array.isArray(l.images) && l.images[0]) || "";
+              return (
+                <Marker
+                  key={l.property_id}
+                  position={[Number(l.latitude), Number(l.longitude)]}
+                  icon={pinIcon(activeId === l.property_id, reactionStateFor(l.property_id))}
+                  eventHandlers={{ click: () => focusListing(r) }}
+                >
+                  <Popup className="rec-pinpop-wrap" closeButton={false} maxWidth={220} minWidth={200}>
+                    <div className="rec-pinpop" onClick={() => openCard(r)}>
+                      <div className="rec-pinpop-thumb">
+                        {cover
+                          ? <img src={cover} alt="" loading="lazy" onError={(e) => { e.currentTarget.style.display = "none"; }} />
+                          : <span className="rec-pinpop-fallback"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6"><path d="M3 10.5 12 4l9 6.5V20a1 1 0 0 1-1 1h-5v-6H9v6H4a1 1 0 0 1-1-1z" /></svg></span>}
+                      </div>
+                      <div className="rec-pinpop-body">
+                        <div className="rec-pinpop-bhk">{[l.flat_type, l.area].filter(Boolean).join(" · ") || "Home"}</div>
+                        <div className="rec-pinpop-rent">{fmtINR(l.rent)}<small>/mo</small></div>
+                        <div className="rec-pinpop-link">View details →</div>
+                      </div>
+                    </div>
+                  </Popup>
+                </Marker>
+              );
+            })}
           </MapContainer>
         </div>
 
@@ -475,7 +523,7 @@ export default function Recommendations() {
                 <div className="rec-detail-map">
                   <MapContainer center={[Number(l.latitude), Number(l.longitude)]} zoom={15} scrollWheelZoom={false} attributionControl={false} style={{ height: "100%", width: "100%" }}>
                     <TileLayer url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png" subdomains="abc" maxZoom={19} />
-                    <Marker position={[Number(l.latitude), Number(l.longitude)]} icon={pinIcon(true)} />
+                    <Marker position={[Number(l.latitude), Number(l.longitude)]} icon={pinIcon(true, reactionStateFor(l.property_id))} />
                   </MapContainer>
                 </div>
               )}
