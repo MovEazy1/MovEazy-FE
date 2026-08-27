@@ -173,6 +173,72 @@ export async function triggerCustomerApplicationStatusEmail({
   }
 }
 
+/**
+ * Invite a tenant an owner just added (TenantManagement.jsx "+ Add Tenant") to
+ * join MovEazy and pay rent through it. Falls back through the same
+ * template-id chain as the other owner-triggered emails, since there's no
+ * guarantee a dedicated "tenant invite" EmailJS template has been created —
+ * the caller should always also offer a copy-to-clipboard fallback of the
+ * same message, since a non-technical owner can send that over WhatsApp/SMS
+ * even when no email template is configured at all.
+ */
+export async function triggerTenantInviteEmail({ toEmail, tenantName, ownerName, listingTitle, rentAmount, rentDueDay, inviteLink }) {
+  if (!EMAILJS_SERVICE_ID || !EMAILJS_PUBLIC_KEY) {
+    reportClientWarn("emailjs", "EmailJS not configured; skipping tenant invite email.");
+    return { ok: false, skipped: true };
+  }
+  const templateId =
+    import.meta.env.VITE_EMAILJS_TENANT_INVITE_TEMPLATE_ID ||
+    import.meta.env.VITE_EMAILJS_INTEREST_TEMPLATE_ID ||
+    EMAILJS_TEMPLATE_ID;
+  if (!templateId) {
+    reportClientWarn("emailjs", "No EmailJS template for tenant invites; set VITE_EMAILJS_TENANT_INVITE_TEMPLATE_ID.");
+    return { ok: false, skipped: true };
+  }
+  const to = String(toEmail || "").trim().toLowerCase();
+  if (!to.includes("@")) return { ok: false, skipped: true };
+  const message = tenantInviteMessage({ tenantName, ownerName, listingTitle, rentAmount, rentDueDay, inviteLink });
+  const template_params = {
+    to_email: to,
+    to_name: String(tenantName || "there"),
+    customer_name: String(tenantName || "there"), // some existing templates key off this name instead of to_name
+    seller_name: String(ownerName || "Your landlord"),
+    listing_title: String(listingTitle || ""),
+    message,
+  };
+  try {
+    const res = await fetch("https://api.emailjs.com/api/v1.0/email/send", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ service_id: EMAILJS_SERVICE_ID, template_id: templateId, user_id: EMAILJS_PUBLIC_KEY, template_params }),
+    });
+    return { ok: res.ok };
+  } catch (e) {
+    reportClientError("emailjs_tenant_invite", e);
+    return { ok: false };
+  }
+}
+
+/** Plain-text invite message — used both as the email body and as the copy-to-clipboard fallback. */
+export function tenantInviteMessage({ tenantName, ownerName, listingTitle, rentAmount, rentDueDay, inviteLink }) {
+  const rentLine = Number(rentAmount) > 0
+    ? `Rent: ₹${Number(rentAmount).toLocaleString("en-IN")}/mo, due on the ${Number(rentDueDay) || 1}${nth(Number(rentDueDay) || 1)} of each month.`
+    : "";
+  return [
+    `Hi ${tenantName || "there"},`,
+    `${ownerName || "Your landlord"} has added you as a tenant for ${listingTitle || "your flat"} on MovEazy.`,
+    rentLine,
+    `Join MovEazy to track and pay your rent: ${inviteLink}`,
+  ].filter(Boolean).join("\n\n");
+}
+
+function nth(n) {
+  if (n % 10 === 1 && n !== 11) return "st";
+  if (n % 10 === 2 && n !== 12) return "nd";
+  if (n % 10 === 3 && n !== 13) return "rd";
+  return "th";
+}
+
 export async function triggerVisitNotificationEmail({ customerEmail, customerPhone, sellerEmail, visitTime, notes, listingId }) {
   if (!EMAILJS_SERVICE_ID || !EMAILJS_TEMPLATE_ID || !EMAILJS_PUBLIC_KEY) {
     reportClientWarn("emailjs", "EmailJS not configured, skipping visit notification.");
