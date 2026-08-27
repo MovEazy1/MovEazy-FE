@@ -41,6 +41,29 @@ export function prefsToRow(prefs, user, extra = {}) {
   };
 }
 
+/** Map a saved user_requirements DB row back to the AIBroker `prefs` shape, so
+ *  "Modify my preferences" can pre-fill every answer. Inverse of prefsToRow.
+ *  (Deliberately doesn't map a phone/whatsapp field — AIBroker's phone step
+ *  reads/writes user_profiles.phone directly, not this table.) */
+export function rowToPrefs(row) {
+  if (!row) return null;
+  return {
+    office: row.office || null,
+    age: row.age || "",
+    localities: arr(row.localities),
+    budgetMin: num(row.budget_min) ?? 20000,
+    budgetMax: num(row.budget_max) ?? 45000,
+    stretch: !!row.stretch,
+    occupants: arr(row.occupants),
+    flatTypes: arr(row.flat_types),
+    mustHaves: arr(row.must_haves),
+    lifestyle: arr(row.lifestyle),
+    dealBreakers: arr(row.deal_breakers),
+    priority: arr(row.priority),
+    notes: row.notes && typeof row.notes === "object" ? row.notes : {},
+  };
+}
+
 /** Upsert the signed-in user's requirement. Best-effort — returns null on failure. */
 export async function saveUserRequirement(user, prefs, extra = {}) {
   const uid = user?.uid || user?.id;
