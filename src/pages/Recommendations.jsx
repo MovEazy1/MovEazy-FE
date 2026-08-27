@@ -29,13 +29,49 @@ function pinIcon(active) {
   });
 }
 
-/** Fly the map when the active/selected listing changes. */
+/** The mobile map pane goes from `display:none` to visible when the visitor
+ * taps "Map" — Leaflet doesn't know its container just changed size, so
+ * without this it can render blank or misaligned until the map is dragged. */
+function SyncSizeOnShow({ shown }) {
+  const map = useMap();
+  useEffect(() => {
+    if (!shown) return;
+    const id = requestAnimationFrame(() => map.invalidateSize());
+    return () => cancelAnimationFrame(id);
+  }, [shown, map]);
+  return null;
+}
+
+/** Fly the map when the active/selected listing changes.
+ *
+ * On mobile the map pane starts `display:none` (the list/map toggle below
+ * defaults to "list"), so this can fire — via the "center on first result"
+ * effect — while the Leaflet container is still zero-sized. flyTo() animates
+ * by interpolating in pixel space using the container's size, and against a
+ * zero size that math produces NaN, which Leaflet then throws as "Invalid
+ * LatLng object: (NaN, NaN)" — uncaught, that took the whole page down via
+ * the top-level error boundary. setView (no animation) doesn't do that pixel
+ * interpolation and is safe to call on a hidden container, so we use it
+ * whenever the map isn't actually visible yet; the try/catch is a last-resort
+ * safety net so this can't crash the page again even in an edge case we
+ * haven't seen.
+ */
 function FlyTo({ center, zoom }) {
   const map = useMap();
   const lat = center?.[0];
   const lng = center?.[1];
   useEffect(() => {
-    if (Number.isFinite(lat) && Number.isFinite(lng)) map.flyTo([lat, lng], zoom, { duration: 0.5 });
+    if (!Number.isFinite(lat) || !Number.isFinite(lng)) return;
+    try {
+      const size = map.getSize();
+      if (size.x > 0 && size.y > 0) {
+        map.flyTo([lat, lng], zoom, { duration: 0.5 });
+      } else {
+        map.setView([lat, lng], zoom, { animate: false });
+      }
+    } catch (err) {
+      console.error("FlyTo: skipped recentering", err);
+    }
   }, [map, lat, lng, zoom]);
   return null;
 }
@@ -252,6 +288,7 @@ export default function Recommendations() {
         <div className="rec-map">
           <MapContainer center={BLR} zoom={12} scrollWheelZoom style={{ height: "100%", width: "100%" }}>
             <TileLayer url="https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png" attribution="&copy; OpenStreetMap &copy; CARTO" />
+            <SyncSizeOnShow shown={mobileView === "map"} />
             <FlyTo center={flyCenter} zoom={14} />
             {markers.map((r) => (
               <Marker
