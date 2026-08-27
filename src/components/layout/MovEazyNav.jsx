@@ -21,7 +21,8 @@ import { Link, useNavigate, useLocation } from "react-router-dom";
 import { useAuth } from "../../context/AuthContext";
 import { useLoginModal } from "../../context/LoginModalContext";
 import { useVisitCart } from "../../context/VisitCartContext";
-import { countMyInventory, hasOwnerListing } from "../../lib/inventory";
+import { countMyInventory, hasOwnerListing, fetchMyInventory } from "../../lib/inventory";
+import { hasAnyOpenSlot } from "../../lib/visits";
 import { fetchUserRequirement } from "../../lib/userRequirements";
 import { isSuperAdminEmail } from "../../lib/adminAccess";
 import logoMint from "../../assets/logo/moveazy-logo-mint-dark.png";
@@ -133,6 +134,7 @@ export default function MovEazyNav({ active = "", transparentAtTop = false, onFi
   const [hasProperties, setHasProperties] = useState(false);
   const [hasSubmittedPrefs, setHasSubmittedPrefs] = useState(false);
   const [isOwner, setIsOwner] = useState(false);
+  const [needsVisitTiming, setNeedsVisitTiming] = useState(false);
   const [acctOpen, setAcctOpen] = useState(false);
   const acctRef = useRef(null);
 
@@ -182,6 +184,22 @@ export default function MovEazyNav({ active = "", transparentAtTop = false, onFi
     hasOwnerListing(user.uid).then((v) => { if (alive) setIsOwner(v); });
     return () => { alive = false; };
   }, [user]);
+
+  // Nudge an owner who hasn't set visit timing on anything yet — checked
+  // across every property they've posted (any role), not just owner-posted
+  // ones, since the ask is really "you have listings nobody can book a visit
+  // for", regardless of which role they posted under.
+  useEffect(() => {
+    let alive = true;
+    if (!isOwner || !user?.uid) { setNeedsVisitTiming(false); return undefined; }
+    (async () => {
+      const rows = await fetchMyInventory(user.uid);
+      const ids = rows.map((r) => r.property_id);
+      const has = ids.length ? await hasAnyOpenSlot(ids) : false;
+      if (alive) setNeedsVisitTiming(!has);
+    })();
+    return () => { alive = false; };
+  }, [isOwner, user]);
 
   // Once someone has been through "Find My Flat" and saved a requirement, the
   // mobile bottom bar switches from the three signup-focused actions (find /
@@ -246,7 +264,7 @@ export default function MovEazyNav({ active = "", transparentAtTop = false, onFi
         .mzn-badge-new { background: linear-gradient(135deg,#FFE1A6,#E8A33D 45%,#B9782A); box-shadow: 0 0 0 1px rgba(255,255,255,.35) inset, 0 1px 4px rgba(232,163,61,.5); color: #1B1204; font-size: 8px; font-weight: 800; letter-spacing: .02em; padding: 1.5px 6px; border-radius: 100px; line-height: 1.6; align-self: flex-start; margin-top: -4px; }
         .mzn-burger { display: none; align-items: center; justify-content: center; width: 44px; height: 44px; border: none; background: rgba(255,255,255,.08); border-radius: 50%; color: #F1F6F4; flex: none; }
         .mzn-burger svg { display: block; }
-        .mzn-sheet, .mzn-backdrop, .mzn-bottombar { display: none; }
+        .mzn-sheet, .mzn-backdrop, .mzn-bottombar, .mzn-visit-nudge { display: none; }
 
         @media (max-width: 900px) {
           .mzn-nav { padding: 12px 14px !important; gap: 10px !important; }
@@ -311,6 +329,17 @@ export default function MovEazyNav({ active = "", transparentAtTop = false, onFi
           }
           .mzn-bottombar button:active { color: #5EEAD4; }
           .mzn-bottombar svg { flex: none; }
+
+          /* Stacked directly above the bottom bar (same 70px the body clears
+             below), full-width, impossible-to-miss red strip. */
+          .mzn-visit-nudge {
+            display: block; width: 100%;
+            position: fixed; left: 0; right: 0; bottom: 70px; z-index: 189;
+            background: #DC2626; color: #fff; border: none;
+            font-size: 13px; font-weight: 800; letter-spacing: -.01em;
+            padding: 12px 16px; text-align: center; cursor: pointer;
+          }
+          .mzn-visit-nudge:active { background: #B91C1C; }
 
           /* Every page must clear the fixed bottom bar. */
           body { padding-bottom: calc(70px + env(safe-area-inset-bottom, 0px)); }
@@ -462,6 +491,16 @@ export default function MovEazyNav({ active = "", transparentAtTop = false, onFi
             deliberately sits underneath it; every other page needs a spacer or
             its first section would start beneath the bar. */}
         {!transparentAtTop && <div aria-hidden style={{ height: navH }} />}
+
+        {/* Nudge: an owner with no visit timing set on anything yet can't be
+            booked for a visit at all — stack this right above the bottom bar
+            (nothing renders below a bottom:0 fixed bar) so it's impossible
+            to miss on mobile. */}
+        {isOwner && needsVisitTiming && (
+          <button type="button" className="mzn-visit-nudge" onClick={() => navigate("/my-properties")}>
+            Set your Flat Visit Timing
+          </button>
+        )}
 
         {/* Mobile bottom action bar — three variants. Before "Find My Flat" is
             ever submitted, it's the three signup-focused entry points. Once

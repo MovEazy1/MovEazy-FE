@@ -45,6 +45,21 @@ export async function fetchSlotsFor(propertyIds = []) {
   return out;
 }
 
+/** Whether any of these properties has at least one upcoming open visit slot —
+ * used to nudge an owner who hasn't set visit timing for anything yet. Not
+ * limited to the 5-day window fetchSlotsFor's callers usually care about, so
+ * it stays accurate even if every slot is further out than that. */
+export async function hasAnyOpenSlot(propertyIds = []) {
+  if (!isSupabaseConfigured || !supabase || !propertyIds.length) return false;
+  const { count, error } = await supabase
+    .from("property_visit_slots")
+    .select("id", { count: "exact", head: true })
+    .in("property_id", propertyIds)
+    .gt("slot_at", new Date().toISOString());
+  if (error) return false;
+  return (count || 0) > 0;
+}
+
 /* ── Admin slot management ─────────────────────────────────────────────────── */
 /** All upcoming slots for one property (admin editor). */
 export async function fetchSlotsForProperty(propertyId) {

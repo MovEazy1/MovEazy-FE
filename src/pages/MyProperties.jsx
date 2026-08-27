@@ -5,7 +5,7 @@
  * Reachable from the nav only once they actually have a listing, so the option
  * never shows up empty for seekers who have never posted.
  */
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { useAuth } from "../context/AuthContext";
 import { useLoginModal } from "../context/LoginModalContext";
@@ -52,8 +52,19 @@ function Row({ label, value }) {
 
 export function PropertyCard({ p, slotCount, onStatus, busy, onSlotCountChange }) {
   const [open, setOpen] = useState(false);
+  const slotsRef = useRef(null);
   const st = STATUS[p.status] || STATUS.published;
   const cover = p.cover_image_url || (p.images || [])[0] || "";
+
+  // "Set visit timing" opens the detail panel (if it isn't already) and
+  // scrolls straight to the slots editor at the bottom of it, instead of
+  // making the owner scroll past every other detail row to find it.
+  const goToSlots = () => {
+    setOpen(true);
+    requestAnimationFrame(() => {
+      setTimeout(() => slotsRef.current?.scrollIntoView({ behavior: "smooth", block: "center" }), 50);
+    });
+  };
 
   return (
     <div className="rounded-2xl bg-white border border-gray-200 overflow-hidden">
@@ -112,6 +123,16 @@ export function PropertyCard({ p, slotCount, onStatus, busy, onSlotCountChange }
         >
           {open ? "Hide details" : "View details"}
         </button>
+        {!isClosed(p.status) && (
+          <button
+            type="button"
+            onClick={goToSlots}
+            className="h-9 px-4 rounded-lg text-[12px] font-bold text-white disabled:opacity-50"
+            style={{ background: "linear-gradient(135deg,#16a34a,#22c55e)" }}
+          >
+            Set visit timing
+          </button>
+        )}
         <Link to="/map" className="h-9 px-4 rounded-lg text-[12px] font-bold border border-gray-200 text-gray-700 hover:bg-gray-50 flex items-center">
           See on map
         </Link>
@@ -176,11 +197,13 @@ export function PropertyCard({ p, slotCount, onStatus, busy, onSlotCountChange }
           </div>
 
           {!isClosed(p.status) && (
-            <PropertyVisitSlots
-              propertyId={p.property_id}
-              hideMarkSold
-              onSlotsChanged={(count) => onSlotCountChange?.(p.property_id, count)}
-            />
+            <div ref={slotsRef}>
+              <PropertyVisitSlots
+                propertyId={p.property_id}
+                hideMarkSold
+                onSlotsChanged={(count) => onSlotCountChange?.(p.property_id, count)}
+              />
+            </div>
           )}
         </div>
       )}
