@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useLocation } from "react-router-dom";
 import MovEazyNav from "../components/layout/MovEazyNav";
 import { useAuth } from "../context/AuthContext";
 import { useVisitCart } from "../context/VisitCartContext";
@@ -12,8 +12,14 @@ const fmtSlot = (iso) =>
 
 export default function Visits() {
   const navigate = useNavigate();
+  const location = useLocation();
   const { user } = useAuth();
   const cart = useVisitCart();
+
+  // The bottom bar's "Scheduled Visits" deep-links here with ?only=scheduled —
+  // show just the confirmed-slot bookings, not everything still to be
+  // scheduled or only submitted as a preference.
+  const onlyScheduled = new URLSearchParams(location.search).get("only") === "scheduled";
 
   const [slots, setSlots] = useState({});          // { property_id: [{id, slot_at}] }
   const [bookings, setBookings] = useState([]);    // visit_bookings rows
@@ -48,7 +54,12 @@ export default function Visits() {
 
   const bookingByPid = useMemo(() => Object.fromEntries(bookings.map((b) => [b.property_id, b])), [bookings]);
   const toSchedule = useMemo(() => cart.items.filter((i) => !bookingByPid[i.property_id]), [cart.items, bookingByPid]);
-  const scheduled = useMemo(() => cart.items.filter((i) => bookingByPid[i.property_id]), [cart.items, bookingByPid]);
+  // A booking without a slot_at was submitted as a preference ("join the next
+  // open visit"), not an actual scheduled time — onlyScheduled excludes those.
+  const scheduled = useMemo(
+    () => cart.items.filter((i) => bookingByPid[i.property_id] && (!onlyScheduled || bookingByPid[i.property_id].status !== "preference")),
+    [cart.items, bookingByPid, onlyScheduled]
+  );
 
   // Slot times shared by every unscheduled property → offered for the combined tour.
   const combinedTimes = useMemo(() => {
@@ -118,8 +129,8 @@ export default function Visits() {
       <MovEazyNav active="" />
 
       <div className="vz-wrap">
-        <div className="vz-title">Your site visits</div>
-        <div className="vz-sub">Book a slot per home, or see them all in one guided tour.</div>
+        <div className="vz-title">{onlyScheduled ? "Your scheduled visits" : "Your site visits"}</div>
+        <div className="vz-sub">{onlyScheduled ? "Homes with a confirmed visit time." : "Book a slot per home, or see them all in one guided tour."}</div>
 
         {loading && <p className="vz-sub" style={{ marginTop: 20 }}>Loading your visits…</p>}
 
@@ -131,8 +142,16 @@ export default function Visits() {
           </div>
         )}
 
+        {!loading && cart.items.length > 0 && onlyScheduled && scheduled.length === 0 && (
+          <div className="vz-empty">
+            <p style={{ fontWeight: 700, fontSize: 16, color: "#2a2621" }}>Nothing scheduled yet.</p>
+            <p style={{ marginTop: 6 }}>Once you book a visit slot for a home, it'll show up here.</p>
+            <button type="button" className="vz-btn" style={{ marginTop: 16 }} onClick={() => navigate("/visits")}>See everything in your list</button>
+          </div>
+        )}
+
         {/* ── Schedule visit ── */}
-        {!loading && toSchedule.length > 0 && (
+        {!loading && !onlyScheduled && toSchedule.length > 0 && (
           <div className="vz-section">
             <div className="vz-sechead">
               <span className="vz-sectitle">Schedule visit</span>

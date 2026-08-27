@@ -157,6 +157,18 @@ export async function fetchMyInventory(uid) {
   return data || [];
 }
 
+/** A specific set of listings by property_id — for the "Shortlists" page, where
+ * a liked listing may not be in the visit cart's own lightweight snapshots. */
+export async function fetchInventoryByIds(propertyIds = []) {
+  if (!isSupabaseConfigured || !supabase || !propertyIds.length) return [];
+  const { data, error } = await supabase
+    .from("inventory")
+    .select("*")
+    .in("property_id", propertyIds);
+  if (error) return [];
+  return data || [];
+}
+
 /** Cheap count for deciding whether to surface "My Properties" in the nav. */
 export async function countMyInventory(uid) {
   if (!isSupabaseConfigured || !supabase || !uid) return 0;

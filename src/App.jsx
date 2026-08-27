@@ -16,6 +16,7 @@ const ListMyFlat = lazy(() => import("./pages/ListMyFlat"));
 const AdminDatabase = lazy(() => import("./pages/AdminDatabase"));
 const Recommendations = lazy(() => import("./pages/Recommendations"));
 const Visits = lazy(() => import("./pages/Visits"));
+const Shortlists = lazy(() => import("./pages/Shortlists"));
 const BrokerRegister = lazy(() => import("./pages/BrokerRegister"));
 const MyProperties = lazy(() => import("./pages/MyProperties"));
 const SuperAdminPanel = lazy(() => import("./pages/SuperAdminPanel"));
@@ -79,6 +80,14 @@ function AppRoutes() {
           element={
             <ProfileRoute>
               <Visits />
+            </ProfileRoute>
+          }
+        />
+        <Route
+          path="/shortlists"
+          element={
+            <ProfileRoute>
+              <Shortlists />
             </ProfileRoute>
           }
         />

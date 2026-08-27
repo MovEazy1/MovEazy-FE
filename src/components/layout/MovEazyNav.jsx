@@ -22,6 +22,7 @@ import { useAuth } from "../../context/AuthContext";
 import { useLoginModal } from "../../context/LoginModalContext";
 import { useVisitCart } from "../../context/VisitCartContext";
 import { countMyInventory } from "../../lib/inventory";
+import { fetchUserRequirement } from "../../lib/userRequirements";
 import { isSuperAdminEmail } from "../../lib/adminAccess";
 import logoMint from "../../assets/logo/moveazy-logo-mint-dark.png";
 
@@ -66,6 +67,30 @@ function BrokerIcon() {
     </svg>
   );
 }
+function HomeIcon() {
+  return (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" width="23" height="23">
+      <path d="M3.5 10.6 12 4l8.5 6.6V20a1 1 0 0 1-1 1h-13a1 1 0 0 1-1-1z" />
+      <path d="M9.5 21v-6.5h5V21" />
+    </svg>
+  );
+}
+function ShortlistIcon() {
+  return (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" width="23" height="23">
+      <path d="M20.8 5.6a5.5 5.5 0 0 0-7.8 0L12 6.6l-1-1a5.5 5.5 0 0 0-7.8 7.8l1 1L12 22l7.8-7.6 1-1a5.5 5.5 0 0 0 0-7.8z" />
+    </svg>
+  );
+}
+function ScheduledIcon() {
+  return (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" width="23" height="23">
+      <rect x="3.5" y="4.5" width="17" height="16" rx="2.5" />
+      <path d="M3.5 9.5h17M8 2.5v4M16 2.5v4" />
+      <path d="M8.5 14.2l2.2 2.2 4.3-4.3" />
+    </svg>
+  );
+}
 
 export default function MovEazyNav({ active = "", transparentAtTop = false, onFindFlat, onGetAgent }) {
   const { user, logout, loading: authLoading } = useAuth();
@@ -78,6 +103,7 @@ export default function MovEazyNav({ active = "", transparentAtTop = false, onFi
   const navRef = useRef(null);
   const [navH, setNavH] = useState(72);
   const [hasProperties, setHasProperties] = useState(false);
+  const [hasSubmittedPrefs, setHasSubmittedPrefs] = useState(false);
   const [acctOpen, setAcctOpen] = useState(false);
   const acctRef = useRef(null);
 
@@ -113,6 +139,16 @@ export default function MovEazyNav({ active = "", transparentAtTop = false, onFi
     let alive = true;
     if (!user?.uid) { setHasProperties(false); return undefined; }
     countMyInventory(user.uid).then((n) => { if (alive) setHasProperties(n > 0); });
+    return () => { alive = false; };
+  }, [user]);
+
+  // Once someone has been through "Find My Flat" and saved a requirement, the
+  // mobile bottom bar switches from the three signup-focused actions (find /
+  // list / register) to the four a returning renter actually needs.
+  useEffect(() => {
+    let alive = true;
+    if (!user?.uid) { setHasSubmittedPrefs(false); return undefined; }
+    fetchUserRequirement(user.uid).then((row) => { if (alive) setHasSubmittedPrefs(!!row); });
     return () => { alive = false; };
   }, [user]);
 
@@ -219,7 +255,7 @@ export default function MovEazyNav({ active = "", transparentAtTop = false, onFi
           /* Fixed bottom action bar. env(safe-area-inset-bottom) keeps it clear
              of the iOS home indicator. */
           .mzn-bottombar {
-            display: grid; grid-template-columns: repeat(3, 1fr);
+            display: grid; grid-auto-flow: column; grid-auto-columns: 1fr;
             position: fixed; left: 0; right: 0; bottom: 0; z-index: 190;
             background: rgba(4,33,29,.95);
             -webkit-backdrop-filter: blur(14px); backdrop-filter: blur(14px);
@@ -386,11 +422,25 @@ export default function MovEazyNav({ active = "", transparentAtTop = false, onFi
             its first section would start beneath the bar. */}
         {!transparentAtTop && <div aria-hidden style={{ height: navH }} />}
 
-        {/* Mobile bottom action bar — the three primary entry points. */}
+        {/* Mobile bottom action bar. Before "Find My Flat" is ever submitted,
+            it's the three signup-focused entry points; once someone has a
+            saved requirement, those aren't useful anymore — swap in the four
+            a returning renter actually needs. */}
         <nav className="mzn-bottombar" aria-label="Primary actions">
-          <button type="button" onClick={findFlat}><FlatIcon /><span>Find My Flat</span></button>
-          <button type="button" onClick={listMyFlat}><OwnerIcon /><span>List as Owner</span></button>
-          <button type="button" onClick={() => navigate("/register-broker")}><BrokerIcon /><span>Register as Broker</span></button>
+          {hasSubmittedPrefs ? (
+            <>
+              <button type="button" onClick={() => navigate("/")}><HomeIcon /><span>Home</span></button>
+              <button type="button" onClick={findFlat}><FlatIcon /><span>Find My Flat</span></button>
+              <button type="button" onClick={() => navigate("/shortlists")}><ShortlistIcon /><span>View Shortlists</span></button>
+              <button type="button" onClick={() => navigate("/visits?only=scheduled")}><ScheduledIcon /><span>Scheduled Visits</span></button>
+            </>
+          ) : (
+            <>
+              <button type="button" onClick={findFlat}><FlatIcon /><span>Find My Flat</span></button>
+              <button type="button" onClick={listMyFlat}><OwnerIcon /><span>List as Owner</span></button>
+              <button type="button" onClick={() => navigate("/register-broker")}><BrokerIcon /><span>Register as Broker</span></button>
+            </>
+          )}
         </nav>
       </div>
     </>
