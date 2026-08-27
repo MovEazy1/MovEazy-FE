@@ -19,7 +19,7 @@ import L from "leaflet";
 import "leaflet/dist/leaflet.css";
 import { geocodePlace, searchPlaces, reverseGeocode } from "../lib/geocode";
 import { useAuth } from "../context/AuthContext";
-import { saveUserRequirement } from "../lib/userRequirements";
+import { saveUserRequirement, fetchUserRequirement, rowToPrefs } from "../lib/userRequirements";
 import { updateUserProfileFields } from "../lib/profileService";
 import { fetchPublishedInventory } from "../lib/inventory";
 import { matchRequirementToListings } from "../lib/inventoryMatch";
@@ -246,30 +246,59 @@ const STEPS = [
   { id: "priority", group: "dealbreakers", type: "rank", q: "Finally — rank these by what matters most.", sub: "Drag to reorder — top = most important." },
 ];
 
+const emptyPrefs = () => ({
+  office: null, phone: "", localities: [], budgetMin: 20000, budgetMax: 45000, stretch: false,
+  occupants: [], flatTypes: [...FLAT_TYPES], mustHaves: [], lifestyle: [], dealBreakers: [],
+  priority: ["Near to Office", "Good locality", "Budget fit", "Apartment over standalone", "Flat size", "Ventilation"],
+  notes: {},
+});
+
+/** The mandatory answers — same set gating "Continue" step-by-step, checked
+ * all at once for the single-page review's "Save preferences" button. */
+function prefsComplete(prefs) {
+  return isValidPhone(prefs.phone) && !!prefs.office &&
+    prefs.localities.length > 0 && prefs.occupants.length > 0 && prefs.flatTypes.length > 0;
+}
+
 export default function AIBroker({ open, onClose }) {
   const navigate = useNavigate();
   const { user } = useAuth();
-  const [phase, setPhase] = useState("intro"); // intro | q | reveal
+  const [phase, setPhase] = useState("intro"); // intro | q | review | reveal
   const [stepIdx, setStepIdx] = useState(0);
   const [brokerState, setBrokerState] = useState("wave");
   const [ack, setAck] = useState("");
-  const [prefs, setPrefs] = useState({
-    office: null, phone: "", localities: [], budgetMin: 20000, budgetMax: 45000, stretch: false,
-    occupants: [], flatTypes: [...FLAT_TYPES], mustHaves: [], lifestyle: [], dealBreakers: [],
-    priority: ["Near to Office", "Good locality", "Budget fit", "Apartment over standalone", "Flat size", "Ventilation"],
-    notes: {},
-  });
-  const notePh = useMemo(() => NOTE_PLACEHOLDERS[Math.floor(Math.random() * NOTE_PLACEHOLDERS.length)], [stepIdx]);
+  const [saving, setSaving] = useState(false);
+  const [saved, setSaved] = useState(false);
+  const [prefs, setPrefs] = useState(emptyPrefs);
 
-  // reset when reopened
+  // Reset when reopened. If this user already has a saved requirement, skip
+  // the ten-question walkthrough entirely and open straight into the single-
+  // page "Modify my Preferences" review, pre-filled with what they told us
+  // last time — editing one answer shouldn't mean re-answering all ten.
   useEffect(() => {
-    if (open) {
-      setPhase("intro");
-      setStepIdx(0);
-      setBrokerState("wave");
-      setAck("");
+    if (!open) return;
+    let alive = true;
+    setPhase("intro");
+    setStepIdx(0);
+    setBrokerState("wave");
+    setAck("");
+    setSaving(false);
+    setSaved(false);
+    setPrefs(emptyPrefs());
+    const uid = user?.uid || user?.id;
+    if (uid) {
+      (async () => {
+        const row = await fetchUserRequirement(uid);
+        const saved = rowToPrefs(row);
+        if (alive && saved) {
+          setPrefs((p) => ({ ...p, ...saved, phone: user?.phone || p.phone }));
+          setPhase("review");
+          setBrokerState("idle");
+        }
+      })();
     }
-  }, [open]);
+    return () => { alive = false; };
+  }, [open, user]);
 
   // esc to close
   useEffect(() => {
@@ -293,11 +322,11 @@ export default function AIBroker({ open, onClose }) {
       if (max && next.length > max) return p;
       return { ...p, [key]: next };
     });
-  const setNote = (v) => setPrefs((p) => ({ ...p, notes: { ...p.notes, [step.id]: v } }));
+  const setNote = (id, v) => setPrefs((p) => ({ ...p, notes: { ...p.notes, [id]: v } }));
 
   const doneGroups = useMemo(() => {
     const passed = STEPS.slice(0, stepIdx).map((s) => s.group);
-    if (phase === "reveal") return new Set(ROADMAP.map((r) => r.key));
+    if (phase === "reveal" || phase === "review") return new Set(ROADMAP.map((r) => r.key));
     return new Set(passed);
   }, [stepIdx, phase]);
 
@@ -343,6 +372,24 @@ export default function AIBroker({ open, onClose }) {
       return true;
     }
     return true;
+  };
+
+  // "Save preferences" on the single-page review: persist the phone number to
+  // the account record (same target the step-by-step flow writes to) plus the
+  // full requirement, then — matching "submit again" — take the user straight
+  // to their freshly-scored matches, same as finishing the questionnaire does.
+  const saveReview = async () => {
+    if (!prefsComplete(prefs) || saving) return;
+    setSaving(true);
+    const uid = user?.uid || user?.id;
+    if (uid) await updateUserProfileFields(uid, { phone: prefs.phone }).catch(() => {});
+    await saveUserRequirement(user, prefs);
+    setSaving(false);
+    setSaved(true);
+    setTimeout(() => {
+      onClose?.();
+      navigate("/recommendations", { state: { prefs, justSubmitted: true } });
+    }, 900);
   };
 
   return (
@@ -393,7 +440,7 @@ export default function AIBroker({ open, onClose }) {
                       <div className="brk-roadmap-bar">
                         <motion.div
                           className="brk-roadmap-fill"
-                          animate={{ width: `${phase === "reveal" ? 100 : (stepIdx / STEPS.length) * 100}%` }}
+                          animate={{ width: `${phase === "reveal" || phase === "review" ? 100 : (stepIdx / STEPS.length) * 100}%` }}
                           transition={{ duration: 0.5, ease: EASE }}
                         />
                       </div>
@@ -447,44 +494,7 @@ export default function AIBroker({ open, onClose }) {
                     </div>
 
                     <div className="brk-qbody">
-                      {step.type === "phone" && (
-                        <PhoneField value={prefs.phone} onChange={(v) => set({ phone: v })} />
-                      )}
-
-                      {step.type === "location" && (
-                        <OfficeSearch value={prefs.office} onPick={(o) => set({ office: o })} chips={OFFICE_CHIPS} />
-                      )}
-
-                      {step.type === "single" && (
-                        <div className="brk-chips">
-                          {step.options.map((o) => (
-                            <Chip key={o} active={prefs.age === o} onClick={() => set({ age: o })}>{o}</Chip>
-                          ))}
-                        </div>
-                      )}
-
-                      {step.type === "multi" && (
-                        <MultiSelect step={step} prefs={prefs} toggle={toggle} />
-                      )}
-
-                      {step.type === "budget" && (
-                        <BudgetSlider
-                          min={prefs.budgetMin} max={prefs.budgetMax} stretch={prefs.stretch}
-                          onChange={(mn, mx) => set({ budgetMin: mn, budgetMax: mx })}
-                          onStretch={(v) => set({ stretch: v })}
-                        />
-                      )}
-
-                      {step.type === "rank" && (
-                        <RankList
-                          items={prefs.priority.map((p) => (p === "Budget fit" ? `Budget under ${fmtINR(prefs.budgetMax)}` : p))}
-                          onReorder={(labels) => set({ priority: labels.map((l) => (l.startsWith("Budget under") ? "Budget fit" : l)) })}
-                        />
-                      )}
-
-                      {step.id !== "priority" && (
-                        <NoteField value={prefs.notes[step.id]} onChange={setNote} placeholder={`e.g. "${notePh}"`} />
-                      )}
+                      <StepBody step={step} prefs={prefs} set={set} toggle={toggle} setNote={setNote} />
                     </div>
 
                     <div className="brk-actions">
@@ -495,6 +505,33 @@ export default function AIBroker({ open, onClose }) {
                       {stepIdx > 0 && (
                         <button type="button" className="brk-back" onClick={() => setStepIdx((i) => Math.max(0, i - 1))}>Back</button>
                       )}
+                    </div>
+                  </motion.div>
+                )}
+
+                {phase === "review" && (
+                  <motion.div key="review" className="brk-step brk-step-review" initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -16 }} transition={{ duration: 0.4, ease: EASE }}>
+                    <div className="brk-qhead">
+                      <span className="brk-qcount">Your preferences</span>
+                      <h2 className="brk-q">Modify my preferences</h2>
+                      <p className="brk-qsub">Everything I know about your search — scroll down, change anything, then save.</p>
+                    </div>
+
+                    <div className="brk-review-list">
+                      {STEPS.map((s) => (
+                        <div key={s.id} className="brk-review-block">
+                          <h3 className="brk-review-q">{s.q}</h3>
+                          <StepBody step={s} prefs={prefs} set={set} toggle={toggle} setNote={setNote} />
+                        </div>
+                      ))}
+                    </div>
+
+                    <div className="brk-actions brk-review-actions">
+                      <button type="button" className="brk-cta" disabled={!prefsComplete(prefs) || saving} onClick={saveReview}>
+                        {saving ? "Saving…" : saved ? "Saved ✓" : "Save preferences"}
+                        {!saving && !saved && <svg viewBox="0 0 24 24" width="17" height="17" fill="none" stroke="currentColor" strokeWidth="2.4" aria-hidden><path d="M5 12h14M13 6l6 6-6 6" strokeLinecap="round" strokeLinejoin="round" /></svg>}
+                      </button>
+                      <button type="button" className="brk-back" onClick={onClose}>Close</button>
                     </div>
                   </motion.div>
                 )}
@@ -510,6 +547,64 @@ export default function AIBroker({ open, onClose }) {
         </motion.div>
       )}
     </AnimatePresence>
+  );
+}
+
+/** A stable, per-step deterministic pick (not Math.random — that's an impure
+ * render-time call React's rules flag, and here it also needs to stay fixed
+ * per step rather than reshuffling on every keystroke/re-render). */
+function notePlaceholderFor(id) {
+  let h = 0;
+  for (let i = 0; i < id.length; i++) h = (h * 31 + id.charCodeAt(i)) >>> 0;
+  return NOTE_PLACEHOLDERS[h % NOTE_PLACEHOLDERS.length];
+}
+
+/** The per-type answer control for one step — the single question view and
+ * the "Modify my preferences" review both render this, so an edit made in
+ * either place behaves identically. */
+function StepBody({ step, prefs, set, toggle, setNote }) {
+  const notePh = notePlaceholderFor(step.id);
+  return (
+    <>
+      {step.type === "phone" && (
+        <PhoneField value={prefs.phone} onChange={(v) => set({ phone: v })} />
+      )}
+
+      {step.type === "location" && (
+        <OfficeSearch value={prefs.office} onPick={(o) => set({ office: o })} chips={OFFICE_CHIPS} />
+      )}
+
+      {step.type === "single" && (
+        <div className="brk-chips">
+          {step.options.map((o) => (
+            <Chip key={o} active={prefs.age === o} onClick={() => set({ age: o })}>{o}</Chip>
+          ))}
+        </div>
+      )}
+
+      {step.type === "multi" && (
+        <MultiSelect step={step} prefs={prefs} toggle={toggle} />
+      )}
+
+      {step.type === "budget" && (
+        <BudgetSlider
+          min={prefs.budgetMin} max={prefs.budgetMax} stretch={prefs.stretch}
+          onChange={(mn, mx) => set({ budgetMin: mn, budgetMax: mx })}
+          onStretch={(v) => set({ stretch: v })}
+        />
+      )}
+
+      {step.type === "rank" && (
+        <RankList
+          items={prefs.priority.map((p) => (p === "Budget fit" ? `Budget under ${fmtINR(prefs.budgetMax)}` : p))}
+          onReorder={(labels) => set({ priority: labels.map((l) => (l.startsWith("Budget under") ? "Budget fit" : l)) })}
+        />
+      )}
+
+      {step.id !== "priority" && (
+        <NoteField value={prefs.notes[step.id]} onChange={(v) => setNote(step.id, v)} placeholder={`e.g. "${notePh}"`} />
+      )}
+    </>
   );
 }
 
@@ -1085,6 +1180,14 @@ function Styles() {
       .brk-actions { display:flex; align-items:center; gap:16px; margin-top:30px; }
       .brk-back { background:none; border:none; color:${C.muted}; font-family:inherit; font-size:14px; font-weight:700; cursor:pointer; }
       .brk-back:hover { color:${C.ink}; }
+
+      /* review ("Modify my preferences" — every answer, scrollable, editable in place) */
+      .brk-step-review { margin:0; }
+      .brk-review-list { display:flex; flex-direction:column; gap:26px; margin-top:8px; }
+      .brk-review-block { display:flex; flex-direction:column; gap:14px; padding-bottom:24px; border-bottom:1px solid ${C.line}; }
+      .brk-review-block:last-child { border-bottom:none; padding-bottom:0; }
+      .brk-review-q { font-family:'Playfair Display', Georgia, serif; font-weight:700; font-size:17px; line-height:1.25; color:${C.ink}; margin:0; }
+      .brk-review-actions { position:sticky; bottom:0; padding:16px 0 4px; margin-top:8px; background:linear-gradient(180deg, ${C.cream}00, ${C.cream} 40%); }
 
       /* office */
       .brk-mapbox { position:relative; height:300px; border-radius:20px; overflow:hidden; border:1px solid ${C.line}; background:linear-gradient(160deg,#eaeef3,#dfe4ec); }
