@@ -4,7 +4,10 @@
  *    likes/dislikes) — backed by the my_listing_stats() RPC
  *    (MovEazy-BE/supabase/owner_dashboard_stats.sql), security-definer and
  *    scoped server-side to the caller's own poster_id, returning only
- *    aggregate counts, never who did what.
+ *    aggregate counts, never who did what. The property list itself does NOT
+ *    depend on this RPC (see load() below) — it comes straight from
+ *    inventory, so the page (and "+ Add tenant") still works before that
+ *    migration has been run; only the interest numbers stay at 0 until then.
  * 2. Who's actually renting it — name, contact, rent, due day — added by the
  *    owner and invited to join MovEazy (see MovEazy-BE/supabase/tenants_schema.sql,
  *    lib/tenants.js). The invite is sent via the same EmailJS pipeline used
@@ -18,6 +21,7 @@ import { useNavigate } from "react-router-dom";
 import { useAuth } from "../context/AuthContext";
 import { useLoginModal } from "../context/LoginModalContext";
 import MovEazyNav from "../components/layout/MovEazyNav";
+import { fetchMyInventory } from "../lib/inventory";
 import { fetchMyListingStats } from "../lib/ownerDashboard";
 import { fetchTenantsFor, addTenant, removeTenant, markInviteSent } from "../lib/tenants";
 import { triggerTenantInviteEmail, tenantInviteMessage } from "../lib/emailService";
@@ -63,15 +67,35 @@ export default function TenantManagement() {
   const [busyId, setBusyId] = useState(""); // tenant id mid-action (invite/remove)
   const [noteById, setNoteById] = useState({}); // { [tenant.id]: "Invite sent" | "Copied — paste it into WhatsApp" | ... }
 
-  const load = async () => {
+  const load = async (uid) => {
     setLoading(true);
     try {
-      const data = await fetchMyListingStats();
-      setRows(data);
-      const ids = data.map((r) => r.property_id);
+      // The property list itself comes straight from inventory — it must not
+      // depend on my_listing_stats() being deployed. Stats are merged in
+      // best-effort on top (defaulting to 0 per property) so a not-yet-run
+      // migration only means blank stats, never a missing "+ Add tenant" button.
+      const [inventory, statRows] = await Promise.all([
+        fetchMyInventory(uid),
+        fetchMyListingStats().catch(() => []),
+      ]);
+      const statsByProperty = new Map(statRows.map((s) => [s.property_id, s]));
+      const merged = inventory.map((r) => {
+        const s = statsByProperty.get(r.property_id);
+        return {
+          ...r,
+          view_count: r.view_count ?? 0,
+          shortlist_count: s?.shortlist_count || 0,
+          visit_request_count: s?.visit_request_count || 0,
+          visit_booking_count: s?.visit_booking_count || 0,
+          like_count: s?.like_count || 0,
+          dislike_count: s?.dislike_count || 0,
+        };
+      });
+      setRows(merged);
+      const ids = inventory.map((r) => r.property_id);
       if (ids.length) setTenantsByProperty(await fetchTenantsFor(ids));
     } catch (e) {
-      setErr(e?.message || "Could not load your leads.");
+      setErr(e?.message || "Could not load your properties.");
     } finally {
       setLoading(false);
     }
@@ -80,7 +104,7 @@ export default function TenantManagement() {
   useEffect(() => {
     if (authLoading) return;
     if (!user) { setLoading(false); return; }
-    load();
+    load(user.uid);
   }, [authLoading, user]);
 
   const openForm = (propertyId) => {
