@@ -20,6 +20,7 @@ import "leaflet/dist/leaflet.css";
 import { geocodePlace, searchPlaces, reverseGeocode } from "../lib/geocode";
 import { useAuth } from "../context/AuthContext";
 import { saveUserRequirement } from "../lib/userRequirements";
+import { updateUserProfileFields } from "../lib/profileService";
 import { fetchPublishedInventory } from "../lib/inventory";
 import { matchRequirementToListings } from "../lib/inventoryMatch";
 import {
@@ -36,6 +37,16 @@ const C = {
 };
 const EASE = [0.22, 1, 0.36, 1];
 const fmtINR = (n) => `₹${Number(n).toLocaleString("en-IN")}`;
+
+/* Indian mobile validation — a bare 10-digit number starting 6-9, optionally
+   prefixed with 91/+91. */
+const phoneDigits = (v) => String(v || "").replace(/\D/g, "");
+const isValidPhone = (v) => {
+  const d = phoneDigits(v);
+  if (d.length === 10) return /^[6-9]/.test(d);
+  if (d.length === 12 && d.startsWith("91")) return /^[6-9]/.test(d.slice(2));
+  return false;
+};
 
 /* ── Question data ─────────────────────────────────────────────────────────── */
 /* Vocabulary now lives in ../data/preferenceOptions.js so the List my Flat
@@ -177,6 +188,35 @@ function Chip({ active, onClick, children, accent = C.coral }) {
   );
 }
 
+function PhoneField({ value, onChange }) {
+  const touched = (value || "").length > 0;
+  const ok = isValidPhone(value);
+  return (
+    <div className="brk-note">
+      <label className="brk-note-label">
+        Your mobile number <span className="brk-req">*</span>
+      </label>
+      <div className={`brk-phone-row ${touched && !ok ? "err" : ""}`}>
+        <span className="brk-phone-prefix">+91</span>
+        <input
+          type="tel"
+          inputMode="numeric"
+          value={value || ""}
+          onChange={(e) => onChange(e.target.value)}
+          placeholder="98xxxxxxxx"
+          className="brk-phone-input"
+          autoComplete="tel"
+        />
+      </div>
+      <p className="brk-phone-hint">
+        {touched && !ok
+          ? "Enter a valid 10-digit mobile number."
+          : "I’ll use this to send you shortlisted homes and coordinate visits."}
+      </p>
+    </div>
+  );
+}
+
 function NoteField({ value, onChange, placeholder }) {
   return (
     <div className="brk-note">
@@ -194,7 +234,8 @@ function NoteField({ value, onChange, placeholder }) {
 
 /* ── Main ──────────────────────────────────────────────────────────────────── */
 const STEPS = [
-  { id: "office", group: "location", type: "location" },
+  { id: "phone", group: "location", type: "phone", q: "First, what's your mobile number?", sub: "So I can send you shortlisted homes and coordinate visits directly." },
+  { id: "office", group: "location", type: "location", q: "Where's your office?", sub: "Search it below. I'll centre the hunt around your commute." },
   { id: "localities", group: "location", type: "multi", q: "Which localities are you considering?", sub: "Pick as many as you like — I'll focus my search here.", options: LOCALITIES, more: LOCALITIES_MORE },
   { id: "budget", group: "budget", type: "budget", q: "What's your monthly rent range?", sub: "Drag both ends to set your range." },
   { id: "occupants", group: "home", type: "multi", q: "Who'll be living there?", sub: "Select everyone who applies.", options: OCCUPANTS },
@@ -213,7 +254,7 @@ export default function AIBroker({ open, onClose }) {
   const [brokerState, setBrokerState] = useState("wave");
   const [ack, setAck] = useState("");
   const [prefs, setPrefs] = useState({
-    office: null, localities: [], budgetMin: 20000, budgetMax: 45000, stretch: false,
+    office: null, phone: "", localities: [], budgetMin: 20000, budgetMax: 45000, stretch: false,
     occupants: [], flatTypes: [...FLAT_TYPES], mustHaves: [], lifestyle: [], dealBreakers: [],
     priority: ["Near to Office", "Good locality", "Budget fit", "Apartment over standalone", "Flat size", "Ventilation"],
     notes: {},
@@ -261,6 +302,10 @@ export default function AIBroker({ open, onClose }) {
   }, [stepIdx, phase]);
 
   const advance = () => {
+    if (step.type === "phone" && isValidPhone(prefs.phone)) {
+      const uid = user?.uid || user?.id;
+      if (uid) updateUserProfileFields(uid, { phone: prefs.phone }).catch(() => {});
+    }
     setAck(ACKS[Math.floor(Math.random() * ACKS.length)]);
     setBrokerState("speaking");
     setTimeout(() => {
@@ -287,6 +332,7 @@ export default function AIBroker({ open, onClose }) {
   };
 
   const canContinue = () => {
+    if (step.type === "phone") return isValidPhone(prefs.phone);
     if (step.type === "location") return !!prefs.office;
     if (step.type === "single") return !!prefs.age;
     if (step.type === "multi") {
@@ -376,14 +422,13 @@ export default function AIBroker({ open, onClose }) {
                 {phase === "intro" && (
                   <motion.div key="intro" className="brk-step" initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -16 }} transition={{ duration: 0.4, ease: EASE }}>
                     <div className="brk-intro">
-                      <div className="brk-badge">👔 Your personal broker</div>
-                      <h2 className="brk-intro-h">Hello! I'm your personal MovEazy broker.</h2>
+                      <div className="brk-badge">💬 Your online agent</div>
+                      <h2 className="brk-intro-h">Hi, I'm your online agent.</h2>
                       <p className="brk-intro-p">
-                        Unlike traditional brokers, I don't start by throwing random flats at you.
-                        First, I'll understand what you're actually looking for.
+                        I'll help you find a perfect, cozy home within 10 minutes.
                       </p>
                       <p className="brk-intro-p brk-intro-p2">
-                        It takes about 5 minutes. The better I know your taste, the better the homes I'll bring you.
+                        First, please help me with your mobile number — I'll use it to send you shortlisted homes.
                       </p>
                       <button type="button" className="brk-cta" onClick={begin}>
                         Let's begin
@@ -397,11 +442,15 @@ export default function AIBroker({ open, onClose }) {
                   <motion.div key={step.id} className="brk-step" initial={{ opacity: 0, y: 22 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -18 }} transition={{ duration: 0.42, ease: EASE }}>
                     <div className="brk-qhead">
                       <span className="brk-qcount">{stepIdx + 1} of {STEPS.length}</span>
-                      <h2 className="brk-q">{step.id === "office" ? "First — where's your office?" : step.q}</h2>
-                      {step.sub && <p className="brk-qsub">{step.id === "office" ? "Search it below. I'll centre the hunt around your commute." : step.sub}</p>}
+                      <h2 className="brk-q">{step.q}</h2>
+                      {step.sub && <p className="brk-qsub">{step.sub}</p>}
                     </div>
 
                     <div className="brk-qbody">
+                      {step.type === "phone" && (
+                        <PhoneField value={prefs.phone} onChange={(v) => set({ phone: v })} />
+                      )}
+
                       {step.type === "location" && (
                         <OfficeSearch value={prefs.office} onPick={(o) => set({ office: o })} chips={OFFICE_CHIPS} />
                       )}
@@ -971,6 +1020,14 @@ function Styles() {
       .brk-note-label { display:block; font-size:12.5px; font-weight:700; color:${C.muted}; margin-bottom:7px; }
       .brk-note-input { width:100%; border:1.5px solid ${C.line}; background:#fff; border-radius:14px; padding:13px 16px; font-family:inherit; font-size:14.5px; color:${C.ink}; outline:none; transition:border-color .15s ease; }
       .brk-note-input:focus { border-color:${C.coral}; }
+      .brk-req { color:${C.coral}; font-weight:900; }
+      .brk-phone-row { display:flex; align-items:center; gap:8px; border:1.5px solid ${C.line}; background:#fff; border-radius:14px; padding:0 14px; transition:border-color .15s ease; }
+      .brk-phone-row:focus-within { border-color:${C.coral}; }
+      .brk-phone-row.err { border-color:${C.coralDeep}; }
+      .brk-phone-prefix { font-size:14.5px; font-weight:800; color:${C.muted}; border-right:1.5px solid ${C.line}; padding-right:10px; }
+      .brk-phone-input { flex:1; border:none; outline:none; background:transparent; font-family:inherit; font-size:14.5px; color:${C.ink}; padding:13px 0; letter-spacing:0.02em; }
+      .brk-phone-hint { font-size:12px; color:${C.muted}; margin:7px 2px 0; }
+      .brk-phone-row.err + .brk-phone-hint { color:${C.coralDeep}; }
 
       .brk-actions { display:flex; align-items:center; gap:16px; margin-top:30px; }
       .brk-back { background:none; border:none; color:${C.muted}; font-family:inherit; font-size:14px; font-weight:700; cursor:pointer; }

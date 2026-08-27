@@ -135,7 +135,11 @@ export default function ForkHome() {
       if (saved) {
         navigate("/recommendations", { state: { prefs: saved } });
       } else {
-        setShowChoice(true);
+        // First-timer, no saved requirement yet — straight into the AI agent
+        // chat instead of the map-vs-agent choice. The choice modal (below)
+        // is kept but no longer triggered from here; nothing else in the app
+        // opens it, so this is a behaviour change, not a removal.
+        setShowChatbot(true);
       }
     } finally {
       setCheckingPrefs(false);
