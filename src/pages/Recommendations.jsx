@@ -9,9 +9,33 @@ import { useVisitCart } from "../context/VisitCartContext";
 import { recommendInventory } from "../lib/recommend";
 import { fetchUserRequirement } from "../lib/userRequirements";
 import { fetchReactions, setReaction } from "../lib/visits";
+import { haversineKm } from "../lib/geo";
 
 const BLR = [12.9716, 77.5946];
 const fmtINR = (n) => `₹${Number(n || 0).toLocaleString("en-IN")}`;
+
+/** Straight-line distance from the seeker's stated office to this listing, in
+ * km — null if either point is missing (nothing to compare against). */
+function distanceFromOffice(listing, prefs) {
+  const office = prefs?.office;
+  if (!office || !Number.isFinite(Number(office.lat)) || !Number.isFinite(Number(office.lng))) return null;
+  if (!Number.isFinite(Number(listing.latitude)) || !Number.isFinite(Number(listing.longitude))) return null;
+  return haversineKm(office.lat, office.lng, Number(listing.latitude), Number(listing.longitude));
+}
+
+/** How well this listing's area matches the localities the seeker asked for —
+ * the same "area" signal the backend scoring uses (recommend_inventory.sql),
+ * surfaced on its own as a plain-language locality fit rather than folded
+ * into the overall match %. Null if they didn't name any localities. */
+function localityScore(listing, prefs) {
+  const chosen = (prefs?.localities || []).map((x) => String(x).toLowerCase());
+  if (!chosen.length) return null;
+  const area = String(listing.area || "").toLowerCase();
+  const nearby = (listing.nearby_areas || []).map((x) => String(x).toLowerCase());
+  if (chosen.includes(area)) return { pct: 100, label: "Exactly the locality you asked for" };
+  if (nearby.some((n) => chosen.includes(n))) return { pct: 70, label: "Right next to a locality you asked for" };
+  return { pct: 30, label: "Outside the localities you named" };
+}
 
 /** Teardrop pin — neutral coral (match score is intentionally not shown). Active enlarges + darkens. */
 function pinIcon(active) {
@@ -91,6 +115,8 @@ export default function Recommendations() {
   const [activeId, setActiveId] = useState(null);
   const [flyCenter, setFlyCenter] = useState(BLR);
   const [mobileView, setMobileView] = useState("list"); // list | map (mobile toggle)
+  const [detailListing, setDetailListing] = useState(null); // the result open in the full-screen detail view
+  const [actionToast, setActionToast] = useState(""); // brief confirmation after like/dislike/site-visit
   const cardRefs = useRef({});
 
   // If we arrived without prefs (e.g. refresh / deep link), load the saved requirement.
@@ -147,6 +173,25 @@ export default function Recommendations() {
     if (r.listing.latitude) setFlyCenter([Number(r.listing.latitude), Number(r.listing.longitude)]);
     const el = cardRefs.current[r.listing.property_id];
     if (el) el.scrollIntoView({ behavior: "smooth", block: "nearest" });
+  };
+
+  // On mobile the map and list are two separate screens (the List/Map toggle
+  // below), so a card tap can't just fly a map the visitor isn't looking at —
+  // it needs its own full-screen detail instead. On wider layouts the map is
+  // already visible beside the list, so keep the existing fly-to-it behaviour.
+  const openCard = (r) => {
+    focusListing(r);
+    if (typeof window !== "undefined" && window.matchMedia("(max-width: 640px)").matches) {
+      setDetailListing(r);
+    }
+  };
+
+  const actWithConfirm = async (r, kind) => {
+    const pid = r.listing.property_id;
+    if (kind === "like") { await react(pid, "like"); setActionToast("Added to your liked homes ♥"); }
+    else if (kind === "dislike") { await react(pid, "dislike"); setActionToast("Got it — you'll see less like this."); }
+    else if (kind === "visit") { cart.add(r.listing); setActionToast("Added to your site visit list."); }
+    setTimeout(() => { setActionToast(""); setDetailListing(null); }, 1400);
   };
 
   return (
@@ -227,6 +272,24 @@ export default function Recommendations() {
           .rec-mobiletoggle button { border: none; background: none; color: rgba(255,255,255,.6); font: 700 13px/1 inherit; padding: 10px 20px; border-radius: 999px; cursor: pointer; }
           .rec-mobiletoggle button.is-on { background: #fff; color: #1c1a17; }
         }
+
+        /* Mobile property detail (a "separate screen" opened from a card tap) */
+        .rec-detail-overlay { position: fixed; inset: 0; z-index: 1350; background: #f4f1ea; display: flex; flex-direction: column; }
+        .rec-detail-back { flex-shrink: 0; display: inline-flex; align-items: center; gap: 6px; margin: 14px; padding: 10px 16px; border-radius: 999px; border: 1px solid #ded6c8; background: #fff; font: 700 13.5px/1 'Plus Jakarta Sans', sans-serif; color: #2a2621; cursor: pointer; align-self: flex-start; }
+        .rec-detail-scroll { flex: 1 1 auto; min-height: 0; overflow-y: auto; }
+        .rec-detail-map { height: 42vh; }
+        .rec-detail-map .leaflet-container { height: 100%; width: 100%; }
+        .rec-detail-info { padding: 18px 18px 100px; }
+        .rec-detail-stats { display: flex; flex-wrap: wrap; gap: 10px; margin-top: 14px; }
+        .rec-detail-stat { flex: 1 1 160px; background: #fff; border: 1px solid #ece6da; border-radius: 14px; padding: 12px 14px; display: flex; flex-direction: column; gap: 2px; }
+        .rec-detail-stat-label { font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: .04em; color: #9a9186; }
+        .rec-detail-stat-val { font-size: 19px; font-weight: 800; color: #1c1a17; }
+        .rec-detail-stat-note { font-size: 11.5px; color: #7a7267; }
+        .rec-detail-actions { margin-top: 16px; display: flex; align-items: center; gap: 8px; }
+        .rec-detail-actbtn { flex-shrink: 0; height: 44px; padding: 0 16px; display: inline-flex; align-items: center; gap: 7px; border-radius: 12px; border: 1px solid #e7e0d3; background: #fff; color: #4a443d; font: 700 13px/1 'Plus Jakarta Sans', sans-serif; cursor: pointer; }
+        .rec-detail-actbtn.on-like { background: #fdeceb; border-color: #f4b8ae; color: #ef5a45; }
+        .rec-detail-actbtn.on-dislike { background: #eef0f2; border-color: #cfd4da; color: #566072; }
+        .rec-detail-toast { position: absolute; left: 50%; bottom: 24px; transform: translateX(-50%); background: #1c1a17; color: #fff; font: 700 13.5px/1.3 'Plus Jakarta Sans', sans-serif; padding: 13px 20px; border-radius: 14px; box-shadow: 0 14px 34px rgba(0,0,0,.3); max-width: calc(100% - 40px); text-align: center; }
       `}</style>
 
       <MovEazyNav active="" />
@@ -333,7 +396,7 @@ export default function Recommendations() {
                   ref={(el) => (cardRefs.current[l.property_id] = el)}
                   className={`rec-card ${activeId === l.property_id ? "is-active" : ""}`}
                   onMouseEnter={() => { setActiveId(l.property_id); if (l.latitude) setFlyCenter([Number(l.latitude), Number(l.longitude)]); }}
-                  onClick={() => focusListing(r)}
+                  onClick={() => openCard(r)}
                 >
                   <div className="rec-thumb">
                     {cover
@@ -391,6 +454,91 @@ export default function Recommendations() {
         <button type="button" className={mobileView === "list" ? "is-on" : ""} onClick={() => setMobileView("list")}>List</button>
         <button type="button" className={mobileView === "map" ? "is-on" : ""} onClick={() => setMobileView("map")}>Map</button>
       </div>
+
+      {/* Mobile-only property detail — a card alone can't show the map,
+          distance, or locality fit, so tapping one opens this full screen
+          instead (see openCard above). */}
+      {detailListing && (() => {
+        const l = detailListing.listing;
+        const dist = distanceFromOffice(l, prefs);
+        const locScore = localityScore(l, prefs);
+        const hasCoords = Number.isFinite(Number(l.latitude)) && Number.isFinite(Number(l.longitude));
+        return (
+          <div className="rec-detail-overlay">
+            <button type="button" className="rec-detail-back" onClick={() => setDetailListing(null)} aria-label="Back to list">
+              <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" strokeWidth="2.3" strokeLinecap="round" strokeLinejoin="round"><path d="M15 18l-6-6 6-6" /></svg>
+              Back to list
+            </button>
+
+            <div className="rec-detail-scroll">
+              {hasCoords && (
+                <div className="rec-detail-map">
+                  <MapContainer center={[Number(l.latitude), Number(l.longitude)]} zoom={15} scrollWheelZoom={false} attributionControl={false} style={{ height: "100%", width: "100%" }}>
+                    <TileLayer url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png" subdomains="abc" maxZoom={19} />
+                    <Marker position={[Number(l.latitude), Number(l.longitude)]} icon={pinIcon(true)} />
+                  </MapContainer>
+                </div>
+              )}
+
+              <div className="rec-detail-info">
+                <div className="rec-name">{l.title || `${l.flat_type || "Home"} in ${l.area || "Bengaluru"}`}</div>
+                <div className="rec-meta">{[l.flat_type, l.area, l.furnishing].filter(Boolean).join(" · ")}</div>
+
+                <div className="rec-detail-stats">
+                  {dist != null && (
+                    <div className="rec-detail-stat">
+                      <span className="rec-detail-stat-label">Distance from office</span>
+                      <span className="rec-detail-stat-val">{dist < 1 ? `${Math.round(dist * 1000)} m` : `${dist.toFixed(1)} km`}</span>
+                    </div>
+                  )}
+                  {locScore && (
+                    <div className="rec-detail-stat">
+                      <span className="rec-detail-stat-label">Locality score</span>
+                      <span className="rec-detail-stat-val">{locScore.pct}%</span>
+                      <span className="rec-detail-stat-note">{locScore.label}</span>
+                    </div>
+                  )}
+                </div>
+
+                {detailListing.reasons?.length > 0 && (
+                  <div className="rec-reasons">
+                    {detailListing.reasons.map((x, i) => <span key={i} className="rec-chip">{x}</span>)}
+                  </div>
+                )}
+
+                <div className="rec-foot">
+                  <span className="rec-rent">{fmtINR(l.rent)}<small>/mo</small></span>
+                  {l.landmark ? <span className="rec-tag">near {String(l.landmark).replace(/^near /i, "")}</span> : null}
+                </div>
+
+                <div className="rec-detail-actions">
+                  <button type="button" className={`rec-detail-actbtn ${reactions[l.property_id] === "like" ? "on-like" : ""}`} onClick={() => actWithConfirm(detailListing, "like")}>
+                    <svg width="18" height="18" viewBox="0 0 24 24" fill={reactions[l.property_id] === "like" ? "currentColor" : "none"} stroke="currentColor" strokeWidth="1.9" strokeLinecap="round" strokeLinejoin="round"><path d="M20.8 4.6a5.5 5.5 0 0 0-7.8 0L12 5.6l-1-1a5.5 5.5 0 0 0-7.8 7.8l1 1L12 21l7.8-7.6 1-1a5.5 5.5 0 0 0 0-7.8z" /></svg>
+                    Like
+                  </button>
+                  <button type="button" className={`rec-detail-actbtn ${reactions[l.property_id] === "dislike" ? "on-dislike" : ""}`} onClick={() => actWithConfirm(detailListing, "dislike")}>
+                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.9" strokeLinecap="round" strokeLinejoin="round"><path d="M17 14V2M9.2 22l1.3-6H4.3a2 2 0 0 1-2-2.3l1.4-9A2 2 0 0 1 5.6 3H17v11l-5 8a2 2 0 0 1-2.8-1z" /></svg>
+                    Not for me
+                  </button>
+                  {cart.has(l.property_id) ? (
+                    <button type="button" className="rec-add is-added" onClick={() => navigate("/visits")}>
+                      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.3" strokeLinecap="round" strokeLinejoin="round"><path d="M20 6 9 17l-5-5" /></svg>
+                      In your visits
+                    </button>
+                  ) : (
+                    <button type="button" className="rec-add" onClick={() => actWithConfirm(detailListing, "visit")}>
+                      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.1" strokeLinecap="round" strokeLinejoin="round"><path d="M12 5v14M5 12h14" /></svg>
+                      Add to site visit
+                    </button>
+                  )}
+                </div>
+              </div>
+            </div>
+
+            {actionToast && <div className="rec-detail-toast">{actionToast}</div>}
+          </div>
+        );
+      })()}
     </div>
   );
 }
