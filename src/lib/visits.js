@@ -45,6 +45,35 @@ export async function fetchSlotsFor(propertyIds = []) {
   return out;
 }
 
+/**
+ * What a renter is actually offered to book: open visit slots within the next
+ * `days` days (default 7), not every slot an owner has ever set up. Same
+ * shape as fetchSlotsFor — { [property_id]: [slot, ...] } — just bounded, so
+ * a far-future custom date doesn't show up as bookable months in advance.
+ */
+export async function fetchOpenVisitsFor(propertyIds = [], { days = 7 } = {}) {
+  if (!isSupabaseConfigured || !supabase || !propertyIds.length) return {};
+  const now = new Date();
+  const until = new Date(now.getTime() + days * 86400000);
+  const { data, error } = await supabase
+    .from("property_visit_slots")
+    .select("id, property_id, slot_at, capacity")
+    .in("property_id", propertyIds)
+    .gt("slot_at", now.toISOString())
+    .lte("slot_at", until.toISOString())
+    .order("slot_at", { ascending: true });
+  if (error) return {};
+  const out = {};
+  for (const s of data || []) (out[s.property_id] ||= []).push(s);
+  return out;
+}
+
+/** Open visit slots for one property within the next `days` days (default 7). */
+export async function fetchOpenVisitsForProperty(propertyId, opts = {}) {
+  const map = await fetchOpenVisitsFor([propertyId], opts);
+  return map[propertyId] || [];
+}
+
 /** Whether any of these properties has at least one upcoming open visit slot —
  * used to nudge an owner who hasn't set visit timing for anything yet. Not
  * limited to the 5-day window fetchSlotsFor's callers usually care about, so

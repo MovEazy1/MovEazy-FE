@@ -3,7 +3,7 @@ import { useNavigate, useLocation } from "react-router-dom";
 import MovEazyNav from "../components/layout/MovEazyNav";
 import { useAuth } from "../context/AuthContext";
 import { useVisitCart } from "../context/VisitCartContext";
-import { fetchSlotsFor, fetchBookings, bookIndividual, bookCombined, cancelBooking } from "../lib/visits";
+import { fetchOpenVisitsFor, fetchBookings, bookIndividual, bookCombined, cancelBooking } from "../lib/visits";
 
 const fmtINR = (n) => `₹${Number(n || 0).toLocaleString("en-IN")}`;
 const COMBINED_FEE = 1000;
@@ -33,7 +33,7 @@ export default function Visits() {
 
   const reload = async () => {
     if (!user) return;
-    const [s, b] = await Promise.all([fetchSlotsFor(propertyIds), fetchBookings(user.uid)]);
+    const [s, b] = await Promise.all([fetchOpenVisitsFor(propertyIds), fetchBookings(user.uid)]);
     setSlots(s);
     setBookings(b);
     setLoading(false);
@@ -45,7 +45,7 @@ export default function Visits() {
     setLoading(true);
     let alive = true;
     (async () => {
-      const [s, b] = await Promise.all([fetchSlotsFor(idsKey ? idsKey.split(",") : []), fetchBookings(user.uid)]);
+      const [s, b] = await Promise.all([fetchOpenVisitsFor(idsKey ? idsKey.split(",") : []), fetchBookings(user.uid)]);
       if (!alive) return;
       setSlots(s); setBookings(b); setLoading(false);
     })();

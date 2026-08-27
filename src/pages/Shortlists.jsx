@@ -14,7 +14,7 @@ import { useNavigate } from "react-router-dom";
 import MovEazyNav from "../components/layout/MovEazyNav";
 import { useAuth } from "../context/AuthContext";
 import { useVisitCart } from "../context/VisitCartContext";
-import { fetchReactions, fetchSlotsFor, fetchBookings, bookIndividual } from "../lib/visits";
+import { fetchReactions, fetchOpenVisitsFor, fetchBookings, bookIndividual } from "../lib/visits";
 import { fetchInventoryByIds } from "../lib/inventory";
 
 const fmtINR = (n) => `₹${Number(n || 0).toLocaleString("en-IN")}`;
@@ -78,7 +78,7 @@ export default function Shortlists() {
     if (!user || !idsKey) { setSlots({}); setBookings([]); return undefined; }
     let alive = true;
     (async () => {
-      const [s, b] = await Promise.all([fetchSlotsFor(idsKey.split(",")), fetchBookings(user.uid)]);
+      const [s, b] = await Promise.all([fetchOpenVisitsFor(idsKey.split(",")), fetchBookings(user.uid)]);
       if (!alive) return;
       setSlots(s);
       setBookings(b);
