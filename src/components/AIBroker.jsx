@@ -559,8 +559,51 @@ const OFFICE_ICON = L.divIcon({
   iconAnchor: [15, 39],
 });
 
+/** Tap-to-drop-a-pin. On some mobile browsers, Leaflet's own tap→click
+ * synthesis silently fails to fire inside this modal (seen in testing: a real
+ * tap does nothing, while a plain DOM click on the same spot works fine) — so
+ * the pin never appears and the map looks unresponsive to touch. As a
+ * fallback, track raw touchstart/touchend directly: if a touch ends close to
+ * where it started and quickly (a tap, not a pan/drag), resolve the pin from
+ * that point ourselves via Leaflet's own coordinate conversion. Guarded so it
+ * can't double-fire if the native click event also happens to go through. */
 function MapClicker({ onPoint }) {
-  useMapEvents({ click(e) { onPoint(e.latlng.lat, e.latlng.lng); } });
+  const lastFired = useRef(0);
+  const fire = (lat, lng) => {
+    lastFired.current = Date.now();
+    onPoint(lat, lng);
+  };
+  const map = useMapEvents({ click(e) { fire(e.latlng.lat, e.latlng.lng); } });
+
+  const touchStart = useRef(null);
+  useEffect(() => {
+    const el = map.getContainer();
+    const onTouchStart = (e) => {
+      if (e.touches.length !== 1) { touchStart.current = null; return; }
+      const t = e.touches[0];
+      touchStart.current = { x: t.clientX, y: t.clientY, time: Date.now() };
+    };
+    const onTouchEnd = (e) => {
+      const start = touchStart.current;
+      touchStart.current = null;
+      if (!start || Date.now() - lastFired.current < 400) return;
+      const t = e.changedTouches[0];
+      if (!t) return;
+      const dx = t.clientX - start.x, dy = t.clientY - start.y;
+      const dt = Date.now() - start.time;
+      if (Math.hypot(dx, dy) > 12 || dt > 500) return; // moved/held too long — a pan, not a tap
+      const rect = el.getBoundingClientRect();
+      const point = L.point(t.clientX - rect.left, t.clientY - rect.top);
+      const latlng = map.containerPointToLatLng(point);
+      fire(latlng.lat, latlng.lng);
+    };
+    el.addEventListener("touchstart", onTouchStart, { passive: true });
+    el.addEventListener("touchend", onTouchEnd, { passive: true });
+    return () => {
+      el.removeEventListener("touchstart", onTouchStart);
+      el.removeEventListener("touchend", onTouchEnd);
+    };
+  }, [map]); // eslint-disable-line react-hooks/exhaustive-deps
   return null;
 }
 function Recenter({ pos }) {
