@@ -210,11 +210,12 @@ export default function MyProperties() {
       setRows(merged);
       const ids = list.map((r) => r.property_id);
       if (ids.length) {
-        const slots = await fetchSlotsFor(ids);
+        // fetchSlotsFor resolves to { [property_id]: [slot, ...] }, not a flat
+        // list — count each property's own array length directly.
+        const slotsByProperty = await fetchSlotsFor(ids);
         const counts = {};
-        for (const s of slots || []) {
-          const pid = s.property_id;
-          counts[pid] = (counts[pid] || 0) + 1;
+        for (const pid of Object.keys(slotsByProperty || {})) {
+          counts[pid] = (slotsByProperty[pid] || []).length;
         }
         setSlotCounts(counts);
       }
