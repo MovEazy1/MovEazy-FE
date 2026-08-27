@@ -832,22 +832,32 @@ function RankList({ items, onReorder }) {
 
 /* ── Live "My Understanding" card ──────────────────────────────────────────── */
 function UnderstandingCard({ prefs }) {
+  // `id` is a stable per-category key, independent of the row's live text —
+  // budget in particular changes on every pixel of a slider drag. Keying on
+  // the old `icon + val` combo meant every drag tick minted a brand-new key,
+  // so AnimatePresence treated it as a whole new row: exit-animating the old
+  // value while entering the new one. Drag events fire faster than that exit
+  // transition completes, so overlapping exiting copies piled up inside the
+  // card, inflating its height while dragging. Keying on `id` instead lets
+  // React recognize it as the same row and just update its text in place —
+  // AnimatePresence still animates rows properly appearing/disappearing
+  // (e.g. localities going from empty to populated).
   const rows = [];
-  if (prefs.office) rows.push(["📍", prefs.office.label]);
-  if (prefs.localities.length) rows.push(["🗺️", prefs.localities.slice(0, 3).join(", ") + (prefs.localities.length > 3 ? "…" : "")]);
-  rows.push(["💰", `${fmtINR(prefs.budgetMin)} – ${prefs.budgetMax >= 200000 ? "₹2L+" : fmtINR(prefs.budgetMax)}`]);
-  if (prefs.flatTypes.length && prefs.flatTypes.length < FLAT_TYPES.length) rows.push(["🏡", prefs.flatTypes.slice(0, 3).join(", ")]);
-  if (prefs.occupants.includes("Pet Owner") || prefs.mustHaves.includes("Pet Friendly")) rows.push(["🐶", "Pet friendly"]);
-  if (prefs.mustHaves.includes("Good Sunlight")) rows.push(["🌞", "Loves sunlight"]);
-  if (prefs.mustHaves.includes("Near Metro")) rows.push(["🚇", "Near metro"]);
-  if (prefs.occupants.includes("Working Professionals") || prefs.lifestyle.includes("Office Commute")) rows.push(["🧑‍💻", "Commute matters"]);
+  if (prefs.office) rows.push(["office", "📍", prefs.office.label]);
+  if (prefs.localities.length) rows.push(["localities", "🗺️", prefs.localities.slice(0, 3).join(", ") + (prefs.localities.length > 3 ? "…" : "")]);
+  rows.push(["budget", "💰", `${fmtINR(prefs.budgetMin)} – ${prefs.budgetMax >= 200000 ? "₹2L+" : fmtINR(prefs.budgetMax)}`]);
+  if (prefs.flatTypes.length && prefs.flatTypes.length < FLAT_TYPES.length) rows.push(["flatTypes", "🏡", prefs.flatTypes.slice(0, 3).join(", ")]);
+  if (prefs.occupants.includes("Pet Owner") || prefs.mustHaves.includes("Pet Friendly")) rows.push(["pets", "🐶", "Pet friendly"]);
+  if (prefs.mustHaves.includes("Good Sunlight")) rows.push(["sunlight", "🌞", "Loves sunlight"]);
+  if (prefs.mustHaves.includes("Near Metro")) rows.push(["metro", "🚇", "Near metro"]);
+  if (prefs.occupants.includes("Working Professionals") || prefs.lifestyle.includes("Office Commute")) rows.push(["commute", "🧑‍💻", "Commute matters"]);
 
   return (
     <div className="brk-understand">
       <div className="brk-understand-h">My understanding</div>
       <AnimatePresence initial={false}>
-        {rows.map(([icon, val]) => (
-          <motion.div key={icon + val} className="brk-understand-row" initial={{ opacity: 0, x: -8 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0 }}>
+        {rows.map(([id, icon, val]) => (
+          <motion.div key={id} className="brk-understand-row" initial={{ opacity: 0, x: -8 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0 }}>
             <span>{icon}</span>{val}
           </motion.div>
         ))}
