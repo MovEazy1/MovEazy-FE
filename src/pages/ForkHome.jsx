@@ -21,6 +21,7 @@ import keysImg from "../assets/images/guarentee-keyhandover.jpg";
 import sofaImg from "../assets/images/services/image1-sofa.png";
 import timelineCityImg from "../assets/images/services/timeline1.png";
 import timelinePhoneImg from "../assets/images/services/timeline2.png";
+import agentAvatar from "../assets/images/aman.png";
 
 const CHOICE_EASE = [0.22, 1, 0.36, 1];
 
@@ -414,7 +415,50 @@ export default function ForkHome() {
           .mzn-tl-numbadge { display: none !important; }
           .mzn-tl-step [data-step-media] { order: 1 !important; }
           .mzn-tl-step .mzn-tl-node-wrap { order: 2 !important; margin: 2px 0 !important; }
-          .mzn-tl-step [data-step-text] { order: 3 !important; }        }
+          .mzn-tl-step [data-step-text] { order: 3 !important; }
+
+          /* Mobile gets its own telling of the same journey (see .mzn-mj below)
+             instead of the desktop zigzag grid. */
+          .mzn-tl-desktop-only { display: none !important; }
+          .mzn-mj { display: flex !important; }
+        }
+
+        /* ── Mobile journey: chat -> engine -> shortlist -> party -> agent ── */
+        .mzn-mj { display: none; flex-direction: column; gap: 64px; margin-top: 12px; }
+        .mzn-mj-scene { display: flex; flex-direction: column; }
+        .mzn-mj-scene-center { align-items: center; text-align: center; }
+        .mzn-mj-eyebrow { font-family: 'Caveat', cursive; font-style: italic; font-weight: 600; font-size: clamp(22px,6vw,28px); color: #0E7C68; text-align: center; margin: 0 0 20px; }
+        .mzn-mj-caption { color: #5C6B67; font-size: 15px; line-height: 1.6; margin-top: 20px; max-width: 340px; }
+        .mzn-mj-scene:not(.mzn-mj-scene-center) .mzn-mj-caption { max-width: none; }
+
+        .mzn-mj-chat { background: #04211D; border-radius: 22px; padding: 18px; display: flex; flex-direction: column; gap: 10px; box-shadow: 0 20px 44px rgba(0,0,0,.16); }
+        .mzn-mj-bubble { max-width: 78%; padding: 10px 14px; border-radius: 16px; font-size: 13.5px; line-height: 1.4; }
+        .mzn-mj-bubble-bot { align-self: flex-start; background: rgba(255,255,255,.08); color: #DCE8E5; border-bottom-left-radius: 4px; }
+        .mzn-mj-bubble-user { align-self: flex-end; background: #5EEAD4; color: #04211D; font-weight: 600; border-bottom-right-radius: 4px; }
+        .mzn-mj-typing { display: flex; gap: 4px; padding: 14px; }
+        .mzn-mj-typing span { width: 6px; height: 6px; border-radius: 50%; background: #04211D; opacity: .5; animation: mznTyping 1.2s ease-in-out infinite; }
+        .mzn-mj-typing span:nth-child(2) { animation-delay: .15s; }
+        .mzn-mj-typing span:nth-child(3) { animation-delay: .3s; }
+        @keyframes mznTyping { 0%, 60%, 100% { transform: translateY(0); opacity: .5; } 30% { transform: translateY(-3px); opacity: 1; } }
+
+        .mzn-mj-engine { position: relative; width: 88px; height: 88px; border-radius: 50%; background: #5EEAD4; display: flex; align-items: center; justify-content: center; }
+        .mzn-mj-radar-ring { position: absolute; inset: 0; border-radius: 50%; border: 1.5px solid #0E7C68; opacity: 0; animation: mznRadar 2.4s ease-out infinite; }
+        .mzn-mj-radar-ring.r2 { animation-delay: .8s; }
+        .mzn-mj-radar-ring.r3 { animation-delay: 1.6s; }
+        @keyframes mznRadar { 0% { transform: scale(1); opacity: .6; } 100% { transform: scale(2.1); opacity: 0; } }
+
+        .mzn-mj-shortlist { display: flex; flex-direction: column; gap: 14px; }
+        .mzn-mj-listing { display: flex; gap: 14px; background: #fff; border: 1px solid rgba(0,0,0,.07); border-radius: 16px; padding: 10px; box-shadow: 0 12px 28px rgba(0,0,0,.06); }
+        .mzn-mj-listing-img { width: 84px; height: 84px; flex: none; border-radius: 12px; background-size: cover; background-position: center; }
+        .mzn-mj-listing-body { display: flex; flex-direction: column; justify-content: center; gap: 3px; min-width: 0; }
+        .mzn-mj-match { align-self: flex-start; font-size: 10.5px; font-weight: 800; letter-spacing: .03em; color: #0E7C68; background: #E4FBF6; padding: 2px 8px; border-radius: 100px; margin-bottom: 2px; }
+        .mzn-mj-listing-title { font-weight: 700; font-size: 14px; color: #0B1A17; }
+        .mzn-mj-listing-rent { font-size: 13px; color: #5C6B67; }
+
+        .mzn-mj-party { width: 88px; height: 88px; border-radius: 50%; background: linear-gradient(135deg,#FFE1A6,#E8A33D); display: flex; align-items: center; justify-content: center; box-shadow: 0 14px 30px rgba(232,163,61,.35); }
+
+        .mzn-mj-broker { width: 88px; height: 88px; border-radius: 50%; object-fit: cover; box-shadow: 0 14px 30px rgba(0,0,0,.2); }
+        .mzn-mj-cta { display: inline-flex; align-items: center; gap: 8px; margin-top: 22px; background: #5EEAD4; color: #04211D !important; font-weight: 700; font-size: 15px; padding: 14px 30px; border-radius: 100px; }
       `}</style>
 
       <MovEazyNav active="home" transparentAtTop onFindFlat={startFlatSearch} />
@@ -610,7 +654,7 @@ export default function ForkHome() {
             </div>
           </div>
 
-          <div style={{ position: "relative", marginTop: "clamp(48px,7vh,84px)" }}>
+          <div className="mzn-tl-desktop-only" style={{ position: "relative", marginTop: "clamp(48px,7vh,84px)" }}>
             <svg viewBox="0 0 100 1000" preserveAspectRatio="none" style={{ position: "absolute", left: "50%", top: 0, transform: "translateX(-50%)", width: 120, height: "100%", overflow: "visible", zIndex: 0 }}>
               <path d="M50 0 C78 90 22 180 50 280 C78 380 22 470 50 570 C78 670 22 760 50 860 C70 925 45 965 50 1000" fill="none" stroke="rgba(14,124,104,.20)" strokeWidth="2" strokeDasharray="7 9" />
               <path data-tl-path d="M50 0 C78 90 22 180 50 280 C78 380 22 470 50 570 C78 670 22 760 50 860 C70 925 45 965 50 1000" pathLength="1000" fill="none" stroke="#0E7C68" strokeWidth="2.4" strokeDasharray="0 1000" />
@@ -710,6 +754,66 @@ export default function ForkHome() {
                 </div>
               </div>
 
+            </div>
+          </div>
+
+          {/* ── MOBILE ONLY: the same journey, told as one continuous scroll instead
+               of the desktop zigzag grid — chat -> engine -> shortlist -> welcome
+               party -> your agent, each revealing as you scroll to it. ── */}
+          <div className="mzn-mj">
+            <div data-reveal className="mzn-mj-scene">
+              <p className="mzn-mj-eyebrow">We understand your requirement thoroughly</p>
+              <div className="mzn-mj-chat">
+                <div className="mzn-mj-bubble mzn-mj-bubble-bot">Hey! Which areas are you looking at?</div>
+                <div className="mzn-mj-bubble mzn-mj-bubble-user">Koramangala, HSR Layout</div>
+                <div className="mzn-mj-bubble mzn-mj-bubble-bot">Got it. What's your monthly budget?</div>
+                <div className="mzn-mj-bubble mzn-mj-bubble-user">&#8377;25,000 &#8211; &#8377;35,000</div>
+                <div className="mzn-mj-bubble mzn-mj-bubble-bot">And when do you want to move in?</div>
+                <div className="mzn-mj-bubble mzn-mj-bubble-user mzn-mj-typing"><span /><span /><span /></div>
+              </div>
+            </div>
+
+            <div data-reveal className="mzn-mj-scene mzn-mj-scene-center">
+              <div className="mzn-mj-engine">
+                <span className="mzn-mj-radar-ring r1" /><span className="mzn-mj-radar-ring r2" /><span className="mzn-mj-radar-ring r3" />
+                <svg width="30" height="30" viewBox="0 0 24 24" fill="none" stroke="#04211D" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><circle cx="11" cy="11" r="7" /><path d="m20 20-4.35-4.35" /></svg>
+              </div>
+              <p className="mzn-mj-caption">Our recommendation engine runs and matches the best available inventory across the web with your requirement.</p>
+            </div>
+
+            <div data-reveal className="mzn-mj-scene">
+              <div className="mzn-mj-shortlist">
+                <div className="mzn-mj-listing">
+                  <div className="mzn-mj-listing-img" style={{ backgroundImage: `url(${livingRoomImg})` }} />
+                  <div className="mzn-mj-listing-body">
+                    <span className="mzn-mj-match">96% match</span>
+                    <p className="mzn-mj-listing-title">2 BHK &middot; Koramangala</p>
+                    <p className="mzn-mj-listing-rent">&#8377;28,000/mo</p>
+                  </div>
+                </div>
+                <div className="mzn-mj-listing">
+                  <div className="mzn-mj-listing-img" style={{ backgroundImage: `url(${sofaImg})` }} />
+                  <div className="mzn-mj-listing-body">
+                    <span className="mzn-mj-match">91% match</span>
+                    <p className="mzn-mj-listing-title">1 BHK &middot; HSR Layout</p>
+                    <p className="mzn-mj-listing-rent">&#8377;22,000/mo</p>
+                  </div>
+                </div>
+              </div>
+              <p className="mzn-mj-caption">We only show the listings you're likely to visit.</p>
+            </div>
+
+            <div data-reveal className="mzn-mj-scene mzn-mj-scene-center">
+              <div className="mzn-mj-party">
+                <svg width="30" height="30" viewBox="0 0 24 24" fill="none" stroke="#04211D" strokeWidth="1.8"><path d="M3 21l6.5-13L21 19.5 3 21z" strokeLinejoin="round" /><path d="M14 4.5v.01M18.5 8v.01M20.5 3.5v.01" strokeLinecap="round" /></svg>
+              </div>
+              <p className="mzn-mj-caption">We throw you a house-warming party from our side to help you settle into the neighbourhood and meet the movEazy community.</p>
+            </div>
+
+            <div data-reveal className="mzn-mj-scene mzn-mj-scene-center">
+              <img src={agentAvatar} alt="" className="mzn-mj-broker" />
+              <p className="mzn-mj-caption">Your dedicated on-ground agent &#8212; ready whenever you are.</p>
+              <a href="#" className="mzn-mj-cta" onClick={(e) => { e.preventDefault(); startFlatSearch(); }}>Find my flat</a>
             </div>
           </div>
         </div>
