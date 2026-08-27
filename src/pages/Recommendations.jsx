@@ -237,7 +237,6 @@ export default function Recommendations() {
         .rec-foot { display: flex; align-items: baseline; justify-content: space-between; padding-top: 8px; }
         .rec-rent { font-size: 18px; font-weight: 800; }
         .rec-rent small { font-size: 12px; font-weight: 600; color: #9a9186; }
-        .rec-tag { font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: .04em; color: #b98d2f; }
         .rec-actions { margin-top: 10px; display: flex; align-items: center; gap: 8px; }
         .rec-ico { width: 40px; height: 40px; flex-shrink: 0; display: inline-flex; align-items: center; justify-content: center; border-radius: 12px; border: 1px solid #e7e0d3; background: #fff; color: #7a7267; cursor: pointer; transition: all .15s ease; }
         .rec-ico:hover { border-color: #d3c9b8; color: #4a443d; }
@@ -468,7 +467,6 @@ export default function Recommendations() {
                     )}
                     <div className="rec-foot">
                       <span className="rec-rent">{fmtINR(l.rent)}<small>/mo</small></span>
-                      {l.landmark ? <span className="rec-tag">near {String(l.landmark).replace(/^near /i, "")}</span> : null}
                     </div>
                     <div className="rec-actions" onClick={(e) => e.stopPropagation()}>
                       <button type="button" className={`rec-ico ${reactions[l.property_id] === "like" ? "on-like" : ""}`} title="Like" aria-label="Like" onClick={() => react(l.property_id, "like")}>
@@ -556,7 +554,6 @@ export default function Recommendations() {
 
                 <div className="rec-foot">
                   <span className="rec-rent">{fmtINR(l.rent)}<small>/mo</small></span>
-                  {l.landmark ? <span className="rec-tag">near {String(l.landmark).replace(/^near /i, "")}</span> : null}
                 </div>
 
                 <div className="rec-detail-actions">
