@@ -104,6 +104,17 @@
 
   section, div, main, header, footer { max-width: 100%; }
 
+  /* Leaflet positions every marker/tile/overlay itself via absolute positioning
+   * + transforms, as <div>s inside panes that carry no explicit CSS width. The
+   * blanket reset above resolves `max-width: 100%` against that indefinite
+   * width as 0, crushing every div-based marker icon (L.divIcon — used for
+   * every pin on every map in the app) to zero width: invisible, though still
+   * present and clickable in the DOM. `.leaflet-container div` outranks the
+   * bare `div` reset on specificity, so this wins regardless of stylesheet
+   * order; the map's own outer box already constrains its footprint via
+   * explicit CSS elsewhere, so freeing its internals from this reset is safe. */
+  .leaflet-container div { max-width: none; }
+
   img, video, canvas, svg {
     display: block;
     max-width: 100%;

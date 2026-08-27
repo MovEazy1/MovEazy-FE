@@ -717,7 +717,7 @@ function OfficeSearch({ value, onPick, chips }) {
           scrollWheelZoom={false}
           attributionControl={false}
         >
-          <TileLayer url="https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png" />
+          <TileLayer url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png" subdomains="abc" maxZoom={19} />
           <ZoomControl position="bottomleft" />
           <MapClicker onPoint={onMapPoint} />
           <Recenter pos={pos} />

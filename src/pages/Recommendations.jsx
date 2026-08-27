@@ -287,7 +287,7 @@ export default function Recommendations() {
         {/* Map (left) */}
         <div className="rec-map">
           <MapContainer center={BLR} zoom={12} scrollWheelZoom style={{ height: "100%", width: "100%" }}>
-            <TileLayer url="https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png" attribution="&copy; OpenStreetMap &copy; CARTO" />
+            <TileLayer url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png" attribution="&copy; OpenStreetMap contributors" subdomains="abc" maxZoom={19} />
             <SyncSizeOnShow shown={mobileView === "map"} />
             <FlyTo center={flyCenter} zoom={14} />
             {markers.map((r) => (
