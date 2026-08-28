@@ -374,14 +374,13 @@ export default function ListMyFlatMobile({ user, onPublished }) {
 
               <div>
                 <Q>Now drop a pin on your building</Q>
-                <div style={{ borderRadius: 14, overflow: "hidden", border: "1px solid rgba(255,255,255,.13)" }}>
-                  <ListingMapPicker
-                    markerPosition={marker}
-                    onMarkerChange={handleMarker}
-                    height={230}
-                    focusQuery={area && area !== "Other" ? `${area}, Bengaluru` : ""}
-                  />
-                </div>
+                <ListingMapPicker
+                  theme="dark"
+                  markerPosition={marker}
+                  onMarkerChange={handleMarker}
+                  height={230}
+                  focusQuery={area && area !== "Other" ? `${area}, Bengaluru` : ""}
+                />
                 <div style={{ color: resolving ? "#9FB5B0" : "#6F8681", fontSize: 12.5, marginTop: 9, lineHeight: 1.45 }}>
                   {resolving ? "Finding the address…" : fullAddress || "Search or tap the map to drop a pin on your building."}
                 </div>

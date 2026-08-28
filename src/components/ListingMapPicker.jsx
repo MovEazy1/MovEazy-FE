@@ -47,7 +47,24 @@ function PinMarker({ position }) {
   return <Marker position={position} />;
 }
 
-export default function ListingMapPicker({ markerPosition, onMarkerChange, height = 260, initialZoom = 12, focusQuery = "" }) {
+/** Opt-in palette so the picker can sit inside the dark mobile posting sheet
+ *  (components/ListMyFlatMobile.jsx) without its light search bar cutting a
+ *  white band through it. Callers that pass nothing keep the original look. */
+const THEMES = {
+  light: {
+    inputBg: "#fff", inputText: "#0f172a", inputBorder: "#cbd5e1", placeholder: "#94a3b8",
+    btnBg: "#16a34a", btnBusy: "#86efac", btnBorder: "#16a34a", btnText: "#fff",
+    hint: "#64748b", frame: "#e2e8f0",
+  },
+  dark: {
+    inputBg: "rgba(255,255,255,.05)", inputText: "#F1F6F4", inputBorder: "rgba(255,255,255,.16)", placeholder: "#6F8681",
+    btnBg: "#5EEAD4", btnBusy: "rgba(94,234,212,.5)", btnBorder: "#5EEAD4", btnText: "#04211D",
+    hint: "#6F8681", frame: "rgba(255,255,255,.13)",
+  },
+};
+
+export default function ListingMapPicker({ markerPosition, onMarkerChange, height = 260, initialZoom = 12, focusQuery = "", theme = "light" }) {
+  const t = THEMES[theme] || THEMES.light;
   const [search, setSearch] = useState("");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
@@ -156,9 +173,12 @@ export default function ListingMapPicker({ markerPosition, onMarkerChange, heigh
             style={{
               width: "100%",
               padding: "8px 10px",
-              border: "1px solid #cbd5e1",
+              border: `1px solid ${t.inputBorder}`,
               borderRadius: "6px",
               fontSize: "13px",
+              background: t.inputBg,
+              color: t.inputText,
+              outline: "none",
             }}
           />
           {open && results.length > 0 && (
@@ -194,9 +214,9 @@ export default function ListingMapPicker({ markerPosition, onMarkerChange, heigh
           style={{
             padding: "8px 14px",
             borderRadius: "6px",
-            border: "1px solid #16a34a",
-            background: loading ? "#86efac" : "#16a34a",
-            color: "white",
+            border: `1px solid ${t.btnBorder}`,
+            background: loading ? t.btnBusy : t.btnBg,
+            color: t.btnText,
             fontWeight: 700,
             fontSize: "13px",
             cursor: loading ? "wait" : "pointer",
@@ -205,13 +225,13 @@ export default function ListingMapPicker({ markerPosition, onMarkerChange, heigh
           {loading ? "…" : "Search"}
         </button>
       </div>
-      <div style={{ fontSize: "11px", color: "#64748b", marginBottom: error ? "4px" : "8px" }}>
+      <div style={{ fontSize: "11px", color: t.hint, marginBottom: error ? "4px" : "8px" }}>
         Pick a suggestion to drop the pin there — or click the map to place / move it.
       </div>
       {error ? (
-        <div style={{ color: "#b91c1c", fontSize: "12px", marginBottom: "8px", fontWeight: 600 }}>{error}</div>
+        <div style={{ color: theme === "dark" ? "#FCA5A5" : "#b91c1c", fontSize: "12px", marginBottom: "8px", fontWeight: 600 }}>{error}</div>
       ) : null}
-      <div style={{ height, borderRadius: "8px", overflow: "hidden", border: "1px solid #e2e8f0" }}>
+      <div style={{ height, borderRadius: "8px", overflow: "hidden", border: `1px solid ${t.frame}` }}>
         <MapContainer center={mapCenter} zoom={zoom} style={{ height: "100%", width: "100%" }} scrollWheelZoom>
           <TileLayer url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png" attribution="&copy; OpenStreetMap" />
           <MapSearchFlyTo center={mapCenter} zoom={zoom} />
