@@ -326,7 +326,7 @@ export default function ListMyFlatMobile({ user, onPublished }) {
             </span>
             <div style={{ minWidth: 0 }}>
               <div style={{ color: "#F1F6F4", fontSize: 14, fontWeight: 800, lineHeight: 1.25 }}>
-                Earn Flat <span style={{ color: GOLD }}>₹5,000 Cash Reward</span>
+                Earn Flat <span style={{ color: GOLD }}>₹10,000 Cash Reward</span>
               </div>
               <div style={{ color: "#C9AE85", fontSize: 12.5, marginTop: 2 }}>+ Tenant Replacement</div>
             </div>
