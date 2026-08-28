@@ -5,6 +5,7 @@ import Navbar from "../components/layout/Navbar";
 import Footer from "../components/layout/Footer";
 import PageShell from "../components/layout/PageShell";
 import ListingMapPicker from "../components/ListingMapPicker";
+import ListMyFlatMobile from "../components/ListMyFlatMobile";
 import { reverseGeocode, nearbyLandmarks } from "../lib/geocode";
 import { createInventoryItem, uploadInventoryPhotos, generatePropertyId } from "../lib/inventory";
 import { fetchAllUserRequirements } from "../lib/userRequirements";
@@ -32,6 +33,23 @@ const WALLET_REWARD_AMOUNT = 10000;
 const fmtWallet = (n) => `₹${Number(n || 0).toLocaleString("en-IN")}`;
 
 const inp = "w-full px-4 py-3 rounded-xl border border-gray-200 bg-white text-[14px] text-gray-900 placeholder:text-gray-400 outline-none transition-all focus:border-red-400 focus:ring-2 focus:ring-red-100";
+
+/** Phone-width only: the posting form gets its own mobile layout (components/ListMyFlatMobile.jsx).
+ *  Tablet and desktop keep the three-step form below. Tracked live so a rotation
+ *  or resize swaps layouts instead of stranding a half-filled form. */
+function useIsPhone() {
+  const query = "(max-width: 767px)";
+  const [isPhone, setIsPhone] = useState(
+    () => typeof window !== "undefined" && window.matchMedia(query).matches
+  );
+  useEffect(() => {
+    const mq = window.matchMedia(query);
+    const onChange = (e) => setIsPhone(e.matches);
+    mq.addEventListener("change", onChange);
+    return () => mq.removeEventListener("change", onChange);
+  }, []);
+  return isPhone;
+}
 
 function Label({ children, required }) {
   return (
@@ -75,6 +93,7 @@ const STEPS = ["Who & Where", "The Home", "Publish"];
 export default function ListMyFlat() {
   const { user } = useAuth();
   const navigate = useNavigate();
+  const isPhone = useIsPhone();
   const [step, setStep] = useState(0);
   const [saving, setSaving] = useState(false);
   const [errors, setErrors] = useState({});
@@ -446,6 +465,26 @@ export default function ListMyFlat() {
         </main>
         <Footer />
       </PageShell>
+    );
+  }
+
+  // Phones get their own posting layout. It reports the created row back up so
+  // the success screen above stays the one implementation for both layouts —
+  // seeding the fields that screen reads (role, flat type, area, title) from
+  // the row it just created, since the mobile form holds its own state.
+  if (isPhone) {
+    return (
+      <ListMyFlatMobile
+        user={user}
+        onPublished={(row, matches) => {
+          setPostedBy(row.posted_by || "owner");
+          setFlatType(row.flat_type || "");
+          setArea(row.area || "");
+          setTitle(row.title || "");
+          setPublished({ row, matches });
+          window.scrollTo({ top: 0, behavior: "smooth" });
+        }}
+      />
     );
   }
 

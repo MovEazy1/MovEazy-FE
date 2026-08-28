@@ -101,6 +101,21 @@ export function buildInventoryRow(draft, poster) {
     images: list(draft.images),
     cover_image_url: list(draft.images)[0] || "",
 
+    // Extra detail from the mobile "List my flat" flow. Columns are nullable
+    // (see MovEazy-BE/supabase/inventory_listing_details.sql); the desktop form
+    // doesn't collect them, so undefined here must stay undefined rather than
+    // becoming 0/"" — hence num(...)'s null fallback and the ?? guards.
+    property_type: String(draft.propertyType || "").trim() || null,
+    built_up_area: num(draft.builtUpArea),
+    floor_number: num(draft.floorNumber),
+    total_floors: num(draft.totalFloors),
+    facing: String(draft.facing || "").trim() || null,
+    parking: String(draft.parking || "").trim() || null,
+    maintenance_amount: num(draft.maintenanceAmount),
+    rent_negotiable: draft.rentNegotiable ?? false,
+    best_time_to_reach: String(draft.bestTimeToReach || "").trim() || null,
+    wants_photographer: draft.wantsPhotographer ?? false,
+
     status: "published",
     updated_at: new Date().toISOString(),
   };
