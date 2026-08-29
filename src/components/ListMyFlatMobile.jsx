@@ -326,7 +326,7 @@ export default function ListMyFlatMobile({ user, onPublished }) {
             </span>
             <div style={{ minWidth: 0 }}>
               <div style={{ color: "#F1F6F4", fontSize: 14, fontWeight: 800, lineHeight: 1.25 }}>
-                Earn Flat <span style={{ color: GOLD }}>₹10,000 Cash Reward</span>
+                Earn Flat <span style={{ color: GOLD }}>₹10,000 Cash Reward/Room</span>
               </div>
               <div style={{ color: "#C9AE85", fontSize: 12.5, marginTop: 2 }}>+ Tenant Replacement</div>
             </div>
@@ -644,7 +644,7 @@ export default function ListMyFlatMobile({ user, onPublished }) {
             <path d="M8 10.5V7.5a4 4 0 0 1 8 0v3" strokeLinecap="round" />
           </svg>
           <span style={{ color: "#8AA5A0", fontSize: 12.5, fontWeight: 600 }}>
-            <span style={{ color: GOLD, fontWeight: 800 }}>₹10,000 Instant Cash Reward</span> | Instant Tenant Replacement
+            <span style={{ color: GOLD, fontWeight: 800 }}>₹10,000 Cash Reward/Room</span> | Instant Tenant Replacement
           </span>
         </div>
       </div>
