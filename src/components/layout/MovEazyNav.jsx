@@ -23,7 +23,6 @@ import { useLoginModal } from "../../context/LoginModalContext";
 import { useVisitCart } from "../../context/VisitCartContext";
 import { countMyInventory, hasOwnerListing, fetchMyInventory } from "../../lib/inventory";
 import { hasAnyOpenSlot } from "../../lib/visits";
-import { fetchUserRequirement } from "../../lib/userRequirements";
 import { isSuperAdminEmail } from "../../lib/adminAccess";
 import { fetchRecentActivity } from "../../lib/ownerDashboard";
 import logoMint from "../../assets/logo/moveazy-logo-mint-dark.png";
@@ -163,7 +162,6 @@ export default function MovEazyNav({ active = "", transparentAtTop = false, onFi
   const navRef = useRef(null);
   const [navH, setNavH] = useState(72);
   const [hasProperties, setHasProperties] = useState(false);
-  const [hasSubmittedPrefs, setHasSubmittedPrefs] = useState(false);
   const [isOwner, setIsOwner] = useState(false);
   const [needsVisitTiming, setNeedsVisitTiming] = useState(false);
   const [acctOpen, setAcctOpen] = useState(false);
@@ -210,9 +208,9 @@ export default function MovEazyNav({ active = "", transparentAtTop = false, onFi
 
   // Someone who has posted at least one property specifically as an owner gets
   // the owner-focused bottom bar (Home / My Properties / Tenant Management /
-  // Rent Management) instead of the renter one — takes priority over
-  // hasSubmittedPrefs below, since managing a live listing is the more
-  // pressing set of tools once you're doing it.
+  // Rent Management). This is the only thing that swaps the bar away from the
+  // property-finder set, so a renter who happens to have listed a flat as a
+  // tenant or broker keeps Shortlists and Scheduled Visits.
   useEffect(() => {
     let alive = true;
     if (!user?.uid) { setIsOwner(false); return undefined; }
@@ -235,16 +233,6 @@ export default function MovEazyNav({ active = "", transparentAtTop = false, onFi
     })();
     return () => { alive = false; };
   }, [isOwner, user]);
-
-  // Once someone has been through "Find My Flat" and saved a requirement, the
-  // mobile bottom bar switches from the three signup-focused actions (find /
-  // list / register) to the four a returning renter actually needs.
-  useEffect(() => {
-    let alive = true;
-    if (!user?.uid) { setHasSubmittedPrefs(false); return undefined; }
-    fetchUserRequirement(user.uid).then((row) => { if (alive) setHasSubmittedPrefs(!!row); });
-    return () => { alive = false; };
-  }, [user]);
 
   useEffect(() => {
     const el = navRef.current;
@@ -633,12 +621,13 @@ export default function MovEazyNav({ active = "", transparentAtTop = false, onFi
           </button>
         )}
 
-        {/* Mobile bottom action bar — three variants. Before "Find My Flat" is
-            ever submitted, it's the three signup-focused entry points. Once
-            someone has a saved requirement, those aren't useful anymore —
-            swap in the four a returning renter actually needs. And once
-            someone has posted a property specifically as an owner, their
-            own management tools take priority over the renter set. */}
+        {/* Mobile bottom action bar. Owner tools are for owners only: someone
+            who listed a property as an owner manages it here. Every other
+            signed-in visitor is a property finder, so they get the finder set
+            (find / shortlists / scheduled visits) whether or not they've saved
+            a requirement yet. Signed-out visitors keep the three acquisition
+            entry points — Shortlists and Visits both require an account, so
+            surfacing them before sign-in would just bounce to the login page. */}
         <nav className="mzn-bottombar" aria-label="Primary actions">
           {isOwner ? (
             <>
@@ -647,7 +636,7 @@ export default function MovEazyNav({ active = "", transparentAtTop = false, onFi
               <button type="button" onClick={() => navigate("/tenant-management")}><TenantIcon /><span>Tenant Management</span></button>
               <button type="button" onClick={() => navigate("/rent-management")}><RentIcon /><span>Rent Management</span></button>
             </>
-          ) : hasSubmittedPrefs ? (
+          ) : user ? (
             <>
               <button type="button" onClick={() => navigate("/")}><HomeIcon /><span>Home</span></button>
               <button type="button" onClick={findFlat}><FlatIcon /><span>Find My Flat</span></button>
