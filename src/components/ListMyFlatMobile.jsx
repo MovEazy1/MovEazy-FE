@@ -16,6 +16,7 @@
  */
 import { useEffect, useMemo, useState } from "react";
 import ListingMapPicker from "./ListingMapPicker";
+import PropertyVisitSlots from "./PropertyVisitSlots";
 import { reverseGeocode, nearbyLandmarks } from "../lib/geocode";
 import { createInventoryItem, uploadInventoryPhotos, generatePropertyId } from "../lib/inventory";
 import { fetchAllUserRequirements } from "../lib/userRequirements";
@@ -26,7 +27,7 @@ import {
 
 const MINT = "#5EEAD4";
 const GOLD = "#E8A33D";
-const TOTAL_STEPS = 6;
+const TOTAL_STEPS = 7;
 
 const POSTER_ROLES = [
   ["owner", "Owner", "I own this property"],
@@ -46,6 +47,7 @@ const STEP_COPY = [
   ["Rent & availability", "Set your price — you can always change it later."],
   ["What's it like?", "The details that match you to the right renters."],
   ["Photos & description", "Photos do most of the selling for you."],
+  ["When can people visit?", "Your flat goes live once this is set — renters can only book a tour during times you open up."],
 ];
 
 /* ── shared bits ───────────────────────────────────────────────────────────── */
@@ -162,6 +164,14 @@ export default function ListMyFlatMobile({ user, onPublished }) {
   const [uploadMsg, setUploadMsg] = useState("");
   const [err, setErr] = useState("");
 
+  // Set once the property row is actually created (leaving step 6) — the
+  // final visit-timing step operates on this REAL row (its own property_id,
+  // which may differ from the locally generated one below if createInventoryItem
+  // had to retry after an id collision), not the placeholder.
+  const [createdRow, setCreatedRow] = useState(null);
+  const [createdMatches, setCreatedMatches] = useState([]);
+  const [slotCount, setSlotCount] = useState(0);
+
   // 1 — who's posting
   const [postedBy, setPostedBy] = useState("owner");
   const [phone, setPhone] = useState(user?.phone || "");
@@ -244,7 +254,9 @@ export default function ListMyFlatMobile({ user, onPublished }) {
     setPhotoFiles((p) => p.filter((_, x) => x !== i));
   };
 
-  // Same rules the desktop form enforces, split across the six steps.
+  // Same rules the desktop form enforces, split across the seven steps —
+  // plus step 7's own rule: at least one real, saved visit time slot (tracked
+  // via PropertyVisitSlots' onSlotsChanged below), not just a filled-in form.
   const validate = () => {
     if (step === 1 && !phone.trim()) return "Add a contact number.";
     if (step === 2) {
@@ -252,10 +264,15 @@ export default function ListMyFlatMobile({ user, onPublished }) {
       if (!marker) return "Drop a pin on the map to set the exact address.";
     }
     if (step === 4 && !rent) return "Enter the monthly rent.";
+    if (step === TOTAL_STEPS && slotCount < 1) return "Add at least one visit time slot — renters need a time to book before your flat can go live.";
     return "";
   };
 
-  const submit = async () => {
+  // Creates the real inventory row. Runs once, on leaving step 6 — the visit-
+  // timing step needs an actual property_id to write property_visit_slots
+  // against (that table's FK requires the property to already exist), so the
+  // listing is genuinely published here, then step 7 finishes it off.
+  const publishListing = async () => {
     setSaving(true);
     setErr("");
     try {
@@ -276,7 +293,11 @@ export default function ListMyFlatMobile({ user, onPublished }) {
       try {
         matches = matchListingToRequirements(row, await fetchAllUserRequirements(), { min: 40 }).slice(0, 8);
       } catch { /* matching is best-effort; never block a successful publish */ }
-      onPublished?.(row, matches);
+      setCreatedRow(row);
+      setCreatedMatches(matches);
+      setSaving(false);
+      setStep(TOTAL_STEPS);
+      window.scrollTo({ top: 0, behavior: "smooth" });
     } catch (e) {
       console.error(e);
       setErr(e?.message || "Something went wrong while publishing.");
@@ -289,7 +310,13 @@ export default function ListMyFlatMobile({ user, onPublished }) {
     const v = validate();
     if (v) { setErr(v); return; }
     setErr("");
-    if (step === TOTAL_STEPS) { submit(); return; }
+    if (step === 6) {
+      // Already created (e.g. came back to review step 6) — don't publish twice.
+      if (createdRow) { setStep(TOTAL_STEPS); window.scrollTo({ top: 0, behavior: "smooth" }); return; }
+      publishListing();
+      return;
+    }
+    if (step === TOTAL_STEPS) { onPublished?.(createdRow, createdMatches); return; }
     setStep((s) => s + 1);
     window.scrollTo({ top: 0, behavior: "smooth" });
   };
@@ -311,24 +338,31 @@ export default function ListMyFlatMobile({ user, onPublished }) {
             mov<span style={{ color: MINT }}>EAZY</span>
           </div>
 
-          {/* Reward banner */}
+          {/* Reward banner — a stat badge, not a sentence: the number does the talking. */}
           <div style={{
-            display: "flex", alignItems: "center", gap: 10, marginTop: 18,
-            border: `1px solid rgba(232,163,61,.35)`, background: "rgba(232,163,61,.09)",
-            borderRadius: 14, padding: "12px 14px",
+            display: "flex", alignItems: "center", gap: 14, marginTop: 18,
+            border: "1px solid rgba(232,163,61,.4)",
+            background: "linear-gradient(135deg, rgba(232,163,61,.16), rgba(232,163,61,.04))",
+            borderRadius: 16, padding: "13px 16px",
+            boxShadow: "0 8px 24px rgba(232,163,61,.08)",
           }}>
-            <span aria-hidden style={{ flex: "none", width: 34, height: 34, borderRadius: "50%", background: "rgba(232,163,61,.16)", display: "flex", alignItems: "center", justifyContent: "center" }}>
-              <svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke={GOLD} strokeWidth="1.8">
+            <span aria-hidden style={{
+              flex: "none", width: 46, height: 46, borderRadius: "50%",
+              background: "rgba(232,163,61,.18)", border: "1px solid rgba(232,163,61,.35)",
+              display: "flex", alignItems: "center", justifyContent: "center",
+            }}>
+              <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke={GOLD} strokeWidth="1.7">
                 <rect x="2.5" y="7.5" width="19" height="13" rx="2.5" />
                 <path d="M2.5 11.5h19M12 7.5v13" strokeLinecap="round" />
                 <path d="M12 7.5S9.8 3.5 7.6 4.4C5.9 5.1 6.6 7.5 9 7.5zM12 7.5s2.2-4 4.4-3.1c1.7.7 1 3.1-1.4 3.1z" strokeLinejoin="round" />
               </svg>
             </span>
             <div style={{ minWidth: 0 }}>
-              <div style={{ color: "#F1F6F4", fontSize: 14, fontWeight: 800, lineHeight: 1.25 }}>
-                Earn Flat <span style={{ color: GOLD }}>₹10,000 Cash Reward/Room</span>
+              <div style={{ display: "flex", alignItems: "baseline", gap: 7 }}>
+                <span style={{ color: GOLD, fontSize: 25, fontWeight: 900, letterSpacing: "-.02em", lineHeight: 1 }}>₹10,000</span>
+                <span style={{ color: "#F1F6F4", fontSize: 13.5, fontWeight: 800 }}>Cash Reward</span>
               </div>
-              <div style={{ color: "#C9AE85", fontSize: 12.5, marginTop: 2 }}>+ Tenant Replacement</div>
+              <div style={{ color: "#C9AE85", fontSize: 12.5, fontWeight: 600, marginTop: 3 }}>for every room you list</div>
             </div>
           </div>
 
@@ -598,6 +632,23 @@ export default function ListMyFlatMobile({ user, onPublished }) {
               </div>
             </>
           )}
+
+          {step === 7 && (
+            <>
+              <Q required sub="This is what makes your flat bookable — renters can only schedule a tour inside the times you open up here. Set at least one before you can publish.">
+                Set your visit timings
+              </Q>
+              {createdRow ? (
+                <PropertyVisitSlots
+                  propertyId={createdRow.property_id}
+                  hideMarkSold
+                  onSlotsChanged={setSlotCount}
+                />
+              ) : (
+                <p style={{ color: "#8AA5A0", fontSize: 13 }}>Preparing your listing…</p>
+              )}
+            </>
+          )}
         </div>
 
         {(err || uploadMsg) && (
@@ -644,7 +695,7 @@ export default function ListMyFlatMobile({ user, onPublished }) {
             <path d="M8 10.5V7.5a4 4 0 0 1 8 0v3" strokeLinecap="round" />
           </svg>
           <span style={{ color: "#8AA5A0", fontSize: 12.5, fontWeight: 600 }}>
-            <span style={{ color: GOLD, fontWeight: 800 }}>₹10,000 Cash Reward/Room</span> | Instant Tenant Replacement
+            <span style={{ color: GOLD, fontWeight: 800 }}>₹10,000 Cash Reward</span> for every room you list
           </span>
         </div>
       </div>
