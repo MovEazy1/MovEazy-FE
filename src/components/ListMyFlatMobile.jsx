@@ -643,7 +643,9 @@ export default function ListMyFlatMobile({ user, onPublished }) {
             <rect x="4.5" y="10.5" width="15" height="10" rx="2.5" />
             <path d="M8 10.5V7.5a4 4 0 0 1 8 0v3" strokeLinecap="round" />
           </svg>
-          <span style={{ color: "#6F8681", fontSize: 12.5, fontWeight: 600 }}>100% Free to list · No Hidden Charges</span>
+          <span style={{ color: "#8AA5A0", fontSize: 12.5, fontWeight: 600 }}>
+            <span style={{ color: GOLD, fontWeight: 800 }}>₹10,000 Instant Cash Reward</span> | Instant Tenant Replacement
+          </span>
         </div>
       </div>
     </div>
