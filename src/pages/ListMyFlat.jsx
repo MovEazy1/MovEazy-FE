@@ -8,6 +8,7 @@ import ListingMapPicker from "../components/ListingMapPicker";
 import ListMyFlatMobile from "../components/ListMyFlatMobile";
 import { reverseGeocode, nearbyLandmarks } from "../lib/geocode";
 import { createInventoryItem, uploadInventoryPhotos, generatePropertyId } from "../lib/inventory";
+import PropertyVisitSlots from "../components/PropertyVisitSlots";
 import { fetchAllUserRequirements } from "../lib/userRequirements";
 import { matchListingToRequirements } from "../lib/inventoryMatch";
 import { fetchSlotsForProperty, addVisitSlot, deleteVisitSlot } from "../lib/visits";
@@ -317,7 +318,7 @@ export default function ListMyFlat() {
               </div>
               {rewardEligible && (isOwner || isTenant) && (
                 <p className="mt-4 text-[12px] font-semibold" style={{ color: "#15803d" }}>
-                  🎉 You've earned {fmtWallet(WALLET_REWARD_AMOUNT)} — credited to your wallet once this home is sold through a MovEazy on-ground executive.
+                  🎉 You've earned {fmtWallet(WALLET_REWARD_AMOUNT)} — it's in your MovEazy wallet now, and paid out to your bank account once this property closes (rented through a MovEazy on-ground executive).
                 </p>
               )}
             </div>
@@ -353,6 +354,9 @@ export default function ListMyFlat() {
                 </div>
               </Card>
 
+              {/* Open visit slots + mark-sold — available to any poster (owner/tenant/broker) */}
+              <PropertyVisitSlots propertyId={row.property_id} brandRed={BRAND_RED} onSold={() => navigate("/map")} />
+
               {/* Role-specific next step */}
               {isBroker && (
                 <>
@@ -378,26 +382,85 @@ export default function ListMyFlat() {
                       </div>
                     </div>
                   </div>
+                  {/* Commission split — the default (pay-as-you-go) broker economics */}
+                  <Card>
+                    <div className="p-6">
+                      <p className="text-[11px] font-bold uppercase tracking-wide mb-2" style={{ color: BRAND_RED }}>How you get paid</p>
+                      <p className="text-[15px] font-extrabold text-gray-900 mb-3">You keep <span style={{ color: BRAND_RED }}>70%</span> of the commission.</p>
+                      <div className="flex items-stretch gap-3 mb-3">
+                        <div className="flex-1 rounded-xl p-4 text-center" style={{ background: "#ecfdf5", border: "1px solid #a7f3d0" }}>
+                          <p className="text-[24px] font-extrabold" style={{ color: "#15803d" }}>70%</p>
+                          <p className="text-[12px] font-semibold text-gray-600">Yours on every closed deal</p>
+                        </div>
+                        <div className="flex-1 rounded-xl p-4 text-center bg-gray-50 border border-gray-200">
+                          <p className="text-[24px] font-extrabold text-gray-700">30%</p>
+                          <p className="text-[12px] font-semibold text-gray-500">MovEazy platform fee</p>
+                        </div>
+                      </div>
+                      <p className="text-[12px] text-gray-500">Prefer zero commission? The Guaranteed Visits plan below drops your platform fee to 0%.</p>
+                    </div>
+                  </Card>
                   <BrokerPlanCard />
                 </>
               )}
 
               {isOwner && (
-                <div className="rounded-2xl overflow-hidden mb-4" style={{ background: "linear-gradient(135deg,#1c1917,#3b2b28)" }}>
-                  <div className="p-6">
-                    <p className="text-[11px] font-bold uppercase tracking-wide mb-2" style={{ color: "#e0a83b" }}>Own more than one place?</p>
-                    <p className="text-[18px] font-extrabold text-white leading-snug mb-1">List <span style={{ color: "#ff6b57" }}>another property</span> and reach more renters.</p>
-                    <p className="text-[13px] mb-4" style={{ color: "rgba(255,255,255,0.72)" }}>
-                      Every home you list gets verified and matched to real seekers. Add your next one in a couple of minutes.
-                    </p>
-                    <button type="button" onClick={() => window.location.reload()}
-                      className="inline-flex items-center gap-2 px-5 py-3 rounded-xl text-[14px] font-bold text-white"
-                      style={{ background: `linear-gradient(135deg,${BRAND_RED},#ef4444)` }}>
-                      List another property
-                      <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" strokeWidth="2.4" aria-hidden><path d="M5 12h14M13 6l6 6-6 6" strokeLinecap="round" strokeLinejoin="round" /></svg>
-                    </button>
+                <>
+                  {/* Owner dashboard — quick performance stats for this listing */}
+                  <Card>
+                    <div className="p-6">
+                      <p className="text-[11px] font-bold uppercase tracking-wide mb-3" style={{ color: BRAND_RED }}>Your property dashboard</p>
+                      <div className="grid grid-cols-3 gap-3">
+                        <div className="rounded-xl p-4 text-center bg-gray-50 border border-gray-100">
+                          <p className="text-[22px] font-extrabold text-gray-900">{row.view_count || 0}</p>
+                          <p className="text-[11px] font-semibold text-gray-500">Listing views</p>
+                        </div>
+                        <div className="rounded-xl p-4 text-center bg-gray-50 border border-gray-100">
+                          <p className="text-[22px] font-extrabold text-gray-900">{matches.length}</p>
+                          <p className="text-[11px] font-semibold text-gray-500">Matched leads</p>
+                        </div>
+                        <div className="rounded-xl p-4 text-center bg-gray-50 border border-gray-100">
+                          <p className="text-[22px] font-extrabold text-gray-900">0</p>
+                          <p className="text-[11px] font-semibold text-gray-500">Profile clicks</p>
+                        </div>
+                      </div>
+                      <p className="text-[11px] text-gray-400 mt-3">Updates live as renters view and enquire. Deeper analytics unlock as traffic grows.</p>
+                    </div>
+                  </Card>
+
+                  <div className="rounded-2xl overflow-hidden mb-4" style={{ background: "linear-gradient(135deg,#1c1917,#3b2b28)" }}>
+                    <div className="p-6">
+                      <p className="text-[11px] font-bold uppercase tracking-wide mb-2" style={{ color: "#e0a83b" }}>Own more than one place?</p>
+                      <p className="text-[18px] font-extrabold text-white leading-snug mb-1">List <span style={{ color: "#ff6b57" }}>another property</span> and reach more renters.</p>
+                      <p className="text-[13px] mb-4" style={{ color: "rgba(255,255,255,0.72)" }}>
+                        Every home you list gets verified and matched to real seekers. Add your next one in a couple of minutes.
+                      </p>
+                      <button type="button" onClick={() => window.location.reload()}
+                        className="inline-flex items-center gap-2 px-5 py-3 rounded-xl text-[14px] font-bold text-white"
+                        style={{ background: `linear-gradient(135deg,${BRAND_RED},#ef4444)` }}>
+                        List another property
+                        <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" strokeWidth="2.4" aria-hidden><path d="M5 12h14M13 6l6 6-6 6" strokeLinecap="round" strokeLinejoin="round" /></svg>
+                      </button>
+                    </div>
                   </div>
-                </div>
+
+                  {/* Upsell — rent-ready services (free quote, stub booking) */}
+                  <Card>
+                    <div className="p-6">
+                      <p className="text-[11px] font-bold uppercase tracking-wide mb-1" style={{ color: BRAND_RED }}>Get your home rent-ready</p>
+                      <p className="text-[15px] font-extrabold text-gray-900 mb-3">Add-on services — free quotes, zero obligation</p>
+                      <div className="grid grid-cols-2 gap-3">
+                        {[["🎨", "Painting & touch-ups"], ["🧹", "Deep cleaning"], ["📸", "Pro photography"], ["📦", "Packers & movers"]].map(([icon, label]) => (
+                          <div key={label} className="flex items-center justify-between gap-2 rounded-xl border border-gray-100 bg-gray-50 p-3">
+                            <span className="flex items-center gap-2 text-[13px] font-semibold text-gray-800"><span>{icon}</span>{label}</span>
+                            <span className="text-[12px] font-bold shrink-0" style={{ color: BRAND_RED }}>Get quote</span>
+                          </div>
+                        ))}
+                      </div>
+                      <p className="text-[11px] text-gray-400 mt-3">A MovEazy executive will call you with a free quote — book only if it works for you.</p>
+                    </div>
+                  </Card>
+                </>
               )}
 
               {isTenant && (
@@ -449,6 +512,12 @@ export default function ListMyFlat() {
                   </div>
                 </Card>
               )}
+
+              <button type="button" onClick={() => navigate("/my-properties")}
+                className="w-full py-3.5 rounded-2xl text-[14px] font-bold text-white mb-3"
+                style={{ background: `linear-gradient(135deg,${BRAND_RED},#ef4444)` }}>
+                View all my listings & shortlists →
+              </button>
 
               <div className="flex gap-3">
                 <button type="button" onClick={() => navigate("/map")}
@@ -814,7 +883,7 @@ const toHHMM = (mins) => `${String(Math.floor(mins / 60)).padStart(2, "0")}:${St
 
 /**
  * property_visit_slots stores one timestamp per bookable slot (no end column),
- * so a "10:00-13:00" window is saved as the individual start times inside it.
+ * so a "10:00–13:00" window is saved as the individual start times inside it.
  * That keeps seekers booking a precise time instead of a vague range.
  */
 function buildTimes(from, to, stepMin) {
@@ -878,7 +947,7 @@ function PropertyLeadDashboard({ propertyId, listingTitle, leads = [], walletAmo
             await addVisitSlot(propertyId, new Date(`${d}T${t}`).toISOString(), capacity);
             added += 1;
           } catch (e) {
-            // (property_id, slot_at) is unique - a time that already exists is
+            // (property_id, slot_at) is unique — a time that already exists is
             // not a failure, just nothing to do.
             const m = String(e?.message || "").toLowerCase();
             if (m.includes("duplicate") || m.includes("unique")) skipped += 1;
@@ -1074,8 +1143,8 @@ function PropertyLeadDashboard({ propertyId, listingTitle, leads = [], walletAmo
           <svg className="w-6 h-6 shrink-0" viewBox="0 0 24 24" fill="none" stroke="#16a34a" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><path d="M3 7h16a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h12" /><path d="M16 12h.01" /></svg>
           <p className="text-[13px] leading-relaxed" style={{ color: "#065f46" }}>
             {rewardEligible
-              ? <>Your <span className="font-extrabold">{fmtWallet(walletAmount)}</span> reward will be <span className="font-semibold">credited to your wallet once this property is sold through our on-ground executive.</span></>
-              : <>Cash rewards apply to 1 RK / 1 BHK / room listings. When this home is sold through our on-ground executive, any applicable reward is credited to your wallet.</>}
+              ? <>Your <span className="font-extrabold">{fmtWallet(walletAmount)}</span> reward is <span className="font-semibold">held in your MovEazy wallet and paid out to your bank account as soon as this property closes</span> (rented through our on-ground executive).</>
+              : <>Cash rewards apply to 1 RK / 1 BHK / room listings. When this home closes through our on-ground executive, any applicable reward is paid out to your bank account.</>}
           </p>
         </div>
       </div>
@@ -1089,8 +1158,9 @@ function PropertyLeadDashboard({ propertyId, listingTitle, leads = [], walletAmo
 }
 
 /**
- * Broker upsell — a ₹1,999/mo guaranteed-leads plan. No payment gateway is wired yet,
- * so the CTA registers interest; the team activates and collects payment on confirmation.
+ * Broker upsell — a ₹4,999/mo Guaranteed Visits plan (20 visits/mo with 5+ listings, else
+ * full refund; 0% commission on-plan). No payment gateway is wired yet, so the CTA registers
+ * interest; the team activates and collects payment on confirmation.
  */
 function BrokerPlanCard() {
   const [requested, setRequested] = useState(false);
@@ -1098,26 +1168,33 @@ function BrokerPlanCard() {
     <Card className="!mb-4" >
       <div className="p-6">
         <div className="flex items-center justify-between gap-3 mb-1 flex-wrap">
-          <p className="text-[15px] font-extrabold text-gray-900">Guaranteed Leads plan</p>
-          <span className="text-[20px] font-extrabold text-gray-900">₹1,999<span className="text-[12px] font-semibold text-gray-400">/month</span></span>
+          <div>
+            <span className="inline-block mb-1 px-2 py-0.5 rounded-full text-[10px] font-extrabold uppercase tracking-wide" style={{ background: "#fff5f5", color: BRAND_RED }}>Broker exclusive</span>
+            <p className="text-[15px] font-extrabold text-gray-900">Guaranteed Visits plan</p>
+          </div>
+          <span className="text-[20px] font-extrabold text-gray-900">₹4,999<span className="text-[12px] font-semibold text-gray-400">/month</span></span>
         </div>
         <ul className="text-[13px] text-gray-600 leading-relaxed mb-4 space-y-1.5 mt-2">
-          <li className="flex gap-2"><span style={{ color: "#16a34a" }}>✓</span> <span><span className="font-semibold text-gray-800">100 leads guaranteed</span> every month.</span></li>
-          <li className="flex gap-2"><span style={{ color: "#16a34a" }}>✓</span> <span>If we don't deliver 100 leads, your <span className="font-semibold text-gray-800">full amount is refunded</span>.</span></li>
+          <li className="flex gap-2"><span style={{ color: "#16a34a" }}>✓</span> <span><span className="font-semibold text-gray-800">20 verified visits guaranteed</span> every month when you keep <span className="font-semibold text-gray-800">5+ properties</span> listed.</span></li>
+          <li className="flex gap-2"><span style={{ color: "#16a34a" }}>✓</span> <span>Miss the guarantee and your <span className="font-semibold text-gray-800">full ₹4,999 is refunded</span> — no questions asked.</span></li>
+          <li className="flex gap-2"><span style={{ color: "#16a34a" }}>✓</span> <span><span className="font-semibold text-gray-800">0% commission</span> on this plan — you keep 100% of every deal.</span></li>
           <li className="flex gap-2"><span style={{ color: "#16a34a" }}>✓</span> <span>Priority matching across all your listed properties.</span></li>
         </ul>
+        <div className="p-3 rounded-xl text-[12px] mb-4" style={{ background: "#fffbeb", color: "#92400e", border: "1px solid #fde68a" }}>
+          <span className="font-semibold">One rule:</span> when a property is sold, mark it <span className="font-semibold">Sold</span> from your dashboard and we'll remove it from the platform.
+        </div>
         {requested ? (
           <div className="p-3 rounded-xl text-[13px] font-semibold" style={{ background: "#ecfdf5", color: "#065f46", border: "1px solid #a7f3d0" }}>
-            Requested — our team will confirm your Guaranteed Leads plan and set up payment.
+            Requested — our team will confirm your Guaranteed Visits plan and set up payment.
           </div>
         ) : (
           <button type="button" onClick={() => setRequested(true)}
             className="w-full py-3 rounded-xl text-[14px] font-bold text-white"
             style={{ background: `linear-gradient(135deg,${BRAND_RED},#ef4444)` }}>
-            Get the ₹1,999 Guaranteed Leads plan
+            Get the ₹4,999 Guaranteed Visits plan
           </button>
         )}
-        <p className="text-[11px] text-gray-400 mt-2">Billed monthly · cancel anytime · 100-lead guarantee or full refund.</p>
+        <p className="text-[11px] text-gray-400 mt-2">Billed monthly · cancel anytime · 20-visit guarantee (5+ listings) or full refund.</p>
       </div>
     </Card>
   );

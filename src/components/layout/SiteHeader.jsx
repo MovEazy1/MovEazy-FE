@@ -13,8 +13,8 @@ import agentAvatar from "../../assets/images/aman.png";
  *
  * Desktop is unchanged. On ≤768px the links + actions collapse behind a hamburger
  * that opens a full-width slide-down menu (closes on navigation).
- * @param {"home"|"dashboard"|"how"|"about"|""} active — which link to highlight, if any.
- * @param {() => void} [onGetAgent] — called when "Train My Broker" is clicked. Each page
+ * @param {"home"|"dashboard"|"how"|"about"|"register-broker"|"admin"|""} active — which link to highlight, if any.
+ * @param {() => void} [onGetAgent] — called when "Modify my Preferences" is clicked. Each page
  *   supplies its own (already auth-gated) handler that opens its AI chat modal; falls back
  *   to just navigating home if a page hasn't wired one up.
  */
@@ -52,7 +52,8 @@ export default function SiteHeader({ active = "", onGetAgent }) {
 
   const goDashboard = () => {
     setMenuOpen(false);
-    user ? navigate("/profile") : openLogin(() => navigate("/profile"));
+    const dest = user?.role === "broker" ? "/broker" : "/profile";
+    user ? navigate(dest) : openLogin(() => navigate(dest));
   };
 
   return (
@@ -152,6 +153,9 @@ export default function SiteHeader({ active = "", onGetAgent }) {
             )}
             <Link to="/how-it-works" className={`sh-link ${active === "how" ? "sh-link-active" : ""}`}>How it works</Link>
             <Link to="/about" className={`sh-link ${active === "about" ? "sh-link-active" : ""}`}>About us</Link>
+            {user?.role !== "broker" && (
+              <Link to="/register-broker" className={`sh-link ${active === "register-broker" ? "sh-link-active" : ""}`}>Register as Broker</Link>
+            )}
             {user?.role === "admin" && (
               <Link to="/admin" className={`sh-link ${active === "admin" ? "sh-link-active" : ""}`}>Admin</Link>
             )}
@@ -169,7 +173,7 @@ export default function SiteHeader({ active = "", onGetAgent }) {
             ) : (
               <button type="button" className="sh-agent" onClick={handleGetAgent}>
                 <img src={agentAvatar} alt="" className="sh-agent-avatar" />
-                Train My Broker
+                Modify my Preferences
                 <span className="sh-agent-star" aria-hidden>
                   <svg viewBox="0 0 24 24" width="10" height="10" fill="currentColor" aria-hidden>
                     <path d="M12 2l1.8 6.2L20 10l-6.2 1.8L12 18l-1.8-6.2L4 10l6.2-1.8L12 2z" />
@@ -216,6 +220,9 @@ export default function SiteHeader({ active = "", onGetAgent }) {
             )}
             <Link to="/how-it-works" className={`sh-sheet-link ${active === "how" ? "sh-sheet-link-active" : ""}`}>How it works</Link>
             <Link to="/about" className={`sh-sheet-link ${active === "about" ? "sh-sheet-link-active" : ""}`}>About us</Link>
+            {user?.role !== "broker" && (
+              <Link to="/register-broker" className={`sh-sheet-link ${active === "register-broker" ? "sh-sheet-link-active" : ""}`}>Register as Broker</Link>
+            )}
             {user?.role === "admin" && (
               <Link to="/admin" className={`sh-sheet-link ${active === "admin" ? "sh-sheet-link-active" : ""}`}>Admin</Link>
             )}
@@ -230,7 +237,7 @@ export default function SiteHeader({ active = "", onGetAgent }) {
             ) : (
               <button type="button" className="sh-agent" onClick={handleGetAgent}>
                 <img src={agentAvatar} alt="" className="sh-agent-avatar" />
-                Train My Broker
+                Modify my Preferences
                 <span className="sh-agent-star" aria-hidden>
                   <svg viewBox="0 0 24 24" width="10" height="10" fill="currentColor" aria-hidden>
                     <path d="M12 2l1.8 6.2L20 10l-6.2 1.8L12 18l-1.8-6.2L4 10l6.2-1.8L12 2z" />

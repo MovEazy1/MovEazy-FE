@@ -1,9 +1,11 @@
 import { supabase, isSupabaseConfigured } from "./supabase";
 import { isEmailAdminAllowed } from "./adminAccess";
 
-export const VALID_ROLES = ["admin", "broker", "seller", "customer", "consultant", "sub_admin"];
+export const VALID_ROLES = ["admin", "broker", "seller", "customer", "consultant", "sub_admin", "tenant", "owner"];
 
 export function normalizeSignupRole(role) {
+  if (role === "tenant") return "tenant";
+  if (role === "owner") return "owner";
   if (role === "seller") return "seller";
   if (role === "broker") return "broker";
   if (role === "admin") return "admin";
@@ -201,13 +203,14 @@ export async function getPendingSellerBadgeApplicationsRemote() {
   if (!isSupabaseConfigured || !supabase) return [];
   const { data, error } = await supabase
     .from("user_profiles")
-    .select("id, email, name, seller_badge_application")
+    .select("id, email, name, role, seller_badge_application")
     .eq("seller_badge_status", "pending");
   if (error) return [];
   return (data || []).map((row) => ({
     uid: row.id,
     email: row.email,
     name: row.name || String(row.email || "seller").split("@")[0],
+    role: row.role || "seller",
     application: row.seller_badge_application || null,
   }));
 }

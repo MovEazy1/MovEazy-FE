@@ -1,5 +1,6 @@
 import { createContext, useContext, useCallback, useEffect, useMemo, useState } from "react";
 import { useAuth } from "./AuthContext";
+import { logUserAction, ACTIONS } from "../lib/userActions";
 
 /**
  * The "site visit" cart — listings the user added to visit. Persisted to
@@ -49,10 +50,22 @@ export function VisitCartProvider({ children }) {
 
   const add = useCallback((listing) => {
     if (!listing?.property_id) return;
-    write((prev) => (prev.some((x) => x.property_id === listing.property_id) ? prev : [...prev, snapshot(listing)]));
-  }, [write]);
+    write((prev) => {
+      if (prev.some((x) => x.property_id === listing.property_id)) return prev;
+      // Record the shortlist so admin can see, user-wise and property-wise, which
+      // homes each renter selected.
+      logUserAction(user, ACTIONS.SHORTLIST, {
+        property_id: listing.property_id,
+        title: listing.title || `${listing.flat_type || "Home"} in ${listing.area || "Bengaluru"}`,
+      });
+      return [...prev, snapshot(listing)];
+    });
+  }, [write, user]);
 
-  const remove = useCallback((propertyId) => write((prev) => prev.filter((x) => x.property_id !== propertyId)), [write]);
+  const remove = useCallback((propertyId) => {
+    logUserAction(user, ACTIONS.UNSHORTLIST, { property_id: propertyId });
+    write((prev) => prev.filter((x) => x.property_id !== propertyId));
+  }, [write, user]);
   const clear = useCallback(() => write([]), [write]);
   const has = useCallback((propertyId) => items.some((x) => x.property_id === propertyId), [items]);
 

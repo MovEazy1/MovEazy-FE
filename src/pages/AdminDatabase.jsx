@@ -6,6 +6,7 @@ import Footer from "../components/layout/Footer";
 import PageShell from "../components/layout/PageShell";
 import { listTables, fetchTableRows } from "../lib/adminDb";
 import VisitSlotsManager from "../components/admin/VisitSlotsManager";
+import BrokerVerificationManager from "../components/admin/BrokerVerificationManager";
 
 const BRAND_RED = "#ff3131";
 
@@ -91,7 +92,7 @@ export default function AdminDatabase() {
       <main className="max-w-6xl mx-auto px-4 pb-16 pt-8">
         {/* Admin section tabs */}
         <div className="flex items-center rounded-full p-1 mb-6 w-fit" style={{ background: "#1c1917" }}>
-          {[["database", "Database"], ["slots", "Visit slots"]].map(([v, label]) => (
+          {[["database", "Database"], ["slots", "Visit slots"], ["brokers", "Broker Verification"]].map(([v, label]) => (
             <button key={v} type="button" onClick={() => setTab(v)}
               className="px-5 py-2 rounded-full text-[13px] font-bold transition-all"
               style={{ background: tab === v ? "white" : "transparent", color: tab === v ? "#1c1917" : "rgba(255,255,255,0.55)" }}>
@@ -107,6 +108,14 @@ export default function AdminDatabase() {
               <p className="text-[13px] text-gray-500">Add or remove the visit slots renters can book, per property.</p>
             </div>
             <VisitSlotsManager />
+          </>
+        ) : tab === "brokers" ? (
+          <>
+            <div className="mb-6">
+              <h1 className="text-[24px] font-extrabold text-gray-900">Broker Verification</h1>
+              <p className="text-[13px] text-gray-500">Review "Register as a Broker" applications and grant the MovEazy Assured badge.</p>
+            </div>
+            <BrokerVerificationManager />
           </>
         ) : (
         <>

@@ -34,7 +34,7 @@ function buildUserFromSupabase(sbUser) {
   const email = String(sbUser?.email || "").toLowerCase().trim();
   const meta = sbUser?.user_metadata || {};
   const roleCandidate = meta.role || "customer";
-  const role = ADMIN_EMAILS.includes(email) ? "admin" : (roleCandidate === "seller" || roleCandidate === "broker" ? roleCandidate : "customer");
+  const role = ADMIN_EMAILS.includes(email) ? "admin" : (roleCandidate === "seller" || roleCandidate === "broker" || roleCandidate === "tenant" || roleCandidate === "owner" ? roleCandidate : "customer");
   return {
     email,
     role,
@@ -388,7 +388,7 @@ export function AuthProvider({ children }) {
     if (isSupabaseConfigured) return pendingSellerBadgeApplications;
     const users = getUsers();
     return Object.entries(users)
-      .filter(([, value]) => (value.role || "customer") === "seller" && normalizeSellerBadgeStatus(value.sellerBadgeStatus) === "pending")
+      .filter(([, value]) => ["seller", "broker"].includes(value.role || "customer") && normalizeSellerBadgeStatus(value.sellerBadgeStatus) === "pending")
       .map(([email, value]) => ({
         email,
         name: value.name || email.split("@")[0],
@@ -399,7 +399,7 @@ export function AuthProvider({ children }) {
   const submitSellerBadgeApplication = async ({ phone, businessName, gst }) => {
     if (!user?.email) return { success: false, error: "Not signed in." };
     if (isSupabaseConfigured) {
-      if (user.role !== "seller") return { success: false, error: "Only seller accounts can request a verified badge." };
+      if (user.role !== "seller" && user.role !== "broker") return { success: false, error: "Only broker or seller accounts can request a verified badge." };
       if (!String(phone || "").trim() || !String(businessName || "").trim()) return { success: false, error: "Business name and phone are required." };
       if (normalizeSellerBadgeStatus(user.sellerBadgeStatus) === "verified") return { success: false, error: "You are already verified." };
       try {
@@ -416,8 +416,8 @@ export function AuthProvider({ children }) {
     }
     const users = getUsers();
     const row = users[user.email];
-    if (!row || (row.role || "customer") !== "seller") {
-      return { success: false, error: "Only seller accounts can request a verified badge." };
+    if (!row || !["seller", "broker"].includes(row.role || "customer")) {
+      return { success: false, error: "Only broker or seller accounts can request a verified badge." };
     }
     if (normalizeSellerBadgeStatus(row.sellerBadgeStatus) === "verified") {
       return { success: false, error: "You are already verified." };
@@ -436,6 +436,41 @@ export function AuthProvider({ children }) {
       },
     };
     saveUsers(users);
+    return { success: true };
+  };
+
+  // Self-service "Register as a Broker" — upgrades the account to role "broker"
+  // (if not already) and files the verification application in one step. Basic
+  // /broker dashboard access follows immediately from the role; the "verified"
+  // trust badge is a separate, admin-approved upgrade on top (see approveSellerBadge).
+  const becomeBroker = async ({ phone, businessName, gst, experienceYears, areas }) => {
+    if (!user?.email) return { success: false, error: "Not signed in." };
+    if (!String(phone || "").trim() || !String(businessName || "").trim()) {
+      return { success: false, error: "Business/agency name and phone are required." };
+    }
+    const application = {
+      phone: String(phone).trim(),
+      businessName: String(businessName).trim(),
+      gst: String(gst || "").trim(),
+      experienceYears: String(experienceYears || "").trim(),
+      areas: String(areas || "").trim(),
+      submittedAt: new Date().toISOString(),
+    };
+    if (isSupabaseConfigured) {
+      try {
+        if (user.role !== "broker") await setRoleForEmail(user.email, "broker");
+        await submitSellerBadgeApplicationRemote(user.uid, application);
+        refreshRole();
+        return { success: true };
+      } catch (error) {
+        return { success: false, error: error.message || "Failed to register as a broker." };
+      }
+    }
+    const users = getUsers();
+    const row = users[user.email] || {};
+    users[user.email] = { ...row, role: "broker", sellerBadgeStatus: "pending", sellerBadgeApplication: application };
+    saveUsers(users);
+    refreshRole();
     return { success: true };
   };
 
@@ -580,7 +615,9 @@ export function AuthProvider({ children }) {
       updateUserProfile,
       getSellerRequests,
       getPendingSellerBadgeApplications,
+      loadPendingSellerBadgeApplications,
       submitSellerBadgeApplication,
+      becomeBroker,
       approveSellerBadge,
       rejectSellerBadge,
     }}>

@@ -8,6 +8,7 @@ import { triggerVisitNotificationEmail } from "../lib/emailService";
 import { findNearbyListings } from "../lib/geo";
 import { isListingSaved, toggleSavedListing } from "../lib/userActivity";
 import { submitListingInterestFull, logSavedListingChange } from "../lib/crmSync";
+import OpenVisitsList from "./OpenVisitsList";
 import { buildBrokerWhatsAppUrl, logBrokerWhatsAppContact } from "../lib/brokerWhatsApp";
 import MovEAZYLogo from "./branding/MovEAZYLogo";
 
@@ -209,12 +210,13 @@ export default function PropertyModal({ property, onClose, listings = [], onSele
   };
   const amenities = property.amenities && property.amenities.length ? property.amenities : [];
   const furnishings = property.furnishings && property.furnishings.length ? property.furnishings : [];
-  // Who listed this home — shown consistently as a badge (owner / broker / tenant).
+  // Owner/tenant homes are surfaced as "MovEazy Assured" (Flipkart-Assured style)
+  // with a brokerage-off highlight. Broker-listed homes appear as ordinary
+  // properties — no "listed by" tag at all.
   const listedByRaw = String(
     property.postedBy || property.posted_by || property.listedBy || property.listerType || ""
   ).toLowerCase();
-  const listedByLabel =
-    listedByRaw === "broker" ? "Broker" : listedByRaw === "tenant" ? "Tenant" : listedByRaw === "owner" ? "Owner" : "";
+  const isAssured = listedByRaw === "owner" || listedByRaw === "tenant";
   const builtUpLabel = property.builtUpArea
     ? `${property.builtUpArea}${property.areaUnit ? ` ${property.areaUnit}` : ""}`
     : "—";
@@ -628,17 +630,34 @@ export default function PropertyModal({ property, onClose, listings = [], onSele
                   >
                     📅 {property.availability || "Immediate"}
                   </div>
-                  {listedByLabel && (
-                    <div
-                      style={{
-                        ...badgeStyles,
-                        border: "1px solid #fbcfc4",
-                        background: "#fff5f2",
-                        color: "#b23a28",
-                      }}
-                    >
-                      🏷️ Listed by {listedByLabel}
-                    </div>
+                  {isAssured && (
+                    <>
+                      <div
+                        style={{
+                          ...badgeStyles,
+                          display: "inline-flex",
+                          alignItems: "center",
+                          gap: "5px",
+                          border: "1px solid #bcd6ff",
+                          background: "#eaf3ff",
+                          color: "#1554b4",
+                          fontWeight: 800,
+                        }}
+                      >
+                        <span aria-hidden style={{ color: "#f5a623" }}>★</span> MovEazy Assured
+                      </div>
+                      <div
+                        style={{
+                          ...badgeStyles,
+                          border: "1px solid #bfe9cf",
+                          background: "#e9f9ef",
+                          color: "#167a45",
+                          fontWeight: 800,
+                        }}
+                      >
+                        20% Brokerage Off
+                      </div>
+                    </>
                   )}
                 </div>
 
@@ -670,6 +689,9 @@ export default function PropertyModal({ property, onClose, listings = [], onSele
                     {property.description || "Stunning property located in a prime neighborhood. Contact the seller to learn more about the unprecedented amenities and layout. Perfect for those looking for comfort and convenience in one place."}
                   </p>
                 </div>
+
+                {/* Open visit slots the poster published — next 5 days (hidden if none) */}
+                <OpenVisitsList propertyId={property.id} />
 
                 {nearbyListings.length > 0 && typeof onSelectListing === "function" ? (
                   <div id="nearby-homes" style={{ marginBottom: "32px" }}>

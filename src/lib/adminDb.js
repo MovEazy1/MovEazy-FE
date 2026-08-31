@@ -16,6 +16,7 @@ export const KNOWN_TABLES = [
   { name: "user_profiles", group: "Customer", desc: "One row per signed-in user: identity, role, seller badge." },
   { name: "customer_search_profiles", group: "Customer", desc: "A seeker's saved flat-search requirements (legacy)." },
   { name: "user_requirements", group: "Customer", desc: "Per-user Find My Flat questionnaire — everything about the user, mapped to user_id." },
+  { name: "user_actions", group: "Customer", desc: "Renter action log — shortlists & visit preferences, viewable user-wise and property-wise." },
   { name: "visit_requests", group: "Customer", desc: "Tour / visit requests from the listing modal." },
   { name: "saved_properties", group: "Customer", desc: "Bookmarked listings per customer." },
   { name: "listing_private", group: "Customer", desc: "Private broker/owner phone numbers per listing." },
