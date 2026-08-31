@@ -5,6 +5,7 @@ import { LoginModalProvider } from "./context/LoginModalContext";
 import { VisitCartProvider } from "./context/VisitCartContext";
 import ForkHome from "./pages/ForkHome";
 import ErrorBoundary from "./components/ErrorBoundary";
+import { useSessionTracking } from "./hooks/useSessionTracking";
 
 const Profile = lazy(() => import("./pages/Profile"));
 const SupabaseLogin = lazy(() => import("./pages/SupabaseLogin"));
@@ -22,6 +23,7 @@ const RentManagement = lazy(() => import("./pages/RentManagement"));
 const BrokerRegister = lazy(() => import("./pages/BrokerRegister"));
 const MyProperties = lazy(() => import("./pages/MyProperties"));
 const SuperAdminPanel = lazy(() => import("./pages/SuperAdminPanel"));
+const AnalyticsDashboard = lazy(() => import("./pages/AnalyticsDashboard"));
 
 function PageLoader() {
   return (
@@ -56,6 +58,11 @@ function BrokerRoute({ children }) {
   return children;
 }
 
+function SessionTrackerComponent() {
+  useSessionTracking();
+  return <AppRoutes />;
+}
+
 function AppRoutes() {
   return (
     <Suspense fallback={<PageLoader />}>
@@ -77,6 +84,7 @@ function AppRoutes() {
         <Route path="/register-broker" element={<BrokerRegister />} />
         <Route path="/my-properties" element={<MyProperties />} />
         <Route path="/superadmin" element={<SuperAdminPanel />} />
+        <Route path="/analytics" element={<AnalyticsDashboard />} />
         <Route
           path="/visits"
           element={
@@ -145,7 +153,7 @@ export default function App() {
         <AuthProvider>
           <LoginModalProvider>
             <VisitCartProvider>
-              <AppRoutes />
+              <SessionTrackerComponent />
             </VisitCartProvider>
           </LoginModalProvider>
         </AuthProvider>
