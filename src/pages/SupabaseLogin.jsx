@@ -241,6 +241,7 @@ function SignInForm({ onSuccess, googleEnabled }) {
 
 function SignUpForm({ onSuccess, googleEnabled }) {
   const { signupWithSupabase, loginWithSupabaseGoogle } = useAuth();
+  const [phone, setPhone]  = useState("");
   const [name,  setName]   = useState("");
   const [email, setEmail]  = useState("");
   const [pw,    setPw]     = useState("");
@@ -252,10 +253,11 @@ function SignUpForm({ onSuccess, googleEnabled }) {
 
   const onSubmit = async (e) => {
     e.preventDefault();
+    if (!phone.trim()) { setError("Please enter your phone number."); return; }
     if (!name.trim()) { setError("Please enter your name."); return; }
     setError(""); setInfo("");
     setBusy(true);
-    const r = await signupWithSupabase(email, pw, name.trim(), role);
+    const r = await signupWithSupabase(email, pw, name.trim(), role, phone.trim());
     setBusy(false);
     if (r.success) {
       if (r.requiresVerification) { setInfo(r.info || "Verify your email, then sign in."); }
@@ -300,7 +302,8 @@ function SignUpForm({ onSuccess, googleEnabled }) {
         </div>
       </div>
 
-      <Input label="Full Name"   required type="text"     value={name}  onChange={(e) => setName(e.target.value)}  placeholder="Your name"      autoFocus disabled={busy} />
+      <Input label="Phone Number" required type="tel"      value={phone} onChange={(e) => setPhone(e.target.value)} placeholder="+91 98765 43210" autoFocus disabled={busy} />
+      <Input label="Full Name"   required type="text"     value={name}  onChange={(e) => setName(e.target.value)}  placeholder="Your name"      disabled={busy} />
       <Input label="Email"       required type="email"    value={email} onChange={(e) => setEmail(e.target.value)} placeholder="you@email.com"  disabled={busy} />
 
       <div style={{ marginBottom: 14 }}>
