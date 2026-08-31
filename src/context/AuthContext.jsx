@@ -34,7 +34,7 @@ function buildUserFromSupabase(sbUser) {
   const email = String(sbUser?.email || "").toLowerCase().trim();
   const meta = sbUser?.user_metadata || {};
   const roleCandidate = meta.role || "customer";
-  const role = ADMIN_EMAILS.includes(email) ? "admin" : (roleCandidate === "seller" || roleCandidate === "broker" ? roleCandidate : "customer");
+  const role = ADMIN_EMAILS.includes(email) ? "admin" : (roleCandidate === "seller" || roleCandidate === "broker" || roleCandidate === "tenant" || roleCandidate === "owner" ? roleCandidate : "customer");
   return {
     email,
     role,

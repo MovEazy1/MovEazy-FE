@@ -1,9 +1,11 @@
 import { supabase, isSupabaseConfigured } from "./supabase";
 import { isEmailAdminAllowed } from "./adminAccess";
 
-export const VALID_ROLES = ["admin", "broker", "seller", "customer", "consultant", "sub_admin"];
+export const VALID_ROLES = ["admin", "broker", "seller", "customer", "consultant", "sub_admin", "tenant", "owner"];
 
 export function normalizeSignupRole(role) {
+  if (role === "tenant") return "tenant";
+  if (role === "owner") return "owner";
   if (role === "seller") return "seller";
   if (role === "broker") return "broker";
   if (role === "admin") return "admin";

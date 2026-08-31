@@ -174,7 +174,7 @@ function SignInForm({ onSuccess, googleEnabled }) {
     setBusy(true);
     const r = await loginWithSupabase(email, pw);
     setBusy(false);
-    if (r.success) { onSuccess(r.role); }
+    if (r.success) { onSuccess(r.role || "tenant"); }
     else { setError(r.error || "Sign-in failed."); }
   };
 
@@ -244,7 +244,7 @@ function SignUpForm({ onSuccess, googleEnabled }) {
   const [name,  setName]   = useState("");
   const [email, setEmail]  = useState("");
   const [pw,    setPw]     = useState("");
-  const [role,  setRole]   = useState("customer");
+  const [role,  setRole]   = useState("tenant");
   const [showPw, setShowPw] = useState(false);
   const [busy,   setBusy]  = useState(false);
   const [error,  setError] = useState("");
@@ -259,7 +259,7 @@ function SignUpForm({ onSuccess, googleEnabled }) {
     setBusy(false);
     if (r.success) {
       if (r.requiresVerification) { setInfo(r.info || "Verify your email, then sign in."); }
-      else { onSuccess(r.role); }
+      else { onSuccess(r.role || role); }
     } else {
       setError(r.error || "Sign-up failed.");
     }
@@ -283,8 +283,8 @@ function SignUpForm({ onSuccess, googleEnabled }) {
       {/* Role picker */}
       <div style={{ marginBottom: 14 }}>
         <Label>I am a</Label>
-        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8 }}>
-          {[{ id: "customer", label: "Tenant / Buyer" }, { id: "broker", label: "Broker / Seller" }].map((c) => (
+        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 8 }}>
+          {[{ id: "tenant", label: "Tenant" }, { id: "owner", label: "Owner" }, { id: "broker", label: "Broker" }].map((c) => (
             <button
               key={c.id} type="button" onClick={() => setRole(c.id)}
               style={{
@@ -351,10 +351,14 @@ export default function SupabaseLogin() {
     navigate(user ? "/profile" : "/");
   }, [user, supabaseSession, navigate, searchParams]);
 
-  function onSuccess() {
+  function onSuccess(role) {
     const next = searchParams.get("next");
     if (next) { navigate(next); return; }
-    navigate("/profile");
+    // Route based on user role
+    if (role === "tenant") navigate("/recommendations");
+    else if (role === "owner") navigate("/my-properties");
+    else if (role === "broker") navigate("/broker");
+    else navigate("/profile");
   }
 
   return (
