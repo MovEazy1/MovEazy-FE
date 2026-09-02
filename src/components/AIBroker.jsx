@@ -427,7 +427,7 @@ export default function AIBroker({ open, onClose }) {
                         I'll help you find a perfect, cozy home within 10 minutes.
                       </p>
                       <p className="brk-intro-p brk-intro-p2">
-                        First, please help me with your mobile number — I'll use it to send you shortlisted homes.
+                        First, tell me where you work — I'll centre the search around your commute.
                       </p>
                       <button type="button" className="brk-cta" onClick={begin}>
                         Let's begin
