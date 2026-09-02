@@ -45,8 +45,8 @@ const ACKS =["Perfect.", "That's helpful.", "Got it.", "Noted — I'll keep that
 
 const ROADMAP = [
   { key: "location", label: "Location", icon: "📍" },
-  { key: "budget", label: "Budget", icon: "💰" },
   { key: "home", label: "Home type", icon: "🏡" },
+  { key: "budget", label: "Budget", icon: "💰" },
   { key: "amenities", label: "Must-haves", icon: "✨" },
   { key: "lifestyle", label: "Lifestyle", icon: "🌆" },
   { key: "dealbreakers", label: "Deal-breakers", icon: "🚫" },
@@ -196,9 +196,9 @@ function NoteField({ value, onChange, placeholder }) {
 const STEPS = [
   { id: "office", group: "location", type: "location", q: "Where's your office?", sub: "Search it below. I'll centre the hunt around your commute." },
   { id: "localities", group: "location", type: "multi", q: "Which localities are you considering?", sub: "Pick as many as you like — I'll focus my search here.", options: LOCALITIES, more: LOCALITIES_MORE },
-  { id: "budget", group: "budget", type: "budget", q: "What's your monthly rent range?", sub: "Drag both ends to set your range." },
   { id: "occupants", group: "home", type: "multi", q: "Who'll be living there?", sub: "Select everyone who applies.", options: OCCUPANTS },
   { id: "flatTypes", group: "home", type: "multi", q: "What kind of home works?", sub: "All are selected by default — untick anything that won't work for you.", options: FLAT_TYPES, defaultAll: true },
+  { id: "budget", group: "budget", type: "budget", q: "What's your monthly rent range?", sub: "Drag both ends to set your range." },
   { id: "mustHaves", group: "amenities", type: "multi", q: "Any must-haves?", sub: "The things you'd really rather not compromise on.", options: MUST_HAVES },
   { id: "lifestyle", group: "lifestyle", type: "multi", q: "What matters most for your lifestyle?", sub: "Choose up to five.", options: LIFESTYLE, max: 5 },
   { id: "dealBreakers", group: "dealbreakers", type: "multi", q: "What should I never recommend?", sub: "Your hard nos — I'll filter these out entirely.", options: DEALBREAKERS },
