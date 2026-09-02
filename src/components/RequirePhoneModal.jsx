@@ -23,7 +23,6 @@ import { useAuth } from "../context/AuthContext";
 const INK     = "#1A2421";
 const WHITE   = "#FFFEFB";
 const LINE    = "#D9D3C4";
-const MUTED   = "#8B8578";
 const RUST    = "#C8500F";
 const RUST_BG = "#FBEAE0";
 
@@ -90,41 +89,20 @@ export default function RequirePhoneModal() {
       <div
         className="w-full my-auto"
         style={{
-          maxWidth: 400, background: WHITE, border: `1px solid ${LINE}`,
-          borderRadius: 20, padding: "32px 28px",
-          boxShadow: "0 20px 60px rgba(26,36,33,0.14)",
+          maxWidth: 340, background: WHITE, border: `1px solid ${LINE}`,
+          borderRadius: 16, padding: "22px 20px",
+          boxShadow: "0 16px 44px rgba(26,36,33,0.14)",
           fontFamily: "Inter, sans-serif",
         }}
       >
-        <span
-          aria-hidden
-          style={{
-            display: "flex", alignItems: "center", justifyContent: "center",
-            width: 44, height: 44, borderRadius: 12,
-            background: RUST_BG, marginBottom: 18,
-          }}
-        >
-          <svg width="21" height="21" viewBox="0 0 24 24" fill="none" stroke={RUST} strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
-            <rect x="6.5" y="2.5" width="11" height="19" rx="2.5" />
-            <path d="M10.5 18.5h3" />
-          </svg>
-        </span>
-
-        <h2 id="reqphone-title" style={{ color: INK, fontSize: 21, fontWeight: 700, letterSpacing: "-0.01em", margin: 0 }}>
+        <h2 id="reqphone-title" style={{ color: INK, fontSize: 17, fontWeight: 700, letterSpacing: "-0.01em", margin: 0 }}>
           Verify your Mobile No.
         </h2>
 
-        <div style={{ marginTop: 22 }}>
-          <label
-            htmlFor="reqphone-input"
-            style={{ display: "block", fontSize: 11, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.06em", color: MUTED, marginBottom: 6, fontFamily: "JetBrains Mono, monospace" }}
-          >
-            Mobile Number<span style={{ color: RUST, marginLeft: 2 }}>*</span>
-          </label>
-
+        <div style={{ marginTop: 16 }}>
           <div
             style={{
-              display: "flex", alignItems: "center", height: 48,
+              display: "flex", alignItems: "center", height: 44,
               borderRadius: 10, background: WHITE, overflow: "hidden",
               border: `1px solid ${err ? "#C0392B" : focused ? RUST : LINE}`,
               boxShadow: focused && !err ? `0 0 0 3px ${RUST_BG}` : "none",
@@ -171,7 +149,7 @@ export default function RequirePhoneModal() {
           onClick={save}
           disabled={busy || !ready}
           style={{
-            width: "100%", height: 46, marginTop: 20, borderRadius: 10,
+            width: "100%", height: 44, marginTop: 14, borderRadius: 10,
             background: INK, color: WHITE, border: "none",
             fontSize: 14.5, fontWeight: 600, fontFamily: "Inter, sans-serif",
             cursor: busy ? "wait" : ready ? "pointer" : "not-allowed",
