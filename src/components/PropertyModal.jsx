@@ -36,7 +36,7 @@ function MediaElement({ src, alt, style, firstImage }) {
 
 export default function PropertyModal({ property, onClose, listings = [], onSelectListing, onSavedChange, initialShowVisitForm = false }) {
   const { user } = useAuth();
-  const [visitForm, setVisitForm] = useState({ phone: "", time: "", notes: "" });
+  const [visitForm, setVisitForm] = useState({ time: "", notes: "" });
   const [visitSuccess, setVisitSuccess] = useState("");
   const [showVisitForm, setShowVisitForm] = useState(false);
   const [applyMode, setApplyMode] = useState("entire_unit");
@@ -260,14 +260,14 @@ export default function PropertyModal({ property, onClose, listings = [], onSele
         listingId: property.id,
         listingTitle: property.title,
         customerEmail: user.email,
-        customerPhone: visitForm.phone,
+        customerPhone: user.phone || "",
         sellerEmail: property.sellerEmail || property.ownerEmail || "",
         visitTime: visitForm.time,
         notes: visitForm.notes
       });
       triggerVisitNotificationEmail({
         customerEmail: user.email,
-        customerPhone: visitForm.phone,
+        customerPhone: user.phone || "",
         sellerEmail: property.sellerEmail || property.ownerEmail || "",
         visitTime: visitForm.time,
         notes: visitForm.notes,
@@ -894,7 +894,6 @@ export default function PropertyModal({ property, onClose, listings = [], onSele
                         </div>
                       ) : (
                         <>
-                          <input type="tel" required placeholder="Phone Number" value={visitForm.phone} onChange={(e) => setVisitForm({ ...visitForm, phone: e.target.value })} style={{ width: "100%", padding: "10px", borderRadius: "8px", border: "1px solid #e2e8f0", boxSizing: "border-box", fontSize: "14px" }} />
                           <input type="text" required placeholder="Date & Time (e.g. Tomorrow 5PM)" value={visitForm.time} onChange={(e) => setVisitForm({ ...visitForm, time: e.target.value })} style={{ width: "100%", padding: "10px", borderRadius: "8px", border: "1px solid #e2e8f0", boxSizing: "border-box", fontSize: "14px" }} />
                           <textarea rows={2} placeholder="Any questions?" value={visitForm.notes} onChange={(e) => setVisitForm({ ...visitForm, notes: e.target.value })} style={{ width: "100%", padding: "10px", borderRadius: "8px", border: "1px solid #e2e8f0", boxSizing: "border-box", fontSize: "14px" }} />
                           <div style={{ display: "flex", gap: "8px", marginTop: "4px" }}>
