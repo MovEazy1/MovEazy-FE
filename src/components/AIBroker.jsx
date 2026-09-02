@@ -20,7 +20,6 @@ import "leaflet/dist/leaflet.css";
 import { geocodePlace, searchPlaces, reverseGeocode } from "../lib/geocode";
 import { useAuth } from "../context/AuthContext";
 import { saveUserRequirement, fetchUserRequirement, rowToPrefs } from "../lib/userRequirements";
-import { updateUserProfileFields } from "../lib/profileService";
 import { fetchPublishedInventory } from "../lib/inventory";
 import { matchRequirementToListings } from "../lib/inventoryMatch";
 import {
@@ -37,16 +36,6 @@ const C = {
 };
 const EASE = [0.22, 1, 0.36, 1];
 const fmtINR = (n) => `₹${Number(n).toLocaleString("en-IN")}`;
-
-/* Indian mobile validation — a bare 10-digit number starting 6-9, optionally
-   prefixed with 91/+91. */
-const phoneDigits = (v) => String(v || "").replace(/\D/g, "");
-const isValidPhone = (v) => {
-  const d = phoneDigits(v);
-  if (d.length === 10) return /^[6-9]/.test(d);
-  if (d.length === 12 && d.startsWith("91")) return /^[6-9]/.test(d.slice(2));
-  return false;
-};
 
 /* ── Question data ─────────────────────────────────────────────────────────── */
 /* Vocabulary now lives in ../data/preferenceOptions.js so the List my Flat
@@ -188,35 +177,6 @@ function Chip({ active, onClick, children, accent = C.coral }) {
   );
 }
 
-function PhoneField({ value, onChange }) {
-  const touched = (value || "").length > 0;
-  const ok = isValidPhone(value);
-  return (
-    <div className="brk-note">
-      <label className="brk-note-label">
-        Your mobile number <span className="brk-req">*</span>
-      </label>
-      <div className={`brk-phone-row ${touched && !ok ? "err" : ""}`}>
-        <span className="brk-phone-prefix">+91</span>
-        <input
-          type="tel"
-          inputMode="numeric"
-          value={value || ""}
-          onChange={(e) => onChange(e.target.value)}
-          placeholder="98xxxxxxxx"
-          className="brk-phone-input"
-          autoComplete="tel"
-        />
-      </div>
-      <p className="brk-phone-hint">
-        {touched && !ok
-          ? "Enter a valid 10-digit mobile number."
-          : "I’ll use this to send you shortlisted homes and coordinate visits."}
-      </p>
-    </div>
-  );
-}
-
 function NoteField({ value, onChange, placeholder }) {
   return (
     <div className="brk-note">
@@ -234,7 +194,6 @@ function NoteField({ value, onChange, placeholder }) {
 
 /* ── Main ──────────────────────────────────────────────────────────────────── */
 const STEPS = [
-  { id: "phone", group: "location", type: "phone", q: "First, what's your mobile number?", sub: "So I can send you shortlisted homes and coordinate visits directly." },
   { id: "office", group: "location", type: "location", q: "Where's your office?", sub: "Search it below. I'll centre the hunt around your commute." },
   { id: "localities", group: "location", type: "multi", q: "Which localities are you considering?", sub: "Pick as many as you like — I'll focus my search here.", options: LOCALITIES, more: LOCALITIES_MORE },
   { id: "budget", group: "budget", type: "budget", q: "What's your monthly rent range?", sub: "Drag both ends to set your range." },
@@ -247,7 +206,7 @@ const STEPS = [
 ];
 
 const emptyPrefs = () => ({
-  office: null, phone: "", localities: [], budgetMin: 20000, budgetMax: 45000, stretch: false,
+  office: null, localities: [], budgetMin: 20000, budgetMax: 45000, stretch: false,
   occupants: [], flatTypes: [...FLAT_TYPES], mustHaves: [], lifestyle: [], dealBreakers: [],
   priority: ["Near to Office", "Good locality", "Budget fit", "Apartment over standalone", "Flat size", "Ventilation"],
   notes: {},
@@ -256,7 +215,7 @@ const emptyPrefs = () => ({
 /** The mandatory answers — same set gating "Continue" step-by-step, checked
  * all at once for the single-page review's "Save preferences" button. */
 function prefsComplete(prefs) {
-  return isValidPhone(prefs.phone) && !!prefs.office &&
+  return !!prefs.office &&
     prefs.localities.length > 0 && prefs.occupants.length > 0 && prefs.flatTypes.length > 0;
 }
 
@@ -291,7 +250,7 @@ export default function AIBroker({ open, onClose }) {
         const row = await fetchUserRequirement(uid);
         const saved = rowToPrefs(row);
         if (alive && saved) {
-          setPrefs((p) => ({ ...p, ...saved, phone: user?.phone || p.phone }));
+          setPrefs((p) => ({ ...p, ...saved }));
           setPhase("review");
           setBrokerState("idle");
         }
@@ -331,10 +290,6 @@ export default function AIBroker({ open, onClose }) {
   }, [stepIdx, phase]);
 
   const advance = () => {
-    if (step.type === "phone" && isValidPhone(prefs.phone)) {
-      const uid = user?.uid || user?.id;
-      if (uid) updateUserProfileFields(uid, { phone: prefs.phone }).catch(() => {});
-    }
     setAck(ACKS[Math.floor(Math.random() * ACKS.length)]);
     setBrokerState("speaking");
     setTimeout(() => {
@@ -361,7 +316,6 @@ export default function AIBroker({ open, onClose }) {
   };
 
   const canContinue = () => {
-    if (step.type === "phone") return isValidPhone(prefs.phone);
     if (step.type === "location") return !!prefs.office;
     if (step.type === "single") return !!prefs.age;
     if (step.type === "multi") {
@@ -374,15 +328,13 @@ export default function AIBroker({ open, onClose }) {
     return true;
   };
 
-  // "Save preferences" on the single-page review: persist the phone number to
-  // the account record (same target the step-by-step flow writes to) plus the
-  // full requirement, then — matching "submit again" — take the user straight
-  // to their freshly-scored matches, same as finishing the questionnaire does.
+  // "Save preferences" on the single-page review: persist the requirement, then
+  // — matching "submit again" — take the user straight to their freshly-scored
+  // matches, same as finishing the questionnaire does. The mobile number isn't
+  // touched here: it's captured once at signup / by the post-login phone gate.
   const saveReview = async () => {
     if (!prefsComplete(prefs) || saving) return;
     setSaving(true);
-    const uid = user?.uid || user?.id;
-    if (uid) await updateUserProfileFields(uid, { phone: prefs.phone }).catch(() => {});
     await saveUserRequirement(user, prefs);
     setSaving(false);
     setSaved(true);
@@ -566,10 +518,6 @@ function StepBody({ step, prefs, set, toggle, setNote }) {
   const notePh = notePlaceholderFor(step.id);
   return (
     <>
-      {step.type === "phone" && (
-        <PhoneField value={prefs.phone} onChange={(v) => set({ phone: v })} />
-      )}
-
       {step.type === "location" && (
         <OfficeSearch value={prefs.office} onPick={(o) => set({ office: o })} chips={OFFICE_CHIPS} />
       )}
@@ -1169,13 +1117,6 @@ function Styles() {
       .brk-note-input { width:100%; border:1.5px solid ${C.line}; background:#fff; border-radius:14px; padding:13px 16px; font-family:inherit; font-size:14.5px; color:${C.ink}; outline:none; transition:border-color .15s ease; }
       .brk-note-input:focus { border-color:${C.coral}; }
       .brk-req { color:${C.coral}; font-weight:900; }
-      .brk-phone-row { display:flex; align-items:center; gap:8px; border:1.5px solid ${C.line}; background:#fff; border-radius:14px; padding:0 14px; transition:border-color .15s ease; }
-      .brk-phone-row:focus-within { border-color:${C.coral}; }
-      .brk-phone-row.err { border-color:${C.coralDeep}; }
-      .brk-phone-prefix { font-size:14.5px; font-weight:800; color:${C.muted}; border-right:1.5px solid ${C.line}; padding-right:10px; }
-      .brk-phone-input { flex:1; border:none; outline:none; background:transparent; font-family:inherit; font-size:14.5px; color:${C.ink}; padding:13px 0; letter-spacing:0.02em; }
-      .brk-phone-hint { font-size:12px; color:${C.muted}; margin:7px 2px 0; }
-      .brk-phone-row.err + .brk-phone-hint { color:${C.coralDeep}; }
 
       .brk-actions { display:flex; align-items:center; gap:16px; margin-top:30px; }
       .brk-back { background:none; border:none; color:${C.muted}; font-family:inherit; font-size:14px; font-weight:700; cursor:pointer; }
