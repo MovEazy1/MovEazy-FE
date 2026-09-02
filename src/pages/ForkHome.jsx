@@ -554,7 +554,7 @@ export default function ForkHome() {
               <div style={{ color: "#9FB5B0", fontSize: 16, lineHeight: 1.5, marginTop: 20 }}>Reach genuine, move-ready tenants while we handle visits and coordination. Zero <span style={{ color: "#E8A33D" }}>hassle.</span></div>
               <div style={{ display: "flex", alignItems: "center", gap: 10, marginTop: 18, padding: "11px 14px", borderRadius: 12, background: "rgba(232,163,61,.16)", border: "1px solid rgba(232,163,61,.4)" }}>
                 <span style={{ flex: "none", width: 26, height: 26, borderRadius: "50%", background: "#E8A33D", color: "#04211D", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 14, fontWeight: 800 }}>&#8377;</span>
-                <span style={{ fontSize: 13.5, fontWeight: 700, color: "#FBE1B0", lineHeight: 1.4 }}>Earn <span style={{ color: "#FFD98A" }}>&#8377;5,000 flat</span> per room sold through our platform</span>
+                <span style={{ fontSize: 13.5, fontWeight: 700, color: "#FBE1B0", lineHeight: 1.4 }}>Earn <span style={{ color: "#FFD98A" }}>&#8377;10,000 flat</span> per room sold through our platform</span>
               </div>
               <div style={{ display: "flex", flexWrap: "wrap", gap: 10, marginTop: 14 }}>
                 <span style={{ border: "1px solid rgba(232,163,61,.24)", color: "#EBDCC2", fontSize: 13, fontWeight: 600, padding: "8px 14px", borderRadius: 100 }}>Verified tenants</span>
