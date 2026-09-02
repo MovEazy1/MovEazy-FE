@@ -91,12 +91,9 @@ export default function RequirePhoneModal() {
             </svg>
           </span>
 
-          <h2 id="reqphone-title" className="text-white text-[20px] font-extrabold leading-snug">
-            Add your mobile number
+          <h2 id="reqphone-title" className="text-white text-[21px] font-extrabold leading-snug">
+            Verify your Mobile No.
           </h2>
-          <p className="text-white/60 text-[13.5px] leading-relaxed mt-2">
-            We need a number to reach you about visits and enquiries. It&apos;s never shown publicly on your listings.
-          </p>
 
           <div
             className="flex items-center gap-3 mt-6 rounded-2xl px-4"
