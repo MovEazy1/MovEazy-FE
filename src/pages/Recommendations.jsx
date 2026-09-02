@@ -278,12 +278,21 @@ export default function Recommendations() {
         @media (max-width: 640px) {
           .rec-shell { display: block; }
           .rec-map, .rec-list { display: none; }
-          .rec-shell.view-map .rec-map { display: block; height: calc(100dvh - 96px); position: static; }
+          /* Fills exactly the gap between the fixed top nav (69px here) and the
+             fixed bottom bar (~70px + safe area; 72 leaves a hair of clearance,
+             since the bar's real height rounds up past 70). The old -96px ran 43px
+             under the bar, hiding the last strip of map and any pin in it. */
+          .rec-shell.view-map .rec-map { display: block; height: calc(100dvh - 69px - 72px - env(safe-area-inset-bottom, 0px)); position: static; }
           .rec-shell.view-list .rec-list { display: block; }
           .rec-title { font-size: 22px; }
           .rec-card { grid-template-columns: 108px 1fr; }
+          /* Clears the shared bottom action bar (MovEazyNav: 70px + safe area,
+             fixed at bottom:0) — at bottom:18px this toggle sat inside that
+             band and, at z-index 1300, drew straight over it. */
           .rec-mobiletoggle {
-            display: inline-flex; position: fixed; bottom: 18px; left: 50%; transform: translateX(-50%);
+            display: inline-flex; position: fixed;
+            bottom: calc(70px + env(safe-area-inset-bottom, 0px) + 14px);
+            left: 50%; transform: translateX(-50%);
             z-index: 1300; background: #1c1a17; border-radius: 999px; padding: 5px; box-shadow: 0 10px 30px rgba(0,0,0,.28);
           }
           .rec-mobiletoggle button { border: none; background: none; color: rgba(255,255,255,.6); font: 700 13px/1 inherit; padding: 10px 20px; border-radius: 999px; cursor: pointer; }
