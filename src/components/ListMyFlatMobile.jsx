@@ -38,6 +38,16 @@ const RULE_OPTIONS = [
   "No Smoking", "No Pets", "No Alcohol", "Vegetarians Only",
   "Working Professionals Only", "No Brokerage", "Fully Furnished",
 ];
+/** The account already told us who they are at signup, so the listing form
+ *  opens on that role instead of always guessing "owner". seller is folded
+ *  into broker, which is the posting role it corresponds to. */
+export function posterRoleFor(user) {
+  const r = String(user?.role || "").toLowerCase();
+  if (r === "tenant") return "tenant";
+  if (r === "broker" || r === "seller") return "broker";
+  return "owner";
+}
+
 const GENDER_PREFS = [["any", "Co-ed / Any"], ["female", "Girls Only"], ["male", "Boys Only"]];
 
 const STEP_COPY = [
@@ -173,7 +183,7 @@ export default function ListMyFlatMobile({ user, onPublished }) {
   const [slotCount, setSlotCount] = useState(0);
 
   // 1 — who's posting
-  const [postedBy, setPostedBy] = useState("owner");
+  const [postedBy, setPostedBy] = useState(() => posterRoleFor(user));
 
   // 2 — where
   const [area, setArea] = useState("");
@@ -262,6 +272,7 @@ export default function ListMyFlatMobile({ user, onPublished }) {
       if (!marker) return "Drop a pin on the map to set the exact address.";
     }
     if (step === 4 && !rent) return "Enter the monthly rent.";
+    if (step === 6 && photoFiles.length === 0) return "Add at least one photo of your flat.";
     if (step === TOTAL_STEPS && slotCount < 1) return "Add at least one visit time slot — renters need a time to book before your flat can go live.";
     return "";
   };
@@ -512,7 +523,7 @@ export default function ListMyFlatMobile({ user, onPublished }) {
                   prefix={<span style={{ color: MINT, fontSize: 20, fontWeight: 800, flex: "none" }}>₹</span>}
                   suffix={<span style={{ color: "#6F8681", fontSize: 13, fontWeight: 600, flex: "none" }}>/ month</span>}
                 >
-                  <input type="number" min="0" placeholder="35,000" value={rent}
+                  <input type="number" min="0" placeholder="" value={rent}
                     onChange={(e) => setRent(e.target.value)} style={{ ...inputStyle, fontSize: 19, fontWeight: 700 }} />
                 </Field>
               </div>
@@ -573,7 +584,7 @@ export default function ListMyFlatMobile({ user, onPublished }) {
                   }} />
               </div>
               <div>
-                <Q sub="Add a few clear photos — you can select many at once from your gallery.">
+                <Q required sub="Add a few clear photos — you can select many at once from your gallery.">
                   Photos {photoPreviews.length > 0 && <span style={{ color: "#6F8681", fontWeight: 600 }}>· {photoPreviews.length} added</span>}
                 </Q>
                 <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 11 }}>

@@ -35,3 +35,20 @@ export async function fetchRecentActivity({ days = 14, limit = 50 } = {}) {
   }
   return data || [];
 }
+
+/**
+ * Booked visits on one property the signed-in user posted, nearest first.
+ * Backed by public.my_property_visits() (MovEazy-BE/supabase/owner_notifications.sql):
+ * visit_bookings is RLS'd to the renter who booked, so a poster can only see
+ * their own listing's visits through that security-definer function. Returns
+ * times and headcounts only — never who booked.
+ */
+export async function fetchPropertyVisits(propertyId) {
+  if (!isSupabaseConfigured || !supabase || !propertyId) return [];
+  const { data, error } = await supabase.rpc("my_property_visits", { pid: propertyId });
+  if (error) {
+    console.error("my_property_visits failed:", error.message);
+    return [];
+  }
+  return data || [];
+}

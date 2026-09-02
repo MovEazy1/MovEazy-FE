@@ -5,12 +5,13 @@ import Navbar from "../components/layout/Navbar";
 import Footer from "../components/layout/Footer";
 import PageShell from "../components/layout/PageShell";
 import ListingMapPicker from "../components/ListingMapPicker";
-import ListMyFlatMobile from "../components/ListMyFlatMobile";
+import ListMyFlatMobile, { posterRoleFor } from "../components/ListMyFlatMobile";
 import { reverseGeocode, nearbyLandmarks } from "../lib/geocode";
 import { createInventoryItem, uploadInventoryPhotos, generatePropertyId } from "../lib/inventory";
 import { fetchAllUserRequirements } from "../lib/userRequirements";
 import { matchListingToRequirements } from "../lib/inventoryMatch";
 import { fetchSlotsForProperty, addVisitSlot, deleteVisitSlot } from "../lib/visits";
+import { fetchMyListingStats, fetchPropertyVisits } from "../lib/ownerDashboard";
 import {
   ALL_LOCALITIES, FLAT_TYPES, FURNISHINGS, OCCUPANTS,
   MUST_HAVES, LIFESTYLE,
@@ -88,6 +89,14 @@ function ChipMulti({ options, selected, onToggle }) {
   );
 }
 
+/** Matched seekers stay anonymous to the poster: contact details belong to the
+ *  seeker, and MovEazy brokers the introduction. A stable per-seeker handle
+ *  keeps the list readable without leaking an email or a real name. */
+function seekerHandle(requirement, i) {
+  const id = String(requirement?.user_id || "");
+  return `Seeker #${id ? id.replace(/-/g, "").slice(0, 6).toUpperCase() : String(i + 1).padStart(3, "0")}`;
+}
+
 const STEPS = ["Who & Where", "The Home", "Publish"];
 
 export default function ListMyFlat() {
@@ -101,7 +110,7 @@ export default function ListMyFlat() {
   const [showDashboard, setShowDashboard] = useState(false); // tenant: leads + visit-slots view
 
   // Step 1 — who & where
-  const [postedBy, setPostedBy] = useState("owner");
+  const [postedBy, setPostedBy] = useState(() => posterRoleFor(user));
   const [area, setArea] = useState("");
   const [fullAddress, setFullAddress] = useState("");
   const [landmark, setLandmark] = useState("");
@@ -193,6 +202,9 @@ export default function ListMyFlat() {
     }
     if (step === 1) {
       if (!rent) e.rent = "Enter the monthly rent";
+    }
+    if (step === 2 && photoFiles.length === 0) {
+      e.photos = "Add at least one photo of your flat";
     }
     setErrors(e);
     return Object.keys(e).length === 0;
@@ -434,7 +446,7 @@ export default function ListMyFlat() {
                         <div key={i} className="flex items-center justify-between p-3 rounded-xl border border-gray-100 bg-gray-50">
                           <div className="min-w-0">
                             <p className="text-[13px] font-bold text-gray-800 truncate">
-                              {m.requirement.email || m.requirement.customer_name || m.requirement.name || `Seeker #${String(m.requirement.user_id || i + 1).slice(0, 6)}`}
+                              {seekerHandle(m.requirement, i)}
                             </p>
                             <p className="text-[11px] text-gray-500 truncate">{m.reasons.join(" · ") || "Requirement match"}</p>
                           </div>
@@ -613,7 +625,7 @@ export default function ListMyFlat() {
               <div className="p-6 grid grid-cols-2 gap-4">
                 <div>
                   <Label required>Monthly Rent (₹)</Label>
-                  <input type="number" min="0" value={rent} onChange={(e) => setRent(e.target.value)} placeholder="35,000" className={inp} />
+                  <input type="number" min="0" value={rent} onChange={(e) => setRent(e.target.value)} placeholder="" className={inp} />
                   {errors.rent && <p className="text-[11px] text-red-500 mt-1 font-semibold">{errors.rent}</p>}
                 </div>
                 <div>
@@ -700,10 +712,11 @@ export default function ListMyFlat() {
             <Card>
               <div className="p-6">
                 <div className="flex items-center justify-between mb-1">
-                  <p className="text-[14px] font-extrabold text-gray-900">Photos</p>
+                  <p className="text-[14px] font-extrabold text-gray-900">Photos <span className="text-red-500">*</span></p>
                   <span className="text-[11px] text-gray-400">{photoPreviews.length} added</span>
                 </div>
                 <p className="text-[12px] text-gray-400 mb-3">Add a few clear photos — you can select many at once from your gallery.</p>
+                {errors.photos && <p className="text-[11px] text-red-500 mb-3 font-semibold">{errors.photos}</p>}
 
                 <label className="block cursor-pointer">
                   <div className="border-2 border-dashed border-gray-200 rounded-xl px-4 py-7 text-center hover:border-red-300 hover:bg-red-50/40 transition-colors">
@@ -829,6 +842,18 @@ const fmtSlot = (iso) =>
  * Tenant "property dashboard" — shown after a tenant publishes. Leads at the top,
  * a per-property visit-slot editor, and the wallet-credit note.
  */
+function DashStat({ label, value, accent }) {
+  return (
+    <div className="rounded-xl px-3 py-3 text-center border"
+      style={accent
+        ? { background: "linear-gradient(135deg,#fff5f5,#fef2f2)", borderColor: "#fbcfc4" }
+        : { background: "#f8fafc", borderColor: "#e2e8f0" }}>
+      <p className="text-[22px] font-extrabold leading-none" style={{ color: accent ? BRAND_RED : "#0f172a" }}>{value}</p>
+      <p className="text-[10px] font-bold uppercase tracking-wide text-gray-400 mt-1.5">{label}</p>
+    </div>
+  );
+}
+
 function PropertyLeadDashboard({ propertyId, listingTitle, leads = [], walletAmount, rewardEligible, onClose }) {
   const [slots, setSlots] = useState([]);
   const [fromT, setFromT] = useState("10:00");
@@ -839,12 +864,28 @@ function PropertyLeadDashboard({ propertyId, listingTitle, leads = [], walletAmo
   const [dateDraft, setDateDraft] = useState("");
   const [busy, setBusy] = useState(false);
   const [msg, setMsg] = useState({ type: "", text: "" });
+  const [stats, setStats] = useState(null);
+  const [visits, setVisits] = useState([]);
 
   const loadSlots = async () => {
     try { setSlots(await fetchSlotsForProperty(propertyId)); } catch { /* ignore */ }
   };
   // eslint-disable-next-line react-hooks/exhaustive-deps
   useEffect(() => { if (propertyId) loadSlots(); }, [propertyId]);
+
+  // Both are best-effort: their RPCs may not be deployed yet, in which case the
+  // lib logs and returns empty, and the panel just shows zeros / "no visits".
+  useEffect(() => {
+    if (!propertyId) return undefined;
+    let alive = true;
+    (async () => {
+      const [rows, v] = await Promise.all([fetchMyListingStats(), fetchPropertyVisits(propertyId)]);
+      if (!alive) return;
+      setStats((rows || []).find((r) => r.property_id === propertyId) || null);
+      setVisits(v || []);
+    })();
+    return () => { alive = false; };
+  }, [propertyId]);
 
   const times = useMemo(() => buildTimes(fromT, toT, every), [fromT, toT, every]);
   const willCreate = times.length * dates.length;
@@ -919,21 +960,48 @@ function PropertyLeadDashboard({ propertyId, listingTitle, leads = [], walletAmo
             <button type="button" onClick={onClose} className="shrink-0 text-[12px] font-bold text-gray-500 hover:text-gray-800">← Back to summary</button>
           </div>
 
-          {/* Leads count */}
-          <div className="rounded-2xl p-5 mb-2" style={{ background: "linear-gradient(135deg,#fff5f5,#fef2f2)", border: "1px solid #fbcfc4" }}>
-            <p className="text-[11px] font-bold uppercase tracking-wide" style={{ color: BRAND_RED }}>Leads</p>
-            <div className="flex items-baseline gap-2">
-              <span className="text-[34px] font-extrabold text-gray-900 leading-none">{leads.length}</span>
-              <span className="text-[13px] text-gray-500">seeker{leads.length === 1 ? "" : "s"} matched to this home</span>
-            </div>
+          {/* Headline numbers. Views/shortlists/likes come from my_listing_stats();
+              until that migration is run the RPC 404s and they read 0, which is
+              why matches (computed client-side) is the one that always works. */}
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 mb-5">
+            <DashStat label="Matches" value={leads.length} accent />
+            <DashStat label="Views" value={stats?.view_count ?? 0} />
+            <DashStat label="Shortlists" value={stats?.shortlist_count ?? 0} />
+            <DashStat label="Likes" value={stats?.like_count ?? 0} />
           </div>
-          {leads.length > 0 && (
-            <div className="space-y-2 mt-3">
+
+          {/* Booked visits, nearest first. */}
+          <p className="text-[14px] font-extrabold text-gray-900 mb-1">Scheduled visits</p>
+          <p className="text-[12px] text-gray-500 mb-3">Times a seeker has actually confirmed, soonest first.</p>
+          {visits.length === 0 ? (
+            <p className="text-[12px] text-gray-400 mb-5">No visits booked yet.</p>
+          ) : (
+            <div className="space-y-2 mb-5">
+              {visits.map((v, i) => (
+                <div key={`${v.slot_at}-${i}`} className="flex items-center justify-between p-3 rounded-xl border border-gray-100 bg-gray-50">
+                  <p className="text-[13px] font-bold text-gray-800">{fmtSlot(v.slot_at)}</p>
+                  <span className="shrink-0 ml-3 text-[12px] font-bold text-gray-500">
+                    {v.visitors} visitor{Number(v.visitors) === 1 ? "" : "s"}
+                  </span>
+                </div>
+              ))}
+            </div>
+          )}
+
+          {/* Matched seekers last — the long list, below the numbers and visits. */}
+          <p className="text-[14px] font-extrabold text-gray-900 mb-1">
+            Total matches <span className="text-gray-400 font-bold">({leads.length})</span>
+          </p>
+          <p className="text-[12px] text-gray-500 mb-3">Seekers whose saved requirements line up with this home.</p>
+          {leads.length === 0 ? (
+            <p className="text-[12px] text-gray-400">No matches yet — they appear as seekers save requirements.</p>
+          ) : (
+            <div className="space-y-2">
               {leads.map((m, i) => (
                 <div key={i} className="flex items-center justify-between p-3 rounded-xl border border-gray-100 bg-gray-50">
                   <div className="min-w-0">
                     <p className="text-[13px] font-bold text-gray-800 truncate">
-                      {m.requirement?.email || m.requirement?.customer_name || m.requirement?.name || `Seeker #${String(m.requirement?.user_id || i + 1).slice(0, 6)}`}
+                      {seekerHandle(m.requirement, i)}
                     </p>
                     <p className="text-[11px] text-gray-500 truncate">{(m.reasons || []).join(" · ") || "Requirement match"}</p>
                   </div>
