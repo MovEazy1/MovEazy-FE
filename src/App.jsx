@@ -5,6 +5,7 @@ import { LoginModalProvider } from "./context/LoginModalContext";
 import { VisitCartProvider } from "./context/VisitCartContext";
 import ForkHome from "./pages/ForkHome";
 import ErrorBoundary from "./components/ErrorBoundary";
+import RequirePhoneModal from "./components/RequirePhoneModal";
 import { useSessionTracking } from "./hooks/useSessionTracking";
 
 const Profile = lazy(() => import("./pages/Profile"));
@@ -60,7 +61,14 @@ function BrokerRoute({ children }) {
 
 function SessionTrackerComponent() {
   useSessionTracking();
-  return <AppRoutes />;
+  return (
+    <>
+      {/* Sits above every route: a signed-in account with no mobile number
+          saved is asked for one before it can use the app. */}
+      <RequirePhoneModal />
+      <AppRoutes />
+    </>
+  );
 }
 
 function AppRoutes() {
