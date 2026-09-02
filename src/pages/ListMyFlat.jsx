@@ -102,7 +102,6 @@ export default function ListMyFlat() {
 
   // Step 1 — who & where
   const [postedBy, setPostedBy] = useState("owner");
-  const [phone, setPhone] = useState(user?.phone || "");
   const [area, setArea] = useState("");
   const [fullAddress, setFullAddress] = useState("");
   const [landmark, setLandmark] = useState("");
@@ -189,7 +188,6 @@ export default function ListMyFlat() {
   const validateStep = () => {
     const e = {};
     if (step === 0) {
-      if (!phone.trim()) e.phone = "Add a contact number";
       if (!area) e.area = "Select the flat's area";
       if (!marker) e.fullAddress = "Drop a pin on the map to set the exact address";
     }
@@ -206,7 +204,7 @@ export default function ListMyFlat() {
   const buildDraft = (images = []) => ({
     propertyId,
     postedBy,
-    phone,
+    phone: user?.phone || "",
     area,
     nearbyAreas: [],
     fullAddress,
@@ -520,11 +518,6 @@ export default function ListMyFlat() {
                       <span className="text-[11px] text-gray-500 leading-tight block">{sub}</span>
                     </button>
                   ))}
-                </div>
-                <div className="mt-4">
-                  <Label required>Contact Phone</Label>
-                  <input value={phone} onChange={(e) => setPhone(e.target.value)} placeholder="10-digit mobile number" className={inp} />
-                  {errors.phone && <p className="text-[11px] text-red-500 mt-1 font-semibold">{errors.phone}</p>}
                 </div>
               </div>
             </Card>

@@ -174,7 +174,6 @@ export default function ListMyFlatMobile({ user, onPublished }) {
 
   // 1 — who's posting
   const [postedBy, setPostedBy] = useState("owner");
-  const [phone, setPhone] = useState(user?.phone || "");
 
   // 2 — where
   const [area, setArea] = useState("");
@@ -258,7 +257,6 @@ export default function ListMyFlatMobile({ user, onPublished }) {
   // plus step 7's own rule: at least one real, saved visit time slot (tracked
   // via PropertyVisitSlots' onSlotsChanged below), not just a filled-in form.
   const validate = () => {
-    if (step === 1 && !phone.trim()) return "Add a contact number.";
     if (step === 2) {
       if (!area) return "Select the flat's area.";
       if (!marker) return "Drop a pin on the map to set the exact address.";
@@ -283,7 +281,7 @@ export default function ListMyFlatMobile({ user, onPublished }) {
       }
       setUploadMsg("");
       const row = await createInventoryItem({
-        propertyId, postedBy, phone, area, nearbyAreas: [], fullAddress, landmark,
+        propertyId, postedBy, phone: user?.phone || "", area, nearbyAreas: [], fullAddress, landmark,
         latitude: marker?.[0] ?? null, longitude: marker?.[1] ?? null,
         rent, deposit, availableFrom, flatType, bedrooms, bathrooms, furnishing,
         maxFlatmates, genderPref, occupantsAllowed, amenities, lifestyle, houseRules,
@@ -416,13 +414,6 @@ export default function ListMyFlatMobile({ user, onPublished }) {
                     );
                   })}
                 </div>
-              </div>
-              <div>
-                <Q required>Contact phone</Q>
-                <Field prefix={<span style={{ color: "#9FB5B0", fontSize: 15, fontWeight: 700, flex: "none", borderRight: "1px solid rgba(255,255,255,.12)", paddingRight: 12 }}>+91</span>}>
-                  <input type="tel" inputMode="numeric" placeholder="10-digit mobile number" value={phone}
-                    onChange={(e) => setPhone(e.target.value)} style={inputStyle} />
-                </Field>
               </div>
             </>
           )}
