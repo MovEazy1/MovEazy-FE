@@ -8,16 +8,20 @@ const Ctx = createContext(null);
 export function useLoginModal() { return useContext(Ctx); }
 
 const SESSION_KEY = "moveasy_login_email";
-// Dark, glassmorphic field styling (matches the login Figma).
-const inputCls = "w-full h-11 rounded-lg bg-white/[0.04] border border-white/10 px-3.5 text-[14px] text-white placeholder:text-white/30 outline-none transition focus:border-white/30 focus:bg-white/[0.06] disabled:opacity-60";
-const selCls = "w-full h-10 rounded-lg bg-white/[0.04] border border-white/10 px-3 text-[13px] text-white outline-none transition focus:border-white/30";
+// Light field styling, matching the /auth page (pages/SupabaseLogin.jsx) so the
+// modal and the full page read as one system.
+const inputCls = "w-full h-11 rounded-lg bg-white border border-[#D9D3C4] px-3.5 text-[14px] text-[#1A2421] placeholder:text-[#B3ADA0] outline-none transition focus:border-[#C8500F] focus:ring-[3px] focus:ring-[#FBEAE0] disabled:opacity-60";
+const selCls = "w-full h-10 rounded-lg bg-white border border-[#D9D3C4] px-3 text-[13px] text-[#1A2421] outline-none transition focus:border-[#C8500F]";
 const EASE = [0.22, 1, 0.36, 1];
 
 const FLAT_TYPES   = ["1 BHK","2 BHK","3 BHK","4 BHK","Villa","PG / Hostel","Studio"];
 const POPULAR_AREAS = ["HSR Layout","Koramangala","Bellandur","Whitefield","Marathalli","Indiranagar","BTM Layout","Hebbal","Electronic City","Hoodi"];
 const PRIORITIES   = ["Rent","Spacious Rooms","Interiors","Locality","Proximity to Office"];
 
-const CORAL = "#f0554a";
+const INK = "#1A2421";
+const LINE = "#D9D3C4";
+const MUTED = "#8B8578";
+const CORAL = "#C8500F"; // rust accent, shared with the /auth page
 
 function GoogleIcon() {
   return (
@@ -32,7 +36,7 @@ function GoogleIcon() {
 
 function EyeToggle({ shown, onToggle }) {
   return (
-    <button type="button" onClick={onToggle} className="absolute right-3 top-1/2 -translate-y-1/2 text-white/40 hover:text-white/80">
+    <button type="button" onClick={onToggle} className="absolute right-3 top-1/2 -translate-y-1/2 text-[#8B8578] hover:text-[#1A2421]">
       {shown
         ? <svg className="w-5 h-5" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" d="M13.875 18.825A10.05 10.05 0 0112 19c-4.478 0-8.268-2.943-9.543-7a9.97 9.97 0 011.563-3.029m5.858.908a3 3 0 114.243 4.243M9.878 9.878l4.242 4.242M9.88 9.88l-3.29-3.29m7.532 7.532l3.29 3.29M3 3l3.59 3.59m0 0A9.953 9.953 0 0112 5c4.478 0 8.268 2.943 9.543 7a10.025 10.025 0 01-4.132 5.411m0 0L21 21"/></svg>
         : <svg className="w-5 h-5" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/><path strokeLinecap="round" strokeLinejoin="round" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"/></svg>
@@ -176,7 +180,7 @@ function LoginPopup({ onClose, onSuccess }) {
       initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
       transition={{ duration: 0.2 }}
       className="fixed inset-0 z-[9000] flex items-center justify-center p-4 overflow-y-auto"
-      style={{ background: "rgba(0,0,0,0.72)", backdropFilter: "blur(6px)", WebkitBackdropFilter: "blur(6px)" }}
+      style={{ background: "rgba(26,36,33,0.45)", backdropFilter: "blur(4px)", WebkitBackdropFilter: "blur(4px)" }}
       onClick={onClose}
     >
       <motion.div
@@ -184,27 +188,24 @@ function LoginPopup({ onClose, onSuccess }) {
         animate={{ opacity: 1, scale: 1, y: 0 }}
         exit={{ opacity: 0, scale: 0.94, y: 20 }}
         transition={{ duration: 0.25, ease: EASE }}
-        className="relative w-full max-w-[420px] my-auto rounded-[26px] overflow-hidden border border-white/[0.12]"
+        className="relative w-full max-w-[420px] my-auto rounded-[22px] overflow-hidden"
         style={{
-          background:
-            "radial-gradient(120% 80% at 18% 6%, rgba(232,74,64,0.22), transparent 42%)," +
-            "radial-gradient(90% 70% at 90% 40%, rgba(255,86,64,0.30), transparent 46%)," +
-            "radial-gradient(130% 90% at 50% 120%, rgba(255,64,52,0.42), transparent 55%)," +
-            "#0b0708",
-          boxShadow: "0 30px 90px rgba(0,0,0,0.6)",
+          background: "#FFFEFB",
+          border: `1px solid ${LINE}`,
+          boxShadow: "0 20px 60px rgba(26,36,33,0.16)",
         }}
         onClick={e => e.stopPropagation()}
       >
         {/* Close */}
         <button onClick={onClose} aria-label="Close"
-          className="absolute top-4 right-4 z-30 w-8 h-8 rounded-full flex items-center justify-center text-white/50 hover:text-white hover:bg-white/10 transition">
+          className="absolute top-4 right-4 z-30 w-8 h-8 rounded-full flex items-center justify-center text-[#8B8578] hover:text-[#1A2421] hover:bg-[#F7F4ED] transition">
           <svg className="w-4 h-4" fill="none" stroke="currentColor" strokeWidth="2.2" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" /></svg>
         </button>
 
         {/* Spinner */}
         {busy && (
-          <div className="absolute inset-0 z-40 flex items-center justify-center" style={{ background: "rgba(11,7,8,0.62)" }}>
-            <div className="h-7 w-7 rounded-full border-[3px] border-white/20 border-t-white animate-spin" />
+          <div className="absolute inset-0 z-40 flex items-center justify-center" style={{ background: "rgba(255,254,251,0.72)" }}>
+            <div className="h-7 w-7 rounded-full border-[3px] border-[#D9D3C4] border-t-white animate-spin" />
           </div>
         )}
 
@@ -216,29 +217,29 @@ function LoginPopup({ onClose, onSuccess }) {
               <motion.div key="login" custom={dir}
                 initial={{ opacity: 0, x: dir > 0 ? 18 : -18 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: dir > 0 ? -18 : 18 }}
                 transition={{ duration: 0.2, ease: EASE }}>
-                <h2 className="text-center text-white text-[26px] leading-tight mb-7" style={{ fontFamily: "'Fredoka','Sora',sans-serif", fontWeight: 600 }}>
+                <h2 className="text-center text-[#1A2421] text-[26px] leading-tight mb-7" style={{ fontFamily: "'Fredoka','Sora',sans-serif", fontWeight: 600 }}>
                   Login to your Account
                 </h2>
 
                 {alertBox}
 
                 <button type="button" onClick={onGoogle} disabled={busy}
-                  className="w-full h-12 rounded-xl border border-white/15 bg-white/[0.03] text-[14px] font-medium text-white flex items-center justify-center gap-2.5 hover:bg-white/[0.07] transition disabled:opacity-60">
+                  className="w-full h-12 rounded-xl border border-[#D9D3C4] bg-white text-[14px] font-medium text-[#1A2421] flex items-center justify-center gap-2.5 hover:bg-[#F7F4ED] transition disabled:opacity-60">
                   <GoogleIcon /> Continue with Google
                 </button>
 
-                <div className="my-5 flex items-center gap-3 text-[12px] text-white/40">
-                  <span className="h-px flex-1 border-t border-dashed border-white/20" />
+                <div className="my-5 flex items-center gap-3 text-[12px] text-[#8B8578]">
+                  <span className="h-px flex-1 border-t border-dashed border-[#D9D3C4]" />
                   or Sign in with Email
-                  <span className="h-px flex-1 border-t border-dashed border-white/20" />
+                  <span className="h-px flex-1 border-t border-dashed border-[#D9D3C4]" />
                 </div>
 
                 <form onSubmit={onLogin}>
-                  <label className="block text-[12px] text-white/55 mb-1.5">Email</label>
+                  <label className="block text-[12px] text-[#8B8578] mb-1.5">Email</label>
                   <input type="email" value={email} onChange={e => setEmail(e.target.value)}
                     required disabled={busy} autoFocus placeholder="you@example.com" className={inputCls} />
 
-                  <label className="block text-[12px] text-white/55 mb-1.5 mt-4">Password</label>
+                  <label className="block text-[12px] text-[#8B8578] mb-1.5 mt-4">Password</label>
                   <div className="relative">
                     <input type={showPw ? "text" : "password"} value={pw} onChange={e => setPw(e.target.value)}
                       required disabled={busy} placeholder="••••••••••••" minLength="6" className={inputCls + " pr-11"} />
@@ -246,27 +247,27 @@ function LoginPopup({ onClose, onSuccess }) {
                   </div>
 
                   <div className="flex items-center justify-between mt-3.5 mb-6">
-                    <button type="button" onClick={() => setRemember(v => !v)} className="flex items-center gap-2 text-[12.5px] text-white/70">
+                    <button type="button" onClick={() => setRemember(v => !v)} className="flex items-center gap-2 text-[12.5px] text-[#1A2421]">
                       <span className="w-4 h-4 rounded-[5px] flex items-center justify-center border transition"
-                        style={{ background: remember ? CORAL : "transparent", borderColor: remember ? CORAL : "rgba(255,255,255,0.3)" }}>
+                        style={{ background: remember ? CORAL : "transparent", borderColor: remember ? CORAL : "rgba(217,211,196,1)" }}>
                         {remember && <svg className="w-3 h-3 text-white" fill="none" stroke="currentColor" strokeWidth="3" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" /></svg>}
                       </span>
                       Remember Me
                     </button>
-                    <button type="button" onClick={onForgot} disabled={fbBusy} className="text-[12.5px] text-white/50 hover:text-white/80 disabled:opacity-50">
+                    <button type="button" onClick={onForgot} disabled={fbBusy} className="text-[12.5px] text-[#8B8578] hover:text-[#1A2421] disabled:opacity-50">
                       {fbBusy ? "Sending…" : "Forgot Password?"}
                     </button>
                   </div>
 
                   <motion.button type="submit" disabled={busy} whileTap={{ scale: 0.98 }}
-                    className="w-full h-12 rounded-xl border border-white/15 bg-white/[0.05] text-[15px] font-semibold text-white hover:bg-white/[0.1] transition disabled:opacity-60">
+                    className="w-full h-12 rounded-xl bg-[#1A2421] text-[15px] font-semibold text-white hover:bg-[#232F2B] transition disabled:opacity-60">
                     Login
                   </motion.button>
                 </form>
 
-                <p className="text-center mt-5 text-[13px] text-white/45">
+                <p className="text-center mt-5 text-[13px] text-[#8B8578]">
                   Don&apos;t have an account?{" "}
-                  <button type="button" onClick={() => goTo("signup", 1)} className="font-semibold" style={{ color: "#ff6a5d" }}>Sign up</button>
+                  <button type="button" onClick={() => goTo("signup", 1)} className="font-semibold" style={{ color: CORAL }}>Sign up</button>
                 </p>
               </motion.div>
             )}
@@ -276,7 +277,7 @@ function LoginPopup({ onClose, onSuccess }) {
               <motion.div key="signup" custom={dir}
                 initial={{ opacity: 0, x: dir > 0 ? 18 : -18 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: dir > 0 ? -18 : 18 }}
                 transition={{ duration: 0.2, ease: EASE }}>
-                <h2 className="text-center text-white text-[26px] leading-tight mb-6" style={{ fontFamily: "'Fredoka','Sora',sans-serif", fontWeight: 600 }}>
+                <h2 className="text-center text-[#1A2421] text-[26px] leading-tight mb-6" style={{ fontFamily: "'Fredoka','Sora',sans-serif", fontWeight: 600 }}>
                   Create your Account
                 </h2>
 
@@ -284,30 +285,30 @@ function LoginPopup({ onClose, onSuccess }) {
 
                 <form onSubmit={onSignup}>
                   {/* Role */}
-                  <label className="block text-[12px] text-white/55 mb-1.5">I am a</label>
+                  <label className="block text-[12px] text-[#8B8578] mb-1.5">I am a</label>
                   <div className="grid grid-cols-2 gap-2 mb-4">
                     {[["customer","Tenant / Buyer"],["seller","Seller / Broker"]].map(([id, label]) => {
                       const on = role === id;
                       return (
                         <button key={id} type="button" onClick={() => setRole(id)}
                           className="h-10 rounded-lg border text-[13px] font-semibold transition"
-                          style={{ borderColor: on ? CORAL : "rgba(255,255,255,0.12)", background: on ? "rgba(240,85,74,0.15)" : "rgba(255,255,255,0.03)", color: on ? "#ff8478" : "rgba(255,255,255,0.6)" }}>
+                          style={{ borderColor: on ? CORAL : "rgba(217,211,196,1)", background: on ? "rgba(200,80,15,0.10)" : "#FFFFFF", color: on ? "#C8500F" : MUTED }}>
                           {label}
                         </button>
                       );
                     })}
                   </div>
 
-                  <label className="block text-[12px] text-white/55 mb-1.5">Email</label>
+                  <label className="block text-[12px] text-[#8B8578] mb-1.5">Email</label>
                   <input type="email" value={email} onChange={e => setEmail(e.target.value)} required disabled={busy} placeholder="you@example.com" className={inputCls} />
 
-                  <label className="block text-[12px] text-white/55 mb-1.5 mt-3">Full Name</label>
+                  <label className="block text-[12px] text-[#8B8578] mb-1.5 mt-3">Full Name</label>
                   <input type="text" value={name} onChange={e => setName(e.target.value)} required disabled={busy} placeholder="Your name" className={inputCls} />
 
-                  <label className="block text-[12px] text-white/55 mb-1.5 mt-3">Phone</label>
+                  <label className="block text-[12px] text-[#8B8578] mb-1.5 mt-3">Phone</label>
                   <input type="tel" value={phone} onChange={e => setPhone(e.target.value)} required disabled={busy} placeholder="+91 98765 43210" className={inputCls} />
 
-                  <label className="block text-[12px] text-white/55 mb-1.5 mt-3">Password</label>
+                  <label className="block text-[12px] text-[#8B8578] mb-1.5 mt-3">Password</label>
                   <div className="relative">
                     <input type={showPw ? "text" : "password"} value={pw} onChange={e => setPw(e.target.value)} required disabled={busy} placeholder="Min 6 characters" minLength="6" className={inputCls + " pr-11"} />
                     <EyeToggle shown={showPw} onToggle={() => setShowPw(v => !v)} />
@@ -317,23 +318,23 @@ function LoginPopup({ onClose, onSuccess }) {
                   {role === "customer" && (
                       <div>
                         <div className="flex items-center gap-2 mt-4 mb-3">
-                          <span className="h-px flex-1 bg-white/10" />
+                          <span className="h-px flex-1 bg-[#D9D3C4]" />
                           <span className="text-[10px] font-bold uppercase tracking-widest" style={{ color: CORAL }}>Flat Search Details</span>
-                          <span className="h-px flex-1 bg-white/10" />
+                          <span className="h-px flex-1 bg-[#D9D3C4]" />
                         </div>
-                        <label className="block text-[12px] text-white/55 mb-1.5">Flat Type</label>
+                        <label className="block text-[12px] text-[#8B8578] mb-1.5">Flat Type</label>
                         <div className="flex flex-wrap gap-1.5 mb-3">
                           {FLAT_TYPES.map(f => (
                             <button key={f} type="button" onClick={() => setFt(ft === f ? "" : f)}
                               className="px-3 py-1 rounded-full text-[12px] font-semibold border transition"
-                              style={{ borderColor: ft===f ? CORAL : "rgba(255,255,255,0.12)", background: ft===f ? "rgba(240,85,74,0.15)" : "rgba(255,255,255,0.03)", color: ft===f ? "#ff8478" : "rgba(255,255,255,0.6)" }}>
+                              style={{ borderColor: ft===f ? CORAL : "rgba(217,211,196,1)", background: ft===f ? "rgba(200,80,15,0.10)" : "#FFFFFF", color: ft===f ? "#C8500F" : MUTED }}>
                               {f}
                             </button>
                           ))}
                         </div>
                         <div className="grid grid-cols-2 gap-2 mb-3">
                           <div>
-                            <label className="block text-[12px] text-white/55 mb-1.5">Preferred Area</label>
+                            <label className="block text-[12px] text-[#8B8578] mb-1.5">Preferred Area</label>
                             <select value={area} onChange={e => setArea(e.target.value)} disabled={busy} className={selCls}>
                               <option value="">Select area…</option>
                               {POPULAR_AREAS.map(a => <option key={a}>{a}</option>)}
@@ -341,11 +342,11 @@ function LoginPopup({ onClose, onSuccess }) {
                             </select>
                           </div>
                           <div>
-                            <label className="block text-[12px] text-white/55 mb-1.5">Budget / mo (₹)</label>
+                            <label className="block text-[12px] text-[#8B8578] mb-1.5">Budget / mo (₹)</label>
                             <input type="number" value={budget} onChange={e => setBudget(e.target.value)} min="0" step="500" disabled={busy} placeholder="25000" className={selCls} />
                           </div>
                         </div>
-                        <label className="block text-[12px] text-white/55 mb-1.5">Move-in timeline</label>
+                        <label className="block text-[12px] text-[#8B8578] mb-1.5">Move-in timeline</label>
                         <select value={mid} onChange={e => setMid(e.target.value)} disabled={busy} className={selCls + " mb-3"}>
                           <option value="">Select…</option>
                           <option value="Immediate">Immediate</option>
@@ -354,13 +355,13 @@ function LoginPopup({ onClose, onSuccess }) {
                           <option value="1–3 months">1–3 months</option>
                           <option value="Flexible">Flexible</option>
                         </select>
-                        <label className="block text-[12px] text-white/55 mb-1.5">My Main Priority</label>
+                        <label className="block text-[12px] text-[#8B8578] mb-1.5">My Main Priority</label>
                         <div className="flex flex-col gap-1.5 mb-1">
                           {PRIORITIES.map(p => (
                             <button key={p} type="button" onClick={() => setPrio(p)}
                               className="flex items-center gap-2.5 rounded-lg border px-3 py-2 text-[13px] font-medium text-left transition"
-                              style={{ borderColor: prio===p ? CORAL : "rgba(255,255,255,0.12)", background: prio===p ? "rgba(240,85,74,0.15)" : "rgba(255,255,255,0.03)", color: prio===p ? "#ff8478" : "rgba(255,255,255,0.75)" }}>
-                              <span className="h-3.5 w-3.5 rounded-full border-2 shrink-0 flex items-center justify-center" style={{ borderColor: prio===p ? CORAL : "rgba(255,255,255,0.3)" }}>
+                              style={{ borderColor: prio===p ? CORAL : "rgba(217,211,196,1)", background: prio===p ? "rgba(200,80,15,0.10)" : "#FFFFFF", color: prio===p ? "#C8500F" : MUTED }}>
+                              <span className="h-3.5 w-3.5 rounded-full border-2 shrink-0 flex items-center justify-center" style={{ borderColor: prio===p ? CORAL : "rgba(217,211,196,1)" }}>
                                 {prio === p && <span className="h-2 w-2 rounded-full" style={{ background: CORAL }} />}
                               </span>
                               {p}
@@ -371,14 +372,14 @@ function LoginPopup({ onClose, onSuccess }) {
                   )}
 
                   <motion.button type="submit" disabled={busy} whileTap={{ scale: 0.98 }}
-                    className="w-full h-12 rounded-xl border border-white/15 bg-white/[0.05] text-[15px] font-semibold text-white hover:bg-white/[0.1] transition disabled:opacity-60 mt-4">
+                    className="w-full h-12 rounded-xl bg-[#1A2421] text-[15px] font-semibold text-white hover:bg-[#232F2B] transition disabled:opacity-60 mt-4">
                     Create Account
                   </motion.button>
                 </form>
 
-                <p className="text-center mt-4 text-[13px] text-white/45">
+                <p className="text-center mt-4 text-[13px] text-[#8B8578]">
                   Already have an account?{" "}
-                  <button type="button" onClick={() => goTo("login", -1)} className="font-semibold" style={{ color: "#ff6a5d" }}>Sign in</button>
+                  <button type="button" onClick={() => goTo("login", -1)} className="font-semibold" style={{ color: CORAL }}>Sign in</button>
                 </p>
               </motion.div>
             )}

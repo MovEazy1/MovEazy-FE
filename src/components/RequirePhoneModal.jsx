@@ -1,6 +1,6 @@
 /**
- * Mandatory phone capture, shown once after sign-in to anyone whose profile
- * has no mobile number saved.
+ * Mandatory mobile-number capture, shown after sign-in to any account whose
+ * profile has no number saved.
  *
  * Signup collects a phone (see pages/SupabaseLogin.jsx), but two groups still
  * arrive without one: Google OAuth users, who never see that form, and every
@@ -12,12 +12,20 @@
  * Deliberately not dismissible: no close button, no backdrop click, no Escape.
  * The number is what a ground agent calls to arrange visits, so an account
  * without one can't actually be served.
+ *
+ * Styled on the same light palette as the /auth page (SupabaseLogin.jsx) so the
+ * two account screens read as one system rather than two products.
  */
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useLocation } from "react-router-dom";
 import { useAuth } from "../context/AuthContext";
 
-const CORAL = "#f0554a";
+const INK     = "#1A2421";
+const WHITE   = "#FFFEFB";
+const LINE    = "#D9D3C4";
+const MUTED   = "#8B8578";
+const RUST    = "#C8500F";
+const RUST_BG = "#FBEAE0";
 
 /** Indian mobile: 10 digits starting 6-9, tolerating spaces and a +91 prefix. */
 function normalizeIndianMobile(raw) {
@@ -26,12 +34,20 @@ function normalizeIndianMobile(raw) {
   return /^[6-9]\d{9}$/.test(local) ? local : "";
 }
 
+/** "98765 43210" — the spacing Indian numbers are normally read in. */
+function formatForDisplay(raw) {
+  const d = String(raw || "").replace(/\D/g, "").slice(0, 10);
+  return d.length > 5 ? `${d.slice(0, 5)} ${d.slice(5)}` : d;
+}
+
 export default function RequirePhoneModal() {
   const { user, loading, updateUserProfile } = useAuth();
   const { pathname } = useLocation();
   const [value, setValue] = useState("");
   const [busy, setBusy] = useState(false);
+  const [focused, setFocused] = useState(false);
   const [err, setErr] = useState("");
+  const inputRef = useRef(null);
 
   const needsPhone =
     !loading && !!user?.uid && !String(user.phone || "").trim() && !pathname.startsWith("/auth");
@@ -42,10 +58,13 @@ export default function RequirePhoneModal() {
     if (!needsPhone) return undefined;
     const prev = document.body.style.overflow;
     document.body.style.overflow = "hidden";
+    inputRef.current?.focus();
     return () => { document.body.style.overflow = prev; };
   }, [needsPhone]);
 
   if (!needsPhone) return null;
+
+  const ready = !!normalizeIndianMobile(value);
 
   const save = async () => {
     const mobile = normalizeIndianMobile(value);
@@ -63,69 +82,105 @@ export default function RequirePhoneModal() {
   return (
     <div
       className="fixed inset-0 z-[9500] flex items-center justify-center p-4 overflow-y-auto"
-      style={{ background: "rgba(0,0,0,0.72)", backdropFilter: "blur(6px)", WebkitBackdropFilter: "blur(6px)" }}
+      style={{ background: "rgba(26,36,33,0.45)", backdropFilter: "blur(4px)", WebkitBackdropFilter: "blur(4px)" }}
       role="dialog"
       aria-modal="true"
       aria-labelledby="reqphone-title"
     >
       <div
-        className="relative w-full max-w-[420px] my-auto rounded-[26px] overflow-hidden border border-white/[0.12]"
+        className="w-full my-auto"
         style={{
-          background:
-            "radial-gradient(120% 80% at 18% 6%, rgba(232,74,64,0.22), transparent 42%)," +
-            "radial-gradient(90% 70% at 90% 40%, rgba(255,86,64,0.30), transparent 46%)," +
-            "radial-gradient(130% 90% at 50% 120%, rgba(255,64,52,0.42), transparent 55%)," +
-            "#0b0708",
-          boxShadow: "0 30px 90px rgba(0,0,0,0.6)",
+          maxWidth: 400, background: WHITE, border: `1px solid ${LINE}`,
+          borderRadius: 20, padding: "32px 28px",
+          boxShadow: "0 20px 60px rgba(26,36,33,0.14)",
+          fontFamily: "Inter, sans-serif",
         }}
       >
-        <div className="p-7 sm:p-8">
-          <span
-            aria-hidden
-            className="flex items-center justify-center w-12 h-12 rounded-full mb-5"
-            style={{ background: "rgba(240,85,74,0.16)", border: "1px solid rgba(240,85,74,0.4)" }}
-          >
-            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke={CORAL} strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
-              <rect x="6.5" y="2.5" width="11" height="19" rx="2.5" />
-              <path d="M10.5 18.5h3" />
-            </svg>
-          </span>
+        <span
+          aria-hidden
+          style={{
+            display: "flex", alignItems: "center", justifyContent: "center",
+            width: 44, height: 44, borderRadius: 12,
+            background: RUST_BG, marginBottom: 18,
+          }}
+        >
+          <svg width="21" height="21" viewBox="0 0 24 24" fill="none" stroke={RUST} strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+            <rect x="6.5" y="2.5" width="11" height="19" rx="2.5" />
+            <path d="M10.5 18.5h3" />
+          </svg>
+        </span>
 
-          <h2 id="reqphone-title" className="text-white text-[21px] font-extrabold leading-snug">
-            Verify your Mobile No.
-          </h2>
+        <h2 id="reqphone-title" style={{ color: INK, fontSize: 21, fontWeight: 700, letterSpacing: "-0.01em", margin: 0 }}>
+          Verify your Mobile No.
+        </h2>
+
+        <div style={{ marginTop: 22 }}>
+          <label
+            htmlFor="reqphone-input"
+            style={{ display: "block", fontSize: 11, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.06em", color: MUTED, marginBottom: 6, fontFamily: "JetBrains Mono, monospace" }}
+          >
+            Mobile Number<span style={{ color: RUST, marginLeft: 2 }}>*</span>
+          </label>
 
           <div
-            className="flex items-center gap-3 mt-6 rounded-2xl px-4"
-            style={{ border: "1px solid rgba(255,255,255,0.14)", background: "rgba(255,255,255,0.04)" }}
+            style={{
+              display: "flex", alignItems: "center", height: 48,
+              borderRadius: 10, background: WHITE, overflow: "hidden",
+              border: `1px solid ${err ? "#C0392B" : focused ? RUST : LINE}`,
+              boxShadow: focused && !err ? `0 0 0 3px ${RUST_BG}` : "none",
+              transition: "border-color .15s, box-shadow .15s",
+            }}
           >
-            <span className="text-white/55 text-[15px] font-bold pr-3 shrink-0" style={{ borderRight: "1px solid rgba(255,255,255,0.14)" }}>
+            <span
+              style={{
+                display: "flex", alignItems: "center", gap: 6, flex: "none",
+                padding: "0 12px 0 14px", height: "100%",
+                color: INK, fontSize: 14.5, fontWeight: 600,
+                borderRight: `1px solid ${LINE}`,
+              }}
+            >
+              <span aria-hidden style={{ fontSize: 15, lineHeight: 1 }}>🇮🇳</span>
               +91
             </span>
             <input
+              id="reqphone-input"
+              ref={inputRef}
               type="tel"
               inputMode="numeric"
-              autoFocus
+              autoComplete="tel-national"
               value={value}
-              onChange={(e) => { setValue(e.target.value); if (err) setErr(""); }}
-              onKeyDown={(e) => { if (e.key === "Enter" && !busy) save(); }}
+              onChange={(e) => { setValue(formatForDisplay(e.target.value)); if (err) setErr(""); }}
+              onFocus={() => setFocused(true)}
+              onBlur={() => setFocused(false)}
+              onKeyDown={(e) => { if (e.key === "Enter" && ready && !busy) save(); }}
               placeholder="98765 43210"
-              className="flex-1 min-w-0 bg-transparent border-none outline-none text-white text-[15px] py-4 placeholder:text-white/35"
+              style={{
+                flex: 1, minWidth: 0, height: "100%", padding: "0 14px",
+                border: "none", outline: "none", background: "transparent",
+                fontSize: 15.5, letterSpacing: "0.02em", color: INK,
+                fontFamily: "Inter, sans-serif",
+              }}
             />
           </div>
 
-          {err && <p className="text-[12.5px] font-semibold mt-2.5" style={{ color: "#ffa39b" }}>{err}</p>}
-
-          <button
-            type="button"
-            onClick={save}
-            disabled={busy}
-            className="w-full h-[52px] mt-5 rounded-full text-[15px] font-extrabold text-white transition disabled:opacity-60"
-            style={{ background: `linear-gradient(135deg, ${CORAL}, #ff6a52)` }}
-          >
-            {busy ? "Saving…" : "Save and continue"}
-          </button>
+          {err && <p style={{ color: "#C0392B", fontSize: 12.5, fontWeight: 600, marginTop: 8 }}>{err}</p>}
         </div>
+
+        <button
+          type="button"
+          onClick={save}
+          disabled={busy || !ready}
+          style={{
+            width: "100%", height: 46, marginTop: 20, borderRadius: 10,
+            background: INK, color: WHITE, border: "none",
+            fontSize: 14.5, fontWeight: 600, fontFamily: "Inter, sans-serif",
+            cursor: busy ? "wait" : ready ? "pointer" : "not-allowed",
+            opacity: busy || !ready ? 0.45 : 1,
+            transition: "opacity .15s",
+          }}
+        >
+          {busy ? "Saving…" : "Continue"}
+        </button>
       </div>
     </div>
   );
