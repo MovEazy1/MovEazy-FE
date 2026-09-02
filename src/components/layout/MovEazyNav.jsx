@@ -420,6 +420,14 @@ export default function MovEazyNav({ active = "", transparentAtTop = false, onFi
           }
           .mzn-bottombar button:active { color: #5EEAD4; }
           .mzn-bottombar svg { flex: none; }
+          .mzn-bb-icon { position: relative; display: inline-flex; }
+          .mzn-bb-badge {
+            position: absolute; top: -7px; left: 50%; transform: translateX(-30%);
+            background: linear-gradient(135deg,#FFE1A6,#E8A33D 45%,#B9782A);
+            color: #1B1204; font-size: 8px; font-weight: 800; letter-spacing: -.02em;
+            line-height: 1; padding: 3px 5px; border-radius: 100px; white-space: nowrap;
+            box-shadow: 0 0 0 1.5px rgba(4,33,29,.95);
+          }
 
           /* Stacked directly above the bottom bar (same 70px the body clears
              below), full-width, impossible-to-miss red strip. */
@@ -642,6 +650,13 @@ export default function MovEazyNav({ active = "", transparentAtTop = false, onFi
               <button type="button" onClick={findFlat}><FlatIcon /><span>Find My Flat</span></button>
               <button type="button" onClick={() => navigate("/shortlists")}><ShortlistIcon /><span>View Shortlists</span></button>
               <button type="button" onClick={() => navigate("/visits?only=scheduled")}><ScheduledIcon /><span>Scheduled Visits</span></button>
+              <button type="button" onClick={listMyFlat}>
+                <span className="mzn-bb-icon">
+                  <OwnerIcon />
+                  <span className="mzn-bb-badge">&#8377;10,000</span>
+                </span>
+                <span>List my flat</span>
+              </button>
             </>
           ) : (
             <>
