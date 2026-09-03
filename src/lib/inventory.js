@@ -125,12 +125,27 @@ export async function createInventoryItem(draft, poster) {
   throw new Error("Could not generate a unique property id — please try again.");
 }
 
-/** All published inventory (for matching / listings). */
+// The public map / discovery feed is readable while signed out, so it must not
+// carry a poster's private contact details or user ids. This is the exact set
+// the anon Postgres role is allowed to read (see inventory RLS: column grants
+// to anon exclude phone/poster_email/poster_name/poster_id/owner_id/tenant_id/
+// broker_id). Selecting "*" here would ask for columns anon can't read and fail
+// the whole request for signed-out visitors — so name the safe columns instead.
+// Contact details are resolved separately, only for a viewer who's entitled to
+// them (canReadListingPrivatePhones), never from this public list.
+const PUBLIC_INVENTORY_COLS =
+  "property_id, posted_by, city, area, nearby_areas, full_address, landmark, " +
+  "latitude, longitude, rent, deposit, available_from, flat_type, bedrooms, " +
+  "bathrooms, furnishing, max_flatmates, gender_pref, occupants_allowed, " +
+  "amenities, lifestyle, house_rules, title, description, images, " +
+  "cover_image_url, status, is_verified, view_count, created_at, updated_at";
+
+/** All published inventory (for matching / listings) — public, no poster PII. */
 export async function fetchPublishedInventory({ limit = 500 } = {}) {
   if (!isSupabaseConfigured || !supabase) return [];
   const { data, error } = await supabase
     .from("inventory")
-    .select("*")
+    .select(PUBLIC_INVENTORY_COLS)
     .eq("status", "published")
     .order("created_at", { ascending: false })
     .limit(limit);
