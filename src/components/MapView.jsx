@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { MapContainer, TileLayer, Marker, Popup, useMap, Circle, Polyline } from "react-leaflet";
+import { MapContainer, TileLayer, Marker, Popup, useMap, useMapEvents, Circle, Polyline } from "react-leaflet";
 import { useLocation, useNavigate } from "react-router-dom";
 import { AnimatePresence, motion } from "framer-motion";
 import L from "leaflet";
@@ -272,19 +272,135 @@ function formatBudget(v) {
   return v >= 100000 ? "₹1L+" : `₹${Math.round(v / 1000)}k`;
 }
 
-function makeBhkIcon(bhk) {
+/** "₹45k", "₹1.2L" — short enough that pins don't collide the way labels did. */
+function compactRent(value) {
+  const n = Number(String(value ?? "").toString().replace(/[^0-9.]/g, "")) || 0;
+  if (n >= 100000) return `₹${(n / 100000).toFixed(1).replace(/\.0$/, "")}L`;
+  if (n >= 1000) return `₹${Math.round(n / 1000)}k`;
+  return n > 0 ? `₹${n}` : "—";
+}
+
+/**
+ * A single listing's pin.
+ *
+ * Labelled with the rent, not the flat type: "Room in Preoccupied flat" is
+ * around 200px wide and was the main reason pins piled into an unreadable heap.
+ * The colour still encodes the flat type, which is what the filter chips key on.
+ */
+function makeBhkIcon(bhk, rent) {
   const c = bhkColors[bhk] || "#6b7280";
+  const label = compactRent(rent);
+  const w = Math.max(52, label.length * 9 + 26);
   return L.divIcon({
     className: "",
     html:
       '<div style="background:' +
       c +
-      ';color:white;padding:6px 14px;border-radius:22px;font-size:15px;font-weight:800;white-space:nowrap;border:2px solid white;box-shadow:0 4px 12px rgba(0,0,0,0.35)">' +
-      bhk +
+      ';color:white;padding:5px 12px;border-radius:22px;font-size:13.5px;font-weight:800;white-space:nowrap;border:2px solid white;box-shadow:0 3px 10px rgba(0,0,0,0.32)">' +
+      label +
       "</div>",
-    iconSize: [72, 30],
-    iconAnchor: [36, 15],
+    iconSize: [w, 28],
+    iconAnchor: [w / 2, 14],
   });
+}
+
+/**
+ * Aggregate pin for a group of listings that would otherwise sit on top of each
+ * other. Reads as a count, not a price, so it's obviously a group.
+ */
+function makeClusterIcon(count) {
+  const w = count > 99 ? 92 : count > 9 ? 82 : 74;
+  return L.divIcon({
+    className: "",
+    html:
+      '<div style="background:#0B3B32;color:#fff;padding:7px 15px;border-radius:22px;' +
+      'font-size:14px;font-weight:800;white-space:nowrap;border:2px solid #fff;' +
+      'box-shadow:0 4px 14px rgba(4,33,29,0.45)">' +
+      count + ' flat' + (count === 1 ? '' : 's') +
+      "</div>",
+    iconSize: [w, 32],
+    iconAnchor: [w / 2, 16],
+  });
+}
+
+/**
+ * Group listings that would overlap at the current zoom.
+ *
+ * A price pin is ~90px wide, so anything closer than that on screen collides —
+ * which is what turned the zoomed-out map into a pile of unreadable labels. The
+ * cell is sized in degrees from the zoom level, so groups break apart on their
+ * own as the map zooms in and stop existing once the pins genuinely fit.
+ *
+ * Longitude degrees shrink with latitude, so the cell is widened by 1/cos(lat)
+ * to stay roughly square on screen. Good enough at city scale.
+ */
+function clusterListings(listings, zoom, cellPx = 92) {
+  const usable = listings.filter(
+    (l) => Number.isFinite(Number(l.lat)) && Number.isFinite(Number(l.lng)),
+  );
+  if (!usable.length) return [];
+
+  const degPerPx = 360 / (256 * Math.pow(2, zoom));
+  const cellLat = cellPx * degPerPx;
+  const cells = new Map();
+
+  for (const l of usable) {
+    const lat = Number(l.lat);
+    const lng = Number(l.lng);
+    const cosLat = Math.max(0.2, Math.cos((lat * Math.PI) / 180));
+    const cellLng = cellLat / cosLat;
+    const key = `${Math.floor(lat / cellLat)}:${Math.floor(lng / cellLng)}`;
+    const cell = cells.get(key);
+    if (cell) {
+      cell.items.push(l);
+      cell.latSum += lat;
+      cell.lngSum += lng;
+    } else {
+      cells.set(key, { key, items: [l], latSum: lat, lngSum: lng });
+    }
+  }
+
+  const grid = [...cells.values()].map((c) => ({
+    key: c.key,
+    items: c.items,
+    // Centre on the group's own listings rather than the cell, so the pill sits
+    // over the homes it represents instead of drifting to a grid corner.
+    lat: c.latSum / c.items.length,
+    lng: c.lngSum / c.items.length,
+  }));
+
+  // Centroids drift toward their listings, so two neighbouring cells can end up
+  // closer than a pill's width and still collide. Absorb those.
+  //
+  // The anchor position is deliberately NOT recomputed as groups merge: moving
+  // it lets one group chain across the map, absorbing a neighbour, drifting
+  // toward it, absorbing the next, until a whole city collapses into one pill.
+  const merged = [];
+  for (const c of grid.sort((a, b) => b.items.length - a.items.length)) {
+    const cosLat = Math.max(0.2, Math.cos((c.lat * Math.PI) / 180));
+    const near = merged.find((m) => {
+      const dLat = Math.abs(m.anchorLat - c.lat);
+      const dLng = Math.abs(m.anchorLng - c.lng) * cosLat;
+      return Math.hypot(dLat, dLng) < cellLat * 0.7;
+    });
+    if (!near) {
+      merged.push({ ...c, anchorLat: c.lat, anchorLng: c.lng });
+      continue;
+    }
+    near.items = near.items.concat(c.items);
+  }
+  return merged;
+}
+
+/** Reports the map's real zoom, which state alone doesn't know after a pinch. */
+function ZoomWatcher({ onZoom }) {
+  const map = useMapEvents({
+    zoomend: () => onZoom(map.getZoom()),
+  });
+  useEffect(() => {
+    onZoom(map.getZoom());
+  }, [map, onZoom]);
+  return null;
 }
 
 /** Distinct draggable "office" pin so users can tell it apart from listing markers and know it's movable. */
@@ -686,6 +802,9 @@ export default function MapView() {
   /** Central Bangalore — street-level default for local inventory */
   const [mapState, setMapState] = useState({ center: [12.9716, 77.5946], zoom: 15 });
   const [selected, setSelected] = useState(null);
+  // The map's actual zoom, which mapState doesn't track after a user pinch or
+  // scroll — clustering has to key off the real one.
+  const [liveZoom, setLiveZoom] = useState(15);
   const [viewingProperty, setViewingProperty] = useState(null);
   /** Single "all filters" panel — a dropdown on desktop, a bottom sheet on mobile. Never occupies map layout. */
   const [showFilterPanel, setShowFilterPanel] = useState(false);
@@ -982,6 +1101,12 @@ export default function MapView() {
     if (relaxedFallbackListings.length > 0) return relaxedFallbackListings;
     return listings.filter((l) => Number.isFinite(Number(l.lat)) && Number.isFinite(Number(l.lng))).slice(0, 500);
   }, [mapListings, relaxedFallbackListings, listings]);
+
+  const listingClusters = useMemo(
+    () => clusterListings(displayPins, liveZoom),
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [displayPins, liveZoom],
+  );
 
   const usingRelaxedPins = mapListings.length === 0 && displayPins.length > 0;
 
@@ -1853,6 +1978,7 @@ export default function MapView() {
           <MapContainer center={mapState.center} zoom={mapState.zoom} style={{ height: "100%", width: "100%" }}>
             <InvalidateMapSize layoutRevision={mapLayoutKey} />
             <ChangeView center={mapState.center} zoom={mapState.zoom} />
+            <ZoomWatcher onZoom={setLiveZoom} />
             <FitListingsBounds
               listings={displayPins}
               enabled={displayPins.length > 0}
@@ -1933,11 +2059,26 @@ export default function MapView() {
                 }}
               />
             ) : null}
-            {displayPins.map((l) => (
+            {/* Groups of listings too close to draw separately become one
+                "N flats" pill; tapping it zooms in until they separate. */}
+            {listingClusters.filter((c) => c.items.length > 1).map((c) => (
+              <Marker
+                key={`cluster-${c.key}`}
+                position={[c.lat, c.lng]}
+                icon={makeClusterIcon(c.items.length)}
+                eventHandlers={{
+                  click: () => {
+                    setSelected(null);
+                    setMapState({ center: [c.lat, c.lng], zoom: Math.min(18, Math.round(liveZoom) + 2) });
+                  },
+                }}
+              />
+            ))}
+            {listingClusters.filter((c) => c.items.length === 1).map((c) => c.items[0]).map((l) => (
               <Marker 
                 key={l.id} 
                 position={[l.lat, l.lng]} 
-                icon={makeBhkIcon(l.bhk)} 
+                icon={makeBhkIcon(l.bhk, l.monthlyRent ?? l.price)} 
                 eventHandlers={{
                   click: () => setSelected(l),
                 }}
