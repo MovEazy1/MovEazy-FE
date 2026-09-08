@@ -25,6 +25,13 @@ const BrokerRegister = lazy(() => import("./pages/BrokerRegister"));
 const MyProperties = lazy(() => import("./pages/MyProperties"));
 const SuperAdminPanel = lazy(() => import("./pages/SuperAdminPanel"));
 const AnalyticsDashboard = lazy(() => import("./pages/AnalyticsDashboard"));
+const CrmShell = lazy(() => import("./pages/crm/CrmShell"));
+const CrmClientsPage = lazy(() => import("./pages/crm/CrmClientsPage"));
+const CrmPipelinePage = lazy(() => import("./pages/crm/CrmPipelinePage"));
+const CrmPropertiesPage = lazy(() => import("./pages/crm/CrmPropertiesPage"));
+const CrmPropertyForm = lazy(() => import("./pages/crm/CrmPropertyForm"));
+const CrmTeamPage = lazy(() => import("./pages/crm/CrmTeamPage"));
+const CrmSettingsPage = lazy(() => import("./pages/crm/CrmSettingsPage"));
 
 function PageLoader() {
   return (
@@ -93,6 +100,16 @@ function AppRoutes() {
         <Route path="/my-properties" element={<MyProperties />} />
         <Route path="/superadmin" element={<SuperAdminPanel />} />
         <Route path="/analytics" element={<AnalyticsDashboard />} />
+        {/* Internal CRM. Access is gated inside CrmShell (staff roles), not here. */}
+        <Route path="/crm" element={<CrmShell />}>
+          <Route index element={<Navigate to="/crm/clients" replace />} />
+          <Route path="clients" element={<CrmClientsPage />} />
+          <Route path="pipeline" element={<CrmPipelinePage />} />
+          <Route path="properties" element={<CrmPropertiesPage />} />
+          <Route path="properties/new" element={<CrmPropertyForm />} />
+          <Route path="team" element={<CrmTeamPage />} />
+          <Route path="settings" element={<CrmSettingsPage />} />
+        </Route>
         <Route
           path="/visits"
           element={

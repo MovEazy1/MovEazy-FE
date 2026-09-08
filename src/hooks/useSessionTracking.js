@@ -1,6 +1,7 @@
 import { useEffect } from "react";
 import { useLocation } from "react-router-dom";
 import { sessionTracker } from "../lib/sessionTracking";
+import { identifySession, startSessionSync } from "../lib/sessionSync";
 import { useAuth } from "../context/AuthContext";
 
 export function useSessionTracking() {
@@ -17,7 +18,13 @@ export function useSessionTracking() {
     if (user) {
       sessionTracker.setUser(user.uid, user.role);
     }
+    // Sessions are also written to Supabase (public.user_sessions) so the CRM
+    // can sort clients by opens and time on site — browser storage alone never
+    // reaches us.
+    identifySession(user);
   }, [user]);
+
+  useEffect(() => startSessionSync(), []);
 
   return sessionTracker;
 }
