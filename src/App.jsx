@@ -31,6 +31,7 @@ const CrmPipelinePage = lazy(() => import("./pages/crm/CrmPipelinePage"));
 const CrmPropertiesPage = lazy(() => import("./pages/crm/CrmPropertiesPage"));
 const CrmPropertyForm = lazy(() => import("./pages/crm/CrmPropertyForm"));
 const CrmTeamPage = lazy(() => import("./pages/crm/CrmTeamPage"));
+const CrmPaymentsPage = lazy(() => import("./pages/crm/CrmPaymentsPage"));
 const CrmSettingsPage = lazy(() => import("./pages/crm/CrmSettingsPage"));
 
 function PageLoader() {
@@ -107,6 +108,7 @@ function AppRoutes() {
           <Route path="pipeline" element={<CrmPipelinePage />} />
           <Route path="properties" element={<CrmPropertiesPage />} />
           <Route path="properties/new" element={<CrmPropertyForm />} />
+          <Route path="payments" element={<CrmPaymentsPage />} />
           <Route path="team" element={<CrmTeamPage />} />
           <Route path="settings" element={<CrmSettingsPage />} />
         </Route>

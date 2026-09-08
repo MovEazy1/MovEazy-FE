@@ -64,7 +64,9 @@ export const fetchClients = () =>
   safeSelect(
     "crm_clients",
     "id,user_id,name,phone,email,source,status,temperature,note,note_by,note_at,dnp_count," +
-      "assigned_to,next_follow_up_at,tags,closed_property_id,closed_rent,closed_reason,closed_at,created_at,updated_at",
+      "assigned_to,next_follow_up_at,tags,closed_property_id,closed_rent,closed_reason,closed_at," +
+      "brokerage_amount,expected_credit_date,payment_status,payment_marked_by,payment_marked_at," +
+      "payment_approved_by,payment_approved_at,created_at,updated_at",
     (q) => q.order("updated_at", { ascending: false }).limit(4000),
   );
 
@@ -134,7 +136,11 @@ async function patchClient(clientId, patch) {
  *  - Either closed status stamps closed_at and mirrors the outcome onto
  *    user_profiles, so the public site stops nudging someone who has moved.
  */
-export async function setClientStatus(client, status, { actorEmail = "", reason = "", propertyId = "", rent = null } = {}) {
+export async function setClientStatus(
+  client,
+  status,
+  { actorEmail = "", reason = "", propertyId = "", rent = null, brokerage = null, creditDate = "" } = {},
+) {
   const patch = { status };
   if (status === "dnp") patch.dnp_count = (client.dnp_count ?? 0) + 1;
   if (CLOSED_STATUSES.includes(status)) {
@@ -142,6 +148,13 @@ export async function setClientStatus(client, status, { actorEmail = "", reason 
     patch.closed_reason = reason || "";
     if (propertyId) patch.closed_property_id = propertyId;
     if (rent != null) patch.closed_rent = rent;
+  }
+  if (status === "closed_by_us") {
+    // Landing here starts the money clock, so the deal shows up on the payments
+    // list straight away rather than only once someone remembers to add it.
+    patch.brokerage_amount = brokerage;
+    patch.expected_credit_date = creditDate || null;
+    if (client.payment_status !== "approved") patch.payment_status = "awaited";
   }
 
   const updated = await patchClient(client.id, patch);

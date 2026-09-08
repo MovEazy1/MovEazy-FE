@@ -26,13 +26,31 @@ function coverOf(listing) {
   return listing?.cover_image_url || (listing?.images ?? [])[0] || "";
 }
 
-function MatchCard({ match, shortlist, canWrite, onSend, onShortlist, onReact, busy }) {
+function MatchCard({ match, shortlist, canWrite, onSend, onShortlist, onReact, busy, selecting, checked, onToggle }) {
   const { listing, score, reasons, blockers } = match;
   const sent = shortlist?.shared_at;
   const cover = coverOf(listing);
 
   return (
-    <div style={{ display: "flex", gap: 10, padding: "11px 12px", borderBottom: `1px solid ${C.lineSoft}` }}>
+    <div
+      onClick={selecting ? () => onToggle(listing.property_id) : undefined}
+      style={{
+        display: "flex", gap: 10, padding: "11px 12px",
+        borderBottom: `1px solid ${C.lineSoft}`,
+        cursor: selecting ? "pointer" : "default",
+        background: selecting && checked ? C.accentSoft : "transparent",
+      }}
+    >
+      {selecting && (
+        <input
+          type="checkbox"
+          checked={checked}
+          onChange={() => onToggle(listing.property_id)}
+          onClick={(e) => e.stopPropagation()}
+          aria-label={`Select ${listing.flat_type || "home"} in ${listing.area || ""}`}
+          style={{ flex: "none", marginTop: 14, width: 16, height: 16, accentColor: C.accent }}
+        />
+      )}
       <div style={{ flex: "none", display: "flex", flexDirection: "column", alignItems: "center", gap: 6 }}>
         <ScoreRing score={score} />
         {/* Five near-identical "Room in Preoccupied flat · Bellandur" rows are
@@ -74,7 +92,7 @@ function MatchCard({ match, shortlist, canWrite, onSend, onShortlist, onReact, b
           ))}
         </div>
 
-        {canWrite && (
+        {canWrite && !selecting && (
           <div style={{ display: "flex", gap: 5, marginTop: 2, flexWrap: "wrap" }}>
             <Btn sm variant={sent ? undefined : "wa"} disabled={busy} onClick={() => onSend(match)}>
               {sent ? `Sent ${relTime(shortlist.shared_at)}` : "Send"}
@@ -100,7 +118,7 @@ function MatchCard({ match, shortlist, canWrite, onSend, onShortlist, onReact, b
           </span>
         )}
 
-        {canWrite && sent && (
+        {canWrite && sent && !selecting && (
           <div style={{ display: "flex", gap: 5, alignItems: "center", marginTop: 2, flexWrap: "wrap" }}>
             <span className="crm-mute" style={{ fontSize: 10 }}>Replied:</span>
             {REACTIONS.map((r) => {
@@ -128,6 +146,18 @@ export default function MatchesPane({
 }) {
   const [availableOnly, setAvailableOnly] = useState(true);
   const [busy, setBusy] = useState(false);
+  const [selecting, setSelecting] = useState(false);
+  const [picked, setPicked] = useState(() => new Set());
+
+  const togglePicked = (propertyId) =>
+    setPicked((cur) => {
+      const next = new Set(cur);
+      if (next.has(propertyId)) next.delete(propertyId);
+      else next.add(propertyId);
+      return next;
+    });
+
+  const cancelSelecting = () => { setSelecting(false); setPicked(new Set()); };
 
   const canWrite = access.has(SCOPES.CLIENTS_WRITE);
   const minScore = requirement?.min_score ?? 60;
@@ -217,10 +247,14 @@ export default function MatchesPane({
     }
   };
 
-  const handleSendAll = async () => {
+  /**
+   * Send a set the agent chose, rather than whatever the top five happened to
+   * be. Every property still gets its own tracked link.
+   */
+  const handleSendSelected = async () => {
     if (!client.phone) return onToast("No phone number on this client", "error");
-    const top = matches.slice(0, 5);
-    if (!top.length) return;
+    const top = matches.filter((m) => picked.has(m.listing.property_id));
+    if (top.length < 2) return onToast("Pick at least two properties", "error");
     const template = (settings?.templates ?? []).find((t) => t.id === "share_matches");
     const shareTokens = Object.fromEntries(
       top.map((m) => [
@@ -242,11 +276,12 @@ export default function MatchesPane({
       }
       await logActivity(client.id, {
         type: "whatsapp",
-        body: `Shared ${top.length} matches`,
+        body: `Shared ${top.length} properties`,
         meta: { property_ids: top.map((m) => m.listing.property_id) },
         actorEmail,
       });
       await onShortlistsChanged();
+      cancelSelecting();
     } catch (e) {
       onToast(e?.message || "Sent, but could not log it", "error");
     } finally {
@@ -257,9 +292,26 @@ export default function MatchesPane({
   return (
     <div className="crm-col" style={{ width: 300, flex: "none" }}>
       <div className="crm-colhead">
-        <span className="crm-label">Matches · {matches.length}</span>
+        <span className="crm-label">
+          {selecting ? `Selected · ${picked.size}` : `Matches · ${matches.length}`}
+        </span>
         {canWrite && matches.length > 0 && (
-          <Btn sm variant="wa" onClick={handleSendAll} disabled={busy}>Share top 5</Btn>
+          selecting ? (
+            <div style={{ display: "flex", gap: 6 }}>
+              <Btn
+                sm
+                variant="wa"
+                onClick={handleSendSelected}
+                disabled={busy || picked.size < 2}
+                title={picked.size < 2 ? "Pick at least two" : `Send ${picked.size} properties`}
+              >
+                Send {picked.size || ""}
+              </Btn>
+              <Btn sm onClick={cancelSelecting}>Cancel</Btn>
+            </div>
+          ) : (
+            <Btn sm onClick={() => setSelecting(true)}>Send multiple</Btn>
+          )
         )}
       </div>
 
@@ -267,6 +319,17 @@ export default function MatchesPane({
         <span className="crm-chip" style={{ pointerEvents: "none" }}>≥ {minScore}%</span>
         <Chip on={availableOnly} onClick={() => setAvailableOnly((v) => !v)}>Available now</Chip>
       </div>
+
+      {selecting && (
+        <p
+          className="crm-mute"
+          style={{ fontSize: 11, margin: 0, padding: "0 12px 8px", lineHeight: 1.45 }}
+        >
+          {picked.size < 2
+            ? "Tap the properties to include — at least two."
+            : `${picked.size} selected. They go in one message, each with its own tracked link.`}
+        </p>
+      )}
 
       <div className="crm-scroll" style={{ flex: 1 }}>
         {matches.length === 0 ? (
@@ -285,6 +348,9 @@ export default function MatchesPane({
               onSend={handleSend}
               onShortlist={handleShortlist}
               onReact={handleReact}
+              selecting={selecting}
+              checked={picked.has(m.listing.property_id)}
+              onToggle={togglePicked}
             />
           ))
         )}

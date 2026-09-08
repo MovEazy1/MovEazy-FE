@@ -16,6 +16,7 @@ import {
 } from "../../lib/crmClients";
 import { formatDuration } from "../../lib/sessionSync";
 import { SCOPES } from "../../lib/adminScopes";
+import { buildTemplateCsv, downloadCsv, parseCsv, planImport, runImport } from "../../lib/crmImport";
 import { Btn, C, Chip, Empty, TempDot, Toast, shortDate } from "./crmUi";
 
 const EMPTY_REQ = {
@@ -64,6 +65,106 @@ function NewClientForm({ actorEmail, onCreated, onCancel, onToast }) {
   );
 }
 
+/**
+ * Bulk import.
+ *
+ * Two steps on purpose: the file is parsed and shown back before anything is
+ * written, because undoing a bad import of two hundred rows is far worse than
+ * pausing to look at it. The template carries the closed statuses and brokerage
+ * columns so a backlog of finished deals imports as history, not as fresh leads.
+ */
+function ImportPanel({ actorEmail, onDone, onCancel, onToast }) {
+  const [plan, setPlan] = useState(null);
+  const [running, setRunning] = useState(false);
+  const [result, setResult] = useState(null);
+
+  const readFile = async (file) => {
+    if (!file) return;
+    try {
+      setPlan(planImport(parseCsv(await file.text())));
+      setResult(null);
+    } catch (e) {
+      onToast(e?.message || "Could not read that file", "error");
+    }
+  };
+
+  const go = async () => {
+    setRunning(true);
+    try {
+      const r = await runImport(plan.clients, actorEmail);
+      setResult(r);
+      if (r.inserted) onDone(r.inserted);
+    } catch (e) {
+      onToast(e?.message || "Import failed", "error");
+    } finally {
+      setRunning(false);
+    }
+  };
+
+  return (
+    <div style={{ padding: "10px 12px", display: "flex", flexDirection: "column", gap: 8, borderBottom: `1px solid ${C.line}` }}>
+      <span className="crm-label">Bulk import</span>
+      <p className="crm-mute" style={{ fontSize: 11, margin: 0, lineHeight: 1.45 }}>
+        Fill the template and upload it. Closed deals can be imported as closed — status,
+        brokerage and expected credit date are all columns.
+      </p>
+
+      <Btn sm onClick={() => downloadCsv("moveazy-leads-template.csv", buildTemplateCsv())}>
+        Download template
+      </Btn>
+
+      <input
+        type="file"
+        accept=".csv,text/csv"
+        className="crm-input"
+        onChange={(e) => readFile(e.target.files?.[0])}
+        style={{ fontSize: 11 }}
+      />
+
+      {plan && !result && (
+        <div className="crm-card" style={{ padding: 10, display: "flex", flexDirection: "column", gap: 6 }}>
+          <span style={{ fontSize: 12, fontWeight: 600 }}>
+            {plan.clients.length} to add
+            {plan.skipped ? ` · ${plan.skipped} guide/blank rows skipped` : ""}
+          </span>
+          {plan.errors.length > 0 && (
+            <div style={{ display: "flex", flexDirection: "column", gap: 3 }}>
+              {plan.errors.slice(0, 6).map((e) => (
+                <span key={e} style={{ fontSize: 11, color: C.coral }}>{e}</span>
+              ))}
+              {plan.errors.length > 6 && (
+                <span className="crm-mute" style={{ fontSize: 11 }}>+{plan.errors.length - 6} more</span>
+              )}
+            </div>
+          )}
+          <div style={{ display: "flex", gap: 6 }}>
+            <Btn sm variant="primary" disabled={running || !plan.clients.length} onClick={go}>
+              {running ? "Importing…" : `Import ${plan.clients.length}`}
+            </Btn>
+            <Btn sm onClick={onCancel}>Cancel</Btn>
+          </div>
+        </div>
+      )}
+
+      {result && (
+        <div className="crm-card" style={{ padding: 10 }}>
+          <span style={{ fontSize: 12, fontWeight: 600, color: C.accent }}>
+            {result.inserted} imported
+          </span>
+          {result.failures.length > 0 && (
+            <div style={{ display: "flex", flexDirection: "column", gap: 3, marginTop: 5 }}>
+              {result.failures.slice(0, 5).map((f) => (
+                <span key={f} style={{ fontSize: 11, color: C.coral }}>{f}</span>
+              ))}
+            </div>
+          )}
+          <div style={{ marginTop: 7 }}><Btn sm onClick={onCancel}>Done</Btn></div>
+        </div>
+      )}
+    </div>
+  );
+}
+
 export default function CrmClientsPage() {
   const crm = useCrm();
   const { clients, requirements, inventory, engagement, shortlists, touches, settings, access, user } = crm;
@@ -77,6 +178,7 @@ export default function CrmClientsPage() {
   const [tempFilter, setTempFilter] = useState("");
   const [mineOnly, setMineOnly] = useState(false);
   const [adding, setAdding] = useState(false);
+  const [importing, setImporting] = useState(false);
   const [toast, setToast] = useState(null);
   const [mobileTab, setMobileTab] = useState("list");
   const [localShortlists, setLocalShortlists] = useState(shortlists);
@@ -229,7 +331,14 @@ export default function CrmClientsPage() {
       <div className="crm-colhead">
         <span className="crm-label">Clients · {visible.length}</span>
         {access.has(SCOPES.CLIENTS_WRITE) && (
-          <Btn sm onClick={() => setAdding((v) => !v)}>{adding ? "Close" : "+ New"}</Btn>
+          <div style={{ display: "flex", gap: 5 }}>
+            <Btn sm onClick={() => { setAdding((v) => !v); setImporting(false); }}>
+              {adding ? "Close" : "+ New"}
+            </Btn>
+            <Btn sm onClick={() => { setImporting((v) => !v); setAdding(false); }}>
+              {importing ? "Close" : "Import"}
+            </Btn>
+          </div>
         )}
       </div>
 
@@ -244,6 +353,15 @@ export default function CrmClientsPage() {
             select(row.id);
             showToast("Client added");
           }}
+        />
+      )}
+
+      {importing && (
+        <ImportPanel
+          actorEmail={actorEmail}
+          onToast={showToast}
+          onCancel={() => setImporting(false)}
+          onDone={(n) => { crm.reload(); showToast(`${n} leads imported`); }}
         />
       )}
 

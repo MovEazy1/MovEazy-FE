@@ -356,6 +356,8 @@ function ClosePrompt({ status, reasons, onCancel, onConfirm }) {
   const [reason, setReason] = useState(outside ? reasons[0] ?? "Other" : "");
   const [propertyId, setPropertyId] = useState("");
   const [rent, setRent] = useState("");
+  const [brokerage, setBrokerage] = useState("");
+  const [creditDate, setCreditDate] = useState("");
 
   return (
     <div className="crm-card" style={{ borderColor: outside ? C.textMute : C.accent, display: "flex", flexDirection: "column", gap: 10 }}>
@@ -370,29 +372,49 @@ function ClosePrompt({ status, reasons, onCancel, onConfirm }) {
           ))}
         </div>
       ) : (
-        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8 }}>
-          <label style={{ display: "flex", flexDirection: "column", gap: 4 }}>
-            <span className="crm-label">Property</span>
-            <input className="crm-input" value={propertyId} placeholder="MZ-XXXXXX"
-              onChange={(e) => setPropertyId(e.target.value.toUpperCase())} />
-          </label>
-          <label style={{ display: "flex", flexDirection: "column", gap: 4 }}>
-            <span className="crm-label">Rent agreed</span>
-            <input className="crm-input crm-num" type="number" value={rent} placeholder="44000"
-              onChange={(e) => setRent(e.target.value)} />
-          </label>
-        </div>
+        <>
+          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8 }}>
+            <label style={{ display: "flex", flexDirection: "column", gap: 4 }}>
+              <span className="crm-label">Property</span>
+              <input className="crm-input" value={propertyId} placeholder="MZ-XXXXXX"
+                onChange={(e) => setPropertyId(e.target.value.toUpperCase())} />
+            </label>
+            <label style={{ display: "flex", flexDirection: "column", gap: 4 }}>
+              <span className="crm-label">Rent agreed</span>
+              <input className="crm-input crm-num" type="number" value={rent} placeholder="44000"
+                onChange={(e) => setRent(e.target.value)} />
+            </label>
+          </div>
+          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8 }}>
+            <label style={{ display: "flex", flexDirection: "column", gap: 4 }}>
+              <span className="crm-label">MovEazy brokerage</span>
+              <input className="crm-input crm-num" type="number" value={brokerage} placeholder="11250"
+                onChange={(e) => setBrokerage(e.target.value)} />
+            </label>
+            <label style={{ display: "flex", flexDirection: "column", gap: 4 }}>
+              <span className="crm-label">Expected credit date</span>
+              <input className="crm-input" type="date" value={creditDate}
+                onChange={(e) => setCreditDate(e.target.value)} />
+            </label>
+          </div>
+        </>
       )}
 
       <div style={{ display: "flex", gap: 7 }}>
         <Btn variant="primary"
-          onClick={() => onConfirm({ reason, propertyId, rent: rent === "" ? null : Number(rent) })}>
+          onClick={() => onConfirm({
+            reason, propertyId,
+            rent: rent === "" ? null : Number(rent),
+            brokerage: brokerage === "" ? null : Number(brokerage),
+            creditDate,
+          })}>
           Confirm
         </Btn>
         <Btn onClick={onCancel}>Cancel</Btn>
       </div>
       <p className="crm-mute" style={{ fontSize: 11, margin: 0, lineHeight: 1.5 }}>
-        This also marks their profile as no longer searching, so the site stops sending them matches.
+        This marks their profile as no longer searching, so the site stops sending them matches.
+        {outside ? "" : " The deal then appears on the payments list awaiting the money."}
       </p>
     </div>
   );
@@ -567,8 +589,8 @@ export default function ClientRecord({
             status={pendingClose}
             reasons={settings?.closedOutsideReasons ?? []}
             onCancel={() => setPendingClose(null)}
-            onConfirm={({ reason, propertyId, rent }) =>
-              applyStatus(pendingClose, { reason, propertyId, rent })}
+            onConfirm={({ reason, propertyId, rent, brokerage, creditDate }) =>
+              applyStatus(pendingClose, { reason, propertyId, rent, brokerage, creditDate })}
           />
         )}
 
