@@ -1,5 +1,9 @@
 import logoLight from "../../assets/logo/moveazy-logo-light.png";
-import logoDark from "../../assets/logo/moveazy-logo-dark.png";
+// The "dark" wordmark has a black plate baked into the PNG, so on any dark
+// surface that isn't pure black it shows as a box around the logo. The mint
+// wordmark is the one drawn for dark grounds — it is what MovEazyNav already
+// uses on the emerald bar.
+import logoDark from "../../assets/logo/moveazy-logo-mint-dark.png";
 
 const SIZE_CLASS = {
   nav: "h-8 w-auto max-w-[180px] object-contain object-left",

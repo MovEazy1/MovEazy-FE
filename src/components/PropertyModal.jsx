@@ -818,28 +818,6 @@ export default function PropertyModal({ property, onClose, listings = [], onSele
                   )}
                 </div>
 
-                <div style={{ background: T.mintSoft, padding: "20px", borderRadius: "12px", marginBottom: "24px", border: "1px solid #bbf7d0" }}>
-                  <h2 style={{ margin: "0 0 10px", fontSize: "17px", color: T.text }}>Availability and rent share</h2>
-                  <p style={{ margin: "0 0 14px", fontSize: "14px", color: T.textDim, lineHeight: 1.55 }}>
-                    Listed availability is shown on the badge above. If you share with flatmates, your portion of the monthly rent is an estimate only — final split depends on bedrooms agreed with the owner.
-                  </p>
-                  <div style={{ display: "grid", gridTemplateColumns: isMobile ? "1fr 1fr" : "repeat(4, minmax(0,1fr))", gap: "10px" }}>
-                    {[1, 2, 3, 4].map((n) => {
-                      const share = numericRent > 0 ? Math.round(numericRent / n) : 0;
-                      return (
-                        <div key={n} style={{ background: "white", border: `1px solid ${T.line}`, borderRadius: "10px", padding: "12px", textAlign: "center" }}>
-                          <div style={{ fontSize: "11px", fontWeight: 800, color: T.textMute, textTransform: "uppercase" }}>{n === 1 ? "Solo" : `${n} people`}</div>
-                          <div style={{ fontSize: "15px", fontWeight: 800, color: T.teal, marginTop: "6px" }}>{share > 0 ? formatInr(share) : "—"}</div>
-                          <div style={{ fontSize: "11px", color: T.textMute, marginTop: "4px" }}>per person / mo</div>
-                        </div>
-                      );
-                    })}
-                  </div>
-                  {property.bhk === "Roommate needed" ? (
-                    <p style={{ margin: "12px 0 0", fontSize: "13px", color: T.gold, fontWeight: 600 }}>This listing is tagged for roommate matching — use Apply below and mention your move-in timeline.</p>
-                  ) : null}
-                </div>
-
                 <div style={{ background: T.cream, padding: "24px", borderRadius: "12px", marginBottom: "32px", border: `1px solid ${T.line}` }}>
                   <h2 style={{ margin: "0 0 12px", fontSize: "18px", color: T.text }}>About this property</h2>
                   <p style={{ margin: 0, fontSize: "15px", color: T.textDim, lineHeight: "1.6", whiteSpace: "pre-wrap" }}>
