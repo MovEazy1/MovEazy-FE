@@ -52,6 +52,16 @@ async function fontFor(text) {
   return data;
 }
 
+/**
+ * Minimal element factory. Satori accepts these plain objects directly, so this
+ * avoids depending on a JSX transform running over /api in a plain Vite project.
+ */
+const h = (type, props = {}, ...children) => ({
+  type,
+  props: { ...props, children: children.flat(Infinity).filter(Boolean) },
+  key: null,
+});
+
 const INK = "#04211D";
 const MINT = "#5EEAD4";
 const CREAM = "#F4F2ED";
