@@ -305,9 +305,9 @@ export default function Recommendations() {
         .rec-detail-overlay { position: fixed; inset: 0; z-index: 1350; background: #f4f1ea; display: flex; flex-direction: column; }
         .rec-detail-back { flex-shrink: 0; display: inline-flex; align-items: center; gap: 6px; margin: 14px; padding: 10px 16px; border-radius: 999px; border: 1px solid #ded6c8; background: #fff; font: 700 13.5px/1 'Plus Jakarta Sans', sans-serif; color: #2a2621; cursor: pointer; align-self: flex-start; }
         .rec-detail-scroll { flex: 1 1 auto; min-height: 0; overflow-y: auto; }
-        .rec-detail-map { height: 42vh; }
+        .rec-detail-map { height: 42vh; margin: 0 18px 24px; border-radius: 14px; overflow: hidden; padding-bottom: env(safe-area-inset-bottom, 0px); }
         .rec-detail-map .leaflet-container { height: 100%; width: 100%; }
-        .rec-detail-info { padding: 18px 18px 100px; }
+        .rec-detail-info { padding: 18px; }
         .rec-detail-stats { display: flex; flex-wrap: wrap; gap: 10px; margin-top: 14px; }
         .rec-detail-stat { flex: 1 1 160px; background: #fff; border: 1px solid #ece6da; border-radius: 14px; padding: 12px 14px; display: flex; flex-direction: column; gap: 2px; }
         .rec-detail-stat-label { font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: .04em; color: #9a9186; }
@@ -601,15 +601,6 @@ export default function Recommendations() {
                 );
               })()}
 
-              {hasCoords && (
-                <div className="rec-detail-map">
-                  <MapContainer center={[Number(l.latitude), Number(l.longitude)]} zoom={15} scrollWheelZoom={false} attributionControl={false} style={{ height: "100%", width: "100%" }}>
-                    <TileLayer url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png" subdomains="abc" maxZoom={19} />
-                    <Marker position={[Number(l.latitude), Number(l.longitude)]} icon={pinIcon(true, reactionStateFor(l.property_id))} />
-                  </MapContainer>
-                </div>
-              )}
-
               <div className="rec-detail-info">
                 <div className="rec-name">{l.title || `${l.flat_type || "Home"} in ${l.area || "Bengaluru"}`}</div>
                 <div className="rec-meta">{[l.flat_type, l.area, l.furnishing].filter(Boolean).join(" · ")}</div>
@@ -662,6 +653,16 @@ export default function Recommendations() {
                   )}
                 </div>
               </div>
+
+              {/* Map last: images and details come first on mobile, location at the bottom. */}
+              {hasCoords && (
+                <div className="rec-detail-map">
+                  <MapContainer center={[Number(l.latitude), Number(l.longitude)]} zoom={15} scrollWheelZoom={false} attributionControl={false} style={{ height: "100%", width: "100%" }}>
+                    <TileLayer url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png" subdomains="abc" maxZoom={19} />
+                    <Marker position={[Number(l.latitude), Number(l.longitude)]} icon={pinIcon(true, reactionStateFor(l.property_id))} />
+                  </MapContainer>
+                </div>
+              )}
             </div>
 
             {actionToast && <div className="rec-detail-toast">{actionToast}</div>}
