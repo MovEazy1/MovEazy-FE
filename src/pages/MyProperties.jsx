@@ -6,7 +6,11 @@
  * never shows up empty for seekers who have never posted.
  */
 import { useEffect, useMemo, useRef, useState } from "react";
-import { Link, useNavigate } from "react-router-dom";
+import { useNavigate } from "react-router-dom";
+import {
+  MapPin, MoreVertical, Share2, PauseCircle, PlayCircle, CalendarClock,
+  Home as HomeIcon, Plus, Check,
+} from "lucide-react";
 import { useAuth } from "../context/AuthContext";
 import { useLoginModal } from "../context/LoginModalContext";
 import MovEazyNav from "../components/layout/MovEazyNav";
@@ -15,27 +19,43 @@ import { fetchSlotsFor } from "../lib/visits";
 import { fetchMyListingStats } from "../lib/ownerDashboard";
 import PropertyVisitSlots from "../components/PropertyVisitSlots";
 
+/** Shared with the listing view — one emerald palette across the owner journey. */
+const T = {
+  ink: "#04211D",
+  teal: "#0E7C68",
+  mint: "#5EEAD4",
+  mintSoft: "#E4F6F1",
+  cream: "#F7FAF8",
+  page: "#F4F6F5",
+  card: "#FFFFFF",
+  line: "#DCE8E5",
+  lineSoft: "#EDF3F1",
+  text: "#12211E",
+  textDim: "#4A5B57",
+  textMute: "#7A8F8A",
+  coral: "#E2573C",
+  gold: "#B0740F",
+};
+
 const inr = (n) =>
-  Number.isFinite(Number(n)) && Number(n) > 0
-    ? `₹${Number(n).toLocaleString("en-IN")}`
-    : "—";
+  Number.isFinite(Number(n)) && Number(n) > 0 ? `₹${Number(n).toLocaleString("en-IN")}` : "—";
 
 const fmtDate = (d) =>
   d ? new Date(d).toLocaleDateString("en-IN", { day: "numeric", month: "short", year: "numeric" }) : "—";
 
 const STATUS = {
-  published: { label: "Live", bg: "#ecfdf5", fg: "#15803d", bd: "#a7f3d0" },
-  paused:    { label: "Paused", bg: "#fffbeb", fg: "#b45309", bd: "#fde68a" },
-  rented:    { label: "Rented", bg: "#f1f5f9", fg: "#475569", bd: "#cbd5e1" },
-  sold:      { label: "Rented", bg: "#f1f5f9", fg: "#475569", bd: "#cbd5e1" },
+  published: { label: "Live", bg: T.teal, fg: "#fff" },
+  paused: { label: "Inactive", bg: "#EFE2C8", fg: T.gold },
+  rented: { label: "Rented", bg: T.lineSoft, fg: T.textDim },
+  sold: { label: "Rented", bg: T.lineSoft, fg: T.textDim },
 };
 const isClosed = (status) => status === "rented" || status === "sold";
 
 export function Stat({ label, value }) {
   return (
-    <div className="rounded-xl bg-gray-50 border border-gray-100 px-2 py-2 text-center">
-      <p className="text-[15px] font-extrabold text-gray-900 leading-none">{value}</p>
-      <p className="text-[10px] font-bold uppercase tracking-wide text-gray-400 mt-1 leading-tight break-words">{label}</p>
+    <div style={{ textAlign: "center", minWidth: 0, flex: 1 }}>
+      <p style={{ fontSize: 19, fontWeight: 800, color: T.text, margin: 0, lineHeight: 1.1 }}>{value}</p>
+      <p style={{ fontSize: 11.5, color: T.textMute, margin: "3px 0 0", lineHeight: 1.25 }}>{label}</p>
     </div>
   );
 }
@@ -44,13 +64,22 @@ function Row({ label, value }) {
   if (value === null || value === undefined || value === "" || (Array.isArray(value) && !value.length)) return null;
   return (
     <div className="flex items-start justify-between gap-4 py-1.5">
-      <span className="text-[12px] text-gray-500 shrink-0">{label}</span>
-      <span className="text-[12px] font-semibold text-gray-800 text-right">{Array.isArray(value) ? value.join(", ") : value}</span>
+      <span style={{ fontSize: 12, color: T.textMute, flexShrink: 0 }}>{label}</span>
+      <span style={{ fontSize: 12, fontWeight: 600, color: T.text, textAlign: "right" }}>
+        {Array.isArray(value) ? value.join(", ") : value}
+      </span>
     </div>
   );
 }
 
-export function PropertyCard({ p, slotCount, onStatus, busy, onSlotCountChange }) {
+const actionBtn = {
+  flex: 1, minWidth: 0, height: 40, borderRadius: 10,
+  display: "flex", alignItems: "center", justifyContent: "center", gap: 7,
+  fontSize: 11.5, fontWeight: 700, cursor: "pointer", whiteSpace: "nowrap", padding: "0 6px",
+  background: T.cream, color: T.textDim, border: `1px solid ${T.line}`,
+};
+
+export function PropertyCard({ p, slotCount, onStatus, busy, onSlotCountChange, onShare }) {
   const [open, setOpen] = useState(false);
   const slotsRef = useRef(null);
   const st = STATUS[p.status] || STATUS.published;
@@ -67,101 +96,94 @@ export function PropertyCard({ p, slotCount, onStatus, busy, onSlotCountChange }
   };
 
   return (
-    <div className="rounded-2xl bg-white border border-gray-200 overflow-hidden">
-      <div className="flex gap-4 p-4">
+    <div style={{ borderRadius: 16, background: T.card, border: `1px solid ${T.line}`, overflow: "hidden" }}>
+      <div style={{ display: "flex", gap: 14, padding: 14 }}>
         <div
-          className="w-24 h-24 sm:w-28 sm:h-28 rounded-xl shrink-0 bg-gray-100 bg-cover bg-center"
-          style={cover ? { backgroundImage: `url(${cover})` } : undefined}
+          style={{
+            width: 104, height: 104, borderRadius: 12, flexShrink: 0, position: "relative",
+            background: cover ? `url(${cover}) center/cover` : T.lineSoft,
+          }}
         >
+          <span
+            style={{
+              position: "absolute", top: 8, left: 8,
+              padding: "3px 9px", borderRadius: 999,
+              fontSize: 11, fontWeight: 700, background: st.bg, color: st.fg,
+            }}
+          >
+            {st.label}
+          </span>
           {!cover && (
-            <div className="w-full h-full flex items-center justify-center text-[10px] font-bold text-gray-400 text-center px-2">
+            <div style={{ width: "100%", height: "100%", display: "grid", placeItems: "center", fontSize: 10, fontWeight: 700, color: T.textMute }}>
               No photo
             </div>
           )}
         </div>
 
-        <div className="min-w-0 flex-1">
-          <div className="flex items-start justify-between gap-2">
-            <div className="min-w-0">
-              <p className="text-[15px] font-extrabold text-gray-900 truncate">
-                {p.title || `${p.flat_type || "Home"} in ${p.area || p.city || "Bengaluru"}`}
-              </p>
-              <p className="text-[12px] text-gray-500 truncate">
-                {[p.area, p.city].filter(Boolean).join(" · ") || "—"}
-              </p>
-            </div>
-            <span
-              className="shrink-0 px-2.5 py-1 rounded-full text-[11px] font-extrabold"
-              style={{ background: st.bg, color: st.fg, border: `1px solid ${st.bd}` }}
+        <div style={{ minWidth: 0, flex: 1 }}>
+          <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", gap: 8 }}>
+            <p style={{ fontSize: 15.5, fontWeight: 800, color: T.text, margin: 0, lineHeight: 1.25 }}>
+              {p.title || `${p.flat_type || "Home"} in ${p.area || p.city || "Bengaluru"}`}
+            </p>
+            <button
+              type="button"
+              aria-label={open ? "Hide details" : "Show details"}
+              onClick={() => setOpen((o) => !o)}
+              style={{ flexShrink: 0, background: "none", border: "none", cursor: "pointer", color: T.textMute, padding: 2 }}
             >
-              {st.label}
+              <MoreVertical size={18} />
+            </button>
+          </div>
+
+          <p style={{ display: "flex", alignItems: "center", gap: 5, fontSize: 12.5, color: T.textMute, margin: "5px 0 0" }}>
+            <MapPin size={13} style={{ flexShrink: 0 }} />
+            <span style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+              {[p.area, p.city].filter(Boolean).join(", ") || "—"}
             </span>
-          </div>
+          </p>
 
-          <div className="flex flex-wrap items-baseline gap-x-3 gap-y-1 mt-2">
-            <span className="text-[17px] font-extrabold text-gray-900">{inr(p.rent)}<span className="text-[12px] font-semibold text-gray-400">/mo</span></span>
-            {Number(p.deposit) > 0 && <span className="text-[12px] text-gray-500">{inr(p.deposit)} deposit</span>}
-          </div>
-
-          <p className="text-[11px] font-mono tracking-wider text-gray-400 mt-1.5">{p.property_id}</p>
+          <p style={{ margin: "8px 0 0", fontSize: 17, fontWeight: 800, color: T.text }}>
+            {inr(p.rent)}
+            <span style={{ fontSize: 12.5, fontWeight: 600, color: T.textMute }}> / month</span>
+          </p>
         </div>
       </div>
 
-      <div className="grid grid-cols-3 sm:grid-cols-6 gap-2 px-4">
+      <div style={{ display: "flex", gap: 4, padding: "12px 8px", borderTop: `1px solid ${T.lineSoft}` }}>
         <Stat label="Views" value={p.view_count ?? 0} />
+        <Stat label="Interested" value={p.like_count ?? 0} />
+        <Stat label="Visit Requests" value={p.visit_count ?? 0} />
         <Stat label="Shortlisted" value={p.shortlist_count ?? 0} />
-        <Stat label="Visits" value={p.visit_count ?? 0} />
-        <Stat label="Visit slots" value={slotCount} />
-        <Stat label="Photos" value={(p.images || []).length} />
-        <Stat label="Verified" value={p.is_verified ? "Yes" : "No"} />
       </div>
 
-      <div className="flex flex-wrap items-center gap-2 p-4">
-        <button
-          type="button"
-          onClick={() => setOpen((o) => !o)}
-          className="h-9 px-4 rounded-lg text-[12px] font-bold border border-gray-200 text-gray-700 hover:bg-gray-50"
-        >
-          {open ? "Hide details" : "View details"}
+      <div style={{ display: "flex", gap: 7, padding: "0 14px 14px" }}>
+        <button type="button" onClick={goToSlots} disabled={isClosed(p.status)} style={{ ...actionBtn, opacity: isClosed(p.status) ? 0.5 : 1 }}>
+          <CalendarClock size={14} style={{ flexShrink: 0 }} />
+          Visit slots{slotCount ? ` (${slotCount})` : ""}
         </button>
-        {!isClosed(p.status) && (
-          <button
-            type="button"
-            onClick={goToSlots}
-            className="h-9 px-4 rounded-lg text-[12px] font-bold text-white disabled:opacity-50"
-            style={{ background: "linear-gradient(135deg,#16a34a,#22c55e)" }}
-          >
-            Set visit timing
+        {p.status === "published" ? (
+          <button type="button" disabled={busy} onClick={() => onStatus(p.property_id, "paused")} style={actionBtn}>
+            <PauseCircle size={14} style={{ flexShrink: 0 }} />
+            Set inactive
           </button>
-        )}
-        <Link to="/map" className="h-9 px-4 rounded-lg text-[12px] font-bold border border-gray-200 text-gray-700 hover:bg-gray-50 flex items-center">
-          See on map
-        </Link>
-        {p.status === "published" && (
-          <button type="button" disabled={busy} onClick={() => onStatus(p.property_id, "paused")}
-            className="h-9 px-4 rounded-lg text-[12px] font-bold border border-gray-200 text-gray-700 hover:bg-gray-50 disabled:opacity-50">
-            Pause listing
-          </button>
-        )}
-        {p.status === "paused" && (
-          <button type="button" disabled={busy} onClick={() => onStatus(p.property_id, "published")}
-            className="h-9 px-4 rounded-lg text-[12px] font-bold border border-gray-200 text-gray-700 hover:bg-gray-50 disabled:opacity-50">
+        ) : (
+          <button type="button" disabled={busy || isClosed(p.status)} onClick={() => onStatus(p.property_id, "published")}
+            style={{ ...actionBtn, opacity: isClosed(p.status) ? 0.5 : 1 }}>
+            <PlayCircle size={14} style={{ flexShrink: 0 }} />
             Make it live
           </button>
         )}
-        {!isClosed(p.status) && (
-          <button type="button" disabled={busy} onClick={() => onStatus(p.property_id, "rented")}
-            className="h-9 px-4 rounded-lg text-[12px] font-bold text-white disabled:opacity-50"
-            style={{ background: "linear-gradient(135deg,#ff3131,#ef4444)" }}>
-            Mark as rented
-          </button>
-        )}
+        <button type="button" onClick={() => onShare(p)} style={actionBtn}>
+          <Share2 size={14} style={{ flexShrink: 0 }} />
+          Share
+        </button>
       </div>
 
       {open && (
-        <div className="px-4 pb-4">
-          <div className="rounded-xl border border-gray-100 bg-gray-50 p-4 divide-y divide-gray-200/70">
+        <div style={{ padding: "0 14px 14px" }}>
+          <div style={{ borderRadius: 12, border: `1px solid ${T.line}`, background: T.cream, padding: 14 }}>
             <div className="pb-1">
+              <Row label="Property ID" value={p.property_id} />
               <Row label="Posted as" value={p.posted_by} />
               <Row label="Listed on" value={fmtDate(p.created_at)} />
               <Row label="Available from" value={fmtDate(p.available_from)} />
@@ -171,6 +193,7 @@ export function PropertyCard({ p, slotCount, onStatus, busy, onSlotCountChange }
               <Row label="Bedrooms" value={p.bedrooms} />
               <Row label="Bathrooms" value={p.bathrooms} />
               <Row label="Furnishing" value={p.furnishing} />
+              <Row label="Deposit" value={Number(p.deposit) > 0 ? inr(p.deposit) : null} />
               <Row label="Flatmates" value={p.max_flatmates || null} />
               <Row label="Preference" value={p.gender_pref && p.gender_pref !== "any" ? p.gender_pref : null} />
             </div>
@@ -187,14 +210,22 @@ export function PropertyCard({ p, slotCount, onStatus, busy, onSlotCountChange }
             </div>
             {p.description && (
               <div className="pt-2">
-                <p className="text-[12px] text-gray-500 mb-1">Description</p>
-                <p className="text-[12px] text-gray-800 leading-relaxed whitespace-pre-line">{p.description}</p>
+                <p style={{ fontSize: 12, color: T.textMute, marginBottom: 4 }}>Description</p>
+                <p style={{ fontSize: 12, color: T.text, lineHeight: 1.6, whiteSpace: "pre-line" }}>{p.description}</p>
               </div>
             )}
             <div className="pt-2">
               <Row label="Contact on listing" value={p.phone} />
               <Row label="Posted by" value={p.poster_name} />
             </div>
+            {!isClosed(p.status) && (
+              <div className="pt-3">
+                <button type="button" disabled={busy} onClick={() => onStatus(p.property_id, "rented")}
+                  style={{ ...actionBtn, flex: "none", padding: "0 16px", color: T.coral, borderColor: "#E8C4BC" }}>
+                  Mark as rented
+                </button>
+              </div>
+            )}
           </div>
 
           {!isClosed(p.status) && (
@@ -212,6 +243,12 @@ export function PropertyCard({ p, slotCount, onStatus, busy, onSlotCountChange }
   );
 }
 
+const TABS = [
+  { id: "active", label: "Active" },
+  { id: "inactive", label: "Inactive" },
+  { id: "drafts", label: "Drafts" },
+];
+
 export default function MyProperties() {
   const { user, loading: authLoading } = useAuth();
   const { openLogin } = useLoginModal();
@@ -221,13 +258,15 @@ export default function MyProperties() {
   const [loading, setLoading] = useState(true);
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState("");
+  const [tab, setTab] = useState("active");
+  const [shared, setShared] = useState("");
 
   const load = async (uid) => {
     setLoading(true);
     try {
       const [list, statRows] = await Promise.all([
         fetchMyInventory(uid),
-        fetchMyListingStats(), // per-property shortlist count; already scoped server-side to this poster
+        fetchMyListingStats(), // per-property counts; already scoped server-side to this poster
       ]);
       const statsByProperty = new Map(statRows.map((s) => [s.property_id, s]));
       const merged = list.map((r) => {
@@ -235,6 +274,9 @@ export default function MyProperties() {
         return {
           ...r,
           shortlist_count: s?.shortlist_count || 0,
+          // "Interested" is a like on the listing — the reaction a seeker leaves
+          // before they commit to asking for a visit.
+          like_count: s?.like_count || 0,
           visit_count: (s?.visit_request_count || 0) + (s?.visit_booking_count || 0),
         };
       });
@@ -277,83 +319,183 @@ export default function MyProperties() {
   };
 
   // PropertyVisitSlots reports its own live count after each add/remove, so the
-  // "Visit slots" stat doesn't go stale until the next full reload.
+  // slot count doesn't go stale until the next full reload.
   const handleSlotCountChange = (propertyId, count) => {
     setSlotCounts((prev) => ({ ...prev, [propertyId]: count }));
   };
 
-  const totals = useMemo(() => ({
-    all: rows.length,
-    live: rows.filter((r) => r.status === "published").length,
-    rented: rows.filter((r) => isClosed(r.status)).length,
-    views: rows.reduce((n, r) => n + (r.view_count || 0), 0),
-    shortlisted: rows.reduce((n, r) => n + (r.shortlist_count || 0), 0),
-    visits: rows.reduce((n, r) => n + (r.visit_count || 0), 0),
+  const share = async (p) => {
+    const url = `${window.location.origin}/p/${encodeURIComponent(p.property_id)}`;
+    const title = p.title || `${p.flat_type || "Home"} in ${p.area || "Bengaluru"}`;
+    try {
+      if (navigator.share) {
+        await navigator.share({ title, text: `${title} — ${inr(p.rent)}/month on MovEazy`, url });
+        return;
+      }
+      await navigator.clipboard.writeText(url);
+      setShared(p.property_id);
+      setTimeout(() => setShared(""), 2000);
+    } catch { /* the user dismissed the share sheet */ }
+  };
+
+  const buckets = useMemo(() => ({
+    active: rows.filter((r) => r.status === "published"),
+    inactive: rows.filter((r) => r.status !== "published"),
+    drafts: [],
   }), [rows]);
 
+  const visible = buckets[tab] ?? [];
+
   return (
-    <div style={{ background: "#f3f4f6", minHeight: "100dvh", fontFamily: "'Manrope', system-ui, sans-serif" }}>
+    <div style={{ background: T.page, minHeight: "100dvh", fontFamily: "'Manrope', system-ui, sans-serif" }}>
       <MovEazyNav active="my-properties" />
 
-      <main className="max-w-3xl mx-auto px-4 sm:px-6 py-8">
-        <h1 className="text-[24px] sm:text-[30px] font-extrabold text-gray-900">My Properties</h1>
-        <p className="text-[13px] text-gray-500 mt-1 mb-6">
-          Everything you&apos;ve listed on MovEazy, and how each one is doing.
-        </p>
+      <main className="max-w-3xl mx-auto px-4 sm:px-6 py-6" style={{ paddingBottom: "calc(96px + env(safe-area-inset-bottom, 0px))" }}>
+        <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", gap: 12 }}>
+          <div style={{ minWidth: 0 }}>
+            <h1 style={{ fontSize: 26, fontWeight: 800, color: T.text, margin: 0, letterSpacing: "-0.02em" }}>
+              My Properties
+            </h1>
+            <p style={{ fontSize: 13, color: T.textMute, margin: "5px 0 0", lineHeight: 1.45 }}>
+              Manage your listings, track requests and schedule visits
+            </p>
+          </div>
+          <button
+            type="button"
+            onClick={() => navigate("/list-my-flat")}
+            style={{
+              flexShrink: 0, height: 44, padding: "0 18px", borderRadius: 999, border: "none",
+              display: "flex", alignItems: "center", gap: 8, cursor: "pointer",
+              background: T.coral, color: "#fff", fontSize: 14, fontWeight: 700,
+            }}
+          >
+            <Plus size={17} strokeWidth={2.4} />
+            Post Property
+          </button>
+        </div>
 
         {!authLoading && !user ? (
-          <div className="rounded-2xl bg-white border border-gray-200 p-8 text-center">
-            <p className="text-[14px] font-bold text-gray-900 mb-1">Sign in to see your properties</p>
-            <p className="text-[13px] text-gray-500 mb-4">Your listings are tied to your MovEazy account.</p>
+          <div style={{ marginTop: 24, borderRadius: 16, background: T.card, border: `1px solid ${T.line}`, padding: 32, textAlign: "center" }}>
+            <p style={{ fontSize: 14, fontWeight: 700, color: T.text, marginBottom: 4 }}>Sign in to see your properties</p>
+            <p style={{ fontSize: 13, color: T.textMute, marginBottom: 16 }}>Your listings are tied to your MovEazy account.</p>
             <button type="button" onClick={() => openLogin()}
-              className="h-11 px-6 rounded-xl text-[13px] font-bold text-white"
-              style={{ background: "linear-gradient(135deg,#ff3131,#ef4444)" }}>
+              style={{ height: 44, padding: "0 24px", borderRadius: 12, border: "none", background: T.teal, color: "#fff", fontSize: 13, fontWeight: 700, cursor: "pointer" }}>
               Sign in
-            </button>
-          </div>
-        ) : loading ? (
-          <p className="text-[13px] text-gray-500">Loading your properties…</p>
-        ) : rows.length === 0 ? (
-          <div className="rounded-2xl bg-white border border-gray-200 p-8 text-center">
-            <p className="text-[14px] font-bold text-gray-900 mb-1">You haven&apos;t listed a home yet</p>
-            <p className="text-[13px] text-gray-500 mb-4">List your flat and it&apos;ll show up here with its views, visit slots and leads.</p>
-            <button type="button" onClick={() => navigate("/list-my-flat")}
-              className="h-11 px-6 rounded-xl text-[13px] font-bold text-white"
-              style={{ background: "linear-gradient(135deg,#ff3131,#ef4444)" }}>
-              List my flat
             </button>
           </div>
         ) : (
           <>
-            <div className="grid grid-cols-3 sm:grid-cols-6 gap-2 sm:gap-3 mb-6">
-              <Stat label="Listed" value={totals.all} />
-              <Stat label="Live" value={totals.live} />
-              <Stat label="Rented" value={totals.rented} />
-              <Stat label="Views" value={totals.views} />
-              <Stat label="Shortlisted" value={totals.shortlisted} />
-              <Stat label="Visits" value={totals.visits} />
+            <div style={{ display: "flex", gap: 22, marginTop: 20, borderBottom: `1px solid ${T.line}` }}>
+              {TABS.map((t) => {
+                const on = tab === t.id;
+                return (
+                  <button
+                    key={t.id}
+                    type="button"
+                    onClick={() => setTab(t.id)}
+                    style={{
+                      background: "none", border: "none", cursor: "pointer", padding: "0 0 10px",
+                      fontSize: 14, fontWeight: on ? 800 : 600,
+                      color: on ? T.text : T.textMute,
+                      borderBottom: `2px solid ${on ? T.teal : "transparent"}`,
+                      marginBottom: -1,
+                    }}
+                  >
+                    {t.label} ({(buckets[t.id] ?? []).length})
+                  </button>
+                );
+              })}
             </div>
 
-            {err && <p className="text-[12px] font-semibold text-red-500 mb-3">{err}</p>}
+            {err && <p style={{ fontSize: 12, fontWeight: 600, color: T.coral, marginTop: 12 }}>{err}</p>}
 
-            <div className="space-y-4">
-              {rows.map((p) => (
-                <PropertyCard
-                  key={p.property_id}
-                  p={p}
-                  slotCount={slotCounts[p.property_id] || 0}
-                  onStatus={changeStatus}
-                  busy={busy}
-                  onSlotCountChange={handleSlotCountChange}
-                />
-              ))}
-            </div>
+            {loading ? (
+              <p style={{ fontSize: 13, color: T.textMute, marginTop: 20 }}>Loading your properties…</p>
+            ) : (
+              <div style={{ display: "flex", flexDirection: "column", gap: 16, marginTop: 18 }}>
+                {visible.map((p) => (
+                  <PropertyCard
+                    key={p.property_id}
+                    p={p}
+                    slotCount={slotCounts[p.property_id] || 0}
+                    onStatus={changeStatus}
+                    busy={busy}
+                    onSlotCountChange={handleSlotCountChange}
+                    onShare={share}
+                  />
+                ))}
 
-            <button type="button" onClick={() => navigate("/list-my-flat")}
-              className="w-full mt-6 h-12 rounded-xl text-[13px] font-bold border border-gray-300 text-gray-700 bg-white hover:bg-gray-50">
-              + List another property
-            </button>
+                {visible.length === 0 && tab === "drafts" && (
+                  <div style={{ borderRadius: 16, background: T.card, border: `1px solid ${T.line}`, padding: 28, textAlign: "center" }}>
+                    <p style={{ fontSize: 13.5, color: T.textMute, margin: 0, lineHeight: 1.5 }}>
+                      Nothing here — a listing goes live as soon as you post it, so there are no drafts to keep.
+                    </p>
+                  </div>
+                )}
+
+                {visible.length === 0 && tab === "inactive" && (
+                  <div style={{ borderRadius: 16, background: T.card, border: `1px solid ${T.line}`, padding: 28, textAlign: "center" }}>
+                    <p style={{ fontSize: 13.5, color: T.textMute, margin: 0 }}>
+                      Nothing paused or rented out. Everything you&apos;ve listed is live.
+                    </p>
+                  </div>
+                )}
+
+                {/* The prompt to list again — and, when there is nothing at all,
+                    the thing that gets someone started. */}
+                {(tab !== "drafts" || visible.length === 0) && (
+                  <div
+                    style={{
+                      borderRadius: 16, background: T.mintSoft, border: `1px solid ${T.line}`,
+                      padding: "28px 24px", textAlign: "center",
+                    }}
+                  >
+                    <div
+                      style={{
+                        width: 62, height: 62, borderRadius: "50%", margin: "0 auto 14px",
+                        background: "rgba(255,255,255,0.72)", display: "grid", placeItems: "center",
+                      }}
+                    >
+                      <HomeIcon size={26} strokeWidth={1.8} color={T.text} />
+                    </div>
+                    <p style={{ fontSize: 17, fontWeight: 800, color: T.text, margin: "0 0 6px" }}>
+                      {rows.length === 0 ? "You haven't listed a home yet" : "Post more properties"}
+                    </p>
+                    <p style={{ fontSize: 13.5, color: T.textDim, margin: "0 0 18px", lineHeight: 1.5 }}>
+                      Reach more genuine tenants and find the right match faster.
+                    </p>
+                    <button
+                      type="button"
+                      onClick={() => navigate("/list-my-flat")}
+                      style={{
+                        width: "100%", height: 48, borderRadius: 12, cursor: "pointer",
+                        display: "flex", alignItems: "center", justifyContent: "center", gap: 9,
+                        background: T.card, color: T.text, border: `1px solid ${T.line}`,
+                        fontSize: 14.5, fontWeight: 700,
+                      }}
+                    >
+                      <Plus size={18} strokeWidth={2.3} />
+                      {rows.length === 0 ? "Post your first property" : "Post Another Property"}
+                    </button>
+                  </div>
+                )}
+              </div>
+            )}
           </>
+        )}
+
+        {shared && (
+          <div
+            role="status"
+            style={{
+              position: "fixed", bottom: "calc(88px + env(safe-area-inset-bottom, 0px))", left: "50%",
+              transform: "translateX(-50%)", background: T.ink, color: "#fff",
+              padding: "10px 18px", borderRadius: 10, fontSize: 13, fontWeight: 600,
+              display: "flex", alignItems: "center", gap: 8, zIndex: 200,
+            }}
+          >
+            <Check size={15} /> Link copied
+          </div>
         )}
       </main>
     </div>

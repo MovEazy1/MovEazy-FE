@@ -97,6 +97,18 @@ function seekerHandle(requirement, i) {
   return `Seeker #${id ? id.replace(/-/g, "").slice(0, 6).toUpperCase() : String(i + 1).padStart(3, "0")}`;
 }
 
+/** Emerald tokens for the post-success screen, matching the owner flow design. */
+const SUCCESS = {
+  ink: "#134E42",
+  teal: "#159C74",
+  mintSoft: "#E7F4EF",
+  line: "#DCE8E5",
+  lineSoft: "#EDF3F1",
+  text: "#12211E",
+  textDim: "#4A5B57",
+  textMute: "#7A8F8A",
+};
+
 const STEPS = ["Who & Where", "The Home", "Publish"];
 
 export default function ListMyFlat() {
@@ -280,58 +292,132 @@ export default function ListMyFlat() {
     const isBroker = postedBy === "broker";
     const isOwner = postedBy === "owner";
     const isTenant = postedBy === "tenant";
-    const roleLabel = isBroker ? "Broker" : isTenant ? "Tenant" : "Owner";
     const rewardEligible = WALLET_REWARD_TYPES.includes(flatType);
     const walletAmount = rewardEligible ? WALLET_REWARD_AMOUNT : 0;
     const listingTitle = row.title || title || `${flatType} in ${area || "Bengaluru"}`;
+    const successCover = row.cover_image_url || (row.images || [])[0] || "";
 
     return (
       <PageShell variant="marketing" overlayOnly className="antialiased" style={{ background: "#f0ebe3" }}>
         <Navbar variant="marketing" />
         <main className="max-w-2xl mx-auto px-4 pb-16 pt-8">
-          {/* Published confirmation (owner & tenant get a wallet top-right) */}
-          <Card>
-            <div className="p-8 text-center relative">
-              {(isOwner || isTenant) && (
-                <button
-                  type="button"
-                  onClick={() => { if (isTenant) setShowDashboard((v) => !v); }}
-                  className="absolute top-4 right-4 inline-flex items-center gap-2 px-3 py-2 rounded-xl border transition-colors"
-                  style={{
-                    borderColor: rewardEligible ? "#86efac" : "#e5e7eb",
-                    background: rewardEligible ? "#ecfdf5" : "#f9fafb",
-                    cursor: isTenant ? "pointer" : "default",
-                  }}
-                  title={isTenant ? "Open your property dashboard" : "Your MovEazy wallet"}
-                >
-                  <svg className="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke={rewardEligible ? "#16a34a" : "#94a3b8"} strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><path d="M3 7h16a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h12" /><path d="M16 12h.01" /></svg>
-                  <span className="text-left leading-tight">
-                    <span className="block text-[9px] font-bold uppercase tracking-wide" style={{ color: "#94a3b8" }}>Wallet</span>
-                    <span className="block text-[14px] font-extrabold" style={{ color: rewardEligible ? "#15803d" : "#334155" }}>{fmtWallet(walletAmount)}</span>
-                  </span>
-                </button>
-              )}
-              <div className="w-16 h-16 rounded-full mx-auto mb-4 flex items-center justify-center" style={{ background: "#dcfce7" }}>
-                <svg className="w-8 h-8" viewBox="0 0 24 24" fill="none" stroke="#16a34a" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M20 6L9 17l-5-5" /></svg>
-              </div>
-              <h1 className="text-[24px] font-extrabold text-gray-900 mb-1">Your listing is published! 🎉</h1>
-              <p className="text-[13px] text-gray-500 mb-4">It's saved to MovEazy and visible to matching renters. Keep this Property ID for any enquiries.</p>
-              <div className="flex flex-wrap items-center justify-center gap-2">
-                <div className="inline-flex items-center gap-2 px-4 py-2 rounded-xl" style={{ background: "#1c1917" }}>
-                  <span className="text-[11px] font-bold uppercase tracking-wide" style={{ color: "rgba(255,255,255,0.5)" }}>Property ID</span>
-                  <span className="text-[16px] font-extrabold text-white tracking-wider">{row.property_id}</span>
-                </div>
-                <span className="inline-flex items-center px-3 py-2 rounded-xl text-[12px] font-bold" style={{ background: "#fff5f5", color: BRAND_RED }}>
-                  Listed by {roleLabel}
-                </span>
-              </div>
-              {rewardEligible && (isOwner || isTenant) && (
-                <p className="mt-4 text-[12px] font-semibold" style={{ color: "#15803d" }}>
-                  🎉 You've earned {fmtWallet(WALLET_REWARD_AMOUNT)} — credited to your wallet once this home is sold through a MovEazy on-ground executive.
-                </p>
-              )}
+          {/* Published confirmation. Rewritten to the owner-flow design: what
+              happened, the listing itself, and the two things to do next. */}
+          <div style={{ textAlign: "center", padding: "8px 0 4px" }}>
+            <div
+              style={{
+                width: 96, height: 96, borderRadius: "50%", margin: "0 auto 22px",
+                background: SUCCESS.teal, display: "grid", placeItems: "center",
+                boxShadow: "0 10px 30px rgba(14,124,104,0.28)",
+              }}
+            >
+              <svg width="46" height="46" viewBox="0 0 24 24" fill="none" stroke="#fff" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M20 6L9 17l-5-5" />
+              </svg>
             </div>
-          </Card>
+
+            <h1 style={{ fontSize: 30, fontWeight: 800, color: SUCCESS.text, margin: "0 0 10px", letterSpacing: "-0.02em" }}>
+              Property Posted!
+            </h1>
+            <p style={{ fontSize: 15, color: SUCCESS.textDim, margin: "0 auto 24px", maxWidth: "34ch", lineHeight: 1.55 }}>
+              Your property has been listed successfully and is now live on MovEazy.
+            </p>
+          </div>
+
+          {/* The listing itself, so it is obvious what went out. */}
+          <div style={{ display: "flex", gap: 14, alignItems: "center", background: "#fff", border: `1px solid ${SUCCESS.line}`, borderRadius: 16, padding: 14, marginBottom: 16 }}>
+            <div
+              style={{
+                width: 92, height: 92, borderRadius: 12, flexShrink: 0, position: "relative",
+                background: successCover ? `url(${successCover}) center/cover` : SUCCESS.lineSoft,
+              }}
+            >
+              <span style={{ position: "absolute", top: 7, left: 7, padding: "3px 9px", borderRadius: 999, fontSize: 11, fontWeight: 700, background: SUCCESS.teal, color: "#fff" }}>
+                Live
+              </span>
+            </div>
+            <div style={{ minWidth: 0, flex: 1 }}>
+              <p style={{ fontSize: 15.5, fontWeight: 800, color: SUCCESS.text, margin: 0, lineHeight: 1.25 }}>{listingTitle}</p>
+              <p style={{ display: "flex", alignItems: "center", gap: 5, fontSize: 12.5, color: SUCCESS.textMute, margin: "6px 0 0" }}>
+                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M20 10c0 6-8 12-8 12s-8-6-8-12a8 8 0 0 1 16 0Z" /><circle cx="12" cy="10" r="3" /></svg>
+                {[row.area, row.city].filter(Boolean).join(", ") || "Bengaluru"}
+              </p>
+              <p style={{ margin: "8px 0 0", fontSize: 17, fontWeight: 800, color: SUCCESS.text }}>
+                ₹{Number(row.rent || 0).toLocaleString("en-IN")}
+                <span style={{ fontSize: 12.5, fontWeight: 600, color: SUCCESS.textMute }}> / month</span>
+              </p>
+              <p style={{ margin: "6px 0 0", fontSize: 11, fontWeight: 700, letterSpacing: "0.06em", color: SUCCESS.textMute }}>
+                {row.property_id}
+              </p>
+            </div>
+          </div>
+
+          <div style={{ display: "flex", gap: 11, alignItems: "flex-start", background: SUCCESS.mintSoft, borderRadius: 14, padding: "14px 16px", marginBottom: 18 }}>
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke={SUCCESS.teal} strokeWidth="1.9" strokeLinecap="round" strokeLinejoin="round" style={{ flexShrink: 0, marginTop: 1 }}>
+              <path d="M2 12s3.6-7 10-7 10 7 10 7-3.6 7-10 7-10-7-10-7Z" /><circle cx="12" cy="12" r="3" />
+            </svg>
+            <p style={{ fontSize: 13.5, color: SUCCESS.textDim, margin: 0, lineHeight: 1.5 }}>
+              Your listing is visible to potential tenants and they can now view and request visits.
+            </p>
+          </div>
+
+          <button
+            type="button"
+            onClick={() => navigate("/my-properties")}
+            style={{
+              width: "100%", height: 56, borderRadius: 14, border: "none", cursor: "pointer",
+              display: "flex", alignItems: "center", justifyContent: "space-between", padding: "0 22px",
+              background: SUCCESS.ink, color: "#fff", fontSize: 16, fontWeight: 700, marginBottom: 12,
+            }}
+          >
+            View My Property
+            <svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.3" strokeLinecap="round" strokeLinejoin="round"><path d="m9 18 6-6-6-6" /></svg>
+          </button>
+
+          <button
+            type="button"
+            onClick={() => window.location.assign("/list-my-flat")}
+            style={{
+              width: "100%", height: 56, borderRadius: 14, cursor: "pointer",
+              display: "flex", alignItems: "center", justifyContent: "space-between", padding: "0 22px",
+              background: "#F6F1E8", color: SUCCESS.text, border: "none", fontSize: 16, fontWeight: 700, marginBottom: 18,
+            }}
+          >
+            Post Another Property
+            <svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.3" strokeLinecap="round" strokeLinejoin="round"><path d="m9 18 6-6-6-6" /></svg>
+          </button>
+
+          {rewardEligible && (isOwner || isTenant) && (
+            <div style={{ display: "flex", gap: 11, alignItems: "flex-start", background: SUCCESS.mintSoft, borderRadius: 14, padding: "14px 16px", marginBottom: 12 }}>
+              <span style={{ fontSize: 17, lineHeight: 1 }}>🎁</span>
+              <p style={{ fontSize: 13.5, color: SUCCESS.textDim, margin: 0, lineHeight: 1.5 }}>
+                You&apos;ve earned <strong style={{ color: SUCCESS.text }}>{fmtWallet(WALLET_REWARD_AMOUNT)}</strong> — credited to your
+                wallet once this home is rented through a MovEazy executive.
+              </p>
+            </div>
+          )}
+
+          <div style={{ display: "flex", gap: 11, alignItems: "flex-start", background: SUCCESS.mintSoft, borderRadius: 14, padding: "14px 16px", marginBottom: 18 }}>
+            <span style={{ fontSize: 17, lineHeight: 1 }}>🚀</span>
+            <p style={{ fontSize: 13.5, color: SUCCESS.textDim, margin: 0, lineHeight: 1.5 }}>
+              <strong style={{ color: SUCCESS.text }}>Tip:</strong> Keep your profile updated and respond to tenant
+              requests quickly to get better results.
+            </p>
+          </div>
+
+          {isTenant && (
+            <button
+              type="button"
+              onClick={() => setShowDashboard((v) => !v)}
+              style={{
+                width: "100%", height: 48, borderRadius: 12, cursor: "pointer", marginBottom: 18,
+                background: "#fff", color: SUCCESS.text, border: `1px solid ${SUCCESS.line}`,
+                fontSize: 14, fontWeight: 700,
+              }}
+            >
+              {showDashboard ? "Hide matching seekers" : `See ${matches.length || ""} matching seekers`.replace("  ", " ")}
+            </button>
+          )}
 
           {isTenant && showDashboard ? (
             <PropertyLeadDashboard
