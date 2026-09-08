@@ -36,7 +36,7 @@ async function interBold() {
 
 const h = (type, props = {}, ...children) => ({
   type,
-  props: { ...props, children: children.flat().filter((c) => c !== null && c !== false) },
+  props: { ...props, children: children.flat(Infinity).filter(Boolean) },
   key: null,
 });
 
@@ -131,10 +131,10 @@ export default async function handler(req) {
           h(
             "div",
             { style: { display: "flex", flexDirection: "column" } },
-            rent && h("div", { style: { color: CREAM, fontSize: 60, fontWeight: 700 } }, rent),
-            line && h("div", { style: { color: MINT, fontSize: 30, marginTop: 6 } }, line),
+            rent && h("div", { style: { display: "flex", color: CREAM, fontSize: 60, fontWeight: 700 } }, rent),
+            line && h("div", { style: { display: "flex", color: MINT, fontSize: 30, marginTop: 6 } }, line),
           ),
-          h("div", { style: { color: CREAM, fontSize: 26, opacity: 0.85 } }, "moveazy.co.in"),
+          h("div", { style: { display: "flex", color: CREAM, fontSize: 26, opacity: 0.85 } }, "moveazy.co.in"),
         )
       : null;
 
