@@ -101,14 +101,33 @@ function MapListingSheet({ listing, saved, onSave, onDetails, onClose, bottomOff
         padding: "8px 16px 16px",
       }}
     >
-      <div
-        role="button"
-        tabIndex={0}
-        aria-label="Close"
-        onClick={onClose}
-        onKeyDown={(e) => (e.key === "Enter" || e.key === " ") && onClose()}
-        style={{ width: 42, height: 4, borderRadius: 99, background: "#D8E2DF", margin: "0 auto 12px", cursor: "pointer" }}
-      />
+      <div style={{ position: "relative" }}>
+        <div
+          role="button"
+          tabIndex={0}
+          aria-label="Close"
+          onClick={onClose}
+          onKeyDown={(e) => (e.key === "Enter" || e.key === " ") && onClose()}
+          style={{ width: 42, height: 4, borderRadius: 99, background: "#D8E2DF", margin: "0 auto 12px", cursor: "pointer" }}
+        />
+        {/* An explicit close: the drag handle was the only way out, and nothing
+            about it says so. */}
+        <button
+          type="button"
+          aria-label="Close"
+          onClick={onClose}
+          style={{
+            position: "absolute", top: -4, right: 0, width: 30, height: 30,
+            borderRadius: "50%", border: "none", background: "#F1F5F3",
+            color: SHEET.text, cursor: "pointer",
+            display: "flex", alignItems: "center", justifyContent: "center",
+          }}
+        >
+          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round">
+            <path d="M18 6 6 18M6 6l12 12" />
+          </svg>
+        </button>
+      </div>
 
       <div style={{ display: "flex", gap: 13 }}>
         <div
@@ -135,16 +154,6 @@ function MapListingSheet({ listing, saved, onSave, onDetails, onClose, bottomOff
             <p style={{ margin: 0, fontSize: 15.5, fontWeight: 800, color: SHEET.text, lineHeight: 1.25 }}>
               {listing.title}
             </p>
-            <button
-              type="button"
-              aria-label={saved ? "Saved" : "Save"}
-              onClick={onSave}
-              style={{ flexShrink: 0, background: "none", border: "none", cursor: "pointer", color: saved ? SHEET.coral : SHEET.textMute, padding: 2 }}
-            >
-              <svg width="21" height="21" viewBox="0 0 24 24" fill={saved ? SHEET.coral : "none"} stroke="currentColor" strokeWidth="1.9" strokeLinecap="round" strokeLinejoin="round">
-                <path d="M20.8 4.6a5.5 5.5 0 0 0-7.8 0L12 5.6l-1-1a5.5 5.5 0 0 0-7.8 7.8l1 1L12 21l7.8-7.6 1-1a5.5 5.5 0 0 0 0-7.8z" />
-              </svg>
-            </button>
           </div>
 
           <p style={{ display: "flex", alignItems: "center", gap: 5, margin: "5px 0 0", fontSize: 12.5, color: SHEET.textMute }}>
@@ -289,22 +298,27 @@ function compactRent(value) {
  * around 200px wide and was the main reason pins piled into an unreadable heap.
  * The colour still encodes the flat type, which is what the filter chips key on.
  */
-function makeBhkIcon(bhk, rent) {
-  const c = bhkColors[bhk] || "#6b7280";
-  const label = compactRent(rent);
-  const w = Math.max(52, label.length * 9 + 26);
+function makeBhkIcon(bhk, rent, isSelected) {
+  const label = compactRent(rent).toUpperCase();
+  const w = Math.max(58, label.length * 9.5 + 26);
+  const bg = isSelected ? "#EF4B2B" : "#FFFFFF";
+  const fg = isSelected ? "#FFFFFF" : "#12211E";
   return L.divIcon({
     className: "",
     html:
-      '<div style="background:' +
-      c +
-      ';color:white;padding:5px 12px;border-radius:22px;font-size:13.5px;font-weight:800;white-space:nowrap;border:2px solid white;box-shadow:0 3px 10px rgba(0,0,0,0.32)">' +
-      label +
+      '<div style="display:flex;flex-direction:column;align-items:center;line-height:1">' +
+        '<div style="background:' + bg + ';color:' + fg + ';padding:6px 13px;border-radius:999px;' +
+          'font-size:13.5px;font-weight:800;white-space:nowrap;' +
+          'box-shadow:0 2px 6px rgba(18,33,30,0.28)">' + label + '</div>' +
+        '<div style="width:2px;height:6px;background:' + (isSelected ? "#EF4B2B" : "#EF4B2B") + '"></div>' +
+        '<div style="width:9px;height:9px;border-radius:50%;background:#EF4B2B;' +
+          'border:2px solid #fff;margin-top:-1px;box-shadow:0 1px 3px rgba(18,33,30,0.3)"></div>' +
       "</div>",
-    iconSize: [w, 28],
-    iconAnchor: [w / 2, 14],
+    iconSize: [w, 44],
+    iconAnchor: [w / 2, 44],
   });
 }
+
 
 /**
  * Aggregate pin for a group of listings that would otherwise sit on top of each
@@ -822,7 +836,7 @@ export default function MapView() {
   /** Single "all filters" panel — a dropdown on desktop, a bottom sheet on mobile. Never occupies map layout. */
   const [showFilterPanel, setShowFilterPanel] = useState(false);
   /** "map" | "list" — replaces the old slide-up toggle; on mobile these are fully separate screens */
-  const [mobileTab, setMobileTab] = useState("map");
+  const [mobileTab, setMobileTab] = useState("list");
   /** "all" | "flatmate" | "entire" */
   const [listingType, setListingType] = useState("all");
   const [filters, setFilters] = useState(getFiltersInitialState());
@@ -1576,7 +1590,10 @@ export default function MapView() {
           background: "rgba(255,255,255,0.9)",
           borderBottom: "1px solid #e9e3db",
           position: "relative",
-          zIndex: 1001,
+          // Above the map's own layers (list panel 1002, toggle 1010, listing
+          // sheet 1200): MovEazyNav renders inside here, so its fixed bottom bar
+          // stacks within this context and was being covered by them.
+          zIndex: 1400,
           fontFamily: "'Plus Jakarta Sans', system-ui, sans-serif",
         }}
       >
@@ -2009,7 +2026,7 @@ export default function MapView() {
         )}
       </div>
 
-      <div style={{ flex: 1, display: "flex", minHeight: 0 }}>
+      <div style={{ flex: 1, display: "flex", minHeight: 0, position: "relative" }}>
         <div style={{ flex: "1 1 0%", minWidth: isMobile ? 0 : 280, position: "relative", background: "#fff" }}>
           <MapContainer center={mapState.center} zoom={mapState.zoom} style={{ height: "100%", width: "100%" }}>
             <InvalidateMapSize layoutRevision={mapLayoutKey} />
@@ -2114,7 +2131,7 @@ export default function MapView() {
               <Marker 
                 key={l.id} 
                 position={[l.lat, l.lng]} 
-                icon={makeBhkIcon(l.bhk, l.monthlyRent ?? l.price)} 
+                icon={makeBhkIcon(l.bhk, l.monthlyRent ?? l.price, selected?.id === l.id)} 
                 eventHandlers={{
                   click: () => setSelected(l),
                 }}
@@ -2340,19 +2357,27 @@ export default function MapView() {
             overflowY: "auto",
             background: "#ffffff",
             borderLeft: isMobile ? "none" : "1px solid #e2e8f0",
-            padding: isMobile ? "12px 12px 80px" : "16px 18px",
+            padding: isMobile ? "12px 12px 64px" : "16px 18px",
             fontSize: "15px",
-            height: isMobile ? "100%" : "100%",
+            // height:100% with top:0 would win over the bottom offset below and
+            // put the panel back over the nav bar.
+            height: isMobile ? "auto" : "100%",
             flexShrink: 0,
             position: isMobile ? "absolute" : "static",
             left: 0,
             right: 0,
-            bottom: 0,
+            // Clears the app's own bottom bar (70px) and the Map/List toggle
+            // above it, so navigation is never covered by the results.
+            bottom: isMobile ? "calc(70px + env(safe-area-inset-bottom, 0px))" : 0,
             top: 0,
             zIndex: isMobile ? 1002 : 4,
             isolation: "isolate",
             boxShadow: isMobile ? "0 -8px 24px rgba(15, 23, 42, 0.18)" : "inset 1px 0 0 rgba(15, 23, 42, 0.04)",
             transform: isMobile ? (mobileTab === "list" ? "translateY(0)" : "translateY(102%)") : "none",
+            // Slid away is not gone: its top edge still landed over the bottom
+            // bar and swallowed taps meant for the nav.
+            visibility: isMobile && mobileTab !== "list" ? "hidden" : "visible",
+            pointerEvents: isMobile && mobileTab !== "list" ? "none" : "auto",
             transition: "transform 0.25s ease",
           }}
         >
@@ -2469,8 +2494,8 @@ export default function MapView() {
                 distanceKm={distanceKm}
                 cover={listingCoverSrc(l)}
                 badges={l.matchReasons?.length ? (
-                  <div style={{ display: "flex", flexWrap: "wrap", gap: 6, marginTop: 8 }}>
-                    {l.matchReasons.slice(0, 3).map((reason) => (
+                  <div style={{ display: "flex", flexWrap: "wrap", gap: 5, marginTop: 6 }}>
+                    {l.matchReasons.slice(0, isMobile ? 2 : 3).map((reason) => (
                       <span key={reason} style={{ background: "#E4F6F1", color: "#0E7C68", fontSize: 11, fontWeight: 700, padding: "3px 9px", borderRadius: 999 }}>
                         {reason}
                       </span>
@@ -2496,41 +2521,42 @@ export default function MapView() {
         )}
       </div>
 
-      {/* Mobile bottom tab bar — sits directly above the site-wide bottom action
-          bar (70px) so both stay reachable instead of overlapping. */}
+      {/* Map / List toggle. A compact centred pill rather than a full-width
+          bar: the bar sat across the bottom of the screen and read as the app's
+          navigation, hiding the real one underneath it. */}
       {isMobile && (
         <div
           style={{
             position: "fixed",
-            bottom: "calc(70px + env(safe-area-inset-bottom, 0px))",
-            left: 0,
-            right: 0,
-            height: 56,
-            background: "#1C1A17",
-            borderTop: "1px solid #27272a",
+            bottom: "calc(74px + env(safe-area-inset-bottom, 0px))",
+            left: "50%",
+            transform: "translateX(-50%)",
             display: "flex",
+            gap: 4,
+            padding: 4,
+            borderRadius: 999,
+            background: "#04211D",
+            boxShadow: "0 6px 20px rgba(4,33,29,0.35)",
             zIndex: 1010,
-            boxShadow: "0 -4px 16px rgba(0,0,0,0.4)",
           }}
         >
-          {[["map", "Map"], ["list", "List"]].map(([tab, label]) => (
+          {[["list", "List"], ["map", "Map"]].map(([tab, label]) => (
             <button
               key={tab}
               type="button"
               onClick={() => setMobileTab(tab)}
               style={{
-                flex: 1,
                 border: "none",
-                background: mobileTab === tab ? "#1a1a1a" : "transparent",
-                color: mobileTab === tab ? "#EF5A45" : "#a1a1aa",
-                fontSize: "13px",
+                borderRadius: 999,
+                padding: "8px 22px",
+                background: mobileTab === tab ? "#fff" : "transparent",
+                color: mobileTab === tab ? "#04211D" : "rgba(244,242,237,0.72)",
+                fontSize: 13,
                 fontWeight: 800,
                 cursor: "pointer",
-                borderTop: mobileTab === tab ? "2px solid #EF5A45" : "2px solid transparent",
-                transition: "all 0.15s",
               }}
             >
-              {tab === "map" ? "🗺 " : "📋 "}{label}
+              {label}
             </button>
           ))}
         </div>
@@ -2597,7 +2623,7 @@ export default function MapView() {
         <MapListingSheet
           listing={selected}
           saved={isListingSaved(user, selected.id)}
-          bottomOffset="calc(62px + env(safe-area-inset-bottom, 0px))"
+          bottomOffset="calc(70px + env(safe-area-inset-bottom, 0px))"
           onClose={() => setSelected(null)}
           onSave={() => {
             const now = toggleSavedListing(user, selected.id, selected.title);

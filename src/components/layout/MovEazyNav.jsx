@@ -406,7 +406,10 @@ export default function MovEazyNav({ active = "", transparentAtTop = false, onFi
              of the iOS home indicator. */
           .mzn-bottombar {
             display: grid; grid-auto-flow: column; grid-auto-columns: 1fr;
-            position: fixed; left: 0; right: 0; bottom: 0; z-index: 190;
+            /* Above every page-level overlay: the map's list panel (1002), its
+               Map/List toggle (1010) and its listing sheet (1200) all used to
+               outrank this and cover the app's own navigation. */
+            position: fixed; left: 0; right: 0; bottom: 0; z-index: 1300;
             background: rgba(4,33,29,.95);
             -webkit-backdrop-filter: blur(14px); backdrop-filter: blur(14px);
             border-top: 1px solid rgba(255,255,255,.10);
@@ -433,7 +436,7 @@ export default function MovEazyNav({ active = "", transparentAtTop = false, onFi
              below), full-width, impossible-to-miss red strip. */
           .mzn-visit-nudge {
             display: block; width: 100%;
-            position: fixed; left: 0; right: 0; bottom: 70px; z-index: 189;
+            position: fixed; left: 0; right: 0; bottom: 70px; z-index: 1299;
             background: #DC2626; color: #fff; border: none;
             font-size: 13px; font-weight: 800; letter-spacing: -.01em;
             padding: 12px 16px; text-align: center; cursor: pointer;

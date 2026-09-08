@@ -77,9 +77,9 @@ export default function ListingCard({
             </svg>
           </button>
         </div>
-        <div style={{ flex: 1, minWidth: 0, padding: "14px 16px", display: "flex", flexDirection: "column" }}>
+        <div style={{ flex: 1, minWidth: 0, padding: "10px 13px", display: "flex", flexDirection: "column" }}>
           <div style={{ display: "flex", alignItems: "baseline", justifyContent: "space-between", gap: 8, flexWrap: "wrap" }}>
-            <div style={{ fontWeight: 800, fontSize: 17, letterSpacing: "-0.01em", color: "#171412" }}>{l.price}</div>
+            <div style={{ fontWeight: 800, fontSize: 16.5, letterSpacing: "-0.01em", color: "#171412" }}>{l.price}</div>
             {commuteLabel ? (
               <span style={{ display: "inline-flex", alignItems: "center", gap: 4, fontSize: 11, fontWeight: 700, color: "#ee5b45", background: "#fdeee9", padding: "3px 9px", borderRadius: 999, whiteSpace: "nowrap" }} title={`${commuteLabel} drive to office · ${distanceKm} km`}>
                 <svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" strokeWidth="2.2" aria-hidden><circle cx="12" cy="12" r="9" /><path d="M12 7v5l3 2" strokeLinecap="round" /></svg>
@@ -95,7 +95,7 @@ export default function ListingCard({
               </span>
             )}
           </div>
-          <div style={{ fontWeight: 700, fontSize: 15, margin: "6px 0 2px", letterSpacing: "-0.01em", color: "#171412", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+          <div style={{ fontWeight: 700, fontSize: 14.5, margin: "4px 0 1px", letterSpacing: "-0.01em", color: "#171412", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
             {l.title}
           </div>
           <div style={{ display: "flex", alignItems: "center", gap: 5, color: "#5c554e", fontSize: 12.5 }}>
@@ -105,13 +105,13 @@ export default function ListingCard({
             <span style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{l.address}</span>
           </div>
           {badges}
-          <div style={{ display: "flex", gap: 12, marginTop: "auto", paddingTop: 10, color: "#5c554e", fontSize: 11.5, fontWeight: 600, flexWrap: "wrap" }}>
+          <div style={{ display: "flex", gap: 10, marginTop: "auto", paddingTop: 7, color: "#5c554e", fontSize: 11.5, fontWeight: 600, flexWrap: "wrap" }}>
             {l.propertyType ? <span>{l.propertyType}</span> : null}
             {l.furnishing ? <span>· {l.furnishing}</span> : null}
             {l.availability ? <span>· {l.availability}</span> : null}
           </div>
           {extra}
-          <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginTop: 10, paddingTop: 10, borderTop: "1px solid #f1ece5" }}>
+          <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginTop: 7, paddingTop: 7, borderTop: "1px solid #f1ece5" }}>
             <span style={{ display: "flex", alignItems: "center", gap: 8, fontSize: 12, color: "#5c554e" }}>
               <span style={{ width: 22, height: 22, borderRadius: "50%", background: "#fdeee9", color: "#d8412b", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 10.5, fontWeight: 800, flexShrink: 0 }}>
                 {String(l.seller || "?").trim().charAt(0).toUpperCase() || "?"}
