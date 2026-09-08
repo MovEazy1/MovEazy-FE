@@ -21,14 +21,41 @@ const REACTIONS = [
   { id: "dislike", label: "Dislike", color: C.coral },
 ];
 
+/** First usable photo — a listing may have a cover set, images only, or neither. */
+function coverOf(listing) {
+  return listing?.cover_image_url || (listing?.images ?? [])[0] || "";
+}
+
 function MatchCard({ match, shortlist, canWrite, onSend, onShortlist, onReact, busy }) {
   const { listing, score, reasons, blockers } = match;
   const sent = shortlist?.shared_at;
+  const cover = coverOf(listing);
 
   return (
     <div style={{ display: "flex", gap: 10, padding: "11px 12px", borderBottom: `1px solid ${C.lineSoft}` }}>
-      <div style={{ flex: "none" }}>
+      <div style={{ flex: "none", display: "flex", flexDirection: "column", alignItems: "center", gap: 6 }}>
         <ScoreRing score={score} />
+        {/* Five near-identical "Room in Preoccupied flat · Bellandur" rows are
+            impossible to tell apart by text; the photo is what an agent recognises. */}
+        <div
+          style={{
+            width: 42, height: 42, borderRadius: 7, overflow: "hidden", flex: "none",
+            background: C.surfaceAlt, border: `1px solid ${C.line}`,
+            display: "grid", placeItems: "center",
+          }}
+        >
+          {cover ? (
+            <img
+              src={cover}
+              alt=""
+              loading="lazy"
+              style={{ width: "100%", height: "100%", objectFit: "cover", display: "block" }}
+              onError={(e) => { e.currentTarget.style.display = "none"; }}
+            />
+          ) : (
+            <span className="crm-mute" style={{ fontSize: 8, letterSpacing: ".06em" }}>NO PIC</span>
+          )}
+        </div>
       </div>
       <div style={{ display: "flex", flexDirection: "column", gap: 5, minWidth: 0, flex: 1 }}>
         <span style={{ fontSize: 12.5, fontWeight: 600, color: C.text }}>

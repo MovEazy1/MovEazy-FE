@@ -139,14 +139,16 @@ export function propertyLink(propertyId, shareToken = "") {
       ? window.location.origin
       : "https://www.moveazy.co.in";
   const q = new URLSearchParams({
-    listingId: propertyId,
     utm_source: "crm",
     utm_medium: "whatsapp",
     utm_campaign: "property_share",
     utm_content: propertyId,
   });
   if (shareToken) q.set("mz_s", shareToken);
-  return `${origin}/map?${q.toString()}`;
+  // /p/:id is a tiny server-rendered page carrying this property's own Open
+  // Graph tags, so WhatsApp previews the flat's photos instead of our logo.
+  // It forwards everything here — token included — on to /map?listingId=…
+  return `${origin}/p/${encodeURIComponent(propertyId)}?${q.toString()}`;
 }
 
 /** Opaque, unguessable id for one send of one property to one client. */

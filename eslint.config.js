@@ -13,6 +13,14 @@ export default defineConfig([
     'e2e/**',
   ]),
   {
+    // Vercel edge functions — server runtime, not the browser.
+    files: ['api/**/*.js'],
+    languageOptions: {
+      globals: { ...globals.node, Response: 'readonly', Request: 'readonly', fetch: 'readonly', URL: 'readonly' },
+      parserOptions: { ecmaVersion: 'latest', sourceType: 'module' },
+    },
+  },
+  {
     files: ['**/*.{js,jsx}'],
     extends: [
       js.configs.recommended,
