@@ -5,11 +5,15 @@ import { addVisitRequestData, getListingPrivateData, isListingPubliclyVisible } 
 import { canReadListingPrivatePhones } from "../lib/accessControl";
 import { isSupabaseConfigured } from "../lib/supabase";
 import { triggerVisitNotificationEmail } from "../lib/emailService";
+import {
+  ArrowLeft, Share2, Heart, BedDouble, Users, Home as HomeIcon, CalendarDays,
+  MapPin, ChevronRight, CalendarCheck, Images,
+} from "lucide-react";
+import logoMint from "../assets/logo/moveazy-logo-mint-dark.png";
 import { findNearbyListings } from "../lib/geo";
 import { isListingSaved, toggleSavedListing } from "../lib/userActivity";
 import { submitListingInterestFull, logSavedListingChange } from "../lib/crmSync";
 import { buildBrokerWhatsAppUrl, logBrokerWhatsAppContact } from "../lib/brokerWhatsApp";
-import MovEAZYLogo from "./branding/MovEAZYLogo";
 
 /**
  * The listing view's palette — MovEazy's emerald, not the slate-and-red mix this
@@ -224,6 +228,21 @@ export default function PropertyModal({ property, onClose, listings = [], onSele
   const maintenanceIsEstimate = maintenanceFromField == null;
   const formatInr = (n) => `₹ ${Number(n || 0).toLocaleString("en-IN")}`;
   /** Just the amount — the "per month" is a separate label everywhere it shows. */
+  const toggleSave = () => {
+    const now = toggleSavedListing(user, property.id, property.title);
+    setIsSaved(now);
+    void logSavedListingChange(user, property.id, now, property.title);
+    onSavedChange?.();
+  };
+
+  const photoBtnStyle = {
+    position: "absolute", top: "12px", zIndex: 3,
+    width: "38px", height: "38px", borderRadius: "50%",
+    background: "rgba(255,255,255,0.94)", color: T.text,
+    border: "none", display: "flex", alignItems: "center", justifyContent: "center",
+    cursor: "pointer", boxShadow: "0 2px 10px rgba(4,33,29,0.18)",
+  };
+
   const rentDisplay = numericRent > 0 ? formatInr(numericRent) : String(property.price || "—").replace(/\s*\/\s*mo\b/i, "");
   // Show raw string (e.g. "3 months") if it contains text, otherwise format as INR
   const rawDeposit = String(property.securityDeposit || "").trim();
@@ -391,7 +410,12 @@ export default function PropertyModal({ property, onClose, listings = [], onSele
         animate={{ opacity: 1 }}
         exit={{ opacity: 0 }}
         style={{
-          position: "fixed", inset: 0, zIndex: 99999, background: "rgba(4, 33, 29, 0.94)",
+          position: "fixed", top: 0, left: 0, right: 0,
+          // The app's own bottom bar is fixed at z-index 190; stopping short of
+          // it keeps that nav visible and working rather than covering it and
+          // drawing a fake one.
+          bottom: isMobile ? "calc(62px + env(safe-area-inset-bottom, 0px))" : 0,
+          zIndex: 99999, background: "rgba(4, 33, 29, 0.94)",
           display: "flex", justifyContent: "center", alignItems: "center", padding: isMobile ? "8px" : "20px"
         }}
         onClick={onClose}
@@ -418,7 +442,7 @@ export default function PropertyModal({ property, onClose, listings = [], onSele
               gap: "12px",
               flexWrap: "wrap",
               background: T.ink,
-              borderBottom: "1px solid #27272a",
+              borderBottom: `1px solid ${T.inkSoft}`,
               zIndex: 10,
             }}
           >
@@ -427,8 +451,14 @@ export default function PropertyModal({ property, onClose, listings = [], onSele
                 onClick={() => onClose()}
                 style={{ cursor: "pointer", display: "flex", alignItems: "center", flexShrink: 0 }}
               >
-                <MovEAZYLogo variant="dark" size={isMobile ? "sm" : "md"} />
+                <img
+                  src={logoMint}
+                  alt="MovEazy"
+                  draggable={false}
+                  style={{ height: isMobile ? "24px" : "30px", width: "auto", display: "block" }}
+                />
               </div>
+{!isMobile && (
               <div style={{ display: "flex", gap: isMobile ? "10px" : "16px", color: T.line, fontWeight: 600, fontSize: isMobile ? "12px" : "14px", flexWrap: "wrap", minWidth: 0 }}>
                 <span onClick={() => scrollTo("overview")} style={{ cursor: "pointer", transition: "color 0.2s" }} onMouseEnter={(e) => e.target.style.color = T.mint} onMouseLeave={(e) => e.target.style.color = T.line}>Overview</span>
                 {nearbyListings.length > 0 && typeof onSelectListing === "function" ? (
@@ -436,17 +466,13 @@ export default function PropertyModal({ property, onClose, listings = [], onSele
                 ) : null}
                 <span onClick={() => scrollTo("facts")} style={{ cursor: "pointer", transition: "color 0.2s" }} onMouseEnter={(e) => e.target.style.color = T.mint} onMouseLeave={(e) => e.target.style.color = T.line}>Facts & Features</span>
               </div>
+              )}
             </div>
             <div style={{ display: "flex", gap: "8px", alignItems: "center", flexShrink: 0, marginLeft: "auto" }}>
               <button
                 type="button"
-                onClick={() => {
-                  const now = toggleSavedListing(user, property.id, property.title);
-                  setIsSaved(now);
-                  void logSavedListingChange(user, property.id, now, property.title);
-                  onSavedChange?.();
-                }}
-                style={{ background: "rgba(255,255,255,0.05)", border: `1px solid ${T.inkSoft}`, borderRadius: "8px", padding: "6px 12px", fontWeight: 600, fontSize: "13px", cursor: "pointer", color: isSaved ? T.teal : T.lineSoft, transition: "all 0.2s" }}
+                onClick={toggleSave}
+                style={{ display: isMobile ? "none" : "block", background: "rgba(255,255,255,0.05)", border: `1px solid ${T.inkSoft}`, borderRadius: "8px", padding: "6px 12px", fontWeight: 600, fontSize: "13px", cursor: "pointer", color: isSaved ? T.teal : T.lineSoft, transition: "all 0.2s" }}
                 onMouseEnter={(e) => {
                   if (!isSaved) {
                     e.currentTarget.style.background = "rgba(255,255,255,0.1)";
@@ -462,7 +488,7 @@ export default function PropertyModal({ property, onClose, listings = [], onSele
               >
                 {isMobile ? (isSaved ? "♥" : "♡") : (isSaved ? "♥ Saved" : "♡ Save")}
               </button>
-              <button type="button" onClick={handleShare} style={{ background: "rgba(255,255,255,0.05)", border: `1px solid ${T.inkSoft}`, borderRadius: "8px", padding: "6px 12px", fontWeight: 600, fontSize: "13px", cursor: "pointer", color: T.lineSoft, transition: "all 0.2s" }} onMouseEnter={(e) => { e.currentTarget.style.background = "rgba(255,255,255,0.1)"; e.currentTarget.style.borderColor = T.textMute; }} onMouseLeave={(e) => { e.currentTarget.style.background = "rgba(255,255,255,0.05)"; e.currentTarget.style.borderColor = T.textDim; }}>
+              <button type="button" onClick={handleShare} style={{ display: isMobile ? "none" : "block", background: "rgba(255,255,255,0.05)", border: `1px solid ${T.inkSoft}`, borderRadius: "8px", padding: "6px 12px", fontWeight: 600, fontSize: "13px", cursor: "pointer", color: T.lineSoft, transition: "all 0.2s" }} onMouseEnter={(e) => { e.currentTarget.style.background = "rgba(255,255,255,0.1)"; e.currentTarget.style.borderColor = T.textMute; }} onMouseLeave={(e) => { e.currentTarget.style.background = "rgba(255,255,255,0.05)"; e.currentTarget.style.borderColor = T.textDim; }}>
                 {isMobile ? "↗" : shareText}
               </button>
               <button
@@ -532,34 +558,47 @@ export default function PropertyModal({ property, onClose, listings = [], onSele
               >
                 <MediaElement src={images[activeMediaIndex]} alt={property.title} firstImage={firstImageUrl} style={{ width: "100%", height: "100%", objectFit: "contain" }} />
 
-                {/* Rent sits on the photo: it is the first thing anyone reads,
-                    and this buys back the vertical space it used to take below. */}
+                {/* Navigation lives on the photo, as the design has it — which
+                    is also what lets the header shrink to just the logo. */}
+                {isMobile && (
+                  <>
+                    <button
+                      type="button"
+                      aria-label="Back"
+                      onClick={() => onClose()}
+                      style={{ ...photoBtnStyle, left: "12px" }}
+                    >
+                      <ArrowLeft size={20} strokeWidth={2.2} />
+                    </button>
+                    <div style={{ position: "absolute", top: "12px", right: "12px", zIndex: 3, display: "flex", gap: "8px" }}>
+                      <button type="button" aria-label="Share" onClick={handleShare} style={{ ...photoBtnStyle, position: "static" }}>
+                        <Share2 size={18} strokeWidth={2.2} />
+                      </button>
+                      <button
+                        type="button"
+                        aria-label={isSaved ? "Saved" : "Save"}
+                        onClick={toggleSave}
+                        style={{ ...photoBtnStyle, position: "static", color: isSaved ? T.coral : T.text }}
+                      >
+                        <Heart size={18} strokeWidth={2.2} fill={isSaved ? T.coral : "none"} />
+                      </button>
+                    </div>
+                  </>
+                )}
+
                 <div
                   style={{
-                    position: "absolute", left: 0, right: 0, bottom: 0,
-                    display: "flex", alignItems: "flex-end", justifyContent: "space-between",
-                    gap: "10px", padding: "26px 14px 12px", pointerEvents: "none",
-                    background: "linear-gradient(transparent, rgba(4,33,29,0.86))",
-                    zIndex: 2,
+                    position: "absolute", left: "12px", bottom: "12px", zIndex: 3,
+                    display: "flex", alignItems: "center", gap: "6px",
+                    background: "rgba(4,33,29,0.72)", color: "#fff",
+                    borderRadius: "8px", padding: "5px 10px",
+                    fontSize: "12px", fontWeight: 700,
                   }}
                 >
-                  <div>
-                    <div style={{ color: "#fff", fontSize: isMobile ? "24px" : "28px", fontWeight: 800, lineHeight: 1.05 }}>
-                      {rentDisplay}
-                    </div>
-                    <div style={{ color: "rgba(244,242,237,0.82)", fontSize: "12px", fontWeight: 600 }}>
-                      per month
-                    </div>
-                  </div>
-                  <span
-                    style={{
-                      background: "rgba(255,255,255,0.94)", color: T.text, fontSize: "12px",
-                      fontWeight: 700, borderRadius: "999px", padding: "6px 12px", whiteSpace: "nowrap",
-                    }}
-                  >
-                    {images.length} photo{images.length === 1 ? "" : "s"}
-                  </span>
+                  <Images size={14} strokeWidth={2.2} />
+                  {activeMediaIndex + 1} / {images.length}
                 </div>
+
                 {isActiveVideo && (
                   <div style={{ position: "absolute", top: "10px", left: "10px", zIndex: 2, background: "rgba(4,33,29,0.78)", color: "white", fontSize: "11px", fontWeight: 700, borderRadius: "999px", padding: "5px 9px" }}>
                     VIDEO
@@ -586,7 +625,7 @@ export default function PropertyModal({ property, onClose, listings = [], onSele
                     <button
                       type="button"
                       onClick={(e) => { e.stopPropagation(); goPrevMedia(); }}
-                      style={{ position: "absolute", left: "10px", top: "50%", transform: "translateY(-50%)", width: "34px", height: "34px", borderRadius: "999px", border: `1px solid ${T.line}`, background: "rgba(255,255,255,0.92)", color: T.text, fontWeight: 700, zIndex: 10, cursor: "pointer", pointerEvents: "auto" }}
+                      style={{ display: isMobile ? "none" : "block", position: "absolute", left: "10px", top: "50%", transform: "translateY(-50%)", width: "34px", height: "34px", borderRadius: "999px", border: `1px solid ${T.line}`, background: "rgba(255,255,255,0.92)", color: T.text, fontWeight: 700, zIndex: 10, cursor: "pointer", pointerEvents: "auto" }}
                       aria-label="Previous media"
                     >
                       {"<"}
@@ -594,7 +633,7 @@ export default function PropertyModal({ property, onClose, listings = [], onSele
                     <button
                       type="button"
                       onClick={(e) => { e.stopPropagation(); goNextMedia(); }}
-                      style={{ position: "absolute", right: "10px", top: "50%", transform: "translateY(-50%)", width: "34px", height: "34px", borderRadius: "999px", border: `1px solid ${T.line}`, background: "rgba(255,255,255,0.92)", color: T.text, fontWeight: 700, zIndex: 10, cursor: "pointer", pointerEvents: "auto" }}
+                      style={{ display: isMobile ? "none" : "block", position: "absolute", right: "10px", top: "50%", transform: "translateY(-50%)", width: "34px", height: "34px", borderRadius: "999px", border: `1px solid ${T.line}`, background: "rgba(255,255,255,0.92)", color: T.text, fontWeight: 700, zIndex: 10, cursor: "pointer", pointerEvents: "auto" }}
                       aria-label="Next media"
                     >
                       {">"}
@@ -694,42 +733,62 @@ export default function PropertyModal({ property, onClose, listings = [], onSele
                     Posted {postedAgo}
                   </p>
                 )}
-                <p style={{ fontSize: "15px", color: T.textMute, margin: "0 0 14px", lineHeight: 1.5 }}>{property.address || property.areas || "Location not provided"}</p>
+                <p style={{ display: "flex", alignItems: "flex-start", gap: "7px", fontSize: "14.5px", color: T.textDim, margin: "0 0 16px", lineHeight: 1.45 }}>
+                  <MapPin size={16} strokeWidth={2} style={{ flexShrink: 0, marginTop: "2px", color: T.textMute }} />
+                  <span>{property.address || property.areas || "Location not provided"}</span>
+                </p>
 
-                {/* Rent and deposit read together — they're the pair a renter
-                    compares listings on, so they belong side by side. */}
+                {/* Rent and deposit are the pair every renter compares on. */}
                 <div
                   style={{
-                    display: "flex", gap: isMobile ? "10px" : "16px", alignItems: "stretch",
-                    margin: "0 0 16px", padding: "12px 0",
-                    borderTop: `1px solid ${T.line}`, borderBottom: `1px solid ${T.line}`,
+                    display: "flex", alignItems: "stretch", gap: "18px",
+                    margin: "0 0 18px", paddingBottom: "18px",
+                    borderBottom: `1px solid ${T.line}`,
                   }}
                 >
                   <div style={{ flex: 1, minWidth: 0 }}>
-                    <div style={{ fontSize: "12px", color: T.textMute, fontWeight: 600, marginBottom: "3px" }}>Rent</div>
-                    <div style={{ fontSize: isMobile ? "16px" : "19px", fontWeight: 800, color: T.text, whiteSpace: "nowrap" }}>{rentDisplay}</div>
+                    <div style={{ fontSize: isMobile ? "26px" : "28px", fontWeight: 800, color: T.text, lineHeight: 1.1 }}>{rentDisplay}</div>
+                    <div style={{ fontSize: "13px", color: T.textMute, marginTop: "3px" }}>/ month</div>
                   </div>
                   <div style={{ width: "1px", background: T.line }} />
                   <div style={{ flex: 1, minWidth: 0 }}>
-                    <div style={{ fontSize: "12px", color: T.textMute, fontWeight: 600, marginBottom: "3px" }}>
-                      Deposit{depositIsEstimate ? " (est.)" : ""}
-                    </div>
-                    <div style={{ fontSize: isMobile ? "16px" : "19px", fontWeight: 800, color: depositIsEstimate ? T.textDim : T.text, whiteSpace: "nowrap" }}>
+                    <div style={{ fontSize: isMobile ? "26px" : "28px", fontWeight: 800, color: depositIsEstimate ? T.textDim : T.text, lineHeight: 1.1 }}>
                       {depositSidebar}
                     </div>
-                  </div>
-                  <div style={{ width: "1px", background: T.line }} />
-                  <div style={{ flex: 1, minWidth: 0 }}>
-                    <div style={{ fontSize: "12px", color: T.textMute, fontWeight: 600, marginBottom: "3px" }}>
-                      Maint.{maintenanceIsEstimate ? " (est.)" : ""}
-                    </div>
-                    <div style={{ fontSize: isMobile ? "16px" : "19px", fontWeight: 800, color: maintenanceIsEstimate ? T.textDim : T.text, whiteSpace: "nowrap" }}>
-                      {maintenanceSidebar}
+                    <div style={{ fontSize: "13px", color: T.textMute, marginTop: "3px" }}>
+                      deposit{depositIsEstimate ? " (est.)" : ""}
                     </div>
                   </div>
                 </div>
-                
-                <div style={{ display: "flex", gap: "12px", marginBottom: "24px", flexWrap: "wrap" }}>
+
+                {/* The four facts that decide whether a listing is even worth
+                    reading — configuration, availability and who it's for. */}
+                <div
+                  style={{
+                    display: "grid",
+                    gridTemplateColumns: isMobile ? "1fr 1fr" : "repeat(4, minmax(0,1fr))",
+                    gap: "16px 12px", marginBottom: "26px",
+                  }}
+                >
+                  {[
+                    [BedDouble, property.bhk || "Home", property.propertyType || "Apartment"],
+                    [Users, property.preferredTenants?.length ? property.preferredTenants[0] : "Anyone", "welcome"],
+                    [HomeIcon, property.furnishing || "Unfurnished", "furnishing"],
+                    [CalendarDays, property.availableFrom
+                      ? new Date(property.availableFrom).toLocaleDateString("en-IN", { day: "numeric", month: "short", year: "numeric" })
+                      : (property.availability || "Immediate"), "available from"],
+                  ].map(([Icon, main, sub]) => (
+                    <div key={sub} style={{ display: "flex", gap: "10px", alignItems: "flex-start", minWidth: 0 }}>
+                      <Icon size={20} strokeWidth={1.9} style={{ flexShrink: 0, marginTop: "2px", color: T.text }} />
+                      <div style={{ minWidth: 0 }}>
+                        <div style={{ fontSize: "14px", fontWeight: 700, color: T.text, lineHeight: 1.25 }}>{main}</div>
+                        <div style={{ fontSize: "12.5px", color: T.textMute, lineHeight: 1.3 }}>{sub}</div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+
+                <div style={{ display: isMobile ? "none" : "flex", gap: "12px", marginBottom: "24px", flexWrap: "wrap" }}>
                   <div style={badgeStyles}>🏢 {property.propertyType || property.type || "Apartment"}</div>
                   <div style={badgeStyles}>🛏️ {property.bhk || "2 BHK"}</div>
                   <div style={badgeStyles}>🛋️ {property.furnishing || "Semi"}</div>
@@ -782,9 +841,9 @@ export default function PropertyModal({ property, onClose, listings = [], onSele
                 </div>
 
                 <div style={{ background: T.cream, padding: "24px", borderRadius: "12px", marginBottom: "32px", border: `1px solid ${T.line}` }}>
-                  <h2 style={{ margin: "0 0 12px", fontSize: "18px", color: T.text }}>What's special</h2>
+                  <h2 style={{ margin: "0 0 12px", fontSize: "18px", color: T.text }}>About this property</h2>
                   <p style={{ margin: 0, fontSize: "15px", color: T.textDim, lineHeight: "1.6", whiteSpace: "pre-wrap" }}>
-                    {property.description || "Stunning property located in a prime neighborhood. Contact the seller to learn more about the unprecedented amenities and layout. Perfect for those looking for comfort and convenience in one place."}
+                    {property.description || "The owner hasn't written a description yet. Schedule a visit and we'll get you the details."}
                   </p>
                 </div>
 
@@ -1016,7 +1075,7 @@ export default function PropertyModal({ property, onClose, listings = [], onSele
                       <span>Security deposit</span><strong style={{ color: T.text }}>{depositSidebar}</strong>
                     </div>
                     <div style={{ display: "flex", justifyContent: "space-between", fontSize: "12px", color: T.textDim, marginBottom: "6px" }}>
-                      <span>Maintenance (est.)</span><strong style={{ color: T.text }}>{maintenanceSidebar}</strong>
+                      <span>Maintenance{maintenanceIsEstimate ? " (est.)" : ""}</span><strong style={{ color: T.text }}>{maintenanceSidebar}</strong>
                     </div>
 
                   </div>
@@ -1148,24 +1207,20 @@ export default function PropertyModal({ property, onClose, listings = [], onSele
                   boxShadow: "0 -6px 20px rgba(4,33,29,0.08)",
                 }}
               >
-                <div style={{ minWidth: 0, flex: "0 0 auto" }}>
-                  <div style={{ fontSize: "17px", fontWeight: 800, color: T.teal, lineHeight: 1.1 }}>
-                    {rentDisplay}
-                  </div>
-                  <div style={{ fontSize: "11px", color: T.textMute }}>per month</div>
-                </div>
                 <button
                   type="button"
                   disabled={offMarket}
                   onClick={() => { if (!offMarket) { setShowVisitForm(true); scrollTo("book"); } }}
                   style={{
-                    flex: 1, padding: "13px", borderRadius: "10px", border: "none",
-                    background: offMarket ? T.line : T.teal, color: "#fff",
-                    fontSize: "15px", fontWeight: 700,
+                    flex: 1, padding: "15px", borderRadius: "12px", border: "none",
+                    display: "flex", alignItems: "center", justifyContent: "center", gap: "10px",
+                    background: offMarket ? T.line : T.coral, color: "#fff",
+                    fontSize: "16px", fontWeight: 700,
                     cursor: offMarket ? "not-allowed" : "pointer",
                   }}
                 >
-                  {offMarket ? "Off market" : "Schedule a visit"}
+                  <CalendarCheck size={19} strokeWidth={2.1} />
+                  {offMarket ? "Off market" : "Schedule Visit"}
                 </button>
               </div>
             )}
