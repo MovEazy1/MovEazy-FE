@@ -9,6 +9,8 @@ import { useVisitCart } from "../context/VisitCartContext";
 import { recommendInventory } from "../lib/recommend";
 import { fetchUserRequirement } from "../lib/userRequirements";
 import { fetchReactions, setReaction } from "../lib/visits";
+import { mapInventoryToListing } from "../lib/inventory";
+import ListingCard from "../components/ListingCard";
 import { recordListingView } from "../lib/inventory";
 import { haversineKm } from "../lib/geo";
 
@@ -122,6 +124,14 @@ export default function Recommendations() {
   const [activeId, setActiveId] = useState(null);
   const [flyCenter, setFlyCenter] = useState(BLR);
   const [mobileView, setMobileView] = useState("list"); // list | map (mobile toggle)
+  // ListingCard sizes its thumbnail from this; kept reactive so a rotate or a
+  // resized window doesn't leave the card at the wrong width.
+  const [isMobile, setIsMobile] = useState(typeof window !== "undefined" ? window.innerWidth <= 768 : false);
+  useEffect(() => {
+    const onResize = () => setIsMobile(window.innerWidth <= 768);
+    window.addEventListener("resize", onResize);
+    return () => window.removeEventListener("resize", onResize);
+  }, []);
   const [detailListing, setDetailListing] = useState(null); // the result open in the full-screen detail view
   const [actionToast, setActionToast] = useState(""); // brief confirmation after like/dislike/site-visit
   const [currentImageIndex, setCurrentImageIndex] = useState(0); // image carousel in detail view
@@ -465,56 +475,47 @@ export default function Recommendations() {
               const l = r.listing;
               const cover = l.cover_image_url || (Array.isArray(l.images) && l.images[0]) || "";
               return (
-                <div
-                  key={l.property_id}
-                  ref={(el) => (cardRefs.current[l.property_id] = el)}
-                  className={`rec-card ${activeId === l.property_id ? "is-active" : ""}`}
-                  onMouseEnter={() => { setActiveId(l.property_id); if (l.latitude) setFlyCenter([Number(l.latitude), Number(l.longitude)]); }}
-                  onClick={() => openCard(r)}
-                >
-                  <div className="rec-thumb">
-                    {cover
-                      ? <img src={cover} alt="" loading="lazy" onError={(e) => { e.currentTarget.style.display = "none"; }} />
-                      : <span className="rec-thumb-fallback"><svg width="34" height="34" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6"><path d="M3 10.5 12 4l9 6.5V20a1 1 0 0 1-1 1h-5v-6H9v6H4a1 1 0 0 1-1-1z"/></svg></span>}
-                  </div>
-                  <div className="rec-body">
-                    <div className="rec-name">{l.title || `${l.flat_type || "Home"} in ${l.area || "Bengaluru"}`}</div>
-                    <div className="rec-meta">
-                      {[l.flat_type, l.area, l.furnishing].filter(Boolean).join(" · ")}
-                      {(() => {
-                        const r = String(l.posted_by || l.postedBy || "").toLowerCase();
-                        const label = r === "broker" ? "Broker" : r === "tenant" ? "Tenant" : r === "owner" ? "Owner" : "";
-                        return label ? <span className="rec-listedby">Listed by {label}</span> : null;
-                      })()}
-                    </div>
-                    {r.reasons?.length > 0 && (
+                <div key={l.property_id} ref={(el) => (cardRefs.current[l.property_id] = el)}>
+                  <ListingCard
+                    listing={mapInventoryToListing(l)}
+                    isActive={activeId === l.property_id}
+                    isMobile={isMobile}
+                    cover={cover}
+                    saved={reactions[l.property_id] === "like"}
+                    onHover={() => {
+                      setActiveId(l.property_id);
+                      if (l.latitude) setFlyCenter([Number(l.latitude), Number(l.longitude)]);
+                    }}
+                    onSelect={() => openCard(r)}
+                    onDetails={() => openCard(r)}
+                    onSave={() => react(l.property_id, "like")}
+                    badges={r.reasons?.length > 0 ? (
                       <div className="rec-reasons">
                         {r.reasons.slice(0, 4).map((x, i) => <span key={i} className="rec-chip">{x}</span>)}
                       </div>
+                    ) : null}
+                    extra={(
+                      <div className="rec-actions" onClick={(e) => e.stopPropagation()}>
+                        <button type="button" className={`rec-ico ${reactions[l.property_id] === "like" ? "on-like" : ""}`} title="Like" aria-label="Like" onClick={() => react(l.property_id, "like")}>
+                          <svg width="18" height="18" viewBox="0 0 24 24" fill={reactions[l.property_id] === "like" ? "currentColor" : "none"} stroke="currentColor" strokeWidth="1.9" strokeLinecap="round" strokeLinejoin="round"><path d="M20.8 4.6a5.5 5.5 0 0 0-7.8 0L12 5.6l-1-1a5.5 5.5 0 0 0-7.8 7.8l1 1L12 21l7.8-7.6 1-1a5.5 5.5 0 0 0 0-7.8z"/></svg>
+                        </button>
+                        <button type="button" className={`rec-ico ${reactions[l.property_id] === "dislike" ? "on-dislike" : ""}`} title="Not for me" aria-label="Dislike" onClick={() => react(l.property_id, "dislike")}>
+                          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.9" strokeLinecap="round" strokeLinejoin="round"><path d="M17 14V2M9.2 22l1.3-6H4.3a2 2 0 0 1-2-2.3l1.4-9A2 2 0 0 1 5.6 3H17v11l-5 8a2 2 0 0 1-2.8-1z"/></svg>
+                        </button>
+                        {cart.has(l.property_id) ? (
+                          <button type="button" className="rec-add is-added" onClick={() => navigate("/visits")}>
+                            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.3" strokeLinecap="round" strokeLinejoin="round"><path d="M20 6 9 17l-5-5"/></svg>
+                            In your visits
+                          </button>
+                        ) : (
+                          <button type="button" className="rec-add" onClick={() => cart.add(l)}>
+                            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.1" strokeLinecap="round" strokeLinejoin="round"><path d="M12 5v14M5 12h14"/></svg>
+                            Add to site visit
+                          </button>
+                        )}
+                      </div>
                     )}
-                    <div className="rec-foot">
-                      <span className="rec-rent">{fmtINR(l.rent)}<small>/mo</small></span>
-                    </div>
-                    <div className="rec-actions" onClick={(e) => e.stopPropagation()}>
-                      <button type="button" className={`rec-ico ${reactions[l.property_id] === "like" ? "on-like" : ""}`} title="Like" aria-label="Like" onClick={() => react(l.property_id, "like")}>
-                        <svg width="18" height="18" viewBox="0 0 24 24" fill={reactions[l.property_id] === "like" ? "currentColor" : "none"} stroke="currentColor" strokeWidth="1.9" strokeLinecap="round" strokeLinejoin="round"><path d="M20.8 4.6a5.5 5.5 0 0 0-7.8 0L12 5.6l-1-1a5.5 5.5 0 0 0-7.8 7.8l1 1L12 21l7.8-7.6 1-1a5.5 5.5 0 0 0 0-7.8z"/></svg>
-                      </button>
-                      <button type="button" className={`rec-ico ${reactions[l.property_id] === "dislike" ? "on-dislike" : ""}`} title="Not for me" aria-label="Dislike" onClick={() => react(l.property_id, "dislike")}>
-                        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.9" strokeLinecap="round" strokeLinejoin="round"><path d="M17 14V2M9.2 22l1.3-6H4.3a2 2 0 0 1-2-2.3l1.4-9A2 2 0 0 1 5.6 3H17v11l-5 8a2 2 0 0 1-2.8-1z"/></svg>
-                      </button>
-                      {cart.has(l.property_id) ? (
-                        <button type="button" className="rec-add is-added" onClick={() => navigate("/visits")}>
-                          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.3" strokeLinecap="round" strokeLinejoin="round"><path d="M20 6 9 17l-5-5"/></svg>
-                          In your visits
-                        </button>
-                      ) : (
-                        <button type="button" className="rec-add" onClick={() => cart.add(l)}>
-                          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.1" strokeLinecap="round" strokeLinejoin="round"><path d="M12 5v14M5 12h14"/></svg>
-                          Add to site visit
-                        </button>
-                      )}
-                    </div>
-                  </div>
+                  />
                 </div>
               );
             })}

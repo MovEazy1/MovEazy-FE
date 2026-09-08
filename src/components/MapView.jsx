@@ -25,6 +25,7 @@ import {
 import { logSavedListingChange } from "../lib/crmSync";
 import { reportClientWarn } from "../lib/clientLog";
 import MovEazyNav from "./layout/MovEazyNav";
+import ListingCard from "./ListingCard";
 
 const MAP_NEARBY_KM = 12;
 /** Default max distance (km) from workplace / geocoded pin; user-adjustable in search panel. */
@@ -58,6 +59,148 @@ function formatCommute(km) {
  * south (lower lat) so the property sits higher in the visible area.
  */
 const MOBILE_LISTING_FOCUS_LAT_OFFSET = 0.0018;
+
+/** Palette shared with the listing view and My Properties. */
+const SHEET = {
+  ink: "#04211D", teal: "#0E7C68", coral: "#E2573C",
+  card: "#FFFFFF", cream: "#F6F1E8", line: "#DCE8E5",
+  text: "#12211E", textMute: "#7A8F8A",
+};
+
+const sheetIcon = (d) => (
+  <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+    strokeWidth="1.9" strokeLinecap="round" strokeLinejoin="round" style={{ flexShrink: 0 }}>
+    {d}
+  </svg>
+);
+
+/**
+ * The selected listing on a phone.
+ *
+ * Replaces the Leaflet popup, which is laid out for a desktop pointer and broke
+ * badly at phone widths — clipped by the map edge, with the text spilling out of
+ * its own frame.
+ */
+function MapListingSheet({ listing, saved, onSave, onDetails, onClose, bottomOffset }) {
+  if (!listing) return null;
+  const photos = (listing.images || []).filter(Boolean);
+  const cover = listing.image || photos[0] || "";
+  const rent = Number(String(listing.monthlyRent || listing.rent || 0).toString().replace(/[^0-9.]/g, "")) || 0;
+  const available = listing.availableFrom
+    ? new Date(listing.availableFrom).toLocaleDateString("en-IN", { day: "numeric", month: "short", year: "numeric" })
+    : (listing.availability || "Immediate");
+
+  return (
+    <div
+      style={{
+        position: "fixed", left: 0, right: 0, bottom: bottomOffset, zIndex: 1200,
+        background: SHEET.card, borderRadius: "18px 18px 0 0",
+        boxShadow: "0 -8px 30px rgba(4,33,29,0.18)",
+        padding: "8px 16px 16px",
+      }}
+    >
+      <div
+        role="button"
+        tabIndex={0}
+        aria-label="Close"
+        onClick={onClose}
+        onKeyDown={(e) => (e.key === "Enter" || e.key === " ") && onClose()}
+        style={{ width: 42, height: 4, borderRadius: 99, background: "#D8E2DF", margin: "0 auto 12px", cursor: "pointer" }}
+      />
+
+      <div style={{ display: "flex", gap: 13 }}>
+        <div
+          style={{
+            width: 108, height: 92, borderRadius: 12, flexShrink: 0, position: "relative",
+            background: cover ? `url(${cover}) center/cover` : "#EDF3F1",
+          }}
+        >
+          {photos.length > 1 && (
+            <span
+              style={{
+                position: "absolute", left: 6, bottom: 6, display: "flex", alignItems: "center", gap: 4,
+                background: "rgba(4,33,29,0.74)", color: "#fff", borderRadius: 7,
+                padding: "3px 7px", fontSize: 10.5, fontWeight: 700,
+              }}
+            >
+              {photos.length} photos
+            </span>
+          )}
+        </div>
+
+        <div style={{ minWidth: 0, flex: 1 }}>
+          <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", gap: 8 }}>
+            <p style={{ margin: 0, fontSize: 15.5, fontWeight: 800, color: SHEET.text, lineHeight: 1.25 }}>
+              {listing.title}
+            </p>
+            <button
+              type="button"
+              aria-label={saved ? "Saved" : "Save"}
+              onClick={onSave}
+              style={{ flexShrink: 0, background: "none", border: "none", cursor: "pointer", color: saved ? SHEET.coral : SHEET.textMute, padding: 2 }}
+            >
+              <svg width="21" height="21" viewBox="0 0 24 24" fill={saved ? SHEET.coral : "none"} stroke="currentColor" strokeWidth="1.9" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M20.8 4.6a5.5 5.5 0 0 0-7.8 0L12 5.6l-1-1a5.5 5.5 0 0 0-7.8 7.8l1 1L12 21l7.8-7.6 1-1a5.5 5.5 0 0 0 0-7.8z" />
+              </svg>
+            </button>
+          </div>
+
+          <p style={{ display: "flex", alignItems: "center", gap: 5, margin: "5px 0 0", fontSize: 12.5, color: SHEET.textMute }}>
+            {sheetIcon(<><path d="M20 10c0 6-8 12-8 12s-8-6-8-12a8 8 0 0 1 16 0Z" /><circle cx="12" cy="10" r="3" /></>)}
+            <span style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{listing.address}</span>
+          </p>
+
+          <p style={{ margin: "7px 0 0", fontSize: 19, fontWeight: 800, color: SHEET.text }}>
+            {rent > 0 ? `₹${rent.toLocaleString("en-IN")}` : listing.price}
+            <span style={{ fontSize: 12.5, fontWeight: 600, color: SHEET.textMute }}> / month</span>
+          </p>
+        </div>
+      </div>
+
+      <div style={{ display: "flex", gap: 12, margin: "14px 0", flexWrap: "wrap" }}>
+        {[
+          [<><path d="M2 9V7a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v2" key="a" /><path d="M2 11h20v6H2z" key="b" /><path d="M4 17v2M20 17v2" key="c" /></>, listing.bhk || "Home"],
+          [<><path d="M4 11V8a2 2 0 0 1 2-2h12a2 2 0 0 1 2 2v3" key="a" /><path d="M2 13h20v5H2z" key="b" /></>, listing.furnishing || "Unfurnished"],
+          [<><rect x="3" y="4" width="18" height="18" rx="2" key="a" /><path d="M16 2v4M8 2v4M3 10h18" key="b" /></>, available],
+        ].map(([d, label]) => (
+          <span key={String(label)} style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 12.5, color: SHEET.text, minWidth: 0 }}>
+            <span style={{ color: SHEET.text }}>{sheetIcon(d)}</span>
+            <span style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{label}</span>
+          </span>
+        ))}
+      </div>
+
+      <div style={{ display: "flex", gap: 10 }}>
+        <button
+          type="button"
+          onClick={onSave}
+          style={{
+            flex: "0 0 40%", height: 48, borderRadius: 12, border: "none", cursor: "pointer",
+            display: "flex", alignItems: "center", justifyContent: "center", gap: 8,
+            background: SHEET.cream, color: SHEET.text, fontSize: 14.5, fontWeight: 700,
+          }}
+        >
+          <svg width="17" height="17" viewBox="0 0 24 24" fill={saved ? SHEET.coral : "none"} stroke={saved ? SHEET.coral : "currentColor"} strokeWidth="1.9" strokeLinecap="round" strokeLinejoin="round">
+            <path d="M20.8 4.6a5.5 5.5 0 0 0-7.8 0L12 5.6l-1-1a5.5 5.5 0 0 0-7.8 7.8l1 1L12 21l7.8-7.6 1-1a5.5 5.5 0 0 0 0-7.8z" />
+          </svg>
+          {saved ? "Saved" : "Save"}
+        </button>
+        <button
+          type="button"
+          onClick={onDetails}
+          style={{
+            flex: 1, height: 48, borderRadius: 12, border: "none", cursor: "pointer",
+            display: "flex", alignItems: "center", justifyContent: "center", gap: 9,
+            background: SHEET.coral, color: "#fff", fontSize: 15, fontWeight: 700,
+          }}
+        >
+          Details
+          <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.3" strokeLinecap="round" strokeLinejoin="round"><path d="M5 12h14M13 6l6 6-6 6" /></svg>
+        </button>
+      </div>
+    </div>
+  );
+}
 
 function mapStateForListingFocus(lat, lng, isMobile) {
   const la = Number(lat);
@@ -1799,6 +1942,7 @@ export default function MapView() {
                   click: () => setSelected(l),
                 }}
               >
+                {!isMobile && (
                 <Popup autoPan={false} keepInView={false} maxWidth={360}>
                   <div
                     style={{
@@ -1884,6 +2028,7 @@ export default function MapView() {
                     </div>
                   </div>
                 </Popup>
+                )}
               </Marker>
             ))}
           </MapContainer>
@@ -2129,7 +2274,6 @@ export default function MapView() {
             }}
           >
           {sortedDisplayPins.map((l) => {
-            const isFlatmate = l.bhk === "Roommate needed";
             const anchor = workplaceAnchor || placeAnchor;
             const distanceRaw = anchor && Number.isFinite(Number(l.lat)) && Number.isFinite(Number(l.lng))
               ? haversineKm(anchor.lat, anchor.lng, Number(l.lat), Number(l.lng))
@@ -2138,125 +2282,27 @@ export default function MapView() {
             const commuteLabel = distanceRaw != null && workplaceAnchor ? formatCommute(distanceRaw) : null;
             const saved = isListingSaved(user, l.id);
             return (
-              <article
+              <ListingCard
                 key={l.id}
-                role="button"
-                tabIndex={0}
-                onClick={() => {
+                listing={l}
+                saved={saved}
+                isActive={selected?.id === l.id}
+                isMobile={isMobile}
+                commuteLabel={commuteLabel}
+                distanceKm={distanceKm}
+                cover={listingCoverSrc(l)}
+                onSelect={() => {
                   setSelected(l);
                   setMapState(mapStateForListingFocus(l.lat, l.lng, isMobile));
                   if (isMobile) setMobileTab("map");
                 }}
-                onKeyDown={(e) => {
-                  if (e.key !== "Enter" && e.key !== " ") return;
-                  e.preventDefault();
-                  setSelected(l);
-                  setMapState(mapStateForListingFocus(l.lat, l.lng, isMobile));
-                  if (isMobile) setMobileTab("map");
+                onSave={() => {
+                  const now = toggleSavedListing(user, l.id, l.title);
+                  void logSavedListingChange(user, l.id, now, l.title);
+                  setSavedRevision((v) => v + 1);
                 }}
-                style={{
-                  background: "#fff",
-                  border: selected?.id === l.id ? "1px solid #ee5b45" : "1px solid #e9e3db",
-                  borderRadius: 16,
-                  overflow: "hidden",
-                  display: "flex",
-                  cursor: "pointer",
-                  transition: "transform 0.18s, box-shadow 0.18s, border-color 0.18s",
-                  boxShadow: selected?.id === l.id ? "0 4px 14px rgba(23,20,18,.08), 0 10px 34px rgba(23,20,18,.07)" : "0 1px 2px rgba(23,20,18,.05), 0 2px 6px rgba(23,20,18,.04)",
-                }}
-              >
-                <div style={{ width: isMobile ? 120 : 148, flexShrink: 0, position: "relative", background: "#efe7dc" }}>
-                  {listingCoverSrc(l) ? (
-                    <MediaElement src={listingCoverSrc(l)} alt={l.title} style={{ width: "100%", height: "100%", objectFit: "cover", display: "block" }} />
-                  ) : (
-                    <div style={{ width: "100%", height: "100%" }} aria-hidden />
-                  )}
-                  <span
-                    style={{
-                      position: "absolute", top: 10, left: 10,
-                      background: isFlatmate ? "rgba(124,140,107,.92)" : "rgba(23,20,18,.82)",
-                      color: "#fff", fontSize: 11, fontWeight: 700, padding: "4px 10px", borderRadius: 999,
-                    }}
-                  >
-                    {isFlatmate ? "Flatmate" : "Entire flat"}
-                  </span>
-                  <button
-                    type="button"
-                    aria-label={saved ? "Remove from saved" : "Save listing"}
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      const now = toggleSavedListing(user, l.id, l.title);
-                      void logSavedListingChange(user, l.id, now, l.title);
-                      setSavedRevision((v) => v + 1);
-                    }}
-                    style={{
-                      position: "absolute", top: 8, right: 8, width: 30, height: 30, borderRadius: "50%",
-                      border: "none", background: "rgba(255,255,255,.9)", boxShadow: "0 1px 2px rgba(23,20,18,.05)",
-                      cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center",
-                      color: saved ? "#ee5b45" : "#5c554e",
-                    }}
-                  >
-                    <svg width="15" height="15" viewBox="0 0 24 24" fill={saved ? "currentColor" : "none"} stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                      <path d="M12 21s-7-4.4-9.5-8.5C.7 9 2 5.5 5 5.5c2 0 3.2 1.3 4 2.5.8-1.2 2-2.5 4-2.5 3 0 4.3 3.5 2.5 7C19 16.6 12 21 12 21z" />
-                    </svg>
-                  </button>
-                </div>
-                <div style={{ flex: 1, minWidth: 0, padding: "14px 16px", display: "flex", flexDirection: "column" }}>
-                  <div style={{ display: "flex", alignItems: "baseline", justifyContent: "space-between", gap: 8, flexWrap: "wrap" }}>
-                    <div style={{ fontWeight: 800, fontSize: 17, letterSpacing: "-0.01em", color: "#171412" }}>{l.price}</div>
-                    {commuteLabel ? (
-                      <span style={{ display: "inline-flex", alignItems: "center", gap: 4, fontSize: 11, fontWeight: 700, color: "#ee5b45", background: "#fdeee9", padding: "3px 9px", borderRadius: 999, whiteSpace: "nowrap" }} title={`${commuteLabel} drive to office · ${distanceKm} km`}>
-                        <svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" strokeWidth="2.2" aria-hidden><circle cx="12" cy="12" r="9" /><path d="M12 7v5l3 2" strokeLinecap="round" /></svg>
-                        {commuteLabel} to office
-                      </span>
-                    ) : distanceKm ? (
-                      <span style={{ fontSize: 11, fontWeight: 700, color: "#ee5b45", background: "#fdeee9", padding: "3px 8px", borderRadius: 999, whiteSpace: "nowrap" }}>
-                        ~{distanceKm} km from pin
-                      </span>
-                    ) : (
-                      <span style={{ fontSize: 11, fontWeight: 700, color: "#7c8c6b", background: "#eef1e9", padding: "3px 8px", borderRadius: 999, whiteSpace: "nowrap" }}>
-                        {l.bhk}
-                      </span>
-                    )}
-                  </div>
-                  <div style={{ fontWeight: 700, fontSize: 15, margin: "6px 0 2px", letterSpacing: "-0.01em", color: "#171412", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
-                    {l.title}
-                  </div>
-                  <div style={{ display: "flex", alignItems: "center", gap: 5, color: "#5c554e", fontSize: 12.5 }}>
-                    <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" style={{ flexShrink: 0, color: "#948c83" }}>
-                      <path d="M12 22s7-7.8 7-13a7 7 0 10-14 0c0 5.2 7 13 7 13z" /><circle cx="12" cy="9" r="2.5" />
-                    </svg>
-                    <span style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{l.address}</span>
-                  </div>
-                  <div style={{ display: "flex", gap: 12, marginTop: "auto", paddingTop: 10, color: "#5c554e", fontSize: 11.5, fontWeight: 600, flexWrap: "wrap" }}>
-                    {l.propertyType ? <span>{l.propertyType}</span> : null}
-                    {l.furnishing ? <span>· {l.furnishing}</span> : null}
-                    {l.availability ? <span>· {l.availability}</span> : null}
-                  </div>
-                  <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginTop: 10, paddingTop: 10, borderTop: "1px solid #f1ece5" }}>
-                    <span style={{ display: "flex", alignItems: "center", gap: 8, fontSize: 12, color: "#5c554e" }}>
-                      <span style={{ width: 22, height: 22, borderRadius: "50%", background: "#fdeee9", color: "#d8412b", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 10.5, fontWeight: 800, flexShrink: 0 }}>
-                        {String(l.seller || "?").trim().charAt(0).toUpperCase() || "?"}
-                      </span>
-                      {l.seller}
-                    </span>
-                    <button
-                      type="button"
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        setViewingProperty(l);
-                      }}
-                      style={{
-                        border: "none", background: "none", padding: 0, cursor: "pointer",
-                        fontSize: 12.5, fontWeight: 700, color: "#d8412b", display: "flex", alignItems: "center", gap: 3,
-                      }}
-                    >
-                      Details
-                      <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round"><path d="M9 6l6 6-6 6" /></svg>
-                    </button>
-                  </div>
-                </div>
-              </article>
+                onDetails={() => setViewingProperty(l)}
+              />
             );
           })}
           </div>
@@ -2357,6 +2403,23 @@ export default function MapView() {
             </div>
           </div>
         </>
+      )}
+
+      {/* On a phone the selected pin opens a bottom sheet instead of a Leaflet
+          popup. Sits above the app's own bottom bar rather than under it. */}
+      {isMobile && selected && !viewingProperty && (
+        <MapListingSheet
+          listing={selected}
+          saved={isListingSaved(user, selected.id)}
+          bottomOffset="calc(62px + env(safe-area-inset-bottom, 0px))"
+          onClose={() => setSelected(null)}
+          onSave={() => {
+            const now = toggleSavedListing(user, selected.id, selected.title);
+            void logSavedListingChange(user, selected.id, now, selected.title);
+            setSavedRevision((v) => v + 1);
+          }}
+          onDetails={() => setViewingProperty(selected)}
+        />
       )}
 
       {viewingProperty && (
