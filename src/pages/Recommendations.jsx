@@ -124,6 +124,7 @@ export default function Recommendations() {
   const [mobileView, setMobileView] = useState("list"); // list | map (mobile toggle)
   const [detailListing, setDetailListing] = useState(null); // the result open in the full-screen detail view
   const [actionToast, setActionToast] = useState(""); // brief confirmation after like/dislike/site-visit
+  const [currentImageIndex, setCurrentImageIndex] = useState(0); // image carousel in detail view
   const cardRefs = useRef({});
 
   // If we arrived without prefs (e.g. refresh / deep link), load the saved requirement.
@@ -200,6 +201,7 @@ export default function Recommendations() {
     focusListing(r);
     recordListingView(r.listing.property_id); // counts toward the owner's "Views" stat on My Properties
     if (typeof window !== "undefined" && window.matchMedia("(max-width: 640px)").matches) {
+      setCurrentImageIndex(0); // reset to first image
       setDetailListing(r);
     }
   };
@@ -316,6 +318,20 @@ export default function Recommendations() {
         .rec-detail-actbtn.on-like { background: #fdeceb; border-color: #f4b8ae; color: #ef5a45; }
         .rec-detail-actbtn.on-dislike { background: #eef0f2; border-color: #cfd4da; color: #566072; }
         .rec-detail-toast { position: absolute; left: 50%; bottom: 24px; transform: translateX(-50%); background: #1c1a17; color: #fff; font: 700 13.5px/1.3 'Plus Jakarta Sans', sans-serif; padding: 13px 20px; border-radius: 14px; box-shadow: 0 14px 34px rgba(0,0,0,.3); max-width: calc(100% - 40px); text-align: center; }
+
+        /* Property image gallery in detail view */
+        .rec-detail-gallery { position: relative; width: 100%; aspect-ratio: 4 / 3; background: #e8dfd2; display: flex; align-items: center; justify-content: center; overflow: hidden; }
+        .rec-detail-gallery img { width: 100%; height: 100%; object-fit: cover; display: block; }
+        .rec-detail-gallery.rec-gallery-empty { flex-direction: column; gap: 12px; color: #9a9186; }
+        .rec-detail-gallery.rec-gallery-empty svg { opacity: 0.5; }
+        .rec-detail-gallery.rec-gallery-empty p { margin: 0; font: 600 13.5px/1 'Plus Jakarta Sans', sans-serif; }
+        .rec-gallery-nav { position: absolute; top: 50%; transform: translateY(-50%); width: 40px; height: 40px; border-radius: 50%; background: rgba(255, 255, 255, 0.85); border: none; display: flex; align-items: center; justify-content: center; cursor: pointer; color: #1c1a17; z-index: 10; }
+        .rec-gallery-nav:hover { background: rgba(255, 255, 255, 1); }
+        .rec-gallery-prev { left: 12px; }
+        .rec-gallery-next { right: 12px; }
+        .rec-gallery-dots { position: absolute; bottom: 12px; left: 50%; transform: translateX(-50%); display: flex; gap: 6px; z-index: 10; }
+        .rec-dot { width: 8px; height: 8px; border-radius: 50%; background: rgba(255, 255, 255, 0.5); border: none; cursor: pointer; padding: 0; }
+        .rec-dot.is-active { background: rgba(255, 255, 255, 1); }
 
         /* Map pin popup — pricing/BHK/thumb mini-card, tap through to the full detail */
         .rec-pinpop-wrap .leaflet-popup-content-wrapper { padding: 0; border-radius: 16px; overflow: hidden; box-shadow: 0 16px 40px rgba(0,0,0,.22); }
@@ -528,6 +544,63 @@ export default function Recommendations() {
             </button>
 
             <div className="rec-detail-scroll">
+              {/* Image Gallery */}
+              {(() => {
+                const images = Array.isArray(l.images) && l.images.length > 0
+                  ? l.images.filter(x => x && String(x).trim())
+                  : [];
+                const cover = l.cover_image_url && String(l.cover_image_url).trim() || (images.length > 0 ? images[0] : null);
+                const allImages = cover ? [cover, ...images.filter(x => x !== cover)] : images;
+
+                if (!allImages.length) {
+                  // Show placeholder if no images
+                  return (
+                    <div className="rec-detail-gallery rec-gallery-empty">
+                      <svg viewBox="0 0 24 24" width="48" height="48" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"><path d="M3 10.5 12 4l9 6.5V20a1 1 0 0 1-1 1h-5v-6H9v6H4a1 1 0 0 1-1-1z"/></svg>
+                      <p>No photos yet</p>
+                    </div>
+                  );
+                }
+
+                const img = allImages[currentImageIndex];
+                return (
+                  <div className="rec-detail-gallery">
+                    <img src={img} alt={`Property view ${currentImageIndex + 1}`} />
+                    {allImages.length > 1 && (
+                      <>
+                        <button
+                          type="button"
+                          className="rec-gallery-nav rec-gallery-prev"
+                          onClick={() => setCurrentImageIndex((i) => (i - 1 + allImages.length) % allImages.length)}
+                          aria-label="Previous image"
+                        >
+                          <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" strokeWidth="2.3" strokeLinecap="round" strokeLinejoin="round"><path d="M15 18l-6-6 6-6" /></svg>
+                        </button>
+                        <button
+                          type="button"
+                          className="rec-gallery-nav rec-gallery-next"
+                          onClick={() => setCurrentImageIndex((i) => (i + 1) % allImages.length)}
+                          aria-label="Next image"
+                        >
+                          <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" strokeWidth="2.3" strokeLinecap="round" strokeLinejoin="round"><path d="M9 18l6-6-6-6" /></svg>
+                        </button>
+                        <div className="rec-gallery-dots">
+                          {allImages.map((_, i) => (
+                            <button
+                              key={i}
+                              type="button"
+                              className={`rec-dot ${i === currentImageIndex ? "is-active" : ""}`}
+                              onClick={() => setCurrentImageIndex(i)}
+                              aria-label={`View image ${i + 1}`}
+                            />
+                          ))}
+                        </div>
+                      </>
+                    )}
+                  </div>
+                );
+              })()}
+
               {hasCoords && (
                 <div className="rec-detail-map">
                   <MapContainer center={[Number(l.latitude), Number(l.longitude)]} zoom={15} scrollWheelZoom={false} attributionControl={false} style={{ height: "100%", width: "100%" }}>
