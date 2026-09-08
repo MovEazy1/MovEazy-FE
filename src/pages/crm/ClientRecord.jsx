@@ -120,7 +120,114 @@ function PinnedNote({ client, canWrite, actorEmail, onSaved, onToast }) {
 
 /* ── Requirement editor ───────────────────────────────────────────────────── */
 
+const budgetLabel = (req) => {
+  const lo = Number(req?.budget_min) || 0;
+  const hi = Number(req?.budget_max) || 0;
+  if (lo && hi) return `${inr(lo)} – ${inr(hi)}`;
+  if (hi) return `up to ${inr(hi)}`;
+  if (lo) return `${inr(lo)}+`;
+  return "";
+};
+
+/** Has anyone told us anything about what this client wants? */
+function hasRequirement(req) {
+  if (!req) return false;
+  return Boolean(
+    (req.localities ?? []).length || (req.flat_types ?? []).length ||
+    (req.must_haves ?? []).length || (req.deal_breakers ?? []).length ||
+    (req.occupants ?? []).length || req.furnishing || req.move_in ||
+    req.budget_min || req.budget_max,
+  );
+}
+
+/**
+ * The four facts that decide whether you pick this client up right now, sitting
+ * directly under the name. Everything else about the requirement is one click
+ * away — this strip is what an agent scans, not the full option vocabulary.
+ */
+function HeaderFacts({ req }) {
+  const facts = [
+    ["Move in", req?.move_in || ""],
+    ["Budget", budgetLabel(req)],
+    ["Flat type", (req?.flat_types ?? []).join(", ")],
+    ["Area", (req?.localities ?? []).join(", ")],
+  ];
+  return (
+    <div
+      style={{
+        display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(120px, 1fr))",
+        border: `1px solid ${C.line}`, borderLeft: `3px solid ${C.accent}`,
+        borderRadius: 9, background: C.surface, overflow: "hidden",
+      }}
+    >
+      {facts.map(([label, value], i) => (
+        <div
+          key={label}
+          style={{ padding: "8px 12px", borderLeft: i ? `1px solid ${C.line}` : "none", minWidth: 0 }}
+        >
+          <div className="crm-label">{label}</div>
+          <div
+            className="crm-num"
+            style={{
+              fontSize: 13, fontWeight: 700, marginTop: 2,
+              color: value ? C.text : C.textMute,
+              overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap",
+            }}
+            title={value || "not set"}
+          >
+            {value || "not set"}
+          </div>
+        </div>
+      ))}
+    </div>
+  );
+}
+
+/** One line per thing we actually know. Nothing that hasn't been set is listed. */
+function RequirementSummary({ req }) {
+  const rows = [
+    ["Areas", (req.localities ?? []).join(", ")],
+    ["Budget", budgetLabel(req)],
+    ["Flat type", (req.flat_types ?? []).join(", ")],
+    ["Furnishing", req.furnishing || ""],
+    ["Must haves", (req.must_haves ?? []).join(", ")],
+    ["Deal breakers", (req.deal_breakers ?? []).join(", ")],
+    ["Occupants", (req.occupants ?? []).join(", ")],
+    ["Move in", req.move_in || ""],
+  ].filter(([, v]) => v);
+
+  return (
+    <ul style={{ margin: 0, padding: 0, listStyle: "none", display: "flex", flexDirection: "column", gap: 6 }}>
+      {rows.map(([label, value]) => (
+        <li key={label} style={{ display: "flex", gap: 10, alignItems: "baseline" }}>
+          <span className="crm-label" style={{ flex: "none", width: 92 }}>{label}</span>
+          <span style={{ fontSize: 12.5, color: label === "Deal breakers" ? C.coral : C.text, lineHeight: 1.5 }}>
+            {value}
+          </span>
+        </li>
+      ))}
+      <li style={{ display: "flex", gap: 10, alignItems: "baseline" }}>
+        <span className="crm-label" style={{ flex: "none", width: 92 }}>Matching</span>
+        <span className="crm-mute crm-num" style={{ fontSize: 12.5 }}>
+          showing matches above {req.min_score ?? 60}%
+        </span>
+      </li>
+    </ul>
+  );
+}
+
+/**
+ * Summary by default, full editor on demand.
+ *
+ * The editor lists every option in the shared vocabulary — sixty-odd chips — and
+ * that wall was the first thing an agent saw on every client. It's the right UI
+ * for changing a requirement and the wrong one for reading it, so reading is now
+ * the default and editing is a click.
+ */
 function RequirementCard({ req, isOverride, canEdit, onChange, onReset }) {
+  const [editing, setEditing] = useState(false);
+  const known = hasRequirement(req);
+
   const set = (patch) => onChange({ ...req, ...patch });
   const toggle = (key, value) => {
     const cur = req[key] ?? [];
@@ -132,94 +239,112 @@ function RequirementCard({ req, isOverride, canEdit, onChange, onReset }) {
       <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 8 }}>
         <span className="crm-label">
           Requirement{" "}
-          {isOverride && <span style={{ color: C.accent, letterSpacing: 0 }}>· CRM override</span>}
+          {isOverride && known && <span style={{ color: C.accent, letterSpacing: 0 }}>· CRM override</span>}
         </span>
-        {canEdit && isOverride && (
-          <Btn sm onClick={onReset}>Reset to client's own</Btn>
-        )}
-      </div>
-
-      <div>
-        <span className="crm-label">Localities</span>
-        <div style={{ marginTop: 5 }}>
-          <ChipRow options={ALL_LOCALITIES} selected={req.localities} disabled={!canEdit}
-            onToggle={(v) => toggle("localities", v)} />
+        <div style={{ display: "flex", gap: 6 }}>
+          {canEdit && editing && isOverride && <Btn sm onClick={onReset}>Reset to client&apos;s own</Btn>}
+          {canEdit && (
+            <Btn sm variant={editing ? "primary" : known ? undefined : "primary"} onClick={() => setEditing((v) => !v)}>
+              {editing ? "Done" : known ? "Modify requirements" : "Add requirements"}
+            </Btn>
+          )}
         </div>
       </div>
 
-      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8 }}>
-        <label style={{ display: "flex", flexDirection: "column", gap: 4 }}>
-          <span className="crm-label">Budget min</span>
-          <input className="crm-input crm-num" type="number" inputMode="numeric" disabled={!canEdit}
-            value={req.budget_min ?? ""} placeholder="30000"
-            onChange={(e) => set({ budget_min: e.target.value === "" ? null : Number(e.target.value) })} />
-        </label>
-        <label style={{ display: "flex", flexDirection: "column", gap: 4 }}>
-          <span className="crm-label">Budget max</span>
-          <input className="crm-input crm-num" type="number" inputMode="numeric" disabled={!canEdit}
-            value={req.budget_max ?? ""} placeholder="50000"
-            onChange={(e) => set({ budget_max: e.target.value === "" ? null : Number(e.target.value) })} />
-        </label>
-      </div>
+      {!editing && known && <RequirementSummary req={req} />}
 
-      <div>
-        <span className="crm-label">Flat type</span>
-        <div style={{ marginTop: 5 }}>
-          <ChipRow options={FLAT_TYPES} selected={req.flat_types} disabled={!canEdit}
-            onToggle={(v) => toggle("flat_types", v)} />
-        </div>
-      </div>
+      {!editing && !known && (
+        <p className="crm-mute" style={{ fontSize: 12.5, margin: 0, lineHeight: 1.55 }}>
+          Nothing captured yet — they never finished Find My Flat. Add what you know and matches appear
+          straight away.
+        </p>
+      )}
 
-      <div>
-        <span className="crm-label">Furnishing</span>
-        <div style={{ marginTop: 5, display: "flex", gap: 6, flexWrap: "wrap" }}>
-          {FURNISHINGS.map((f) => (
-            <Chip key={f} on={req.furnishing === f} disabled={!canEdit}
-              onClick={() => set({ furnishing: req.furnishing === f ? "" : f })}>
-              {f}
-            </Chip>
-          ))}
-        </div>
-      </div>
+      {editing && (
+        <>
+          <div>
+            <span className="crm-label">Localities</span>
+            <div style={{ marginTop: 5 }}>
+              <ChipRow options={ALL_LOCALITIES} selected={req.localities} disabled={!canEdit}
+                onToggle={(v) => toggle("localities", v)} />
+            </div>
+          </div>
 
-      <div>
-        <span className="crm-label">Must haves</span>
-        <div style={{ marginTop: 5 }}>
-          <ChipRow options={MUST_HAVES} selected={req.must_haves} disabled={!canEdit}
-            onToggle={(v) => toggle("must_haves", v)} />
-        </div>
-      </div>
+          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8 }}>
+            <label style={{ display: "flex", flexDirection: "column", gap: 4 }}>
+              <span className="crm-label">Budget min</span>
+              <input className="crm-input crm-num" type="number" inputMode="numeric" disabled={!canEdit}
+                value={req.budget_min ?? ""} placeholder="30000"
+                onChange={(e) => set({ budget_min: e.target.value === "" ? null : Number(e.target.value) })} />
+            </label>
+            <label style={{ display: "flex", flexDirection: "column", gap: 4 }}>
+              <span className="crm-label">Budget max</span>
+              <input className="crm-input crm-num" type="number" inputMode="numeric" disabled={!canEdit}
+                value={req.budget_max ?? ""} placeholder="50000"
+                onChange={(e) => set({ budget_max: e.target.value === "" ? null : Number(e.target.value) })} />
+            </label>
+          </div>
 
-      <div>
-        <span className="crm-label">Deal breakers</span>
-        <div style={{ marginTop: 5 }}>
-          <ChipRow options={DEALBREAKERS} selected={req.deal_breakers} disabled={!canEdit}
-            onToggle={(v) => toggle("deal_breakers", v)} />
-        </div>
-      </div>
+          <div>
+            <span className="crm-label">Flat type</span>
+            <div style={{ marginTop: 5 }}>
+              <ChipRow options={FLAT_TYPES} selected={req.flat_types} disabled={!canEdit}
+                onToggle={(v) => toggle("flat_types", v)} />
+            </div>
+          </div>
 
-      <div>
-        <span className="crm-label">Occupants</span>
-        <div style={{ marginTop: 5 }}>
-          <ChipRow options={OCCUPANTS} selected={req.occupants} disabled={!canEdit}
-            onToggle={(v) => toggle("occupants", v)} />
-        </div>
-      </div>
+          <div>
+            <span className="crm-label">Furnishing</span>
+            <div style={{ marginTop: 5, display: "flex", gap: 6, flexWrap: "wrap" }}>
+              {FURNISHINGS.map((f) => (
+                <Chip key={f} on={req.furnishing === f} disabled={!canEdit}
+                  onClick={() => set({ furnishing: req.furnishing === f ? "" : f })}>
+                  {f}
+                </Chip>
+              ))}
+            </div>
+          </div>
 
-      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8 }}>
-        <label style={{ display: "flex", flexDirection: "column", gap: 4 }}>
-          <span className="crm-label">Move in</span>
-          <input className="crm-input" disabled={!canEdit} value={req.move_in ?? ""}
-            placeholder="15 Oct 2026, or ASAP"
-            onChange={(e) => set({ move_in: e.target.value })} />
-        </label>
-        <label style={{ display: "flex", flexDirection: "column", gap: 4 }}>
-          <span className="crm-label">Show matches above</span>
-          <input className="crm-input crm-num" type="number" min="0" max="100" disabled={!canEdit}
-            value={req.min_score ?? 60}
-            onChange={(e) => set({ min_score: Math.max(0, Math.min(100, Number(e.target.value) || 0)) })} />
-        </label>
-      </div>
+          <div>
+            <span className="crm-label">Must haves</span>
+            <div style={{ marginTop: 5 }}>
+              <ChipRow options={MUST_HAVES} selected={req.must_haves} disabled={!canEdit}
+                onToggle={(v) => toggle("must_haves", v)} />
+            </div>
+          </div>
+
+          <div>
+            <span className="crm-label">Deal breakers</span>
+            <div style={{ marginTop: 5 }}>
+              <ChipRow options={DEALBREAKERS} selected={req.deal_breakers} disabled={!canEdit}
+                onToggle={(v) => toggle("deal_breakers", v)} />
+            </div>
+          </div>
+
+          <div>
+            <span className="crm-label">Occupants</span>
+            <div style={{ marginTop: 5 }}>
+              <ChipRow options={OCCUPANTS} selected={req.occupants} disabled={!canEdit}
+                onToggle={(v) => toggle("occupants", v)} />
+            </div>
+          </div>
+
+          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8 }}>
+            <label style={{ display: "flex", flexDirection: "column", gap: 4 }}>
+              <span className="crm-label">Move in</span>
+              <input className="crm-input" disabled={!canEdit} value={req.move_in ?? ""}
+                placeholder="15 Oct 2026, or ASAP"
+                onChange={(e) => set({ move_in: e.target.value })} />
+            </label>
+            <label style={{ display: "flex", flexDirection: "column", gap: 4 }}>
+              <span className="crm-label">Show matches above</span>
+              <input className="crm-input crm-num" type="number" min="0" max="100" disabled={!canEdit}
+                value={req.min_score ?? 60}
+                onChange={(e) => set({ min_score: Math.max(0, Math.min(100, Number(e.target.value) || 0)) })} />
+            </label>
+          </div>
+        </>
+      )}
     </div>
   );
 }
@@ -355,6 +480,9 @@ export default function ClientRecord({
   };
 
   const chooseStatus = (status) => {
+    // Re-clicking the current status wrote a "Fresh lead -> Fresh lead" row and
+    // buried the real history. Nothing changed, so log nothing.
+    if (status === client.status) return;
     if (CLOSED_STATUSES.includes(status)) return setPendingClose(status);
     applyStatus(status);
   };
@@ -399,6 +527,8 @@ export default function ClientRecord({
             {copied ? "Copied" : "Call"}
           </Btn>
         </div>
+
+        <HeaderFacts req={requirement} />
         {client.phone && (
           <span className="crm-mute crm-num" style={{ fontSize: 10.5, marginTop: -10 }}>
             {isTouch ? `tel:+${String(client.phone).replace(/\D/g, "")} · opens your phone's dialler`
