@@ -14,8 +14,8 @@ import { SCOPES } from "../../lib/adminScopes";
 import { Btn, C, Chip, Empty, ScoreRing, inr, relTime } from "./crmUi";
 
 const REACTIONS = [
-  { id: "like", label: "Like", color: C.mint },
-  { id: "okay", label: "Okay", color: C.creamDim },
+  { id: "like", label: "Like", color: C.accent },
+  { id: "okay", label: "Okay", color: C.textDim },
   { id: "dislike", label: "Dislike", color: C.coral },
 ];
 
@@ -29,7 +29,7 @@ function MatchCard({ match, shortlist, canWrite, onSend, onShortlist, onReact, b
         <ScoreRing score={score} />
       </div>
       <div style={{ display: "flex", flexDirection: "column", gap: 5, minWidth: 0, flex: 1 }}>
-        <span style={{ fontSize: 12.5, fontWeight: 600, color: C.cream }}>
+        <span style={{ fontSize: 12.5, fontWeight: 600, color: C.text }}>
           {listing.flat_type || "Home"} · {listing.area || "—"}
         </span>
         <span className="crm-mute crm-num" style={{ fontSize: 11 }}>

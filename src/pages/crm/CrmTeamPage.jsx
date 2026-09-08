@@ -76,7 +76,7 @@ export default function CrmTeamPage() {
       <div style={{ padding: 20, maxWidth: 820, display: "flex", flexDirection: "column", gap: 18 }}>
         <div>
           <h1 style={{ fontSize: 21, fontWeight: 800, margin: "0 0 6px" }}>Team &amp; roles</h1>
-          <p style={{ color: C.creamDim, fontSize: 13.5, margin: 0, maxWidth: "62ch", lineHeight: 1.6 }}>
+          <p style={{ color: C.textDim, fontSize: 13.5, margin: 0, maxWidth: "62ch", lineHeight: 1.6 }}>
             Add someone by email, pick a role, done. The role decides what they see; Postgres enforces it, so
             hiding a button here isn't the only thing standing between them and your data.
           </p>
@@ -137,7 +137,7 @@ export default function CrmTeamPage() {
 
         <div className="crm-card">
           <span className="crm-label">What a {roleLabel(role)} can do</span>
-          <ul style={{ margin: "8px 0 0", paddingLeft: 18, color: C.creamDim, fontSize: 12.5, lineHeight: 1.7 }}>
+          <ul style={{ margin: "8px 0 0", paddingLeft: 18, color: C.textDim, fontSize: 12.5, lineHeight: 1.7 }}>
             {scopesForRole(role).map((s) => <li key={s}>{SCOPE_LABELS[s] ?? s}</li>)}
           </ul>
           <p className="crm-mute" style={{ fontSize: 11.5, margin: "10px 0 0", lineHeight: 1.55 }}>

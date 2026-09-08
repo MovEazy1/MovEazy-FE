@@ -68,9 +68,9 @@ function Gate({ children }) {
         <CrmStyles />
         <div style={{ maxWidth: 420, textAlign: "center" }}>
           <h1 style={{ fontSize: 22, fontWeight: 800, margin: "0 0 10px" }}>Not your door</h1>
-          <p style={{ color: C.creamDim, fontSize: 14, margin: "0 0 18px" }}>
+          <p style={{ color: C.textDim, fontSize: 14, margin: "0 0 18px" }}>
             The CRM is for MovEazy staff. You're signed in as{" "}
-            <span style={{ color: C.cream }}>{user.email}</span>, which isn't on the team list.
+            <span style={{ color: C.text }}>{user.email}</span>, which isn't on the team list.
           </p>
           <Link to="/" className="crm-btn crm-btn--primary" style={{ textDecoration: "none" }}>
             Back to MovEazy
@@ -89,7 +89,7 @@ function Rail({ access }) {
     <nav
       aria-label="CRM sections"
       style={{
-        width: 56, flex: "none", background: C.ink, borderRight: `1px solid ${C.line}`,
+        width: 56, flex: "none", background: C.surface, borderRight: `1px solid ${C.line}`,
         padding: "10px 0", display: "flex", flexDirection: "column", alignItems: "center", gap: 4,
       }}
     >

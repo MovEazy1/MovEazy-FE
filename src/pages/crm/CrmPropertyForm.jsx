@@ -219,7 +219,7 @@ export default function CrmPropertyForm() {
         <h1 style={{ fontSize: 22, fontWeight: 800, margin: 0 }}>
           {published.listing.property_id} is live
         </h1>
-        <p style={{ color: C.creamDim, fontSize: 14, margin: 0 }}>
+        <p style={{ color: C.textDim, fontSize: 14, margin: 0 }}>
           {published.matches.length === 0
             ? "No clients clear 60% on it yet — it'll surface as requirements change."
             : `${published.matches.length} client${published.matches.length === 1 ? "" : "s"} match it at 60% or better.`}
@@ -230,10 +230,10 @@ export default function CrmPropertyForm() {
               <button key={m.requirement.client_id} type="button"
                 onClick={() => navigate(`/crm/clients?client=${m.requirement.client_id}`)}
                 style={{ display: "flex", justifyContent: "space-between", gap: 10, textAlign: "left" }}>
-                <span style={{ fontSize: 12.5, color: C.cream }}>
+                <span style={{ fontSize: 12.5, color: C.text }}>
                   {(m.requirement.localities ?? []).slice(0, 2).join(", ") || "—"}
                 </span>
-                <span className="crm-num" style={{ fontSize: 12.5, color: C.mint }}>{m.score}%</span>
+                <span className="crm-num" style={{ fontSize: 12.5, color: C.accent }}>{m.score}%</span>
               </button>
             ))}
             <p className="crm-mute" style={{ fontSize: 11, margin: 0, lineHeight: 1.5 }}>
@@ -397,7 +397,7 @@ export default function CrmPropertyForm() {
           </Column>
 
           {/* ── how it looks ── */}
-          <div style={{ padding: "14px 16px", background: C.ink, display: "flex", flexDirection: "column", gap: 11, minWidth: 0 }}>
+          <div style={{ padding: "14px 16px", background: C.surface, display: "flex", flexDirection: "column", gap: 11, minWidth: 0 }}>
             <span className="crm-label">How it looks</span>
 
             <div
@@ -407,12 +407,12 @@ export default function CrmPropertyForm() {
               onClick={() => dropRef.current?.querySelector("input")?.click()}
               style={{
                 border: `1px dashed ${C.line}`, borderRadius: 9, padding: "18px 10px",
-                textAlign: "center", fontSize: 11.5, color: C.creamMute, cursor: "pointer",
+                textAlign: "center", fontSize: 11.5, color: C.textMute, cursor: "pointer",
               }}
             >
               Drag photos here
               <br />
-              <span style={{ color: C.creamMute }}>or press ⌘V to paste from the owner's chat</span>
+              <span style={{ color: C.textMute }}>or press ⌘V to paste from the owner's chat</span>
               <input type="file" accept="image/*" multiple hidden
                 onChange={(e) => setPhotos((p) => [...p, ...e.target.files].slice(0, 20))} />
             </div>

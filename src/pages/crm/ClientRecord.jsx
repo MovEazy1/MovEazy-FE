@@ -80,7 +80,7 @@ function PinnedNote({ client, canWrite, actorEmail, onSaved, onToast }) {
   };
 
   return (
-    <div className="crm-card" style={{ background: C.panel2, borderLeft: `2px solid ${C.mint}` }}>
+    <div className="crm-card" style={{ background: C.surfaceAlt, borderLeft: `2px solid ${C.accent}` }}>
       <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 8, marginBottom: 5 }}>
         <span className="crm-label">Note about this client</span>
         <span className="crm-mute" style={{ fontSize: 10 }}>
@@ -107,7 +107,7 @@ function PinnedNote({ client, canWrite, actorEmail, onSaved, onToast }) {
           onClick={() => canWrite && setEditing(true)}
           style={{
             margin: 0, fontSize: 12.5, lineHeight: 1.58,
-            color: client.note ? C.cream : C.creamMute,
+            color: client.note ? C.text : C.textMute,
             cursor: canWrite ? "text" : "default", whiteSpace: "pre-wrap",
           }}
         >
@@ -132,7 +132,7 @@ function RequirementCard({ req, isOverride, canEdit, onChange, onReset }) {
       <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 8 }}>
         <span className="crm-label">
           Requirement{" "}
-          {isOverride && <span style={{ color: C.mint, letterSpacing: 0 }}>· CRM override</span>}
+          {isOverride && <span style={{ color: C.accent, letterSpacing: 0 }}>· CRM override</span>}
         </span>
         {canEdit && isOverride && (
           <Btn sm onClick={onReset}>Reset to client's own</Btn>
@@ -233,8 +233,8 @@ function ClosePrompt({ status, reasons, onCancel, onConfirm }) {
   const [rent, setRent] = useState("");
 
   return (
-    <div className="crm-card" style={{ borderColor: outside ? "#9FB5B0" : C.mint, display: "flex", flexDirection: "column", gap: 10 }}>
-      <span className="crm-label" style={{ color: outside ? "#9FB5B0" : C.mint }}>
+    <div className="crm-card" style={{ borderColor: outside ? C.textMute : C.accent, display: "flex", flexDirection: "column", gap: 10 }}>
+      <span className="crm-label" style={{ color: outside ? C.textMute : C.accent }}>
         {outside ? "Closed outside — why?" : "Closed by us — the details"}
       </span>
 
@@ -382,7 +382,7 @@ export default function ClientRecord({
           <span
             style={{
               width: 38, height: 38, borderRadius: 10, display: "grid", placeItems: "center",
-              background: C.teal, color: "#04211D", fontWeight: 700, fontSize: 13, flex: "none",
+              background: C.accent, color: "#fff", fontWeight: 700, fontSize: 13, flex: "none",
             }}
           >
             {initials}
@@ -503,7 +503,7 @@ export default function ClientRecord({
             {activities.slice(0, 60).map((a) => (
               <div key={a.id} style={{ display: "flex", gap: 9, alignItems: "flex-start" }}>
                 <span className="crm-chip" style={{ flex: "none", pointerEvents: "none" }}>{a.type}</span>
-                <span style={{ fontSize: 12, color: C.creamDim, lineHeight: 1.5, minWidth: 0 }}>
+                <span style={{ fontSize: 12, color: C.textDim, lineHeight: 1.5, minWidth: 0 }}>
                   {a.body}{" "}
                   <span className="crm-mute">
                     · {a.actor_email || "—"}, {relTime(a.created_at)}

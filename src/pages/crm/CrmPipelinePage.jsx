@@ -26,7 +26,7 @@ function Card({ client, requirement, engagement, lastTouch, canWrite, onOpen, on
       tabIndex={0}
       onKeyDown={(e) => (e.key === "Enter" || e.key === " ") && onOpen(client)}
       style={{
-        background: C.panel, border: `1px solid ${C.line}`, borderRadius: 9, padding: 9,
+        background: C.surface, border: `1px solid ${C.line}`, borderRadius: 9, padding: 9,
         display: "flex", flexDirection: "column", gap: 5, cursor: canWrite ? "grab" : "pointer",
       }}
     >
@@ -34,7 +34,7 @@ function Card({ client, requirement, engagement, lastTouch, canWrite, onOpen, on
         height: 2, borderRadius: 2, flex: "none",
         background: client.temperature ? tempColor(client.temperature) : C.line,
       }} />
-      <span style={{ fontSize: 12, fontWeight: 600, color: C.cream }}>
+      <span style={{ fontSize: 12, fontWeight: 600, color: C.text }}>
         {client.name || client.email || "Unnamed"}
       </span>
       <span className="crm-mute crm-num" style={{ fontSize: 10.5 }}>
@@ -141,12 +141,12 @@ export default function CrmPipelinePage() {
                 }}
                 style={{
                   display: "flex", flexDirection: "column", gap: 8, minHeight: 120,
-                  background: over === s.id ? C.panel2 : "transparent",
+                  background: over === s.id ? C.surfaceAlt : "transparent",
                   borderRadius: 10, padding: over === s.id ? 6 : 0, transition: "background .12s",
                 }}
               >
                 <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 6, paddingBottom: 7, borderBottom: `2px solid ${C.line}` }}>
-                  <span style={{ fontSize: 11, fontWeight: 700, color: isWin ? C.mint : isOut ? "#9FB5B0" : C.creamDim }}>
+                  <span style={{ fontSize: 11, fontWeight: 700, color: isWin ? C.accent : isOut ? C.textMute : C.textDim }}>
                     {s.label}
                   </span>
                   <span className="crm-mute crm-num" style={{ fontSize: 11 }}>{list.length}</span>

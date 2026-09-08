@@ -77,7 +77,7 @@ export default function CrmPropertiesPage() {
               <tbody>
                 {rows.map((l) => (
                   <tr key={l.property_id}>
-                    <td className="crm-num" style={{ color: C.mint }}>{l.property_id}</td>
+                    <td className="crm-num" style={{ color: C.accent }}>{l.property_id}</td>
                     <td>{l.flat_type || "—"}{l.furnishing ? ` · ${l.furnishing}` : ""}</td>
                     <td>{l.area || "—"}</td>
                     <td className="crm-num">{inr(l.rent)}</td>
@@ -123,7 +123,7 @@ export default function CrmPropertiesPage() {
                     <span style={{ display: "flex", alignItems: "center", gap: 9 }}>
                       <ScoreRing score={m.score} size={34} />
                       <span style={{ minWidth: 0 }}>
-                        <span style={{ display: "block", fontSize: 12.5, fontWeight: 600, color: C.cream }}>
+                        <span style={{ display: "block", fontSize: 12.5, fontWeight: 600, color: C.text }}>
                           {client?.name || client?.email || "Client"}
                         </span>
                         <span className="crm-mute crm-num" style={{ fontSize: 11 }}>

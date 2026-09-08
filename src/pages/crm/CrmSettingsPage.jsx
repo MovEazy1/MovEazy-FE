@@ -101,7 +101,7 @@ export default function CrmSettingsPage() {
       <div style={{ padding: 20, display: "flex", flexDirection: "column", gap: 18, maxWidth: 1000 }}>
         <div>
           <h1 style={{ fontSize: 21, fontWeight: 800, margin: "0 0 6px" }}>Message templates</h1>
-          <p style={{ color: C.creamDim, fontSize: 13.5, margin: 0, maxWidth: "64ch", lineHeight: 1.6 }}>
+          <p style={{ color: C.textDim, fontSize: 13.5, margin: 0, maxWidth: "64ch", lineHeight: 1.6 }}>
             These are shared. Edit one and the next WhatsApp anyone on the team sends uses the new wording.
             {!canEdit && " You can send with these, but not change them."}
           </p>
@@ -160,14 +160,14 @@ export default function CrmSettingsPage() {
             )}
           </div>
 
-          <div style={{ background: "#071E1A", border: `1px solid ${C.line}`, borderRadius: 10, padding: 14, display: "flex", flexDirection: "column", gap: 9, alignSelf: "start" }}>
+          <div style={{ background: C.surface, border: `1px solid ${C.line}`, borderRadius: 10, padding: 14, display: "flex", flexDirection: "column", gap: 9, alignSelf: "start" }}>
             <span className="crm-label">
               Preview{sample.client ? ` · ${sample.client.name || sample.client.email}` : ""}
             </span>
             <div style={{
-              background: "#0F3A2E", border: "1px solid rgba(37,211,102,.28)",
+              background: "#E9F6EE", border: "1px solid #BFE3CC",
               borderRadius: "10px 10px 10px 3px", padding: "10px 12px",
-              fontSize: 12.5, lineHeight: 1.62, color: C.cream, whiteSpace: "pre-wrap",
+              fontSize: 12.5, lineHeight: 1.62, color: C.text, whiteSpace: "pre-wrap",
             }}>
               {preview || "—"}
             </div>

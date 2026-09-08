@@ -291,7 +291,7 @@ export default function CrmClientsPage() {
             <button key={c.id} type="button" onClick={() => select(c.id)}
               className={c.id === selected?.id ? "crm-lead crm-lead--on" : "crm-lead"}>
               <span style={{ display: "flex", alignItems: "baseline", justifyContent: "space-between", gap: 8 }}>
-                <span style={{ fontSize: 13, fontWeight: 600, color: C.cream, display: "flex", alignItems: "center", gap: 6, minWidth: 0 }}>
+                <span style={{ fontSize: 13, fontWeight: 600, color: C.text, display: "flex", alignItems: "center", gap: 6, minWidth: 0 }}>
                   <TempDot color={c.temperature ? tempColor(c.temperature) : C.line} />
                   <span style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
                     {c.name || c.email || "Unnamed"}

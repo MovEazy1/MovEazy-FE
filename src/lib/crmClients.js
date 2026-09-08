@@ -25,11 +25,12 @@ export const CLOSED_STATUSES = ["closed_by_us", "closed_outside"];
 export const statusLabel = (id) => STATUSES.find((s) => s.id === id)?.label ?? id ?? "—";
 
 /** The human read on a client. Never computed — blank until someone decides. */
+/** Reads as one thermometer, warm to cool. Darkened for a white ground. */
 export const TEMPERATURES = [
-  { id: "fire", label: "Fire", color: "#EF5A45", hint: "Closing this week" },
-  { id: "hot",  label: "Hot",  color: "#E8A33D", hint: "Engaged, date still soft" },
-  { id: "cold", label: "Cold", color: "#4FA3B8", hint: "Real requirement, no urgency" },
-  { id: "ice",  label: "Ice",  color: "#9FB5B0", hint: "Dormant or unreachable" },
+  { id: "fire", label: "Fire", color: "#CC3F28", hint: "Closing this week" },
+  { id: "hot",  label: "Hot",  color: "#B0740F", hint: "Engaged, date still soft" },
+  { id: "cold", label: "Cold", color: "#2E7F99", hint: "Real requirement, no urgency" },
+  { id: "ice",  label: "Ice",  color: "#8FA5A0", hint: "Dormant or unreachable" },
 ];
 export const tempColor = (id) => TEMPERATURES.find((t) => t.id === id)?.color ?? "#3C5A54";
 export const tempLabel = (id) => TEMPERATURES.find((t) => t.id === id)?.label ?? "Unset";
