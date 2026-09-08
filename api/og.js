@@ -21,31 +21,36 @@ export const config = { runtime: "edge" };
  * renderer fails and returns a zero-byte PNG, which previews as a broken image.
  * Fetched once per warm instance from the same Inter the site ships.
  */
-const FONT_BASE = "https://cdn.jsdelivr.net/npm/@fontsource/inter@5.0.16/files";
-// Two subsets, because ₹ (U+20B9) is not in Inter's `latin` subset — it sits in
-// `latin-ext`, and without it every price rendered as a tofu box. Satori falls
-// through the fonts of a family for glyphs the first one lacks.
-const FONT_FILES = ["inter-latin-700-normal.woff", "inter-latin-ext-700-normal.woff"];
-let fontCache = null;
+/**
+ * Satori needs a real font file and does NOT fall through between fonts of the
+ * same family for missing glyphs — supplying Inter's latin and latin-ext subsets
+ * together still rendered ₹ as a tofu box.
+ *
+ * So instead of guessing which subset holds which glyph, ask Google Fonts for a
+ * subset containing exactly the characters this image draws, via the `text`
+ * parameter. Requesting with an old User-Agent gets TrueType back; a modern one
+ * gets woff2, which Satori can't read. The result is ~7KB and always complete.
+ */
+const fontCache = new Map();
 
-async function interBold() {
-  if (!fontCache) {
-    fontCache = await Promise.all(
-      FONT_FILES.map(async (file) => {
-        const res = await fetch(`${FONT_BASE}/${file}`);
-        if (!res.ok) throw new Error(`font fetch failed: ${file} ${res.status}`);
-        return res.arrayBuffer();
-      }),
-    );
-  }
-  return fontCache;
+async function fontFor(text) {
+  const chars = [...new Set(`${text}MovEazy0123456789`)].join("");
+  if (fontCache.has(chars)) return fontCache.get(chars);
+
+  const cssUrl =
+    "https://fonts.googleapis.com/css2?family=Inter:wght@700&text=" +
+    encodeURIComponent(chars);
+  const css = await fetch(cssUrl, {
+    headers: { "User-Agent": "Mozilla/5.0 (Windows NT 6.1; WOW64)" },
+  }).then((r) => r.text());
+
+  const url = css.match(/src:\s*url\((https:[^)]+)\)/)?.[1];
+  if (!url) throw new Error("no font url in Google Fonts response");
+
+  const data = await fetch(url).then((r) => r.arrayBuffer());
+  fontCache.set(chars, data);
+  return data;
 }
-
-const h = (type, props = {}, ...children) => ({
-  type,
-  props: { ...props, children: children.flat(Infinity).filter(Boolean) },
-  key: null,
-});
 
 const INK = "#04211D";
 const MINT = "#5EEAD4";
@@ -165,9 +170,9 @@ export default async function handler(req) {
     const rendered = new ImageResponse(image, {
       width: W,
       height: H,
-      fonts: (await interBold()).map((data) => ({
-        name: "Inter", data, weight: 700, style: "normal",
-      })),
+      fonts: [
+        { name: "Inter", data: await fontFor(`${rent}${line}moveazy.co.in`), weight: 700, style: "normal" },
+      ],
     });
 
     // ImageResponse streams its body, so a render failure surfaces *after* the
