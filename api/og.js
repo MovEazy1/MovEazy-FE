@@ -15,6 +15,25 @@ import { fetchListing, photosOf, inr } from "./_listing.js";
 
 export const config = { runtime: "edge" };
 
+/**
+ * Satori cannot lay out a single character without a real font file, and unlike
+ * the Next.js integration nothing bundles one for us here — without this the
+ * renderer fails and returns a zero-byte PNG, which previews as a broken image.
+ * Fetched once per warm instance from the same Inter the site ships.
+ */
+const FONT_URL =
+  "https://cdn.jsdelivr.net/npm/@fontsource/inter@5.0.16/files/inter-latin-700-normal.woff";
+let fontCache = null;
+
+async function interBold() {
+  if (!fontCache) {
+    const res = await fetch(FONT_URL);
+    if (!res.ok) throw new Error(`font fetch failed: ${res.status}`);
+    fontCache = await res.arrayBuffer();
+  }
+  return fontCache;
+}
+
 const h = (type, props = {}, ...children) => ({
   type,
   props: { ...props, children: children.flat().filter((c) => c !== null && c !== false) },
@@ -121,16 +140,27 @@ export default async function handler(req) {
 
   const image = h(
     "div",
-    { style: { display: "flex", position: "relative", width: W, height: H, background: INK } },
+    { style: { display: "flex", position: "relative", width: W, height: H, background: INK, fontFamily: "Inter" } },
     body,
     overlay,
   );
 
-  return new ImageResponse(image, {
-    width: W,
-    height: H,
-    headers: {
-      "cache-control": "public, max-age=3600, s-maxage=86400, stale-while-revalidate=604800",
-    },
-  });
+  const cache = "public, max-age=3600, s-maxage=86400, stale-while-revalidate=604800";
+
+  try {
+    return new ImageResponse(image, {
+      width: W,
+      height: H,
+      fonts: [{ name: "Inter", data: await interBold(), weight: 700, style: "normal" }],
+      headers: { "cache-control": cache },
+    });
+  } catch (err) {
+    // Never hand a crawler a broken image. One real photo of the flat beats a
+    // zero-byte PNG, and the logo beats nothing at all.
+    const fallback = photos[0] || `${new URL(req.url).origin}/logo-moveazy-bar.png`;
+    return new Response(null, {
+      status: 302,
+      headers: { location: fallback, "cache-control": "public, max-age=60" },
+    });
+  }
 }
