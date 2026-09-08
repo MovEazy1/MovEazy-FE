@@ -11,6 +11,30 @@ import { submitListingInterestFull, logSavedListingChange } from "../lib/crmSync
 import { buildBrokerWhatsAppUrl, logBrokerWhatsAppContact } from "../lib/brokerWhatsApp";
 import MovEAZYLogo from "./branding/MovEAZYLogo";
 
+/**
+ * The listing view's palette — MovEazy's emerald, not the slate-and-red mix this
+ * screen had grown. Declared once so a colour can't drift per section again.
+ */
+const T = {
+  ink: "#04211D",        // header and deep surfaces
+  inkSoft: "#0A3A33",
+  teal: "#0E7C68",       // primary action
+  tealDark: "#0B6353",
+  mint: "#5EEAD4",       // accent on dark grounds
+  mintSoft: "#E4F6F1",   // accent tint on light grounds
+  cream: "#F7FAF8",      // page ground
+  card: "#FFFFFF",
+  line: "#DCE8E5",
+  lineSoft: "#EDF3F1",
+  text: "#12211E",
+  textDim: "#4A5B57",
+  textMute: "#7A8F8A",
+  gold: "#B0740F",
+  goldSoft: "#FBF3E4",
+  coral: "#CC3F28",
+  coralSoft: "#FBEEEB",
+};
+
 function MediaElement({ src, alt, style, firstImage }) {
   if (!src) return null;
   const isVideo = src.match(/\.(mp4|webm|ogg|mov)$/i) || src.includes('video');
@@ -175,6 +199,8 @@ export default function PropertyModal({ property, onClose, listings = [], onSele
   const securityDeposit = depositFromField ?? (numericRent > 0 ? Math.round(numericRent * 2.5) : 0);
   const maintenance = maintenanceFromField ?? (numericRent > 0 ? Math.round(numericRent * 0.08) : 0);
   const formatInr = (n) => `₹ ${Number(n || 0).toLocaleString("en-IN")}`;
+  /** Just the amount — the "per month" is a separate label everywhere it shows. */
+  const rentDisplay = numericRent > 0 ? formatInr(numericRent) : String(property.price || "—").replace(/\s*\/\s*mo\b/i, "");
   // Show raw string (e.g. "3 months") if it contains text, otherwise format as INR
   const rawDeposit = String(property.securityDeposit || "").trim();
   
@@ -286,11 +312,11 @@ export default function PropertyModal({ property, onClose, listings = [], onSele
 
   const badgeStyles = {
     padding: "6px 12px",
-    background: "#f1f5f9",
+    background: T.lineSoft,
     borderRadius: "8px",
     fontSize: "13px",
     fontWeight: 600,
-    color: "#334155",
+    color: T.textDim,
     display: "flex",
     alignItems: "center",
     gap: "6px"
@@ -341,7 +367,7 @@ export default function PropertyModal({ property, onClose, listings = [], onSele
         animate={{ opacity: 1 }}
         exit={{ opacity: 0 }}
         style={{
-          position: "fixed", inset: 0, zIndex: 99999, background: "rgba(15, 23, 42, 0.95)",
+          position: "fixed", inset: 0, zIndex: 99999, background: "rgba(4, 33, 29, 0.94)",
           display: "flex", justifyContent: "center", alignItems: "center", padding: isMobile ? "8px" : "20px"
         }}
         onClick={onClose}
@@ -352,7 +378,7 @@ export default function PropertyModal({ property, onClose, listings = [], onSele
           exit={{ y: 20, opacity: 0, scale: 0.98 }}
           transition={{ type: "spring", damping: 25, stiffness: 300 }}
           style={{
-            background: "linear-gradient(180deg, #fffdfd 0%, #fff8f8 100%)", width: "100%", maxWidth: "1100px", height: isMobile ? "95vh" : "90vh",
+            background: T.cream, width: "100%", maxWidth: "1100px", height: isMobile ? "95vh" : "90vh",
             borderRadius: isMobile ? "14px" : "16px", overflow: "hidden", display: "flex", flexDirection: "column",
             position: "relative", boxShadow: "0 25px 50px -12px rgba(0,0,0,0.5)"
           }}
@@ -367,7 +393,7 @@ export default function PropertyModal({ property, onClose, listings = [], onSele
               alignItems: "center",
               gap: "12px",
               flexWrap: "wrap",
-              background: "#000000",
+              background: T.ink,
               borderBottom: "1px solid #27272a",
               zIndex: 10,
             }}
@@ -379,12 +405,12 @@ export default function PropertyModal({ property, onClose, listings = [], onSele
               >
                 <MovEAZYLogo variant="dark" size={isMobile ? "sm" : "md"} />
               </div>
-              <div style={{ display: "flex", gap: isMobile ? "10px" : "16px", color: "#cbd5e1", fontWeight: 600, fontSize: isMobile ? "12px" : "14px", flexWrap: "wrap", minWidth: 0 }}>
-                <span onClick={() => scrollTo("overview")} style={{ cursor: "pointer", transition: "color 0.2s" }} onMouseEnter={(e) => e.target.style.color = "#fff"} onMouseLeave={(e) => e.target.style.color = "#cbd5e1"}>Overview</span>
+              <div style={{ display: "flex", gap: isMobile ? "10px" : "16px", color: T.line, fontWeight: 600, fontSize: isMobile ? "12px" : "14px", flexWrap: "wrap", minWidth: 0 }}>
+                <span onClick={() => scrollTo("overview")} style={{ cursor: "pointer", transition: "color 0.2s" }} onMouseEnter={(e) => e.target.style.color = T.mint} onMouseLeave={(e) => e.target.style.color = T.line}>Overview</span>
                 {nearbyListings.length > 0 && typeof onSelectListing === "function" ? (
-                  <span onClick={() => scrollTo("nearby-homes")} style={{ cursor: "pointer", transition: "color 0.2s" }} onMouseEnter={(e) => e.target.style.color = "#fff"} onMouseLeave={(e) => e.target.style.color = "#cbd5e1"}>Nearby</span>
+                  <span onClick={() => scrollTo("nearby-homes")} style={{ cursor: "pointer", transition: "color 0.2s" }} onMouseEnter={(e) => e.target.style.color = T.mint} onMouseLeave={(e) => e.target.style.color = T.line}>Nearby</span>
                 ) : null}
-                <span onClick={() => scrollTo("facts")} style={{ cursor: "pointer", transition: "color 0.2s" }} onMouseEnter={(e) => e.target.style.color = "#fff"} onMouseLeave={(e) => e.target.style.color = "#cbd5e1"}>Facts & Features</span>
+                <span onClick={() => scrollTo("facts")} style={{ cursor: "pointer", transition: "color 0.2s" }} onMouseEnter={(e) => e.target.style.color = T.mint} onMouseLeave={(e) => e.target.style.color = T.line}>Facts & Features</span>
               </div>
             </div>
             <div style={{ display: "flex", gap: "8px", alignItems: "center", flexShrink: 0, marginLeft: "auto" }}>
@@ -396,23 +422,23 @@ export default function PropertyModal({ property, onClose, listings = [], onSele
                   void logSavedListingChange(user, property.id, now, property.title);
                   onSavedChange?.();
                 }}
-                style={{ background: "rgba(255,255,255,0.05)", border: "1px solid #475569", borderRadius: "8px", padding: "6px 12px", fontWeight: 600, fontSize: "13px", cursor: "pointer", color: isSaved ? "#ff3131" : "#f1f5f9", transition: "all 0.2s" }}
+                style={{ background: "rgba(255,255,255,0.05)", border: `1px solid ${T.inkSoft}`, borderRadius: "8px", padding: "6px 12px", fontWeight: 600, fontSize: "13px", cursor: "pointer", color: isSaved ? T.teal : T.lineSoft, transition: "all 0.2s" }}
                 onMouseEnter={(e) => {
                   if (!isSaved) {
                     e.currentTarget.style.background = "rgba(255,255,255,0.1)";
-                    e.currentTarget.style.borderColor = "#94a3b8";
+                    e.currentTarget.style.borderColor = T.textMute;
                   }
                 }}
                 onMouseLeave={(e) => {
                   if (!isSaved) {
                     e.currentTarget.style.background = "rgba(255,255,255,0.05)";
-                    e.currentTarget.style.borderColor = "#475569";
+                    e.currentTarget.style.borderColor = T.textDim;
                   }
                 }}
               >
                 {isMobile ? (isSaved ? "♥" : "♡") : (isSaved ? "♥ Saved" : "♡ Save")}
               </button>
-              <button type="button" onClick={handleShare} style={{ background: "rgba(255,255,255,0.05)", border: "1px solid #475569", borderRadius: "8px", padding: "6px 12px", fontWeight: 600, fontSize: "13px", cursor: "pointer", color: "#f1f5f9", transition: "all 0.2s" }} onMouseEnter={(e) => { e.currentTarget.style.background = "rgba(255,255,255,0.1)"; e.currentTarget.style.borderColor = "#94a3b8"; }} onMouseLeave={(e) => { e.currentTarget.style.background = "rgba(255,255,255,0.05)"; e.currentTarget.style.borderColor = "#475569"; }}>
+              <button type="button" onClick={handleShare} style={{ background: "rgba(255,255,255,0.05)", border: `1px solid ${T.inkSoft}`, borderRadius: "8px", padding: "6px 12px", fontWeight: 600, fontSize: "13px", cursor: "pointer", color: T.lineSoft, transition: "all 0.2s" }} onMouseEnter={(e) => { e.currentTarget.style.background = "rgba(255,255,255,0.1)"; e.currentTarget.style.borderColor = T.textMute; }} onMouseLeave={(e) => { e.currentTarget.style.background = "rgba(255,255,255,0.05)"; e.currentTarget.style.borderColor = T.textDim; }}>
                 {isMobile ? "↗" : shareText}
               </button>
               <button
@@ -422,9 +448,9 @@ export default function PropertyModal({ property, onClose, listings = [], onSele
                   width: "36px",
                   height: "36px",
                   borderRadius: "999px",
-                  border: "1px solid #475569",
+                  border: `1px solid ${T.inkSoft}`,
                   background: "rgba(255,255,255,0.05)",
-                  color: "#f1f5f9",
+                  color: T.lineSoft,
                   fontWeight: 800,
                   fontSize: "18px",
                   lineHeight: 1,
@@ -443,9 +469,9 @@ export default function PropertyModal({ property, onClose, listings = [], onSele
               role="status"
               style={{
                 padding: "10px 16px",
-                background: "#fffbeb",
+                background: T.goldSoft,
                 borderBottom: "1px solid #fcd34d",
-                color: "#92400e",
+                color: T.gold,
                 fontSize: "13px",
                 fontWeight: 600,
                 textAlign: "center",
@@ -465,8 +491,8 @@ export default function PropertyModal({ property, onClose, listings = [], onSele
                 flexDirection: "column",
                 gap: "10px",
                 padding: "10px 10px 14px",
-                background: "#f8fafc",
-                borderBottom: "1px solid #e2e8f0",
+                background: T.cream,
+                borderBottom: `1px solid ${T.line}`,
               }}
             >
               <div
@@ -476,13 +502,13 @@ export default function PropertyModal({ property, onClose, listings = [], onSele
                   height: isMobile ? 240 : 380,
                   flexShrink: 0,
                   overflow: "hidden",
-                  background: "#0f172a",
+                  background: T.ink,
                   borderRadius: "14px",
                 }}
               >
                 <MediaElement src={images[activeMediaIndex]} alt={property.title} firstImage={firstImageUrl} style={{ width: "100%", height: "100%", objectFit: "contain" }} />
                 {isActiveVideo && (
-                  <div style={{ position: "absolute", top: "10px", left: "10px", background: "rgba(15,23,42,0.7)", color: "white", fontSize: "11px", fontWeight: 700, borderRadius: "999px", padding: "5px 9px" }}>
+                  <div style={{ position: "absolute", top: "10px", left: "10px", background: "rgba(4,33,29,0.78)", color: "white", fontSize: "11px", fontWeight: 700, borderRadius: "999px", padding: "5px 9px" }}>
                     VIDEO
                   </div>
                 )}
@@ -507,7 +533,7 @@ export default function PropertyModal({ property, onClose, listings = [], onSele
                     <button
                       type="button"
                       onClick={(e) => { e.stopPropagation(); goPrevMedia(); }}
-                      style={{ position: "absolute", left: "10px", top: "50%", transform: "translateY(-50%)", width: "34px", height: "34px", borderRadius: "999px", border: "1px solid #e2e8f0", background: "rgba(255,255,255,0.92)", color: "#0f172a", fontWeight: 700, zIndex: 10, cursor: "pointer", pointerEvents: "auto" }}
+                      style={{ position: "absolute", left: "10px", top: "50%", transform: "translateY(-50%)", width: "34px", height: "34px", borderRadius: "999px", border: `1px solid ${T.line}`, background: "rgba(255,255,255,0.92)", color: T.text, fontWeight: 700, zIndex: 10, cursor: "pointer", pointerEvents: "auto" }}
                       aria-label="Previous media"
                     >
                       {"<"}
@@ -515,7 +541,7 @@ export default function PropertyModal({ property, onClose, listings = [], onSele
                     <button
                       type="button"
                       onClick={(e) => { e.stopPropagation(); goNextMedia(); }}
-                      style={{ position: "absolute", right: "10px", top: "50%", transform: "translateY(-50%)", width: "34px", height: "34px", borderRadius: "999px", border: "1px solid #e2e8f0", background: "rgba(255,255,255,0.92)", color: "#0f172a", fontWeight: 700, zIndex: 10, cursor: "pointer", pointerEvents: "auto" }}
+                      style={{ position: "absolute", right: "10px", top: "50%", transform: "translateY(-50%)", width: "34px", height: "34px", borderRadius: "999px", border: `1px solid ${T.line}`, background: "rgba(255,255,255,0.92)", color: T.text, fontWeight: 700, zIndex: 10, cursor: "pointer", pointerEvents: "auto" }}
                       aria-label="Next media"
                     >
                       {">"}
@@ -535,7 +561,7 @@ export default function PropertyModal({ property, onClose, listings = [], onSele
                         height: "8px",
                         borderRadius: "999px",
                         border: "none",
-                        background: idx === activeMediaIndex ? "#334155" : "#cbd5e1",
+                        background: idx === activeMediaIndex ? T.textDim : T.line,
                         transition: "all 0.2s ease",
                       }}
                       aria-label={`Go to media ${idx + 1}`}
@@ -553,7 +579,7 @@ export default function PropertyModal({ property, onClose, listings = [], onSele
                         type="button"
                         onClick={() => setActiveMediaIndex(idx)}
                         style={{
-                          border: idx === activeMediaIndex ? "2px solid #334155" : "1px solid #cbd5e1",
+                          border: idx === activeMediaIndex ? `2px solid ${T.teal}` : `1px solid ${T.line}`,
                           borderRadius: "10px",
                           padding: 0,
                           background: "white",
@@ -605,12 +631,39 @@ export default function PropertyModal({ property, onClose, listings = [], onSele
               {/* Left Column (Details) */}
               <div id="overview" style={{ flex: "1 1 500px", minWidth: 0 }}>
                 {property.badge && (
-                  <div style={{ background: "#fef2f2", color: "#ff3131", padding: "4px 8px", borderRadius: "4px", fontSize: "12px", fontWeight: 700, display: "inline-block", marginBottom: "12px" }}>
+                  <div style={{ background: T.coralSoft, color: T.teal, padding: "4px 8px", borderRadius: "4px", fontSize: "12px", fontWeight: 700, display: "inline-block", marginBottom: "12px" }}>
                     {property.badge.toUpperCase()}
                   </div>
                 )}
-                <h1 style={{ fontSize: "28px", margin: "0 0 8px", fontWeight: 800, color: "#0f172a" }}>{property.title}</h1>
-                <p style={{ fontSize: "16px", color: "#64748b", margin: "0 0 16px" }}>{property.address || property.areas || "Location not provided"}</p>
+                {/* Rent first: it is the thing every renter checks before anything
+                    else, and it used to sit in a sidebar below the fold on mobile. */}
+                <div
+                  style={{
+                    display: "flex", alignItems: "baseline", gap: "10px", flexWrap: "wrap",
+                    marginBottom: "10px",
+                  }}
+                >
+                  <span style={{ fontSize: isMobile ? "30px" : "34px", fontWeight: 800, color: T.teal, letterSpacing: "-0.02em" }}>
+                    {rentDisplay}
+                  </span>
+                  <span style={{ fontSize: "14px", color: T.textMute, fontWeight: 600 }}>per month</span>
+                </div>
+                <div
+                  style={{
+                    display: "flex", gap: "8px", flexWrap: "wrap", marginBottom: "14px",
+                    fontSize: "12.5px", color: T.textDim,
+                  }}
+                >
+                  <span style={{ background: T.mintSoft, borderRadius: "999px", padding: "4px 10px", fontWeight: 600 }}>
+                    Deposit {depositSidebar}
+                  </span>
+                  <span style={{ background: T.mintSoft, borderRadius: "999px", padding: "4px 10px", fontWeight: 600 }}>
+                    Maintenance {maintenanceSidebar}
+                  </span>
+                </div>
+
+                <h1 style={{ fontSize: isMobile ? "22px" : "28px", margin: "0 0 8px", fontWeight: 800, color: T.text, lineHeight: 1.2 }}>{property.title}</h1>
+                <p style={{ fontSize: "16px", color: T.textMute, margin: "0 0 16px" }}>{property.address || property.areas || "Location not provided"}</p>
                 
                 <div style={{ display: "flex", gap: "12px", marginBottom: "24px", flexWrap: "wrap" }}>
                   <div style={badgeStyles}>🏢 {property.propertyType || property.type || "Apartment"}</div>
@@ -622,8 +675,8 @@ export default function PropertyModal({ property, onClose, listings = [], onSele
                     style={{
                       ...badgeStyles,
                       border: "1px solid #bbf7d0",
-                      background: "#ecfdf5",
-                      color: "#14532d",
+                      background: T.mintSoft,
+                      color: T.teal,
                     }}
                   >
                     📅 {property.availability || "Immediate"}
@@ -633,8 +686,8 @@ export default function PropertyModal({ property, onClose, listings = [], onSele
                       style={{
                         ...badgeStyles,
                         border: "1px solid #fbcfc4",
-                        background: "#fff5f2",
-                        color: "#b23a28",
+                        background: T.goldSoft,
+                        color: T.gold,
                       }}
                     >
                       🏷️ Listed by {listedByLabel}
@@ -642,39 +695,39 @@ export default function PropertyModal({ property, onClose, listings = [], onSele
                   )}
                 </div>
 
-                <div style={{ background: "linear-gradient(135deg, #f0fdf4 0%, #eff6ff 100%)", padding: "20px", borderRadius: "12px", marginBottom: "24px", border: "1px solid #bbf7d0" }}>
-                  <h2 style={{ margin: "0 0 10px", fontSize: "17px", color: "#0f172a" }}>Availability and rent share</h2>
-                  <p style={{ margin: "0 0 14px", fontSize: "14px", color: "#475569", lineHeight: 1.55 }}>
+                <div style={{ background: T.mintSoft, padding: "20px", borderRadius: "12px", marginBottom: "24px", border: "1px solid #bbf7d0" }}>
+                  <h2 style={{ margin: "0 0 10px", fontSize: "17px", color: T.text }}>Availability and rent share</h2>
+                  <p style={{ margin: "0 0 14px", fontSize: "14px", color: T.textDim, lineHeight: 1.55 }}>
                     Listed availability is shown on the badge above. If you share with flatmates, your portion of the monthly rent is an estimate only — final split depends on bedrooms agreed with the owner.
                   </p>
                   <div style={{ display: "grid", gridTemplateColumns: isMobile ? "1fr 1fr" : "repeat(4, minmax(0,1fr))", gap: "10px" }}>
                     {[1, 2, 3, 4].map((n) => {
                       const share = numericRent > 0 ? Math.round(numericRent / n) : 0;
                       return (
-                        <div key={n} style={{ background: "white", border: "1px solid #e2e8f0", borderRadius: "10px", padding: "12px", textAlign: "center" }}>
-                          <div style={{ fontSize: "11px", fontWeight: 800, color: "#64748b", textTransform: "uppercase" }}>{n === 1 ? "Solo" : `${n} people`}</div>
-                          <div style={{ fontSize: "15px", fontWeight: 800, color: "#15803d", marginTop: "6px" }}>{share > 0 ? formatInr(share) : "—"}</div>
-                          <div style={{ fontSize: "11px", color: "#94a3b8", marginTop: "4px" }}>per person / mo</div>
+                        <div key={n} style={{ background: "white", border: `1px solid ${T.line}`, borderRadius: "10px", padding: "12px", textAlign: "center" }}>
+                          <div style={{ fontSize: "11px", fontWeight: 800, color: T.textMute, textTransform: "uppercase" }}>{n === 1 ? "Solo" : `${n} people`}</div>
+                          <div style={{ fontSize: "15px", fontWeight: 800, color: T.teal, marginTop: "6px" }}>{share > 0 ? formatInr(share) : "—"}</div>
+                          <div style={{ fontSize: "11px", color: T.textMute, marginTop: "4px" }}>per person / mo</div>
                         </div>
                       );
                     })}
                   </div>
                   {property.bhk === "Roommate needed" ? (
-                    <p style={{ margin: "12px 0 0", fontSize: "13px", color: "#92400e", fontWeight: 600 }}>This listing is tagged for roommate matching — use Apply below and mention your move-in timeline.</p>
+                    <p style={{ margin: "12px 0 0", fontSize: "13px", color: T.gold, fontWeight: 600 }}>This listing is tagged for roommate matching — use Apply below and mention your move-in timeline.</p>
                   ) : null}
                 </div>
 
-                <div style={{ background: "#f8fafc", padding: "24px", borderRadius: "12px", marginBottom: "32px", border: "1px solid #e2e8f0" }}>
-                  <h2 style={{ margin: "0 0 12px", fontSize: "18px", color: "#0f172a" }}>What's special</h2>
-                  <p style={{ margin: 0, fontSize: "15px", color: "#475569", lineHeight: "1.6", whiteSpace: "pre-wrap" }}>
+                <div style={{ background: T.cream, padding: "24px", borderRadius: "12px", marginBottom: "32px", border: `1px solid ${T.line}` }}>
+                  <h2 style={{ margin: "0 0 12px", fontSize: "18px", color: T.text }}>What's special</h2>
+                  <p style={{ margin: 0, fontSize: "15px", color: T.textDim, lineHeight: "1.6", whiteSpace: "pre-wrap" }}>
                     {property.description || "Stunning property located in a prime neighborhood. Contact the seller to learn more about the unprecedented amenities and layout. Perfect for those looking for comfort and convenience in one place."}
                   </p>
                 </div>
 
                 {nearbyListings.length > 0 && typeof onSelectListing === "function" ? (
                   <div id="nearby-homes" style={{ marginBottom: "32px" }}>
-                    <h2 style={{ margin: "0 0 8px", fontSize: "18px", color: "#0f172a" }}>Nearby homes</h2>
-                    <p style={{ margin: "0 0 14px", fontSize: "14px", color: "#64748b", lineHeight: 1.5 }}>
+                    <h2 style={{ margin: "0 0 8px", fontSize: "18px", color: T.text }}>Nearby homes</h2>
+                    <p style={{ margin: "0 0 14px", fontSize: "14px", color: T.textMute, lineHeight: 1.5 }}>
                       Other listings in this neighbourhood — tap a card to switch without closing the map.
                     </p>
                     <div style={{ display: "flex", gap: "12px", overflowX: "auto", paddingBottom: "6px", WebkitOverflowScrolling: "touch" }}>
@@ -693,7 +746,7 @@ export default function PropertyModal({ property, onClose, listings = [], onSele
                               flex: "0 0 auto",
                               width: "min(200px, 72vw)",
                               textAlign: "left",
-                              border: "1px solid #e2e8f0",
+                              border: `1px solid ${T.line}`,
                               borderRadius: "12px",
                               overflow: "hidden",
                               background: "white",
@@ -705,13 +758,13 @@ export default function PropertyModal({ property, onClose, listings = [], onSele
                             {img ? (
                               <img src={img} alt="" style={{ width: "100%", height: "100px", objectFit: "cover", display: "block" }} />
                             ) : (
-                              <div style={{ height: "100px", background: "#f1f5f9" }} />
+                              <div style={{ height: "100px", background: T.lineSoft }} />
                             )}
                             <div style={{ padding: "10px 12px 12px" }}>
-                              <div style={{ fontSize: "11px", fontWeight: 700, color: "#64748b", marginBottom: "4px" }}>{km} km away</div>
-                              <div style={{ fontSize: "14px", fontWeight: 700, color: "#0f172a", lineHeight: 1.35 }}>{n.title}</div>
-                              <div style={{ fontSize: "12px", color: "#64748b", marginTop: "4px", lineHeight: 1.35 }}>{n.address}</div>
-                              <div style={{ fontSize: "13px", fontWeight: 800, color: "#16a34a", marginTop: "6px" }}>{n.price || `₹ ${n.monthlyRent}`}</div>
+                              <div style={{ fontSize: "11px", fontWeight: 700, color: T.textMute, marginBottom: "4px" }}>{km} km away</div>
+                              <div style={{ fontSize: "14px", fontWeight: 700, color: T.text, lineHeight: 1.35 }}>{n.title}</div>
+                              <div style={{ fontSize: "12px", color: T.textMute, marginTop: "4px", lineHeight: 1.35 }}>{n.address}</div>
+                              <div style={{ fontSize: "13px", fontWeight: 800, color: T.teal, marginTop: "6px" }}>{n.price || `₹ ${n.monthlyRent}`}</div>
                             </div>
                           </button>
                         );
@@ -721,50 +774,50 @@ export default function PropertyModal({ property, onClose, listings = [], onSele
                 ) : null}
 
                 <div id="facts" style={{ marginBottom: "32px" }}>
-                  <h2 style={{ margin: "0 0 16px", fontSize: "18px", color: "#0f172a" }}>Facts, features & policies</h2>
+                  <h2 style={{ margin: "0 0 16px", fontSize: "18px", color: T.text }}>Facts, features & policies</h2>
                   <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "16px" }}>
-                    <div style={{ background: "#f1f5f9", padding: "12px", borderRadius: "8px" }}>
-                      <div style={{ fontSize: "12px", color: "#64748b", marginBottom: "4px" }}>Availability</div>
-                      <div style={{ fontWeight: 600, color: "#0f172a" }}>{property.availability || "Immediate"}</div>
+                    <div style={{ background: T.lineSoft, padding: "12px", borderRadius: "8px" }}>
+                      <div style={{ fontSize: "12px", color: T.textMute, marginBottom: "4px" }}>Availability</div>
+                      <div style={{ fontWeight: 600, color: T.text }}>{property.availability || "Immediate"}</div>
                     </div>
-                    <div style={{ background: "#f1f5f9", padding: "12px", borderRadius: "8px" }}>
-                      <div style={{ fontSize: "12px", color: "#64748b", marginBottom: "4px" }}>Listed By</div>
-                      <div style={{ fontWeight: 600, color: "#0f172a" }}>{property.seller || property.company || "Owner"}</div>
+                    <div style={{ background: T.lineSoft, padding: "12px", borderRadius: "8px" }}>
+                      <div style={{ fontSize: "12px", color: T.textMute, marginBottom: "4px" }}>Listed By</div>
+                      <div style={{ fontWeight: 600, color: T.text }}>{property.seller || property.company || "Owner"}</div>
                     </div>
-                    <div style={{ background: "#f1f5f9", padding: "12px", borderRadius: "8px" }}>
-                      <div style={{ fontSize: "12px", color: "#64748b", marginBottom: "4px" }}>Broker contact</div>
-                      <div style={{ fontWeight: 600, color: "#0f172a" }}>
+                    <div style={{ background: T.lineSoft, padding: "12px", borderRadius: "8px" }}>
+                      <div style={{ fontSize: "12px", color: T.textMute, marginBottom: "4px" }}>Broker contact</div>
+                      <div style={{ fontWeight: 600, color: T.text }}>
                         {showBrokerDirectLine
                           ? brokerCallLine
                           : "Not published on the public map — request a visit or apply and MovEazy coordinates with the broker."}
                       </div>
                     </div>
-                    <div style={{ background: "#f1f5f9", padding: "12px", borderRadius: "8px" }}>
-                      <div style={{ fontSize: "12px", color: "#64748b", marginBottom: "4px" }}>Source</div>
-                      <div style={{ fontWeight: 600, color: "#0f172a" }}>{property.source || "Direct"}</div>
+                    <div style={{ background: T.lineSoft, padding: "12px", borderRadius: "8px" }}>
+                      <div style={{ fontSize: "12px", color: T.textMute, marginBottom: "4px" }}>Source</div>
+                      <div style={{ fontWeight: 600, color: T.text }}>{property.source || "Direct"}</div>
                     </div>
-                    <div style={{ background: "#f1f5f9", padding: "12px", borderRadius: "8px" }}>
-                      <div style={{ fontSize: "12px", color: "#64748b", marginBottom: "4px" }}>Coordinates</div>
-                      <div style={{ fontWeight: 600, color: "#0f172a" }}>{property.lat && property.lng ? `${property.lat}, ${property.lng}` : "Not available"}</div>
+                    <div style={{ background: T.lineSoft, padding: "12px", borderRadius: "8px" }}>
+                      <div style={{ fontSize: "12px", color: T.textMute, marginBottom: "4px" }}>Coordinates</div>
+                      <div style={{ fontWeight: 600, color: T.text }}>{property.lat && property.lng ? `${property.lat}, ${property.lng}` : "Not available"}</div>
                     </div>
-                    <div style={{ background: "#f1f5f9", padding: "12px", borderRadius: "8px" }}>
-                      <div style={{ fontSize: "12px", color: "#64748b", marginBottom: "4px" }}>Move-in</div>
-                      <div style={{ fontWeight: 600, color: "#0f172a" }}>{property.availableFrom || property.availability || "Immediate"}</div>
+                    <div style={{ background: T.lineSoft, padding: "12px", borderRadius: "8px" }}>
+                      <div style={{ fontSize: "12px", color: T.textMute, marginBottom: "4px" }}>Move-in</div>
+                      <div style={{ fontWeight: 600, color: T.text }}>{property.availableFrom || property.availability || "Immediate"}</div>
                     </div>
                   </div>
                 </div>
 
-                <div style={{ marginBottom: "32px", background: "#f8fafc", borderRadius: "12px", border: "1px solid #e2e8f0", overflow: "hidden" }}>
-                  <div style={{ padding: "14px 16px", fontSize: "18px", fontWeight: 700, color: "#0f172a", borderBottom: "1px solid #e2e8f0" }}>
-                    Listing specifications <span style={{ fontSize: "13px", fontWeight: 500, color: "#64748b" }}>(from listing / broker)</span>
+                <div style={{ marginBottom: "32px", background: T.cream, borderRadius: "12px", border: `1px solid ${T.line}`, overflow: "hidden" }}>
+                  <div style={{ padding: "14px 16px", fontSize: "18px", fontWeight: 700, color: T.text, borderBottom: `1px solid ${T.line}` }}>
+                    Listing specifications <span style={{ fontSize: "13px", fontWeight: 500, color: T.textMute }}>(from listing / broker)</span>
                   </div>
                   <div style={{ display: "grid", gridTemplateColumns: isMobile ? "1fr" : "1fr 1fr", gap: "0 20px", padding: "0 16px" }}>
                     {detailRows.map(([label, value], idx) => (
-                      <div key={label} style={{ padding: "12px 0", borderBottom: idx < detailRows.length - 1 ? "1px solid #e2e8f0" : "none" }}>
-                        <div style={{ fontSize: "13px", color: "#94a3b8", marginBottom: "4px" }}>{label}</div>
-                        <div style={{ fontSize: "15px", fontWeight: 600, color: "#0f172a", wordBreak: "break-word" }}>
+                      <div key={label} style={{ padding: "12px 0", borderBottom: idx < detailRows.length - 1 ? `1px solid ${T.line}` : "none" }}>
+                        <div style={{ fontSize: "13px", color: T.textMute, marginBottom: "4px" }}>{label}</div>
+                        <div style={{ fontSize: "15px", fontWeight: 600, color: T.text, wordBreak: "break-word" }}>
                           {label === "Source URL" && value !== "—" ? (
-                            <a href={value} target="_blank" rel="noopener noreferrer" style={{ color: "#2563eb" }}>
+                            <a href={value} target="_blank" rel="noopener noreferrer" style={{ color: T.teal }}>
                               {value}
                             </a>
                           ) : (
@@ -777,63 +830,63 @@ export default function PropertyModal({ property, onClose, listings = [], onSele
                 </div>
 
                 <div style={{ marginBottom: "32px" }}>
-                  <h2 style={{ margin: "0 0 12px", fontSize: "18px", color: "#0f172a" }}>Furnishings</h2>
+                  <h2 style={{ margin: "0 0 12px", fontSize: "18px", color: T.text }}>Furnishings</h2>
                   {furnishings.length ? (
                     <div style={{ display: "grid", gridTemplateColumns: isMobile ? "1fr 1fr" : "repeat(4, minmax(0,1fr))", gap: "10px" }}>
                       {furnishings.map((item) => (
-                        <div key={item} style={{ background: "white", border: "1px solid #e2e8f0", borderRadius: "10px", padding: "10px 12px", fontSize: "13px", fontWeight: 600, color: "#334155" }}>
+                        <div key={item} style={{ background: "white", border: `1px solid ${T.line}`, borderRadius: "10px", padding: "10px 12px", fontSize: "13px", fontWeight: 600, color: T.textDim }}>
                           {item}
                         </div>
                       ))}
                     </div>
                   ) : (
-                    <p style={{ margin: 0, fontSize: "14px", color: "#64748b" }}>—</p>
+                    <p style={{ margin: 0, fontSize: "14px", color: T.textMute }}>—</p>
                   )}
                 </div>
 
                 <div style={{ marginBottom: "32px" }}>
-                  <h2 style={{ margin: "0 0 12px", fontSize: "18px", color: "#0f172a" }}>Amenities</h2>
+                  <h2 style={{ margin: "0 0 12px", fontSize: "18px", color: T.text }}>Amenities</h2>
                   {amenities.length ? (
                     <div style={{ display: "flex", flexWrap: "wrap", gap: "10px" }}>
                       {amenities.map((item) => (
-                        <span key={item} style={{ background: "#fff1f2", color: "#be123c", border: "1px solid #fecdd3", padding: "7px 10px", borderRadius: "999px", fontSize: "12px", fontWeight: 600 }}>
+                        <span key={item} style={{ background: T.mintSoft, color: T.teal, border: "1px solid #fecdd3", padding: "7px 10px", borderRadius: "999px", fontSize: "12px", fontWeight: 600 }}>
                           {item}
                         </span>
                       ))}
                     </div>
                   ) : (
-                    <p style={{ margin: 0, fontSize: "14px", color: "#64748b" }}>—</p>
+                    <p style={{ margin: 0, fontSize: "14px", color: T.textMute }}>—</p>
                   )}
                 </div>
               </div>
 
               {/* Right Column (Sticky Action Card) */}
               <div style={{ flex: "1 1 320px", position: "relative" }}>
-                <div style={{ position: "sticky", top: "32px", background: "white", padding: "24px", borderRadius: "16px", border: "1px solid #e2e8f0", boxShadow: "0 10px 25px -5px rgba(0,0,0,0.05)" }}>
-                  <div style={{ fontSize: "32px", fontWeight: 800, color: "#16a34a", marginBottom: "4px" }}>
-                    {property.price || `₹ ${property.monthlyRent || 0}`}
+                <div id="book" style={{ position: "sticky", top: "32px", background: T.card, padding: "24px", borderRadius: "16px", border: `1px solid ${T.line}`, boxShadow: "0 10px 25px -5px rgba(4,33,29,0.06)" }}>
+                  <div style={{ fontSize: "26px", fontWeight: 800, color: T.teal, marginBottom: "4px" }}>
+                    {rentDisplay}
                   </div>
-                  <div style={{ fontSize: "13px", color: "#64748b", marginBottom: "20px" }}>Rent per month</div>
+                  <div style={{ fontSize: "13px", color: T.textMute, marginBottom: "20px" }}>Rent per month</div>
 
-                  <div style={{ border: "1px solid #e2e8f0", borderRadius: "12px", padding: "14px", marginBottom: "16px", background: offMarket ? "#f1f5f9" : "#fafafa", opacity: offMarket ? 0.85 : 1 }}>
-                    <div style={{ fontSize: "14px", fontWeight: 800, color: "#0f172a", marginBottom: "10px" }}>Apply interest</div>
-                    <label style={{ display: "block", fontSize: "12px", fontWeight: 600, color: "#64748b", marginBottom: "6px" }}>How do you want to rent?</label>
+                  <div style={{ border: `1px solid ${T.line}`, borderRadius: "12px", padding: "14px", marginBottom: "16px", background: offMarket ? T.lineSoft : T.cream, opacity: offMarket ? 0.85 : 1 }}>
+                    <div style={{ fontSize: "14px", fontWeight: 800, color: T.text, marginBottom: "10px" }}>Apply interest</div>
+                    <label style={{ display: "block", fontSize: "12px", fontWeight: 600, color: T.textMute, marginBottom: "6px" }}>How do you want to rent?</label>
                     <select
                       value={applyMode}
                       onChange={(e) => setApplyMode(e.target.value)}
                       disabled={offMarket}
-                      style={{ width: "100%", marginBottom: "10px", padding: "10px", borderRadius: "8px", border: "1px solid #cbd5e1", fontSize: "14px", boxSizing: "border-box" }}
+                      style={{ width: "100%", marginBottom: "10px", padding: "10px", borderRadius: "8px", border: `1px solid ${T.line}`, fontSize: "14px", boxSizing: "border-box" }}
                     >
                       <option value="entire_unit">Whole unit (family / solo)</option>
                       <option value="seeking_flatmate">Looking for a flatmate for this home</option>
                       <option value="open_to_share">Open to sharing rent with others</option>
                     </select>
-                    <label style={{ display: "block", fontSize: "12px", fontWeight: 600, color: "#64748b", marginBottom: "6px" }}>People splitting rent (incl. you)</label>
+                    <label style={{ display: "block", fontSize: "12px", fontWeight: 600, color: T.textMute, marginBottom: "6px" }}>People splitting rent (incl. you)</label>
                     <select
                       value={adultsSharing}
                       onChange={(e) => setAdultsSharing(Number(e.target.value))}
                       disabled={offMarket}
-                      style={{ width: "100%", marginBottom: "10px", padding: "10px", borderRadius: "8px", border: "1px solid #cbd5e1", fontSize: "14px", boxSizing: "border-box" }}
+                      style={{ width: "100%", marginBottom: "10px", padding: "10px", borderRadius: "8px", border: `1px solid ${T.line}`, fontSize: "14px", boxSizing: "border-box" }}
                     >
                       {[1, 2, 3, 4, 5, 6].map((n) => (
                         <option key={n} value={n}>
@@ -847,7 +900,7 @@ export default function PropertyModal({ property, onClose, listings = [], onSele
                       onChange={(e) => setApplyNotes(e.target.value)}
                       disabled={offMarket}
                       placeholder="Optional note (move-in date, budget, pets…)"
-                      style={{ width: "100%", marginBottom: "10px", padding: "10px", borderRadius: "8px", border: "1px solid #cbd5e1", fontSize: "13px", boxSizing: "border-box", resize: "vertical" }}
+                      style={{ width: "100%", marginBottom: "10px", padding: "10px", borderRadius: "8px", border: `1px solid ${T.line}`, fontSize: "13px", boxSizing: "border-box", resize: "vertical" }}
                     />
                     <button
                       type="button"
@@ -856,7 +909,7 @@ export default function PropertyModal({ property, onClose, listings = [], onSele
                       style={{
                         width: "100%",
                         padding: "12px",
-                        background: offMarket ? "#94a3b8" : "#0f172a",
+                        background: offMarket ? T.textMute : T.text,
                         color: "white",
                         border: "none",
                         borderRadius: "8px",
@@ -868,19 +921,19 @@ export default function PropertyModal({ property, onClose, listings = [], onSele
                       Submit interest
                     </button>
                     {applyMessage ? (
-                      <div style={{ marginTop: "10px", fontSize: "12px", color: "#166534", fontWeight: 600, lineHeight: 1.45 }}>{applyMessage}</div>
+                      <div style={{ marginTop: "10px", fontSize: "12px", color: T.teal, fontWeight: 600, lineHeight: 1.45 }}>{applyMessage}</div>
                     ) : null}
-                    <p style={{ margin: "10px 0 0", fontSize: "11px", color: "#94a3b8", lineHeight: 1.45 }}>
+                    <p style={{ margin: "10px 0 0", fontSize: "11px", color: T.textMute, lineHeight: 1.45 }}>
                       {!user?.email ? "Signed out: we still save this on this device under a guest profile. Sign in to sync across devices." : null}
                     </p>
                   </div>
 
-                  <div style={{ background: "#f8fafc", border: "1px solid #e2e8f0", borderRadius: "10px", padding: "12px", marginBottom: "16px" }}>
-                    <div style={{ display: "flex", justifyContent: "space-between", fontSize: "12px", color: "#475569", marginBottom: "6px" }}>
-                      <span>Security deposit</span><strong style={{ color: "#0f172a" }}>{depositSidebar}</strong>
+                  <div style={{ background: T.cream, border: `1px solid ${T.line}`, borderRadius: "10px", padding: "12px", marginBottom: "16px" }}>
+                    <div style={{ display: "flex", justifyContent: "space-between", fontSize: "12px", color: T.textDim, marginBottom: "6px" }}>
+                      <span>Security deposit</span><strong style={{ color: T.text }}>{depositSidebar}</strong>
                     </div>
-                    <div style={{ display: "flex", justifyContent: "space-between", fontSize: "12px", color: "#475569", marginBottom: "6px" }}>
-                      <span>Maintenance (est.)</span><strong style={{ color: "#0f172a" }}>{maintenanceSidebar}</strong>
+                    <div style={{ display: "flex", justifyContent: "space-between", fontSize: "12px", color: T.textDim, marginBottom: "6px" }}>
+                      <span>Maintenance (est.)</span><strong style={{ color: T.text }}>{maintenanceSidebar}</strong>
                     </div>
 
                   </div>
@@ -889,26 +942,26 @@ export default function PropertyModal({ property, onClose, listings = [], onSele
                     <form onSubmit={submitVisit} style={{ display: "flex", flexDirection: "column", gap: "12px", opacity: offMarket ? 0.6 : 1, pointerEvents: offMarket ? "none" : "auto" }}>
                       <h3 style={{ margin: "0 0 8px", fontSize: "16px" }}>Schedule a Visit</h3>
                       {visitSuccess ? (
-                        <div style={{ background: "#dcfce7", color: "#166534", padding: "12px", borderRadius: "8px", fontWeight: 600, textAlign: "center", fontSize: "13px" }}>
+                        <div style={{ background: T.mintSoft, color: T.teal, padding: "12px", borderRadius: "8px", fontWeight: 600, textAlign: "center", fontSize: "13px" }}>
                           {visitSuccess}
                         </div>
                       ) : (
                         <>
-                          <input type="text" required placeholder="Date & Time (e.g. Tomorrow 5PM)" value={visitForm.time} onChange={(e) => setVisitForm({ ...visitForm, time: e.target.value })} style={{ width: "100%", padding: "10px", borderRadius: "8px", border: "1px solid #e2e8f0", boxSizing: "border-box", fontSize: "14px" }} />
-                          <textarea rows={2} placeholder="Any questions?" value={visitForm.notes} onChange={(e) => setVisitForm({ ...visitForm, notes: e.target.value })} style={{ width: "100%", padding: "10px", borderRadius: "8px", border: "1px solid #e2e8f0", boxSizing: "border-box", fontSize: "14px" }} />
+                          <input type="text" required placeholder="Date & Time (e.g. Tomorrow 5PM)" value={visitForm.time} onChange={(e) => setVisitForm({ ...visitForm, time: e.target.value })} style={{ width: "100%", padding: "10px", borderRadius: "8px", border: `1px solid ${T.line}`, boxSizing: "border-box", fontSize: "14px" }} />
+                          <textarea rows={2} placeholder="Any questions?" value={visitForm.notes} onChange={(e) => setVisitForm({ ...visitForm, notes: e.target.value })} style={{ width: "100%", padding: "10px", borderRadius: "8px", border: `1px solid ${T.line}`, boxSizing: "border-box", fontSize: "14px" }} />
                           <div style={{ display: "flex", gap: "8px", marginTop: "4px" }}>
-                            <button type="button" onClick={() => setShowVisitForm(false)} style={{ flex: 1, padding: "12px", background: "#f1f5f9", color: "#475569", border: "none", borderRadius: "8px", fontWeight: 600, cursor: "pointer" }}>Cancel</button>
-                            <button type="submit" style={{ flex: 2, padding: "12px", background: "#ff3131", color: "white", border: "none", borderRadius: "8px", fontWeight: 700, cursor: "pointer" }}>Confirm</button>
+                            <button type="button" onClick={() => setShowVisitForm(false)} style={{ flex: 1, padding: "12px", background: T.lineSoft, color: T.textDim, border: "none", borderRadius: "8px", fontWeight: 600, cursor: "pointer" }}>Cancel</button>
+                            <button type="submit" style={{ flex: 2, padding: "12px", background: T.teal, color: "white", border: "none", borderRadius: "8px", fontWeight: 700, cursor: "pointer" }}>Confirm</button>
                           </div>
                         </>
                       )}
                     </form>
                   ) : (
                     <div style={{ display: "flex", flexDirection: "column", gap: "12px" }}>
-                      <button type="button" disabled={offMarket} onClick={() => !offMarket && setShowVisitForm(true)} style={{ width: "100%", padding: "14px", background: offMarket ? "#cbd5e1" : "#ff3131", color: "white", border: "none", borderRadius: "8px", fontSize: "15px", fontWeight: 700, cursor: offMarket ? "not-allowed" : "pointer", transition: "all 0.2s" }}>
+                      <button type="button" disabled={offMarket} onClick={() => !offMarket && setShowVisitForm(true)} style={{ width: "100%", padding: "14px", background: offMarket ? T.line : T.teal, color: "white", border: "none", borderRadius: "8px", fontSize: "15px", fontWeight: 700, cursor: offMarket ? "not-allowed" : "pointer", transition: "all 0.2s" }}>
                         Request a tour
                       </button>
-                      <button type="button" disabled={offMarket} onClick={() => !offMarket && setShowVisitForm(true)} style={{ width: "100%", padding: "14px", background: offMarket ? "#f1f5f9" : "white", color: offMarket ? "#94a3b8" : "#ff3131", border: offMarket ? "1px solid #e2e8f0" : "1px solid #ff3131", borderRadius: "8px", fontSize: "15px", fontWeight: 700, cursor: offMarket ? "not-allowed" : "pointer", transition: "all 0.2s" }}>
+                      <button type="button" disabled={offMarket} onClick={() => !offMarket && setShowVisitForm(true)} style={{ width: "100%", padding: "14px", background: offMarket ? T.lineSoft : "white", color: offMarket ? T.textMute : T.teal, border: offMarket ? `1px solid ${T.line}` : `1px solid ${T.teal}`, borderRadius: "8px", fontSize: "15px", fontWeight: 700, cursor: offMarket ? "not-allowed" : "pointer", transition: "all 0.2s" }}>
                         Check availability
                       </button>
                       {showBrokerDirectLine && brokerCallLine ? (
@@ -920,9 +973,9 @@ export default function PropertyModal({ property, onClose, listings = [], onSele
                               textAlign: "center",
                               width: "100%",
                               padding: "14px",
-                              background: "#f8fafc",
-                              color: "#0f172a",
-                              border: "1px solid #cbd5e1",
+                              background: T.cream,
+                              color: T.text,
+                              border: `1px solid ${T.line}`,
                               borderRadius: "8px",
                               fontSize: "15px",
                               fontWeight: 700,
@@ -954,8 +1007,8 @@ export default function PropertyModal({ property, onClose, listings = [], onSele
                               textAlign: "center",
                               width: "100%",
                               padding: "14px",
-                              background: "#ecfdf3",
-                              color: "#166534",
+                              background: T.mintSoft,
+                              color: T.teal,
                               border: "1px solid #86efac",
                               borderRadius: "8px",
                               fontSize: "15px",
@@ -975,9 +1028,9 @@ export default function PropertyModal({ property, onClose, listings = [], onSele
                             borderRadius: "8px",
                             fontSize: "13px",
                             fontWeight: 600,
-                            color: "#475569",
-                            background: "#f8fafc",
-                            border: "1px solid #e2e8f0",
+                            color: T.textDim,
+                            background: T.cream,
+                            border: `1px solid ${T.line}`,
                             textAlign: "center",
                             lineHeight: 1.45,
                           }}
@@ -988,9 +1041,9 @@ export default function PropertyModal({ property, onClose, listings = [], onSele
                     </div>
                   )}
 
-                  <div style={{ marginTop: "20px", display: "flex", gap: "12px", alignItems: "flex-start", background: "#f8fafc", padding: "12px", borderRadius: "8px" }}>
+                  <div style={{ marginTop: "20px", display: "flex", gap: "12px", alignItems: "flex-start", background: T.cream, padding: "12px", borderRadius: "8px" }}>
                     <div style={{ fontSize: "20px" }}>💡</div>
-                    <div style={{ fontSize: "12px", color: "#475569", lineHeight: "1.5" }}>
+                    <div style={{ fontSize: "12px", color: T.textDim, lineHeight: "1.5" }}>
                       <strong>MovEazy Guarantee available.</strong> Avoid unfair deductions and secure your deposit with our legal support.
                     </div>
                   </div>
@@ -998,6 +1051,41 @@ export default function PropertyModal({ property, onClose, listings = [], onSele
               </div>
 
             </div>
+
+            {/* On a phone the action card sits far below the photos and the
+                description, so the two things a renter actually does are pinned
+                to the bottom instead — matching the app's own bottom bar. */}
+            {isMobile && (
+              <div
+                style={{
+                  position: "sticky", bottom: 0, zIndex: 20,
+                  display: "flex", alignItems: "center", gap: "10px",
+                  padding: "10px 14px calc(10px + env(safe-area-inset-bottom))",
+                  background: T.card, borderTop: `1px solid ${T.line}`,
+                  boxShadow: "0 -6px 20px rgba(4,33,29,0.08)",
+                }}
+              >
+                <div style={{ minWidth: 0, flex: "0 0 auto" }}>
+                  <div style={{ fontSize: "17px", fontWeight: 800, color: T.teal, lineHeight: 1.1 }}>
+                    {rentDisplay}
+                  </div>
+                  <div style={{ fontSize: "11px", color: T.textMute }}>per month</div>
+                </div>
+                <button
+                  type="button"
+                  disabled={offMarket}
+                  onClick={() => { if (!offMarket) { setShowVisitForm(true); scrollTo("book"); } }}
+                  style={{
+                    flex: 1, padding: "13px", borderRadius: "10px", border: "none",
+                    background: offMarket ? T.line : T.teal, color: "#fff",
+                    fontSize: "15px", fontWeight: 700,
+                    cursor: offMarket ? "not-allowed" : "pointer",
+                  }}
+                >
+                  {offMarket ? "Off market" : "Schedule a visit"}
+                </button>
+              </div>
+            )}
           </div>
         </motion.div>
       </motion.div>
