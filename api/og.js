@@ -154,7 +154,7 @@ export default async function handler(req) {
       fonts: [{ name: "Inter", data: await interBold(), weight: 700, style: "normal" }],
       headers: { "cache-control": cache },
     });
-  } catch (err) {
+  } catch {
     // Never hand a crawler a broken image. One real photo of the flat beats a
     // zero-byte PNG, and the logo beats nothing at all.
     const fallback = photos[0] || `${new URL(req.url).origin}/logo-moveazy-bar.png`;
