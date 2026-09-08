@@ -10,6 +10,8 @@ import {
   MapPin, ChevronRight, CalendarCheck, Images,
 } from "lucide-react";
 import logoMint from "../assets/logo/moveazy-logo-mint-dark.png";
+import { useLoginModal } from "../context/LoginModalContext";
+import { bookIndividual, fetchOpenVisitsForProperty } from "../lib/visits";
 import { findNearbyListings } from "../lib/geo";
 import { isListingSaved, toggleSavedListing } from "../lib/userActivity";
 import { submitListingInterestFull, logSavedListingChange } from "../lib/crmSync";
@@ -64,9 +66,16 @@ function MediaElement({ src, alt, style, firstImage }) {
 
 export default function PropertyModal({ property, onClose, listings = [], onSelectListing, onSavedChange, initialShowVisitForm = false }) {
   const { user } = useAuth();
+  const { openLogin } = useLoginModal();
   const [visitForm, setVisitForm] = useState({ time: "", notes: "" });
   const [visitSuccess, setVisitSuccess] = useState("");
   const [showVisitForm, setShowVisitForm] = useState(false);
+  // The times the lister has actually published. Only these are offered — the
+  // alternative is asking a renter to invent a time nobody agreed to.
+  const [visitSlots, setVisitSlots] = useState([]);
+  const [slotsLoading, setSlotsLoading] = useState(false);
+  const [chosenSlot, setChosenSlot] = useState("");
+  const [booking, setBooking] = useState(false);
   const [applyMode, setApplyMode] = useState("entire_unit");
   const [adultsSharing, setAdultsSharing] = useState(1);
   const [applyNotes, setApplyNotes] = useState("");
@@ -81,6 +90,18 @@ export default function PropertyModal({ property, onClose, listings = [], onSele
   useEffect(() => {
     if (initialShowVisitForm) setShowVisitForm(true);
   }, [property?.id, initialShowVisitForm]);
+
+  useEffect(() => {
+    if (!property?.id) return;
+    let alive = true;
+    setSlotsLoading(true);
+    setChosenSlot("");
+    fetchOpenVisitsForProperty(property.id, { days: 21 })
+      .then((rows) => { if (alive) setVisitSlots((rows || []).slice(0, 5)); })
+      .catch(() => { if (alive) setVisitSlots([]); })
+      .finally(() => { if (alive) setSlotsLoading(false); });
+    return () => { alive = false; };
+  }, [property?.id]);
 
   useEffect(() => {
     const onResize = () => setIsMobile(window.innerWidth <= 768);
@@ -309,6 +330,38 @@ export default function PropertyModal({ property, onClose, listings = [], onSele
     ["Gated community", dash(property.gatedCommunity)],
     ["Source URL", property.sourceUrl ? property.sourceUrl : "—"],
   ];
+
+  const slotLabel = (iso) => {
+    const d = new Date(iso);
+    const day = d.toLocaleDateString("en-IN", { weekday: "short", day: "numeric", month: "short" });
+    const time = d.toLocaleTimeString("en-IN", { hour: "numeric", minute: "2-digit", hour12: true });
+    return { day, time };
+  };
+
+  /**
+   * Book one of the lister's published slots.
+   *
+   * Writes a visit_bookings row, which is the record everything else reads:
+   * my_recent_activity() puts it in the lister's notification bell, and a
+   * trigger files it into the CRM against this client. Nothing here has to
+   * remember to notify anyone.
+   */
+  const confirmSlot = async () => {
+    if (!chosenSlot || offMarket) return;
+    // Signing in mid-flow shouldn't lose the slot they picked.
+    if (!user) { openLogin?.(() => confirmSlot()); return; }
+    setBooking(true);
+    try {
+      await bookIndividual(user.uid, property.id, chosenSlot);
+      const { day, time } = slotLabel(chosenSlot);
+      setVisitSuccess(`Visit booked for ${day} at ${time}. The lister has been notified.`);
+    } catch (err) {
+      setVisitSuccess("");
+      alert(err?.message || "Could not book that slot — please try another.");
+    } finally {
+      setBooking(false);
+    }
+  };
 
   const submitVisit = async (e) => {
     e.preventDefault();
@@ -747,12 +800,12 @@ export default function PropertyModal({ property, onClose, listings = [], onSele
                   }}
                 >
                   <div style={{ flex: 1, minWidth: 0 }}>
-                    <div style={{ fontSize: isMobile ? "26px" : "28px", fontWeight: 800, color: T.text, lineHeight: 1.1 }}>{rentDisplay}</div>
+                    <div style={{ fontSize: isMobile ? "22px" : "28px", fontWeight: 800, color: T.text, lineHeight: 1.1, whiteSpace: "nowrap" }}>{rentDisplay}</div>
                     <div style={{ fontSize: "13px", color: T.textMute, marginTop: "3px" }}>/ month</div>
                   </div>
                   <div style={{ width: "1px", background: T.line }} />
                   <div style={{ flex: 1, minWidth: 0 }}>
-                    <div style={{ fontSize: isMobile ? "26px" : "28px", fontWeight: 800, color: depositIsEstimate ? T.textDim : T.text, lineHeight: 1.1 }}>
+                    <div style={{ fontSize: isMobile ? "22px" : "28px", fontWeight: 800, color: depositIsEstimate ? T.textDim : T.text, lineHeight: 1.1, whiteSpace: "nowrap" }}>
                       {depositSidebar}
                     </div>
                     <div style={{ fontSize: "13px", color: T.textMute, marginTop: "3px" }}>
@@ -1065,13 +1118,67 @@ export default function PropertyModal({ property, onClose, listings = [], onSele
                         <div style={{ background: T.mintSoft, color: T.teal, padding: "12px", borderRadius: "8px", fontWeight: 600, textAlign: "center", fontSize: "13px" }}>
                           {visitSuccess}
                         </div>
+                      ) : slotsLoading ? (
+                        <p style={{ margin: 0, fontSize: 13, color: T.textMute }}>Loading visit times…</p>
+                      ) : visitSlots.length > 0 ? (
+                        <>
+                          <p style={{ margin: "0 0 2px", fontSize: 13, color: T.textDim, lineHeight: 1.5 }}>
+                            Pick a time the lister has opened up:
+                          </p>
+                          <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+                            {visitSlots.map((slot) => {
+                              const { day, time } = slotLabel(slot.slot_at);
+                              const on = chosenSlot === slot.slot_at;
+                              return (
+                                <button
+                                  key={slot.id}
+                                  type="button"
+                                  onClick={() => setChosenSlot(slot.slot_at)}
+                                  style={{
+                                    display: "flex", alignItems: "center", justifyContent: "space-between",
+                                    gap: 10, padding: "12px 14px", borderRadius: 10, cursor: "pointer",
+                                    background: on ? T.mintSoft : "#fff",
+                                    border: `1.5px solid ${on ? T.teal : T.line}`,
+                                    color: T.text, textAlign: "left",
+                                  }}
+                                >
+                                  <span style={{ fontSize: 13.5, fontWeight: 700 }}>{day}</span>
+                                  <span style={{ fontSize: 13.5, fontWeight: on ? 800 : 600, color: on ? T.teal : T.textDim }}>
+                                    {time}
+                                  </span>
+                                </button>
+                              );
+                            })}
+                          </div>
+                          <div style={{ display: "flex", gap: "8px", marginTop: "4px" }}>
+                            <button type="button" onClick={() => setShowVisitForm(false)} style={{ flex: 1, padding: "12px", background: T.lineSoft, color: T.textDim, border: "none", borderRadius: "8px", fontWeight: 600, cursor: "pointer" }}>Cancel</button>
+                            <button
+                              type="button"
+                              onClick={confirmSlot}
+                              disabled={!chosenSlot || booking}
+                              style={{
+                                flex: 2, padding: "12px", borderRadius: "8px", border: "none", fontWeight: 700,
+                                background: chosenSlot ? T.teal : T.line,
+                                color: chosenSlot ? "white" : T.textMute,
+                                cursor: chosenSlot && !booking ? "pointer" : "not-allowed",
+                              }}
+                            >
+                              {booking ? "Booking…" : chosenSlot ? "Confirm visit" : "Pick a time"}
+                            </button>
+                          </div>
+                        </>
                       ) : (
                         <>
+                          {/* No published slots. Rather than invent times nobody
+                              agreed to, fall back to asking for one. */}
+                          <p style={{ margin: "0 0 2px", fontSize: 13, color: T.textDim, lineHeight: 1.5 }}>
+                            The lister hasn&apos;t published visit times yet. Tell us when suits you and we&apos;ll arrange it.
+                          </p>
                           <input type="text" required placeholder="Date & Time (e.g. Tomorrow 5PM)" value={visitForm.time} onChange={(e) => setVisitForm({ ...visitForm, time: e.target.value })} style={{ width: "100%", padding: "10px", borderRadius: "8px", border: `1px solid ${T.line}`, boxSizing: "border-box", fontSize: "14px" }} />
                           <textarea rows={2} placeholder="Any questions?" value={visitForm.notes} onChange={(e) => setVisitForm({ ...visitForm, notes: e.target.value })} style={{ width: "100%", padding: "10px", borderRadius: "8px", border: `1px solid ${T.line}`, boxSizing: "border-box", fontSize: "14px" }} />
                           <div style={{ display: "flex", gap: "8px", marginTop: "4px" }}>
                             <button type="button" onClick={() => setShowVisitForm(false)} style={{ flex: 1, padding: "12px", background: T.lineSoft, color: T.textDim, border: "none", borderRadius: "8px", fontWeight: 600, cursor: "pointer" }}>Cancel</button>
-                            <button type="submit" style={{ flex: 2, padding: "12px", background: T.teal, color: "white", border: "none", borderRadius: "8px", fontWeight: 700, cursor: "pointer" }}>Confirm</button>
+                            <button type="submit" style={{ flex: 2, padding: "12px", background: T.teal, color: "white", border: "none", borderRadius: "8px", fontWeight: 700, cursor: "pointer" }}>Request</button>
                           </div>
                         </>
                       )}
@@ -1079,10 +1186,10 @@ export default function PropertyModal({ property, onClose, listings = [], onSele
                   ) : (
                     <div style={{ display: "flex", flexDirection: "column", gap: "12px" }}>
                       <button type="button" disabled={offMarket} onClick={() => !offMarket && setShowVisitForm(true)} style={{ width: "100%", padding: "14px", background: offMarket ? T.line : T.teal, color: "white", border: "none", borderRadius: "8px", fontSize: "15px", fontWeight: 700, cursor: offMarket ? "not-allowed" : "pointer", transition: "all 0.2s" }}>
-                        Request a tour
+                        Schedule a visit
                       </button>
                       <button type="button" disabled={offMarket} onClick={() => !offMarket && setShowVisitForm(true)} style={{ width: "100%", padding: "14px", background: offMarket ? T.lineSoft : "white", color: offMarket ? T.textMute : T.teal, border: offMarket ? `1px solid ${T.line}` : `1px solid ${T.teal}`, borderRadius: "8px", fontSize: "15px", fontWeight: 700, cursor: offMarket ? "not-allowed" : "pointer", transition: "all 0.2s" }}>
-                        Check availability
+                        {visitSlots.length > 0 ? `${visitSlots.length} times available` : "Check availability"}
                       </button>
                       {showBrokerDirectLine && brokerCallLine ? (
                         <>

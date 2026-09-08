@@ -2388,7 +2388,7 @@ export default function MapView() {
           </div>
           <p style={{ margin: "6px 0 0", color: "#5c554e", fontSize: 13.5, lineHeight: 1.5, maxWidth: "52ch" }}>
             <span style={{ fontWeight: 700, color: "#ee5b45" }}>{displayPins.length} place{displayPins.length === 1 ? "" : "s"}</span>
-            {" "}{workplaceAnchor || placeAnchor || selectedLocality ? `near ${areaLabel}` : "across Bengaluru"}. Tap a card to fly the map there; hover to spotlight its pin.
+            {" "}{workplaceAnchor || placeAnchor || selectedLocality ? `near ${areaLabel}` : "across Bengaluru"}. Tap a card to open it; hover to spotlight its pin on the map.
           </p>
           {usingRelaxedPins ? (
             <div style={{ fontSize: 12, fontWeight: 600, color: "#b45309", marginTop: 6 }}>
@@ -2502,11 +2502,10 @@ export default function MapView() {
                     ))}
                   </div>
                 ) : null}
-                onSelect={() => {
-                  setSelected(l);
-                  setMapState(mapStateForListingFocus(l.lat, l.lng, isMobile));
-                  if (isMobile) setMobileTab("map");
-                }}
+                // Tapping a result opens the property itself. It used to throw
+                // you onto the map with a summary card at the bottom, which is
+                // a step further from what you asked for, not closer.
+                onSelect={() => setViewingProperty(l)}
                 onSave={() => {
                   const now = toggleSavedListing(user, l.id, l.title);
                   void logSavedListingChange(user, l.id, now, l.title);
