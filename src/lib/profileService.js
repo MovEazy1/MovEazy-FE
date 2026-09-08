@@ -93,12 +93,16 @@ export async function getProfileForUser(sbUser) {
     };
   }
   if (await isEmailAdminAllowed(email)) {
+    // Still read the saved row so an admin's real name/phone survive — hardcoding
+    // phone:"" here made the post-login "Verify your Mobile No." gate fire on
+    // every admin login even when a number was already saved.
+    const adminRow = await fetchProfileRow(sbUser.id);
     return {
       email,
-      name: "MovEazy Admin",
+      name: adminRow?.name || "MovEazy Admin",
       role: "admin",
       sellerBadgeStatus: null,
-      phone: "",
+      phone: adminRow?.phone || sbUser?.phone || "",
       uid: sbUser.id,
       profileComplete: true,
     };
