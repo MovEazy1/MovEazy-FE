@@ -146,15 +146,32 @@ export default async function handler(req) {
   );
 
   const cache = "public, max-age=3600, s-maxage=86400, stale-while-revalidate=604800";
+  const debug = searchParams.get("debug") === "1";
 
   try {
-    return new ImageResponse(image, {
+    const rendered = new ImageResponse(image, {
       width: W,
       height: H,
       fonts: [{ name: "Inter", data: await interBold(), weight: 700, style: "normal" }],
-      headers: { "cache-control": cache },
     });
-  } catch {
+
+    // ImageResponse streams its body, so a render failure surfaces *after* the
+    // 200 headers are already committed — the client just gets an empty PNG and
+    // nothing is catchable. Draining it here turns that into a real exception we
+    // can fall back from.
+    const buf = await rendered.arrayBuffer();
+    if (!buf || buf.byteLength === 0) throw new Error("renderer produced an empty image");
+
+    return new Response(buf, {
+      headers: { "content-type": "image/png", "cache-control": cache },
+    });
+  } catch (err) {
+    if (debug) {
+      return new Response(
+        `og render failed: ${err?.message || err}\n\nphotos:\n${photos.join("\n") || "(none)"}`,
+        { status: 500, headers: { "content-type": "text/plain; charset=utf-8" } },
+      );
+    }
     // Never hand a crawler a broken image. One real photo of the flat beats a
     // zero-byte PNG, and the logo beats nothing at all.
     const fallback = photos[0] || `${new URL(req.url).origin}/logo-moveazy-bar.png`;
