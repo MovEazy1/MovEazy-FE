@@ -45,12 +45,13 @@ const MINT = "#5EEAD4";
 const CREAM = "#F4F2ED";
 // WhatsApp commonly declines to render a preview image much over ~600KB, and a
 // four-photo collage as PNG is heavy — resvg gives us no JPEG or quality knob,
-// so output dimensions are the only lever. 800x420 keeps the 1.91:1 ratio OG
-// wants and lands comfortably under the limit; a preview is displayed around
-// 500px wide anyway, so nothing visible is lost.
-const W = 800;
-const H = 420;
-const GAP = 6;
+// so output dimensions are the only lever. 800x420 still came out at 748KB, so
+// this drops to 600x315 — Facebook's own documented minimum for an OG image,
+// holding the same 1.91:1 ratio. WhatsApp renders a preview around 500px wide,
+// so this is still above display size and nothing visible is lost.
+const W = 600;
+const H = 315;
+const GAP = 4;
 
 const tile = (src, width, height) =>
   h(
@@ -113,7 +114,7 @@ export default async function handler(req) {
           style: {
             display: "flex", width: W, height: H, alignItems: "center",
             justifyContent: "center", background: INK, color: MINT,
-            fontSize: 42, fontWeight: 700,
+            fontSize: 32, fontWeight: 700,
           },
         },
         "MovEazy",
@@ -129,17 +130,17 @@ export default async function handler(req) {
             style: {
               position: "absolute", left: 0, right: 0, bottom: 0,
               display: "flex", alignItems: "flex-end", justifyContent: "space-between",
-              padding: "18px 24px",
+              padding: "14px 18px",
               background: "linear-gradient(transparent, rgba(4,33,29,0.92))",
             },
           },
           h(
             "div",
             { style: { display: "flex", flexDirection: "column" } },
-            rent && h("div", { style: { display: "flex", color: CREAM, fontSize: 40, fontWeight: 700 } }, rent),
-            line && h("div", { style: { display: "flex", color: MINT, fontSize: 20, marginTop: 4 } }, line),
+            rent && h("div", { style: { display: "flex", color: CREAM, fontSize: 30, fontWeight: 700 } }, rent),
+            line && h("div", { style: { display: "flex", color: MINT, fontSize: 15, marginTop: 3 } }, line),
           ),
-          h("div", { style: { display: "flex", color: CREAM, fontSize: 17, opacity: 0.85 } }, "moveazy.co.in"),
+          h("div", { style: { display: "flex", color: CREAM, fontSize: 13, opacity: 0.85 } }, "moveazy.co.in"),
         )
       : null;
 
