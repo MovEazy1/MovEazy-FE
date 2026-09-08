@@ -8,7 +8,9 @@
  */
 import { useMemo, useState } from "react";
 import { matchRequirementToListings } from "../../lib/inventoryMatch";
-import { buildTemplateVars, propertyLink, renderTemplate, whatsappUrl } from "../../lib/crmSettings";
+import {
+  buildTemplateVars, generateShareToken, propertyLink, renderTemplate, whatsappUrl,
+} from "../../lib/crmSettings";
 import { logActivity, recordClientReaction, upsertShortlist } from "../../lib/crmClients";
 import { SCOPES } from "../../lib/adminScopes";
 import { Btn, C, Chip, Empty, ScoreRing, inr, relTime } from "./crmUi";
@@ -58,6 +60,17 @@ function MatchCard({ match, shortlist, canWrite, onSend, onShortlist, onReact, b
               Open
             </a>
           </div>
+        )}
+
+        {sent && (
+          <span
+            className="crm-num"
+            style={{ fontSize: 10.5, color: shortlist.open_count > 0 ? C.accent : C.textMute }}
+          >
+            {shortlist.open_count > 0
+              ? `Opened ${shortlist.open_count}× · last ${relTime(shortlist.last_opened_at)}`
+              : "Not opened yet"}
+          </span>
         )}
 
         {canWrite && sent && (
@@ -115,7 +128,12 @@ export default function MatchesPane({
 
   const handleSend = async (match) => {
     if (!client.phone) return onToast("No phone number on this client", "error");
-    const vars = buildTemplateVars({ client, requirement, agentName, property: match.listing });
+    // Reuse the token if this property was shared before, so a re-send keeps
+    // counting against the same row instead of orphaning the earlier opens.
+    const existing = byProperty.get(match.listing.property_id);
+    const shareToken = existing?.share_token || generateShareToken();
+
+    const vars = buildTemplateVars({ client, requirement, agentName, property: match.listing, shareToken });
     const url = whatsappUrl(client.phone, renderTemplate(sendTemplate?.body ?? "", vars));
     window.open(url, "_blank", "noopener");
 
@@ -126,6 +144,7 @@ export default function MatchesPane({
         score_at_share: match.score,
         shared_by: actorEmail,
         shared_at: new Date().toISOString(),
+        share_token: shareToken,
       });
       await logActivity(client.id, {
         type: "whatsapp",
@@ -176,7 +195,13 @@ export default function MatchesPane({
     const top = matches.slice(0, 5);
     if (!top.length) return;
     const template = (settings?.templates ?? []).find((t) => t.id === "share_matches");
-    const vars = buildTemplateVars({ client, requirement, agentName, matches: top });
+    const shareTokens = Object.fromEntries(
+      top.map((m) => [
+        m.listing.property_id,
+        byProperty.get(m.listing.property_id)?.share_token || generateShareToken(),
+      ]),
+    );
+    const vars = buildTemplateVars({ client, requirement, agentName, matches: top, shareTokens });
     window.open(whatsappUrl(client.phone, renderTemplate(template?.body ?? "", vars)), "_blank", "noopener");
 
     setBusy(true);
@@ -185,6 +210,7 @@ export default function MatchesPane({
         await upsertShortlist(client.id, m.listing.property_id, {
           status: "shared", score_at_share: m.score, shared_by: actorEmail,
           shared_at: new Date().toISOString(),
+          share_token: shareTokens[m.listing.property_id],
         });
       }
       await logActivity(client.id, {

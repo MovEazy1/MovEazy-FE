@@ -13,6 +13,7 @@
  */
 import { supabase, isSupabaseConfigured } from "./supabase";
 import { sessionTracker } from "./sessionTracking";
+import { readUtm } from "./shareAttribution";
 
 const ANON_KEY = "moveazy_anon_id";
 /** Sessions shorter than this are a bounce or a redirect — not worth a row. */
@@ -68,6 +69,9 @@ async function flush() {
     email: current.email,
     anon_id: anonId(),
     referrer: typeof document !== "undefined" ? String(document.referrer || "").slice(0, 300) : "",
+    // So "arrived from the CRM" is answerable even when a link was forwarded
+    // and its per-share token no longer identifies the right person.
+    utm: readUtm(),
   };
 
   try {

@@ -80,7 +80,8 @@ export const fetchEngagement = () =>
 export const fetchShortlists = () =>
   safeSelect(
     "crm_shortlists",
-    "id,client_id,property_id,status,score_at_share,shared_by,shared_at,created_at",
+    "id,client_id,property_id,status,score_at_share,shared_by,shared_at,created_at,"
+      + "share_token,opened_at,last_opened_at,open_count",
     (q) => q.order("created_at", { ascending: false }).limit(6000),
   );
 

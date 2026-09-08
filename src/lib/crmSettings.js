@@ -120,13 +120,44 @@ export async function saveCrmSettings(draft, actorEmail = "") {
 const inr = (n) =>
   Number.isFinite(Number(n)) && Number(n) > 0 ? `₹${Number(n).toLocaleString("en-IN")}` : "";
 
-/** Public, shareable link to one listing — the URL the property modal shares. */
-export function propertyLink(propertyId) {
+/**
+ * Public, shareable link to one listing.
+ *
+ * `/map?listingId=` is the URL the property modal already shares, so the landing
+ * behaviour is unchanged. What's added is attribution:
+ *
+ *  - UTM parameters, so this shows up as CRM traffic in any analytics tool and
+ *    reads as deliberate to anyone who inspects the link.
+ *  - `mz_s`, an opaque per-share token. UTMs can only say "someone came from the
+ *    CRM"; the recipient is signed out when they tap a WhatsApp link, so the
+ *    token is the only thing that ties the open back to one client and one
+ *    property. Omit it and you get a plain campaign-tagged link.
+ */
+export function propertyLink(propertyId, shareToken = "") {
   const origin =
     typeof window !== "undefined" && window.location?.origin
       ? window.location.origin
       : "https://www.moveazy.co.in";
-  return `${origin}/map?listingId=${encodeURIComponent(propertyId)}`;
+  const q = new URLSearchParams({
+    listingId: propertyId,
+    utm_source: "crm",
+    utm_medium: "whatsapp",
+    utm_campaign: "property_share",
+    utm_content: propertyId,
+  });
+  if (shareToken) q.set("mz_s", shareToken);
+  return `${origin}/map?${q.toString()}`;
+}
+
+/** Opaque, unguessable id for one send of one property to one client. */
+export function generateShareToken() {
+  const bytes = new Uint8Array(12);
+  if (typeof crypto !== "undefined" && crypto.getRandomValues) {
+    crypto.getRandomValues(bytes);
+  } else {
+    for (let i = 0; i < bytes.length; i++) bytes[i] = Math.floor(Math.random() * 256);
+  }
+  return `mz${Array.from(bytes, (b) => b.toString(16).padStart(2, "0")).join("")}`;
 }
 
 /**
@@ -134,7 +165,10 @@ export function propertyLink(propertyId) {
  * string rather than a literal {{placeholder}} — a half-filled template is
  * embarrassing in a customer's WhatsApp.
  */
-export function buildTemplateVars({ client, requirement, agentName, property, matches = [], visitTime = "" } = {}) {
+export function buildTemplateVars({
+  client, requirement, agentName, property, matches = [], visitTime = "",
+  shareToken = "", shareTokens = {},
+} = {}) {
   const budget =
     requirement?.budget_min || requirement?.budget_max
       ? [inr(requirement.budget_min), inr(requirement.budget_max)].filter(Boolean).join("–")
@@ -146,15 +180,21 @@ export function buildTemplateVars({ client, requirement, agentName, property, ma
     localities: (requirement?.localities ?? []).join(", "),
     budget,
     match_count: String(matches.length || ""),
+    // Each line carries its own tracked link, so a bulk share is as attributable
+    // as a single send — otherwise "share top 5" would be the one blind path.
     match_list: matches
-      .map((m) => `• ${m.listing?.flat_type || "Home"}, ${m.listing?.area || ""} — ${inr(m.listing?.rent)}`)
-      .join("\n"),
+      .map((m) => {
+        const id = m.listing?.property_id;
+        const head = `• ${m.listing?.flat_type || "Home"}, ${m.listing?.area || ""} — ${inr(m.listing?.rent)}`;
+        return id ? `${head}\n${propertyLink(id, shareTokens[id] || "")}` : head;
+      })
+      .join("\n\n"),
     property_id: property?.property_id ?? "",
     property_title: property?.title || property?.area || "",
     flat_type: property?.flat_type ?? "",
     rent: inr(property?.rent),
     area: property?.area ?? "",
-    link: property?.property_id ? propertyLink(property.property_id) : "",
+    link: property?.property_id ? propertyLink(property.property_id, shareToken) : "",
     visit_time: visitTime,
   };
 }

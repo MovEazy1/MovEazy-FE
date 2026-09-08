@@ -2,6 +2,7 @@ import { useEffect } from "react";
 import { useLocation } from "react-router-dom";
 import { sessionTracker } from "../lib/sessionTracking";
 import { identifySession, startSessionSync } from "../lib/sessionSync";
+import { recordShareOpenFromUrl } from "../lib/shareAttribution";
 import { useAuth } from "../context/AuthContext";
 
 export function useSessionTracking() {
@@ -25,6 +26,9 @@ export function useSessionTracking() {
   }, [user]);
 
   useEffect(() => startSessionSync(), []);
+
+  // A link shared from the CRM carries mz_s; tell the CRM it was opened.
+  useEffect(() => { recordShareOpenFromUrl(); }, []);
 
   return sessionTracker;
 }
