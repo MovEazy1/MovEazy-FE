@@ -1,5 +1,5 @@
 import { lazy, Suspense } from "react";
-import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
+import { BrowserRouter, Routes, Route, Navigate, useLocation } from "react-router-dom";
 import { AuthProvider, useAuth } from "./context/AuthContext";
 import { LoginModalProvider } from "./context/LoginModalContext";
 import { VisitCartProvider } from "./context/VisitCartContext";
@@ -16,7 +16,6 @@ const HowItWorks = lazy(() => import("./pages/HowItWorks"));
 const About = lazy(() => import("./pages/About"));
 const ListMyFlat = lazy(() => import("./pages/ListMyFlat"));
 const AdminDatabase = lazy(() => import("./pages/AdminDatabase"));
-const Recommendations = lazy(() => import("./pages/Recommendations"));
 const Visits = lazy(() => import("./pages/Visits"));
 const Shortlists = lazy(() => import("./pages/Shortlists"));
 const TenantManagement = lazy(() => import("./pages/TenantManagement"));
@@ -49,6 +48,12 @@ function PageLoader() {
       Loading…
     </div>
   );
+}
+
+/** Keeps every existing link and bookmark to /recommendations working. */
+function RecommendationsRedirect() {
+  const { state } = useLocation();
+  return <Navigate to="/map" replace state={state} />;
 }
 
 function ProfileRoute({ children }) {
@@ -96,7 +101,11 @@ function AppRoutes() {
           }
         />
         <Route path="/admin" element={<AdminDatabase />} />
-        <Route path="/recommendations" element={<Recommendations />} />
+        {/* One browsing surface. /recommendations had a second map and a second
+            listing detail view of its own, so every improvement reached only one
+            of the two paths a seeker could arrive by. Ranking now lives in the
+            map; the old URL keeps working and carries its preferences over. */}
+        <Route path="/recommendations" element={<RecommendationsRedirect />} />
         <Route path="/register-broker" element={<BrokerRegister />} />
         <Route path="/my-properties" element={<MyProperties />} />
         <Route path="/superadmin" element={<SuperAdminPanel />} />

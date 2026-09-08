@@ -177,3 +177,24 @@ export function matchRequirementToListings(requirement, listings, { min = 40 } =
     .filter((m) => m.blockers.length === 0 && m.score >= min)
     .sort((a, b) => b.score - a.score);
 }
+
+/**
+ * displayPins hold the mapped listing shape (bhk / monthlyRent / location);
+ * scoreMatch reads the inventory column names. Bridge the two.
+ *
+ * Exported for tests: if a field name drifts here, ranking doesn't crash — it
+ * silently scores everything zero and "Best match" stops ranking without a
+ * single error to notice.
+ */
+export function listingForScoring(l) {
+  return {
+    area: l.location || l.area || "",
+    nearby_areas: l.nearbyAreas || l.nearby_areas || [],
+    rent: Number(l.monthlyRent ?? l.rent) || 0,
+    flat_type: l.bhk || l.flat_type || "",
+    furnishing: l.furnishing || "",
+    amenities: l.amenities || [],
+    house_rules: l.houseRules || l.house_rules || [],
+    occupants_allowed: l.preferredTenants || l.occupants_allowed || [],
+  };
+}

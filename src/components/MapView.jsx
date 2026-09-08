@@ -12,6 +12,8 @@ import { getListingsData, isListingPubliclyVisible } from "../lib/firestoreStore
 import { fetchInventoryAsListings } from "../lib/inventory";
 import { geocodePlace, searchPlaces, reverseGeocode } from "../lib/geocode";
 import { haversineKm } from "../lib/geo";
+import { scoreMatch, listingForScoring } from "../lib/inventoryMatch";
+import { fetchUserRequirement, rowToPrefs } from "../lib/userRequirements";
 import PropertyModal from "./PropertyModal";
 import AIBroker from "./AIBroker";
 import { AREA_NAMES_SORTED } from "../data/listingsData";
@@ -308,6 +310,7 @@ function makeBhkIcon(bhk, rent) {
  * Aggregate pin for a group of listings that would otherwise sit on top of each
  * other. Reads as a count, not a price, so it's obviously a group.
  */
+
 function makeClusterIcon(count) {
   const w = count > 99 ? 92 : count > 9 ? 82 : 74;
   return L.divIcon({
@@ -805,6 +808,16 @@ export default function MapView() {
   // The map's actual zoom, which mapState doesn't track after a user pinch or
   // scroll — clustering has to key off the real one.
   const [liveZoom, setLiveZoom] = useState(15);
+
+  /**
+   * The seeker's own requirement, when they have one.
+   *
+   * This is what /recommendations used to be for. Ranking lives here now so
+   * there is one browsing surface instead of two — arriving from Find My Flat
+   * and arriving from a shared property link land on the same screen, and every
+   * improvement to it reaches both.
+   */
+  const [requirement, setRequirement] = useState(null);
   const [viewingProperty, setViewingProperty] = useState(null);
   /** Single "all filters" panel — a dropdown on desktop, a bottom sheet on mobile. Never occupies map layout. */
   const [showFilterPanel, setShowFilterPanel] = useState(false);
@@ -1104,7 +1117,6 @@ export default function MapView() {
 
   const listingClusters = useMemo(
     () => clusterListings(displayPins, liveZoom),
-    // eslint-disable-next-line react-hooks/exhaustive-deps
     [displayPins, liveZoom],
   );
 
@@ -1112,11 +1124,35 @@ export default function MapView() {
 
   /** List-panel-only sort — never touches `displayPins` itself, so map marker order/behavior is untouched. */
   const [sortBy, setSortBy] = useState("best");
+  const scoredPins = useMemo(() => {
+    if (!requirement) return displayPins;
+    return displayPins.map((l) => {
+      const { score, reasons } = scoreMatch(listingForScoring(l), requirement);
+      return { ...l, matchScore: score, matchReasons: reasons };
+    });
+  }, [displayPins, requirement]);
+
   const sortedDisplayPins = useMemo(() => {
-    if (sortBy === "price-asc") return [...displayPins].sort((a, b) => (Number(a.monthlyRent) || 0) - (Number(b.monthlyRent) || 0));
-    if (sortBy === "price-desc") return [...displayPins].sort((a, b) => (Number(b.monthlyRent) || 0) - (Number(a.monthlyRent) || 0));
-    return displayPins;
-  }, [displayPins, sortBy]);
+    if (sortBy === "price-asc") return [...scoredPins].sort((a, b) => (Number(a.monthlyRent) || 0) - (Number(b.monthlyRent) || 0));
+    if (sortBy === "price-desc") return [...scoredPins].sort((a, b) => (Number(b.monthlyRent) || 0) - (Number(a.monthlyRent) || 0));
+    // "Best match" used to return the list untouched — the label was doing
+    // nothing. With a requirement loaded it now actually ranks by fit.
+    if (requirement) return [...scoredPins].sort((a, b) => (b.matchScore || 0) - (a.matchScore || 0));
+    return scoredPins;
+  }, [scoredPins, sortBy, requirement]);
+
+  useEffect(() => {
+    // Prefs handed over by Find My Flat win; otherwise load what we saved for
+    // this account, so a returning seeker still gets ranked results.
+    const fromRoute = location.state?.prefs;
+    if (fromRoute) { setRequirement(fromRoute); return; }
+    if (requirement || !user?.uid) return;
+    let alive = true;
+    fetchUserRequirement(user.uid)
+      .then((row) => { if (alive && row) setRequirement(rowToPrefs(row)); })
+      .catch(() => {});
+    return () => { alive = false; };
+  }, [user?.uid, requirement, location.state]);
 
   useEffect(() => {
     const t = setTimeout(() => {
@@ -2432,6 +2468,15 @@ export default function MapView() {
                 commuteLabel={commuteLabel}
                 distanceKm={distanceKm}
                 cover={listingCoverSrc(l)}
+                badges={l.matchReasons?.length ? (
+                  <div style={{ display: "flex", flexWrap: "wrap", gap: 6, marginTop: 8 }}>
+                    {l.matchReasons.slice(0, 3).map((reason) => (
+                      <span key={reason} style={{ background: "#E4F6F1", color: "#0E7C68", fontSize: 11, fontWeight: 700, padding: "3px 9px", borderRadius: 999 }}>
+                        {reason}
+                      </span>
+                    ))}
+                  </div>
+                ) : null}
                 onSelect={() => {
                   setSelected(l);
                   setMapState(mapStateForListingFocus(l.lat, l.lng, isMobile));
