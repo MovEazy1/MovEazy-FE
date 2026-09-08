@@ -43,8 +43,13 @@ const h = (type, props = {}, ...children) => ({
 const INK = "#04211D";
 const MINT = "#5EEAD4";
 const CREAM = "#F4F2ED";
-const W = 1200;
-const H = 630;
+// WhatsApp commonly declines to render a preview image much over ~600KB, and a
+// four-photo collage as PNG is heavy — resvg gives us no JPEG or quality knob,
+// so output dimensions are the only lever. 800x420 keeps the 1.91:1 ratio OG
+// wants and lands comfortably under the limit; a preview is displayed around
+// 500px wide anyway, so nothing visible is lost.
+const W = 800;
+const H = 420;
 const GAP = 6;
 
 const tile = (src, width, height) =>
@@ -108,7 +113,7 @@ export default async function handler(req) {
           style: {
             display: "flex", width: W, height: H, alignItems: "center",
             justifyContent: "center", background: INK, color: MINT,
-            fontSize: 64, fontWeight: 700,
+            fontSize: 42, fontWeight: 700,
           },
         },
         "MovEazy",
@@ -124,17 +129,17 @@ export default async function handler(req) {
             style: {
               position: "absolute", left: 0, right: 0, bottom: 0,
               display: "flex", alignItems: "flex-end", justifyContent: "space-between",
-              padding: "28px 36px",
+              padding: "18px 24px",
               background: "linear-gradient(transparent, rgba(4,33,29,0.92))",
             },
           },
           h(
             "div",
             { style: { display: "flex", flexDirection: "column" } },
-            rent && h("div", { style: { display: "flex", color: CREAM, fontSize: 60, fontWeight: 700 } }, rent),
-            line && h("div", { style: { display: "flex", color: MINT, fontSize: 30, marginTop: 6 } }, line),
+            rent && h("div", { style: { display: "flex", color: CREAM, fontSize: 40, fontWeight: 700 } }, rent),
+            line && h("div", { style: { display: "flex", color: MINT, fontSize: 20, marginTop: 4 } }, line),
           ),
-          h("div", { style: { display: "flex", color: CREAM, fontSize: 26, opacity: 0.85 } }, "moveazy.co.in"),
+          h("div", { style: { display: "flex", color: CREAM, fontSize: 17, opacity: 0.85 } }, "moveazy.co.in"),
         )
       : null;
 
