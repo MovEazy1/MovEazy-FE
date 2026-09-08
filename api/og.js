@@ -21,15 +21,22 @@ export const config = { runtime: "edge" };
  * renderer fails and returns a zero-byte PNG, which previews as a broken image.
  * Fetched once per warm instance from the same Inter the site ships.
  */
-const FONT_URL =
-  "https://cdn.jsdelivr.net/npm/@fontsource/inter@5.0.16/files/inter-latin-700-normal.woff";
+const FONT_BASE = "https://cdn.jsdelivr.net/npm/@fontsource/inter@5.0.16/files";
+// Two subsets, because ₹ (U+20B9) is not in Inter's `latin` subset — it sits in
+// `latin-ext`, and without it every price rendered as a tofu box. Satori falls
+// through the fonts of a family for glyphs the first one lacks.
+const FONT_FILES = ["inter-latin-700-normal.woff", "inter-latin-ext-700-normal.woff"];
 let fontCache = null;
 
 async function interBold() {
   if (!fontCache) {
-    const res = await fetch(FONT_URL);
-    if (!res.ok) throw new Error(`font fetch failed: ${res.status}`);
-    fontCache = await res.arrayBuffer();
+    fontCache = await Promise.all(
+      FONT_FILES.map(async (file) => {
+        const res = await fetch(`${FONT_BASE}/${file}`);
+        if (!res.ok) throw new Error(`font fetch failed: ${file} ${res.status}`);
+        return res.arrayBuffer();
+      }),
+    );
   }
   return fontCache;
 }
@@ -158,7 +165,9 @@ export default async function handler(req) {
     const rendered = new ImageResponse(image, {
       width: W,
       height: H,
-      fonts: [{ name: "Inter", data: await interBold(), weight: 700, style: "normal" }],
+      fonts: (await interBold()).map((data) => ({
+        name: "Inter", data, weight: 700, style: "normal",
+      })),
     });
 
     // ImageResponse streams its body, so a render failure surfaces *after* the
