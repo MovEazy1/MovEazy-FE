@@ -248,6 +248,24 @@ export function mapInventoryToListing(row) {
     amenities: list(row.amenities),
     postedBy: row.posted_by,
     source: "inventory",
+
+    // These are all selected by PUBLIC_INVENTORY_COLS and were being dropped
+    // here, so the listing view fell back to inventing them: the deposit showed
+    // as 2.5x rent rather than what the owner actually asked, and every listing
+    // rendered the same placeholder marketing paragraph instead of its own
+    // description. Pass them through.
+    securityDeposit: num(row.deposit, 0),
+    description: String(row.description || "").trim(),
+    houseRules: list(row.house_rules),
+    preferredTenants: list(row.occupants_allowed),
+    lifestyle: list(row.lifestyle),
+    bedrooms: num(row.bedrooms),
+    bathrooms: num(row.bathrooms),
+    availableFrom: row.available_from || "",
+    postedAt: row.created_at || "",
+    landmark: String(row.landmark || "").trim(),
+    nearbyAreas: list(row.nearby_areas),
+    isVerified: Boolean(row.is_verified),
   };
 }
 

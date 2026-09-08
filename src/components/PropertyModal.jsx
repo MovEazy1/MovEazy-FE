@@ -89,6 +89,26 @@ export default function PropertyModal({ property, onClose, listings = [], onSele
   const [shareText, setShareText] = useState("↗ Share");
   const [activeMediaIndex, setActiveMediaIndex] = useState(0);
   const [touchStartX, setTouchStartX] = useState(null);
+  /**
+   * "3 days ago" — how fresh a listing is, from created_at. Computed in an
+   * effect rather than during render: reading the clock while rendering is
+   * impure, and the value would drift between renders of the same view.
+   */
+  const [postedAgo, setPostedAgo] = useState("");
+  useEffect(() => {
+    const raw = property?.postedAt;
+    if (!raw) return setPostedAgo("");
+    const ms = Date.now() - new Date(raw).getTime();
+    if (!Number.isFinite(ms) || ms < 0) return setPostedAgo("");
+    const mins = Math.round(ms / 60000);
+    if (mins < 60) return setPostedAgo(`${Math.max(mins, 1)} minute${mins === 1 ? "" : "s"} ago`);
+    const hrs = Math.round(mins / 60);
+    if (hrs < 24) return setPostedAgo(`${hrs} hour${hrs === 1 ? "" : "s"} ago`);
+    const days = Math.round(hrs / 24);
+    if (days < 31) return setPostedAgo(`${days} day${days === 1 ? "" : "s"} ago`);
+    setPostedAgo(new Date(raw).toLocaleDateString("en-IN", { day: "numeric", month: "short", year: "numeric" }));
+  }, [property?.postedAt]);
+
   const [resolvedBrokerPhone, setResolvedBrokerPhone] = useState("");
 
   useEffect(() => {
@@ -198,6 +218,10 @@ export default function PropertyModal({ property, onClose, listings = [], onSele
   const maintenanceFromField = parseMoney(property.maintenanceCost);
   const securityDeposit = depositFromField ?? (numericRent > 0 ? Math.round(numericRent * 2.5) : 0);
   const maintenance = maintenanceFromField ?? (numericRent > 0 ? Math.round(numericRent * 0.08) : 0);
+  // A figure we derived is not a figure the owner quoted. Say which is which
+  // rather than presenting our arithmetic as the listing's terms.
+  const depositIsEstimate = depositFromField == null;
+  const maintenanceIsEstimate = maintenanceFromField == null;
   const formatInr = (n) => `₹ ${Number(n || 0).toLocaleString("en-IN")}`;
   /** Just the amount — the "per month" is a separate label everywhere it shows. */
   const rentDisplay = numericRent > 0 ? formatInr(numericRent) : String(property.price || "—").replace(/\s*\/\s*mo\b/i, "");
@@ -507,8 +531,37 @@ export default function PropertyModal({ property, onClose, listings = [], onSele
                 }}
               >
                 <MediaElement src={images[activeMediaIndex]} alt={property.title} firstImage={firstImageUrl} style={{ width: "100%", height: "100%", objectFit: "contain" }} />
+
+                {/* Rent sits on the photo: it is the first thing anyone reads,
+                    and this buys back the vertical space it used to take below. */}
+                <div
+                  style={{
+                    position: "absolute", left: 0, right: 0, bottom: 0,
+                    display: "flex", alignItems: "flex-end", justifyContent: "space-between",
+                    gap: "10px", padding: "26px 14px 12px", pointerEvents: "none",
+                    background: "linear-gradient(transparent, rgba(4,33,29,0.86))",
+                    zIndex: 2,
+                  }}
+                >
+                  <div>
+                    <div style={{ color: "#fff", fontSize: isMobile ? "24px" : "28px", fontWeight: 800, lineHeight: 1.05 }}>
+                      {rentDisplay}
+                    </div>
+                    <div style={{ color: "rgba(244,242,237,0.82)", fontSize: "12px", fontWeight: 600 }}>
+                      per month
+                    </div>
+                  </div>
+                  <span
+                    style={{
+                      background: "rgba(255,255,255,0.94)", color: T.text, fontSize: "12px",
+                      fontWeight: 700, borderRadius: "999px", padding: "6px 12px", whiteSpace: "nowrap",
+                    }}
+                  >
+                    {images.length} photo{images.length === 1 ? "" : "s"}
+                  </span>
+                </div>
                 {isActiveVideo && (
-                  <div style={{ position: "absolute", top: "10px", left: "10px", background: "rgba(4,33,29,0.78)", color: "white", fontSize: "11px", fontWeight: 700, borderRadius: "999px", padding: "5px 9px" }}>
+                  <div style={{ position: "absolute", top: "10px", left: "10px", zIndex: 2, background: "rgba(4,33,29,0.78)", color: "white", fontSize: "11px", fontWeight: 700, borderRadius: "999px", padding: "5px 9px" }}>
                     VIDEO
                   </div>
                 )}
@@ -635,35 +688,46 @@ export default function PropertyModal({ property, onClose, listings = [], onSele
                     {property.badge.toUpperCase()}
                   </div>
                 )}
-                {/* Rent first: it is the thing every renter checks before anything
-                    else, and it used to sit in a sidebar below the fold on mobile. */}
-                <div
-                  style={{
-                    display: "flex", alignItems: "baseline", gap: "10px", flexWrap: "wrap",
-                    marginBottom: "10px",
-                  }}
-                >
-                  <span style={{ fontSize: isMobile ? "30px" : "34px", fontWeight: 800, color: T.teal, letterSpacing: "-0.02em" }}>
-                    {rentDisplay}
-                  </span>
-                  <span style={{ fontSize: "14px", color: T.textMute, fontWeight: 600 }}>per month</span>
-                </div>
-                <div
-                  style={{
-                    display: "flex", gap: "8px", flexWrap: "wrap", marginBottom: "14px",
-                    fontSize: "12.5px", color: T.textDim,
-                  }}
-                >
-                  <span style={{ background: T.mintSoft, borderRadius: "999px", padding: "4px 10px", fontWeight: 600 }}>
-                    Deposit {depositSidebar}
-                  </span>
-                  <span style={{ background: T.mintSoft, borderRadius: "999px", padding: "4px 10px", fontWeight: 600 }}>
-                    Maintenance {maintenanceSidebar}
-                  </span>
-                </div>
+                                <h1 style={{ fontSize: isMobile ? "22px" : "28px", margin: "0 0 8px", fontWeight: 800, color: T.text, lineHeight: 1.2 }}>{property.title}</h1>
+                {postedAgo && (
+                  <p style={{ margin: "0 0 8px", fontSize: "12.5px", color: T.textMute, fontWeight: 600 }}>
+                    Posted {postedAgo}
+                  </p>
+                )}
+                <p style={{ fontSize: "15px", color: T.textMute, margin: "0 0 14px", lineHeight: 1.5 }}>{property.address || property.areas || "Location not provided"}</p>
 
-                <h1 style={{ fontSize: isMobile ? "22px" : "28px", margin: "0 0 8px", fontWeight: 800, color: T.text, lineHeight: 1.2 }}>{property.title}</h1>
-                <p style={{ fontSize: "16px", color: T.textMute, margin: "0 0 16px" }}>{property.address || property.areas || "Location not provided"}</p>
+                {/* Rent and deposit read together — they're the pair a renter
+                    compares listings on, so they belong side by side. */}
+                <div
+                  style={{
+                    display: "flex", gap: isMobile ? "10px" : "16px", alignItems: "stretch",
+                    margin: "0 0 16px", padding: "12px 0",
+                    borderTop: `1px solid ${T.line}`, borderBottom: `1px solid ${T.line}`,
+                  }}
+                >
+                  <div style={{ flex: 1, minWidth: 0 }}>
+                    <div style={{ fontSize: "12px", color: T.textMute, fontWeight: 600, marginBottom: "3px" }}>Rent</div>
+                    <div style={{ fontSize: isMobile ? "16px" : "19px", fontWeight: 800, color: T.text, whiteSpace: "nowrap" }}>{rentDisplay}</div>
+                  </div>
+                  <div style={{ width: "1px", background: T.line }} />
+                  <div style={{ flex: 1, minWidth: 0 }}>
+                    <div style={{ fontSize: "12px", color: T.textMute, fontWeight: 600, marginBottom: "3px" }}>
+                      Deposit{depositIsEstimate ? " (est.)" : ""}
+                    </div>
+                    <div style={{ fontSize: isMobile ? "16px" : "19px", fontWeight: 800, color: depositIsEstimate ? T.textDim : T.text, whiteSpace: "nowrap" }}>
+                      {depositSidebar}
+                    </div>
+                  </div>
+                  <div style={{ width: "1px", background: T.line }} />
+                  <div style={{ flex: 1, minWidth: 0 }}>
+                    <div style={{ fontSize: "12px", color: T.textMute, fontWeight: 600, marginBottom: "3px" }}>
+                      Maint.{maintenanceIsEstimate ? " (est.)" : ""}
+                    </div>
+                    <div style={{ fontSize: isMobile ? "16px" : "19px", fontWeight: 800, color: maintenanceIsEstimate ? T.textDim : T.text, whiteSpace: "nowrap" }}>
+                      {maintenanceSidebar}
+                    </div>
+                  </div>
+                </div>
                 
                 <div style={{ display: "flex", gap: "12px", marginBottom: "24px", flexWrap: "wrap" }}>
                   <div style={badgeStyles}>🏢 {property.propertyType || property.type || "Apartment"}</div>
@@ -844,12 +908,31 @@ export default function PropertyModal({ property, onClose, listings = [], onSele
                   )}
                 </div>
 
+                {Array.isArray(property.houseRules) && property.houseRules.length > 0 && (
+                  <div style={{ marginBottom: "32px" }}>
+                    <h2 style={{ margin: "0 0 12px", fontSize: "18px", color: T.text }}>House rules</h2>
+                    <div style={{ display: "flex", flexWrap: "wrap", gap: "8px" }}>
+                      {property.houseRules.map((rule) => (
+                        <span
+                          key={rule}
+                          style={{
+                            background: T.goldSoft, color: T.gold, padding: "8px 13px",
+                            borderRadius: "999px", fontSize: "12.5px", fontWeight: 600,
+                          }}
+                        >
+                          {rule}
+                        </span>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
                 <div style={{ marginBottom: "32px" }}>
                   <h2 style={{ margin: "0 0 12px", fontSize: "18px", color: T.text }}>Amenities</h2>
                   {amenities.length ? (
                     <div style={{ display: "flex", flexWrap: "wrap", gap: "10px" }}>
                       {amenities.map((item) => (
-                        <span key={item} style={{ background: T.mintSoft, color: T.teal, border: "1px solid #fecdd3", padding: "7px 10px", borderRadius: "999px", fontSize: "12px", fontWeight: 600 }}>
+                        <span key={item} style={{ background: T.lineSoft, color: T.textDim, padding: "8px 13px", borderRadius: "999px", fontSize: "12.5px", fontWeight: 600 }}>
                           {item}
                         </span>
                       ))}
