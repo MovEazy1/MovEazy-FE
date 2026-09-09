@@ -1,10 +1,9 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { MapContainer, TileLayer, Marker, Popup, useMap, useMapEvents, Circle, Polyline } from "react-leaflet";
 import { useLocation, useNavigate } from "react-router-dom";
-import { AnimatePresence, motion } from "framer-motion";
 import L from "leaflet";
 import "leaflet/dist/leaflet.css";
-import { applyListingFilters, FILTER_OPTIONS, getFiltersInitialState, getListings } from "../lib/store";
+import { applyListingFilters, FILTER_OPTIONS, getFiltersInitialState } from "../lib/store";
 import { useAuth } from "../context/AuthContext";
 import { useLoginModal } from "../context/LoginModalContext";
 import { isFirebaseConfigured } from "../lib/firebase";
@@ -2393,18 +2392,17 @@ export default function MapView() {
             overflowY: "auto",
             background: "#ffffff",
             borderLeft: isMobile ? "none" : "1px solid #e2e8f0",
-            padding: isMobile ? "12px 12px 64px" : "16px 18px",
+            padding: isMobile ? "12px 12px calc(140px + env(safe-area-inset-bottom, 0px))" : "16px 18px",
             fontSize: "15px",
-            // height:100% with top:0 would win over the bottom offset below and
-            // put the panel back over the nav bar.
-            height: isMobile ? "auto" : "100%",
+            height: "100%",
             flexShrink: 0,
             position: isMobile ? "absolute" : "static",
             left: 0,
             right: 0,
-            // Clears the app's own bottom bar (70px) and the Map/List toggle
-            // above it, so navigation is never covered by the results.
-            bottom: isMobile ? "calc(70px + env(safe-area-inset-bottom, 0px))" : 0,
+            // Full height of the map area. Stopping short of the bottom left a
+            // strip of map showing under the results; the nav bar no longer
+            // needs the gap because its wrapper outranks this panel.
+            bottom: 0,
             top: 0,
             zIndex: isMobile ? 1002 : 4,
             isolation: "isolate",
