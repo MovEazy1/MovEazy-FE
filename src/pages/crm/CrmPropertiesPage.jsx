@@ -15,6 +15,8 @@ export default function CrmPropertiesPage() {
   const { inventory, requirements, clients, access } = useCrm();
   const navigate = useNavigate();
 
+  const canEdit = access.has(SCOPES.PROPERTIES_WRITE);
+
   const [q, setQ] = useState("");
   const [status, setStatus] = useState("published");
   const [openId, setOpenId] = useState("");
@@ -46,7 +48,7 @@ export default function CrmPropertiesPage() {
       <div className="crm-col" style={{ flex: 1 }}>
         <div className="crm-colhead">
           <span className="crm-label">Properties · {rows.length}</span>
-          {access.has(SCOPES.PROPERTIES_WRITE) && (
+          {canEdit && (
             <Link to="/crm/properties/new" className="crm-btn crm-btn--primary crm-btn--sm" style={{ textDecoration: "none" }}>
               + Add property
             </Link>
@@ -87,6 +89,10 @@ export default function CrmPropertiesPage() {
                     <td>
                       <div style={{ display: "flex", gap: 5 }}>
                         <Btn sm onClick={() => setOpenId(l.property_id)}>Who fits</Btn>
+                        {canEdit && (
+                          <Link to={`/crm/properties/${l.property_id}/edit`}
+                                className="crm-btn crm-btn--sm" style={{ textDecoration: "none" }}>Edit</Link>
+                        )}
                         <a className="crm-btn crm-btn--sm" href={propertyLink(l.property_id)}
                            target="_blank" rel="noopener noreferrer" style={{ textDecoration: "none" }}>Open</a>
                       </div>

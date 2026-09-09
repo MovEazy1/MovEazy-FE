@@ -34,9 +34,9 @@ async function fetchInventory() {
   const { data, error } = await supabase
     .from("inventory")
     .select(
-      "property_id,posted_by,poster_name,poster_email,phone,city,area,nearby_areas,full_address," +
+      "property_id,posted_by,poster_name,poster_email,phone,city,area,nearby_areas,full_address,landmark," +
         "rent,deposit,available_from,flat_type,bedrooms,bathrooms,furnishing,occupants_allowed," +
-        "amenities,house_rules,title,description,images,cover_image_url,status,is_verified," +
+        "amenities,house_rules,lifestyle,title,description,images,cover_image_url,status,is_verified," +
         "source,source_url,created_at",
     )
     .order("created_at", { ascending: false })

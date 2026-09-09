@@ -4,9 +4,15 @@
  * The public List My Flat flow is a guided story for an owner listing once. This
  * is the opposite: three columns, every field on screen, tab straight through,
  * ⌘↵ to publish. Same `inventory` table, same MZ- code.
+ *
+ * The same form edits an existing listing (/crm/properties/:propertyId/edit).
+ * Editing is not a second screen because it is not a different job — the fields
+ * are the fields. What changes in edit mode: the row is loaded in, the MZ- code
+ * and the poster it belongs to are left alone, photos already on the listing can
+ * be removed or added to, and the listing's status becomes editable.
  */
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useParams } from "react-router-dom";
 import { useCrm } from "./CrmShell";
 import {
   ALL_LOCALITIES, FLAT_TYPES, FURNISHINGS, MUST_HAVES, OCCUPANTS,
@@ -24,10 +30,40 @@ const BLANK = {
   flat_type: "", bedrooms: "", bathrooms: "", furnishing: "",
   occupants_allowed: [], amenities: [],
   poster_name: "", phone: "", posted_by: "owner",
-  title: "", description: "", source_url: "",
+  title: "", description: "", source_url: "", status: "published",
 };
 
 const DRAFT_KEY = "moveazy_crm_property_draft";
+
+const STATUSES = ["published", "paused", "rented"];
+
+/** A DB row → the form's shape. Nulls become "", arrays stay arrays, and the
+ *  date arrives as a timestamp that <input type="date"> won't accept. */
+function rowToForm(row) {
+  const list = (v) => (Array.isArray(v) ? v : []);
+  return {
+    area: row.area ?? "",
+    nearby_areas: list(row.nearby_areas),
+    full_address: row.full_address ?? "",
+    landmark: row.landmark ?? "",
+    rent: row.rent ?? "",
+    deposit: row.deposit ?? "",
+    available_from: String(row.available_from ?? "").slice(0, 10),
+    flat_type: row.flat_type ?? "",
+    bedrooms: row.bedrooms ?? "",
+    bathrooms: row.bathrooms ?? "",
+    furnishing: row.furnishing ?? "",
+    occupants_allowed: list(row.occupants_allowed),
+    amenities: list(row.amenities),
+    poster_name: row.poster_name ?? "",
+    phone: row.phone ?? "",
+    posted_by: row.posted_by || "owner",
+    title: row.title ?? "",
+    description: row.description ?? "",
+    source_url: row.source_url ?? "",
+    status: row.status || "published",
+  };
+}
 
 function Field({ label, hint, children }) {
   return (
@@ -53,10 +89,16 @@ function Column({ title, children }) {
 
 export default function CrmPropertyForm() {
   const crm = useCrm();
-  const { access, user, requirements, reload } = crm;
+  const { access, user, requirements, reload, inventory } = crm;
   const navigate = useNavigate();
+  const { propertyId: editId } = useParams();
+  const isEdit = Boolean(editId);
 
   const [f, setF] = useState(() => {
+    // A saved draft belongs to the *new listing* form. Restoring it over a
+    // listing being edited would quietly overwrite real data with someone
+    // else's half-typed flat.
+    if (editId) return BLANK;
     try {
       const saved = localStorage.getItem(DRAFT_KEY);
       return saved ? { ...BLANK, ...JSON.parse(saved) } : BLANK;
@@ -67,6 +109,11 @@ export default function CrmPropertyForm() {
   const [pasteText, setPasteText] = useState("");
   const [importInfo, setImportInfo] = useState(null);
   const [photos, setPhotos] = useState([]);
+  // Photos already on the listing, by URL. Kept apart from `photos` (new File
+  // objects): these are uploaded, and removing one is a change to the row.
+  const [keptImages, setKeptImages] = useState([]);
+  const [loaded, setLoaded] = useState(!editId);
+  const [loadError, setLoadError] = useState("");
   const [saving, setSaving] = useState(false);
   const [toast, setToast] = useState(null);
   const [published, setPublished] = useState(null);
@@ -86,11 +133,50 @@ export default function CrmPropertyForm() {
     });
 
   // Autosave from the first keystroke — a half-typed listing survives a reload.
+  // Only for a new listing: an edit is already saved, in the database.
   useEffect(() => {
+    if (isEdit) return;
     try {
       localStorage.setItem(DRAFT_KEY, JSON.stringify(f));
     } catch { /* private mode */ }
-  }, [f]);
+  }, [f, isEdit]);
+
+  /* ── Load the listing being edited ─────────────────────────────────────── */
+
+  useEffect(() => {
+    if (!editId) return;
+    let cancelled = false;
+    (async () => {
+      // The shell has already loaded every listing; go to the network only if
+      // this one isn't among them (a direct link, or a listing added since).
+      const cached = (inventory ?? []).find((l) => l.property_id === editId);
+      if (cached) {
+        setF(rowToForm(cached));
+        setKeptImages(Array.isArray(cached.images) ? cached.images : []);
+        setLoaded(true);
+        return;
+      }
+      if (!isSupabaseConfigured || !supabase) {
+        setLoadError("Supabase is not configured.");
+        setLoaded(true);
+        return;
+      }
+      const { data, error } = await supabase
+        .from("inventory").select("*").eq("property_id", editId).maybeSingle();
+      if (cancelled) return;
+      if (error || !data) {
+        setLoadError(error?.message || `No listing with the id ${editId}.`);
+      } else {
+        setF(rowToForm(data));
+        setKeptImages(Array.isArray(data.images) ? data.images : []);
+      }
+      setLoaded(true);
+    })();
+    return () => { cancelled = true; };
+    // inventory is a dependency in name only — refetching on every shell reload
+    // would throw away edits in progress.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [editId]);
 
   /* ── Import ────────────────────────────────────────────────────────────── */
 
@@ -151,8 +237,11 @@ export default function CrmPropertyForm() {
 
     setSaving(true);
     try {
-      const propertyId = generatePropertyId();
-      const images = photos.length ? await uploadInventoryPhotos(photos, propertyId) : [];
+      const propertyId = isEdit ? editId : generatePropertyId();
+      const uploaded = photos.length ? await uploadInventoryPhotos(photos, propertyId) : [];
+      // On an edit, the photos kept from before come first — the owner's own
+      // ordering — with anything added this session after them.
+      const images = isEdit ? [...keptImages, ...uploaded] : uploaded;
       const sourceUrl = cleanSourceUrl(f.source_url);
 
       const row = {
@@ -180,10 +269,32 @@ export default function CrmPropertyForm() {
         description: f.description || "",
         images,
         cover_image_url: images[0] ?? "",
-        status: "published",
+        status: isEdit ? (f.status || "published") : "published",
         source: sourceUrl ? detectSource(sourceUrl) : "crm",
         source_url: sourceUrl,
       };
+
+      if (isEdit) {
+        // The MZ- code identifies the listing and the poster owns it — an edit
+        // changes neither, whoever is doing the editing. Everything else in the
+        // row is the poster's to change and ours to correct.
+        const changes = { ...row, updated_at: new Date().toISOString() };
+        delete changes.property_id;
+        delete changes.poster_id;
+        delete changes.poster_email;
+        const { data, error } = await supabase
+          .from("inventory")
+          .update(changes)
+          .eq("property_id", editId)
+          .select()
+          .single();
+        if (error) throw error;
+        setKeptImages(Array.isArray(data.images) ? data.images : []);
+        setPhotos([]);
+        reload();
+        showToast(`${editId} saved`);
+        return;
+      }
 
       const { data, error } = await supabase.from("inventory").insert(row).select().single();
       if (error) throw error;
@@ -195,11 +306,11 @@ export default function CrmPropertyForm() {
       setPhotos([]);
       reload();
     } catch (e) {
-      showToast(e?.message || "Could not publish", "error");
+      showToast(e?.message || (isEdit ? "Could not save" : "Could not publish"), "error");
     } finally {
       setSaving(false);
     }
-  }, [canWrite, missingRequired, f, photos, user, requirements, reload]);
+  }, [canWrite, missingRequired, f, photos, keptImages, user, requirements, reload, isEdit, editId]);
 
   useEffect(() => {
     const onKey = (e) => {
@@ -210,7 +321,17 @@ export default function CrmPropertyForm() {
   }, [publish]);
 
   if (!canWrite) {
-    return <Empty>You don't have permission to add listings.</Empty>;
+    return <Empty>You don't have permission to add or change listings.</Empty>;
+  }
+
+  if (isEdit && !loaded) return <Empty>Loading {editId}…</Empty>;
+  if (loadError) {
+    return (
+      <div style={{ padding: 24, display: "flex", flexDirection: "column", gap: 12, alignItems: "flex-start" }}>
+        <p style={{ fontSize: 13.5, color: C.text, margin: 0 }}>{loadError}</p>
+        <Btn onClick={() => navigate("/crm/properties")}>Back to properties</Btn>
+      </div>
+    );
   }
 
   if (published) {
@@ -254,13 +375,14 @@ export default function CrmPropertyForm() {
   return (
     <div style={{ display: "flex", flexDirection: "column", flex: 1, minHeight: 0 }}>
       <div className="crm-colhead">
-        <span className="crm-label">New property</span>
+        <span className="crm-label">{isEdit ? `Editing ${editId}` : "New property"}</span>
         <div style={{ display: "flex", gap: 6, alignItems: "center" }}>
           {missingRequired.length > 0 && (
             <span className="crm-mute" style={{ fontSize: 11 }}>Needs: {missingRequired.join(", ")}</span>
           )}
+          {isEdit && <Btn onClick={() => navigate("/crm/properties")}>Back to properties</Btn>}
           <Btn variant="primary" onClick={publish} disabled={saving}>
-            {saving ? "Publishing…" : "Publish"}
+            {saving ? (isEdit ? "Saving…" : "Publishing…") : (isEdit ? "Save changes" : "Publish")}
           </Btn>
         </div>
       </div>
@@ -269,6 +391,16 @@ export default function CrmPropertyForm() {
         <div style={{ display: "grid", gridTemplateColumns: "minmax(260px,1fr) minmax(260px,1fr) minmax(240px,300px)" }}>
           {/* ── where ── */}
           <Column title="Where it is">
+            {isEdit ? (
+              <Field label="Status" hint="Paused and rented listings stop appearing on the public map.">
+                <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
+                  {STATUSES.map((x) => (
+                    <Chip key={x} on={f.status === x} onClick={() => set({ status: x })}>{x}</Chip>
+                  ))}
+                </div>
+              </Field>
+            ) : (
+              <>
             <Field
               label="Paste the post"
               hint="Facebook post text or the owner's WhatsApp message. Facebook links can't be read — paste the words."
@@ -283,6 +415,8 @@ export default function CrmPropertyForm() {
                 {importInfo.found.length ? `Read ${importInfo.found.join(", ")}. ` : ""}
                 {importInfo.missing.length ? `Couldn't find ${importInfo.missing.join(", ")} — fill those in.` : ""}
               </span>
+            )}
+              </>
             )}
 
             <Field label="Source link (optional)" hint="Saved for traceability, not fetched. Session parameters are stripped.">
@@ -417,6 +551,26 @@ export default function CrmPropertyForm() {
                 onChange={(e) => setPhotos((p) => [...p, ...e.target.files].slice(0, 20))} />
             </div>
 
+            {isEdit && keptImages.length > 0 && (
+              <>
+                <span className="crm-mute" style={{ fontSize: 10.5 }}>
+                  Already on the listing · click to remove
+                </span>
+                <div style={{ display: "grid", gridTemplateColumns: "repeat(4,1fr)", gap: 6 }}>
+                  {keptImages.map((url, i) => (
+                    <button key={url} type="button" title="Remove this photo"
+                      onClick={() => setKeptImages((cur) => cur.filter((_, idx) => idx !== i))}
+                      style={{
+                        aspectRatio: "1", borderRadius: 6, overflow: "hidden",
+                        border: `1px solid ${C.line}`, padding: 0,
+                      }}>
+                      <img src={url} alt="" style={{ width: "100%", height: "100%", objectFit: "cover" }} />
+                    </button>
+                  ))}
+                </div>
+              </>
+            )}
+
             {previews.length > 0 && (
               <div style={{ display: "grid", gridTemplateColumns: "repeat(4,1fr)", gap: 6 }}>
                 {previews.map((p, i) => (
@@ -445,14 +599,20 @@ export default function CrmPropertyForm() {
 
             <div style={{ display: "flex", gap: 7 }}>
               <Btn variant="primary" onClick={publish} disabled={saving}>
-                {saving ? "Publishing…" : "Publish"}
+                {saving ? (isEdit ? "Saving…" : "Publishing…") : (isEdit ? "Save changes" : "Publish")}
               </Btn>
-              <Btn onClick={() => { setF(BLANK); setPhotos([]); setPasteText(""); setImportInfo(null); }}>
-                Clear
-              </Btn>
+              {isEdit ? (
+                <Btn onClick={() => navigate("/crm/properties")}>Cancel</Btn>
+              ) : (
+                <Btn onClick={() => { setF(BLANK); setPhotos([]); setPasteText(""); setImportInfo(null); }}>
+                  Clear
+                </Btn>
+              )}
             </div>
             <span className="crm-mute" style={{ fontSize: 10.5 }}>
-              Autosaves as you type · ⌘↵ publishes · {f.rent ? inr(f.rent) : "no rent yet"}
+              {isEdit
+                ? `⌘↵ saves · nothing changes until you do · ${f.rent ? inr(f.rent) : "no rent set"}`
+                : `Autosaves as you type · ⌘↵ publishes · ${f.rent ? inr(f.rent) : "no rent yet"}`}
             </span>
           </div>
         </div>

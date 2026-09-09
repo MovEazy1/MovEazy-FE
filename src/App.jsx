@@ -117,6 +117,7 @@ function AppRoutes() {
           <Route path="pipeline" element={<CrmPipelinePage />} />
           <Route path="properties" element={<CrmPropertiesPage />} />
           <Route path="properties/new" element={<CrmPropertyForm />} />
+          <Route path="properties/:propertyId/edit" element={<CrmPropertyForm />} />
           <Route path="payments" element={<CrmPaymentsPage />} />
           <Route path="team" element={<CrmTeamPage />} />
           <Route path="settings" element={<CrmSettingsPage />} />
