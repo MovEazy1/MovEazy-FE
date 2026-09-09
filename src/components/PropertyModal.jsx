@@ -14,7 +14,7 @@ import { useLoginModal } from "../context/LoginModalContext";
 import { bookIndividual, fetchOpenVisitsForProperty, requestNextAvailableVisit } from "../lib/visits";
 import { findNearbyListings } from "../lib/geo";
 import { isListingSaved, toggleSavedListing } from "../lib/userActivity";
-import { submitListingInterestFull, logSavedListingChange } from "../lib/crmSync";
+import { logSavedListingChange } from "../lib/crmSync";
 import { buildBrokerWhatsAppUrl, logBrokerWhatsAppContact } from "../lib/brokerWhatsApp";
 
 /**
@@ -76,10 +76,6 @@ export default function PropertyModal({ property, onClose, listings = [], onSele
   const [slotsLoading, setSlotsLoading] = useState(false);
   const [chosenSlot, setChosenSlot] = useState("");
   const [booking, setBooking] = useState(false);
-  const [applyMode, setApplyMode] = useState("entire_unit");
-  const [adultsSharing, setAdultsSharing] = useState(1);
-  const [applyNotes, setApplyNotes] = useState("");
-  const [applyMessage, setApplyMessage] = useState("");
   const [isMobile, setIsMobile] = useState(typeof window !== "undefined" ? window.innerWidth <= 768 : false);
 
   useEffect(() => {
@@ -450,29 +446,6 @@ export default function PropertyModal({ property, onClose, listings = [], onSele
     // old maths landed somewhere arbitrary — usually not moving at all, which
     // made Schedule Visit look broken.
     el.scrollIntoView({ behavior: "smooth", block: "center" });
-  };
-
-  const submitInterest = async () => {
-    if (offMarket) {
-      setApplyMessage("This listing is no longer on the market.");
-      return;
-    }
-    try {
-      await submitListingInterestFull(user, {
-        listingId: property.id,
-        listingTitle: property.title,
-        seller: property.seller,
-        contact: property.contact,
-        sellerEmail: property.sellerEmail || "",
-        tenancyPreference: applyMode,
-        adultsSharing,
-        notes: applyNotes,
-      });
-      setApplyMessage("Interest saved. Admins and the seller are notified by email when EmailJS is configured. Track status under Saved · activity or your dashboard.");
-      setApplyNotes("");
-    } catch (e) {
-      setApplyMessage(e instanceof Error ? e.message : "Could not complete submission. Please try again.");
-    }
   };
 
   return (
@@ -1059,66 +1032,6 @@ export default function PropertyModal({ property, onClose, listings = [], onSele
                     {rentDisplay}
                   </div>
                   <div style={{ fontSize: "13px", color: T.textMute, marginBottom: "20px" }}>Rent per month</div>
-
-                  <div style={{ border: `1px solid ${T.line}`, borderRadius: "12px", padding: "14px", marginBottom: "16px", background: offMarket ? T.lineSoft : T.cream, opacity: offMarket ? 0.85 : 1 }}>
-                    <div style={{ fontSize: "14px", fontWeight: 800, color: T.text, marginBottom: "10px" }}>Apply interest</div>
-                    <label style={{ display: "block", fontSize: "12px", fontWeight: 600, color: T.textMute, marginBottom: "6px" }}>How do you want to rent?</label>
-                    <select
-                      value={applyMode}
-                      onChange={(e) => setApplyMode(e.target.value)}
-                      disabled={offMarket}
-                      style={{ width: "100%", marginBottom: "10px", padding: "10px", borderRadius: "8px", border: `1px solid ${T.line}`, fontSize: "14px", boxSizing: "border-box" }}
-                    >
-                      <option value="entire_unit">Whole unit (family / solo)</option>
-                      <option value="seeking_flatmate">Looking for a flatmate for this home</option>
-                      <option value="open_to_share">Open to sharing rent with others</option>
-                    </select>
-                    <label style={{ display: "block", fontSize: "12px", fontWeight: 600, color: T.textMute, marginBottom: "6px" }}>People splitting rent (incl. you)</label>
-                    <select
-                      value={adultsSharing}
-                      onChange={(e) => setAdultsSharing(Number(e.target.value))}
-                      disabled={offMarket}
-                      style={{ width: "100%", marginBottom: "10px", padding: "10px", borderRadius: "8px", border: `1px solid ${T.line}`, fontSize: "14px", boxSizing: "border-box" }}
-                    >
-                      {[1, 2, 3, 4, 5, 6].map((n) => (
-                        <option key={n} value={n}>
-                          {n} {n === 1 ? "person" : "people"}
-                        </option>
-                      ))}
-                    </select>
-                    <textarea
-                      rows={2}
-                      value={applyNotes}
-                      onChange={(e) => setApplyNotes(e.target.value)}
-                      disabled={offMarket}
-                      placeholder="Optional note (move-in date, budget, pets…)"
-                      style={{ width: "100%", marginBottom: "10px", padding: "10px", borderRadius: "8px", border: `1px solid ${T.line}`, fontSize: "13px", boxSizing: "border-box", resize: "vertical" }}
-                    />
-                    <button
-                      type="button"
-                      onClick={submitInterest}
-                      disabled={offMarket}
-                      style={{
-                        width: "100%",
-                        padding: "12px",
-                        background: offMarket ? T.textMute : T.text,
-                        color: "white",
-                        border: "none",
-                        borderRadius: "8px",
-                        fontWeight: 800,
-                        fontSize: "14px",
-                        cursor: offMarket ? "not-allowed" : "pointer",
-                      }}
-                    >
-                      Submit interest
-                    </button>
-                    {applyMessage ? (
-                      <div style={{ marginTop: "10px", fontSize: "12px", color: T.teal, fontWeight: 600, lineHeight: 1.45 }}>{applyMessage}</div>
-                    ) : null}
-                    <p style={{ margin: "10px 0 0", fontSize: "11px", color: T.textMute, lineHeight: 1.45 }}>
-                      {!user?.email ? "Signed out: we still save this on this device under a guest profile. Sign in to sync across devices." : null}
-                    </p>
-                  </div>
 
                   <div style={{ background: T.cream, border: `1px solid ${T.line}`, borderRadius: "10px", padding: "12px", marginBottom: "16px" }}>
                     <div style={{ display: "flex", justifyContent: "space-between", fontSize: "12px", color: T.textDim, marginBottom: "6px" }}>
