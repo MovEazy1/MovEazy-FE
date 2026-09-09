@@ -15,6 +15,7 @@ import { useAuth } from "../context/AuthContext";
 import { useLoginModal } from "../context/LoginModalContext";
 import MovEazyNav from "../components/layout/MovEazyNav";
 import { fetchMyInventory, setInventoryStatus } from "../lib/inventory";
+import { coverPhoto } from "../lib/listingMedia";
 import { fetchSlotsFor } from "../lib/visits";
 import { fetchMyListingStats } from "../lib/ownerDashboard";
 import PropertyVisitSlots from "../components/PropertyVisitSlots";
@@ -86,7 +87,8 @@ export function PropertyCard({ p, slotCount, onStatus, busy, onSlotCountChange, 
   const [panel, setPanel] = useState("");
   const slotsRef = useRef(null);
   const st = STATUS[p.status] || STATUS.published;
-  const cover = p.cover_image_url || (p.images || [])[0] || "";
+  // A video can't stand in for a thumbnail — take the first photo.
+  const cover = coverPhoto([p.cover_image_url, ...(p.images || [])]);
 
   // "Visit slots" opens the slots editor on its own. It deliberately does not
   // unfold the property's detail table first — the owner came to set times,

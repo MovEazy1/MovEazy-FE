@@ -7,7 +7,8 @@ import PageShell from "../components/layout/PageShell";
 import ListingMapPicker from "../components/ListingMapPicker";
 import ListMyFlatMobile, { posterRoleFor } from "../components/ListMyFlatMobile";
 import { reverseGeocode, nearbyLandmarks } from "../lib/geocode";
-import { createInventoryItem, uploadInventoryPhotos, generatePropertyId } from "../lib/inventory";
+import { createInventoryItem, uploadInventoryPhotos, generatePropertyId, mediaRejectionReason } from "../lib/inventory";
+import { coverPhoto, describeMedia, isListingMediaFile, isVideoFile, orderListingMedia } from "../lib/listingMedia";
 import { fetchAllUserRequirements } from "../lib/userRequirements";
 import { matchListingToRequirements } from "../lib/inventoryMatch";
 import { fetchSlotsForProperty, addVisitSlot, deleteVisitSlot } from "../lib/visits";
@@ -194,9 +195,13 @@ export default function ListMyFlat() {
     }
   };
 
-  // Bulk photo picker — accepts a multi-selection straight from the gallery.
+  // Bulk picker — a multi-selection of photos and videos straight from the
+  // gallery. Anything rejected says so; nothing is dropped quietly.
   const addPhotos = (fileList) => {
-    const files = Array.from(fileList || []).filter((f) => f.type.startsWith("image/"));
+    const picked = Array.from(fileList || []).filter(isListingMediaFile);
+    const tooBig = picked.map(mediaRejectionReason).filter(Boolean);
+    const files = picked.filter((f) => !mediaRejectionReason(f));
+    setErrors((e) => ({ ...e, photos: tooBig[0] || "" }));
     if (!files.length) return;
     setPhotoFiles((prev) => [...prev, ...files]);
     setPhotoPreviews((prev) => [...prev, ...files.map((f) => URL.createObjectURL(f))]);
@@ -205,6 +210,10 @@ export default function ListMyFlat() {
     setPhotoPreviews((prev) => { URL.revokeObjectURL(prev[i]); return prev.filter((_, idx) => idx !== i); });
     setPhotoFiles((prev) => prev.filter((_, idx) => idx !== i));
   };
+
+  // A listing needs at least one photo — a video alone leaves nothing to put on
+  // the card, and the flat itself is what a renter scrolls for.
+  const photoCount = useMemo(() => photoFiles.filter((f) => !isVideoFile(f)).length, [photoFiles]);
 
   const validateStep = () => {
     const e = {};
@@ -215,8 +224,10 @@ export default function ListMyFlat() {
     if (step === 1) {
       if (!rent) e.rent = "Enter the monthly rent";
     }
-    if (step === 2 && photoFiles.length === 0) {
-      e.photos = "Add at least one photo of your flat";
+    if (step === 2 && photoCount === 0) {
+      e.photos = photoFiles.length
+        ? "Add at least one photo — a video on its own leaves the listing with no cover"
+        : "Add at least one photo of your flat";
     }
     setErrors(e);
     return Object.keys(e).length === 0;
@@ -261,9 +272,18 @@ export default function ListMyFlat() {
     try {
       // 1) Upload the gallery photos, then 2) store the inventory row in the DB.
       let images = [];
+      let uploadSkipped = [];
       if (photoFiles.length) {
-        setUploadMsg(`Uploading ${photoFiles.length} photo${photoFiles.length > 1 ? "s" : ""}…`);
-        images = await uploadInventoryPhotos(photoFiles, propertyId, (d, t) => setUploadMsg(`Uploading photos… ${d}/${t}`));
+        const label = describeMedia(photoFiles.map((f) => (isVideoFile(f) ? "x.mp4" : "x.jpg")));
+        setUploadMsg(`Uploading ${label}…`);
+        const skipped = [];
+        const uploaded = await uploadInventoryPhotos(
+          photoFiles, propertyId,
+          (d, t) => setUploadMsg(`Uploading ${label}… ${d}/${t}`),
+          (file, why) => skipped.push(`${file.name || "A file"}: ${why}`),
+        );
+        images = orderListingMedia(uploaded);
+        uploadSkipped = skipped;
       }
       setUploadMsg("");
       const row = await createInventoryItem(buildDraft(images), user);
@@ -273,7 +293,7 @@ export default function ListMyFlat() {
         const requirements = await fetchAllUserRequirements();
         matches = matchListingToRequirements(row, requirements, { min: 40 }).slice(0, 8);
       } catch { /* matching is best-effort */ }
-      setPublished({ row, matches });
+      setPublished({ row, matches, skipped: uploadSkipped });
       window.scrollTo({ top: 0, behavior: "smooth" });
     } catch (err) {
       console.error(err);
@@ -288,19 +308,28 @@ export default function ListMyFlat() {
 
   /* ── Success / mapping screen ── */
   if (published) {
-    const { row, matches } = published;
+    const { row, matches, skipped = [] } = published;
     const isBroker = postedBy === "broker";
     const isOwner = postedBy === "owner";
     const isTenant = postedBy === "tenant";
     const rewardEligible = WALLET_REWARD_TYPES.includes(flatType);
     const walletAmount = rewardEligible ? WALLET_REWARD_AMOUNT : 0;
     const listingTitle = row.title || title || `${flatType} in ${area || "Bengaluru"}`;
-    const successCover = row.cover_image_url || (row.images || [])[0] || "";
+    const successCover = coverPhoto([row.cover_image_url, ...(row.images || [])]);
+    // Publishing succeeded; a file that didn't make it still has to be said.
+    const skippedNote = skipped.length
+      ? `${skipped.length} file${skipped.length === 1 ? "" : "s"} didn't upload — ${skipped[0]}`
+      : "";
 
     return (
       <PageShell variant="marketing" overlayOnly className="antialiased" style={{ background: "#f0ebe3" }}>
         <Navbar variant="marketing" />
         <main className="max-w-2xl mx-auto px-4 pb-16 pt-8">
+          {skippedNote && (
+            <div className="mb-4 p-3 rounded-xl text-[12.5px] font-medium border bg-amber-50 text-amber-800 border-amber-200">
+              {skippedNote}. Everything else is live — add it again from My Properties.
+            </div>
+          )}
           {/* Published confirmation. Rewritten to the owner-flow design: what
               happened, the listing itself, and the two things to do next. */}
           <div style={{ textAlign: "center", padding: "8px 0 4px" }}>
@@ -794,14 +823,19 @@ export default function ListMyFlat() {
               </div>
             </Card>
 
-            {/* Photos — bulk upload straight from the gallery */}
+            {/* Photos and video — bulk upload straight from the gallery */}
             <Card>
               <div className="p-6">
                 <div className="flex items-center justify-between mb-1">
-                  <p className="text-[14px] font-extrabold text-gray-900">Photos <span className="text-red-500">*</span></p>
-                  <span className="text-[11px] text-gray-400">{photoPreviews.length} added</span>
+                  <p className="text-[14px] font-extrabold text-gray-900">Photos &amp; video <span className="text-red-500">*</span></p>
+                  <span className="text-[11px] text-gray-400">
+                    {describeMedia(photoFiles.map((f) => (isVideoFile(f) ? "x.mp4" : "x.jpg")))}
+                  </span>
                 </div>
-                <p className="text-[12px] text-gray-400 mb-3">Add a few clear photos — you can select many at once from your gallery.</p>
+                <p className="text-[12px] text-gray-400 mb-3">
+                  Add a few clear photos — select many at once from your gallery. A walkthrough video is
+                  welcome too; renters see it after the fourth photo.
+                </p>
                 {errors.photos && <p className="text-[11px] text-red-500 mb-3 font-semibold">{errors.photos}</p>}
 
                 <label className="block cursor-pointer">
@@ -809,23 +843,34 @@ export default function ListMyFlat() {
                     <svg className="w-8 h-8 mx-auto mb-2 text-gray-300" fill="none" stroke="currentColor" strokeWidth="1.6" viewBox="0 0 24 24">
                       <path strokeLinecap="round" strokeLinejoin="round" d="M3 16.5v2.25A2.25 2.25 0 005.25 21h13.5A2.25 2.25 0 0021 18.75V16.5m-13.5-9L12 3m0 0l4.5 4.5M12 3v13.5" />
                     </svg>
-                    <p className="text-[13px] font-bold text-gray-700">Tap to upload photos</p>
-                    <p className="text-[11px] text-gray-400 mt-0.5">Select multiple from your gallery · JPG, PNG, WEBP</p>
+                    <p className="text-[13px] font-bold text-gray-700">Tap to upload photos or a video</p>
+                    <p className="text-[11px] text-gray-400 mt-0.5">JPG, PNG, WEBP up to 15 MB · MP4, MOV up to 60 MB</p>
                   </div>
-                  <input type="file" accept="image/*" multiple className="hidden"
+                  <input type="file" accept="image/*,video/*" multiple className="hidden"
                     onChange={(e) => { addPhotos(e.target.files); e.target.value = ""; }} />
                 </label>
 
                 {photoPreviews.length > 0 && (
                   <div className="grid grid-cols-4 gap-2 mt-3">
-                    {photoPreviews.map((src, i) => (
-                      <div key={i} className="relative aspect-square rounded-lg overflow-hidden border border-gray-200">
-                        <img src={src} alt="" className="w-full h-full object-cover" />
-                        <button type="button" onClick={() => removePhoto(i)}
-                          className="absolute top-1 right-1 w-5 h-5 rounded-full bg-black/60 text-white text-[11px] leading-none flex items-center justify-center">×</button>
-                        {i === 0 && <span className="absolute bottom-1 left-1 px-1.5 py-0.5 rounded bg-black/60 text-white text-[9px] font-bold">COVER</span>}
-                      </div>
-                    ))}
+                    {photoPreviews.map((src, i) => {
+                      const video = isVideoFile(photoFiles[i]);
+                      // The cover is the first photo, not the first file — a
+                      // video picked first must not claim the thumbnail.
+                      const isCover = !video && photoFiles.findIndex((f) => !isVideoFile(f)) === i;
+                      return (
+                        <div key={i} className="relative aspect-square rounded-lg overflow-hidden border border-gray-200 bg-gray-100">
+                          {video ? (
+                            <video src={src} className="w-full h-full object-cover" muted playsInline preload="metadata" />
+                          ) : (
+                            <img src={src} alt="" className="w-full h-full object-cover" />
+                          )}
+                          <button type="button" onClick={() => removePhoto(i)}
+                            className="absolute top-1 right-1 w-5 h-5 rounded-full bg-black/60 text-white text-[11px] leading-none flex items-center justify-center">×</button>
+                          {video && <span className="absolute bottom-1 left-1 px-1.5 py-0.5 rounded bg-black/60 text-white text-[9px] font-bold">VIDEO</span>}
+                          {isCover && <span className="absolute bottom-1 left-1 px-1.5 py-0.5 rounded bg-black/60 text-white text-[9px] font-bold">COVER</span>}
+                        </div>
+                      );
+                    })}
                   </div>
                 )}
               </div>
@@ -844,7 +889,7 @@ export default function ListMyFlat() {
                   <Row k="Rent" v={rent ? `₹${Number(rent).toLocaleString("en-IN")}` : "—"} />
                   <Row k="Location pin" v={marker ? `${marker[0].toFixed(4)}, ${marker[1].toFixed(4)}` : "Not set"} />
                   <Row k="Amenities" v={amenities.length ? `${amenities.length} selected` : "—"} />
-                  <Row k="Photos" v={photoPreviews.length ? `${photoPreviews.length} added` : "None"} />
+                  <Row k="Photos" v={photoPreviews.length ? describeMedia(photoFiles.map((f) => (isVideoFile(f) ? "x.mp4" : "x.jpg"))) : "None"} />
                 </div>
               </div>
             </Card>

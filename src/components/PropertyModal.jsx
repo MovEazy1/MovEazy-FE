@@ -1,5 +1,6 @@
 import { useState, useEffect, useRef, useMemo } from "react";
 import { motion, AnimatePresence } from "framer-motion";
+import { coverPhoto, isVideoUrl, orderListingMedia } from "../lib/listingMedia";
 import { useAuth } from "../context/AuthContext";
 import { addVisitRequestData, getListingPrivateData, isListingPubliclyVisible } from "../lib/firestoreStore";
 import { canReadListingPrivatePhones } from "../lib/accessControl";
@@ -158,8 +159,7 @@ function SuggestDateTime({ value, onChange, tokens }) {
 
 function MediaElement({ src, alt, style, firstImage }) {
   if (!src) return null;
-  const isVideo = src.match(/\.(mp4|webm|ogg|mov)$/i) || src.includes('video');
-  if (isVideo) {
+  if (isVideoUrl(src)) {
     return (
       <div style={{ position: "relative", width: "100%", height: "100%", overflow: "hidden", display: "flex", justifyContent: "center", alignItems: "center" }}>
         {firstImage && (
@@ -337,9 +337,13 @@ export default function PropertyModal({ property, onClose, listings = [], onSele
     .map((u) => String(u ?? "").trim())
     .filter((u) => u.length > 0 && u !== "undefined" && u !== "null");
   const uniqueMedia = [...new Set(cleaned)];
-  const images = uniqueMedia.length > 0 ? uniqueMedia : [PLACEHOLDER_IMAGE];
-  const isVideoUrl = (u) => String(u).match(/\.(mp4|webm|ogg|mov)$/i) || String(u).includes("video");
-  const firstImageUrl = images.find((u) => !isVideoUrl(u)) || PLACEHOLDER_IMAGE;
+  // Applied again here rather than trusted from upstream: this modal is opened
+  // from the map, a share link and the CRM, and only one of those paths is
+  // guaranteed to have come through mapInventoryToListing. Ordering is
+  // idempotent, so a second pass costs nothing.
+  const ordered = orderListingMedia(uniqueMedia);
+  const images = ordered.length > 0 ? ordered : [PLACEHOLDER_IMAGE];
+  const firstImageUrl = coverPhoto(images) || PLACEHOLDER_IMAGE;
 
   const numericRent = Number(String(property.monthlyRent || property.rent || "0").replace(/[^0-9.]/g, "")) || 0;
   const parseMoney = (raw) => {
@@ -549,7 +553,7 @@ export default function PropertyModal({ property, onClose, listings = [], onSele
   };
 
   const activeMedia = images[activeMediaIndex] || images[0];
-  const isActiveVideo = String(activeMedia || "").match(/\.(mp4|webm|ogg|mov)$/i) || String(activeMedia || "").includes("video");
+  const isActiveVideo = isVideoUrl(activeMedia);
   const goPrevMedia = () => setActiveMediaIndex((prev) => (prev - 1 + images.length) % images.length);
   const goNextMedia = () => setActiveMediaIndex((prev) => (prev + 1) % images.length);
 
@@ -824,7 +828,7 @@ export default function PropertyModal({ property, onClose, listings = [], onSele
               {images.length > 1 && (
                 <div style={{ display: "flex", gap: "8px", overflowX: "auto", paddingBottom: "4px", WebkitOverflowScrolling: "touch" }}>
                   {images.map((src, idx) => {
-                    const isVideoThumb = String(src || "").match(/\.(mp4|webm|ogg|mov)$/i) || String(src || "").includes("video");
+                    const isVideoThumb = isVideoUrl(src);
                     return (
                       <button
                         key={`${src}-${idx}`}

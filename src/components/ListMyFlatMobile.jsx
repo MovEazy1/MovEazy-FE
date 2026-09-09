@@ -18,7 +18,8 @@ import { useEffect, useMemo, useState } from "react";
 import ListingMapPicker from "./ListingMapPicker";
 import PropertyVisitSlots from "./PropertyVisitSlots";
 import { reverseGeocode, nearbyLandmarks } from "../lib/geocode";
-import { createInventoryItem, uploadInventoryPhotos, generatePropertyId } from "../lib/inventory";
+import { createInventoryItem, uploadInventoryPhotos, generatePropertyId, mediaRejectionReason } from "../lib/inventory";
+import { describeMedia, isListingMediaFile, isVideoFile, orderListingMedia } from "../lib/listingMedia";
 import { fetchAllUserRequirements } from "../lib/userRequirements";
 import { matchListingToRequirements } from "../lib/inventoryMatch";
 import {
@@ -56,7 +57,7 @@ const STEP_COPY = [
   ["About the home", "The basics every renter asks about."],
   ["Rent & availability", "Set your price — you can always change it later."],
   ["What's it like?", "The details that match you to the right renters."],
-  ["Photos & description", "Photos do most of the selling for you."],
+  ["Photos & description", "Photos do most of the selling for you. A video helps too."],
   ["When can people visit?", "Your flat goes live once this is set — renters can only book a tour during times you open up."],
 ];
 
@@ -253,7 +254,10 @@ export default function ListMyFlatMobile({ user, onPublished }) {
   };
 
   const addPhotos = (fileList) => {
-    const files = Array.from(fileList || []).filter((f) => f.type.startsWith("image/"));
+    const picked = Array.from(fileList || []).filter(isListingMediaFile);
+    const tooBig = picked.map(mediaRejectionReason).filter(Boolean);
+    if (tooBig.length) setErr(tooBig[0]);
+    const files = picked.filter((f) => !mediaRejectionReason(f));
     if (!files.length) return;
     setPhotoFiles((p) => [...p, ...files]);
     setPhotoPreviews((p) => [...p, ...files.map((f) => URL.createObjectURL(f))]);
@@ -272,7 +276,12 @@ export default function ListMyFlatMobile({ user, onPublished }) {
       if (!marker) return "Drop a pin on the map to set the exact address.";
     }
     if (step === 4 && !rent) return "Enter the monthly rent.";
-    if (step === 6 && photoFiles.length === 0) return "Add at least one photo of your flat.";
+    if (step === 6 && !photoFiles.some((f) => !isVideoFile(f))) {
+      // A video on its own leaves the listing with no cover to show on a card.
+      return photoFiles.length
+        ? "Add at least one photo — a video on its own leaves the listing with no cover."
+        : "Add at least one photo of your flat.";
+    }
     if (step === TOTAL_STEPS && slotCount < 1) return "Add at least one visit time slot — renters need a time to book before your flat can go live.";
     return "";
   };
@@ -287,8 +296,16 @@ export default function ListMyFlatMobile({ user, onPublished }) {
     try {
       let images = [];
       if (photoFiles.length) {
-        setUploadMsg(`Uploading ${photoFiles.length} photo${photoFiles.length > 1 ? "s" : ""}…`);
-        images = await uploadInventoryPhotos(photoFiles, propertyId, (d, t) => setUploadMsg(`Uploading photos… ${d}/${t}`));
+        const label = describeMedia(photoFiles.map((f) => (isVideoFile(f) ? "x.mp4" : "x.jpg")));
+        setUploadMsg(`Uploading ${label}…`);
+        const skipped = [];
+        const uploaded = await uploadInventoryPhotos(
+          photoFiles, propertyId,
+          (d, t) => setUploadMsg(`Uploading ${label}… ${d}/${t}`),
+          (file, why) => skipped.push(`${file.name || "A file"}: ${why}`),
+        );
+        images = orderListingMedia(uploaded);
+        if (skipped.length) setErr(`Couldn't upload ${skipped.length} file${skipped.length === 1 ? "" : "s"} — ${skipped[0]}`);
       }
       setUploadMsg("");
       const row = await createInventoryItem({
@@ -584,22 +601,36 @@ export default function ListMyFlatMobile({ user, onPublished }) {
                   }} />
               </div>
               <div>
-                <Q required sub="Add a few clear photos — you can select many at once from your gallery.">
-                  Photos {photoPreviews.length > 0 && <span style={{ color: "#6F8681", fontWeight: 600 }}>· {photoPreviews.length} added</span>}
+                <Q required sub="Add a few clear photos — select many at once from your gallery. A walkthrough video is welcome too; renters see it after the fourth photo.">
+                  Photos &amp; video {photoPreviews.length > 0 && (
+                    <span style={{ color: "#6F8681", fontWeight: 600 }}>
+                      · {describeMedia(photoFiles.map((f) => (isVideoFile(f) ? "x.mp4" : "x.jpg")))}
+                    </span>
+                  )}
                 </Q>
                 <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 11 }}>
-                  {photoPreviews.map((src, i) => (
-                    <div key={src} style={{ position: "relative", aspectRatio: "4/3", borderRadius: 14, overflow: "hidden", border: "1px solid rgba(255,255,255,.13)" }}>
-                      <img src={src} alt={`Photo ${i + 1}`} style={{ width: "100%", height: "100%", objectFit: "cover" }} />
-                      <button type="button" onClick={() => removePhoto(i)} aria-label={`Remove photo ${i + 1}`}
-                        style={{ position: "absolute", top: 6, right: 6, width: 26, height: 26, borderRadius: "50%", border: "none", background: "rgba(4,17,15,.75)", color: "#fff", fontSize: 15, lineHeight: 1, cursor: "pointer" }}>
-                        ×
-                      </button>
-                      {i === 0 && (
-                        <span style={{ position: "absolute", bottom: 6, left: 6, padding: "2px 7px", borderRadius: 5, background: "rgba(4,17,15,.75)", color: "#fff", fontSize: 9, fontWeight: 800, letterSpacing: ".04em" }}>COVER</span>
-                      )}
-                    </div>
-                  ))}
+                  {photoPreviews.map((src, i) => {
+                    const video = isVideoFile(photoFiles[i]);
+                    // The cover is the first photo, not the first file.
+                    const isCover = !video && photoFiles.findIndex((f) => !isVideoFile(f)) === i;
+                    const badge = video ? "VIDEO" : isCover ? "COVER" : "";
+                    return (
+                      <div key={src} style={{ position: "relative", aspectRatio: "4/3", borderRadius: 14, overflow: "hidden", border: "1px solid rgba(255,255,255,.13)" }}>
+                        {video ? (
+                          <video src={src} style={{ width: "100%", height: "100%", objectFit: "cover" }} muted playsInline preload="metadata" />
+                        ) : (
+                          <img src={src} alt={`Photo ${i + 1}`} style={{ width: "100%", height: "100%", objectFit: "cover" }} />
+                        )}
+                        <button type="button" onClick={() => removePhoto(i)} aria-label={`Remove ${video ? "video" : "photo"} ${i + 1}`}
+                          style={{ position: "absolute", top: 6, right: 6, width: 26, height: 26, borderRadius: "50%", border: "none", background: "rgba(4,17,15,.75)", color: "#fff", fontSize: 15, lineHeight: 1, cursor: "pointer" }}>
+                          ×
+                        </button>
+                        {badge && (
+                          <span style={{ position: "absolute", bottom: 6, left: 6, padding: "2px 7px", borderRadius: 5, background: "rgba(4,17,15,.75)", color: "#fff", fontSize: 9, fontWeight: 800, letterSpacing: ".04em" }}>{badge}</span>
+                        )}
+                      </div>
+                    );
+                  })}
                   <label style={{
                     aspectRatio: "4/3", borderRadius: 14, cursor: "pointer",
                     border: "1px dashed rgba(94,234,212,.4)", background: "rgba(94,234,212,.05)",
@@ -611,7 +642,7 @@ export default function ListMyFlatMobile({ user, onPublished }) {
                     <span style={{ color: MINT, fontSize: 12.5, fontWeight: 700 }}>
                       {photoPreviews.length ? "Add more" : "Tap to upload"}
                     </span>
-                    <input type="file" accept="image/*" multiple hidden onChange={(e) => { addPhotos(e.target.files); e.target.value = ""; }} />
+                    <input type="file" accept="image/*,video/*" multiple hidden onChange={(e) => { addPhotos(e.target.files); e.target.value = ""; }} />
                   </label>
                 </div>
               </div>

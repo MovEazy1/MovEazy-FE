@@ -4,6 +4,7 @@ import { useLocation, useNavigate } from "react-router-dom";
 import L from "leaflet";
 import "leaflet/dist/leaflet.css";
 import { applyListingFilters, FILTER_OPTIONS, getFiltersInitialState } from "../lib/store";
+import { isVideoUrl } from "../lib/listingMedia";
 import { useAuth } from "../context/AuthContext";
 import { useLoginModal } from "../context/LoginModalContext";
 import { isFirebaseConfigured } from "../lib/firebase";
@@ -221,8 +222,7 @@ function mapStateForListingFocus(lat, lng, isMobile) {
 
 function MediaElement({ src, alt, style }) {
   if (!src) return null;
-  const isVideo = src.match(/\.(mp4|webm|ogg|mov)$/i) || src.includes('video');
-  if (isVideo) {
+  if (isVideoUrl(src)) {
     return <video src={src} style={style} autoPlay muted loop playsInline />;
   }
   return <img src={src} alt={alt} loading="lazy" style={style} />;

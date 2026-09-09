@@ -6,10 +6,11 @@
  * us what they want. Those had drifted into two different layouts for the same
  * object, which made the second set look like a different product.
  */
+import { isVideoUrl } from "../lib/listingMedia";
+
 function Media({ src, alt, style }) {
   if (!src) return null;
-  const isVideo = /\.(mp4|webm|ogg|mov)$/i.test(src) || src.includes("video");
-  if (isVideo) return <video src={src} style={style} autoPlay muted loop playsInline />;
+  if (isVideoUrl(src)) return <video src={src} style={style} autoPlay muted loop playsInline />;
   return <img src={src} alt={alt} loading="lazy" style={style} />;
 }
 

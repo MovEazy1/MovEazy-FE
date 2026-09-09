@@ -1,4 +1,5 @@
 import { supabase, isSupabaseConfigured } from "./supabase";
+import { coverPhoto, isVideoFile, orderListingMedia } from "./listingMedia";
 
 /**
  * Inventory = the supply side. One row per listed home in the Supabase
@@ -10,12 +11,34 @@ import { supabase, isSupabaseConfigured } from "./supabase";
 const CODE_CHARS = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789"; // no ambiguous 0/O/1/I
 const PHOTO_BUCKET = "listings"; // reuse the existing public storage bucket
 
+/** A phone shoots ~7 MB a minute at 1080p; 60 MB is a generous walkthrough and
+ *  still inside what Supabase Storage accepts in one upload. */
+export const MAX_VIDEO_BYTES = 60 * 1024 * 1024;
+export const MAX_IMAGE_BYTES = 15 * 1024 * 1024;
+
+/** Whether this file can be uploaded, and if not, why — in words a poster can
+ *  act on. Callers show the reason; nothing is dropped silently. */
+export function mediaRejectionReason(file) {
+  const video = isVideoFile(file);
+  const cap = video ? MAX_VIDEO_BYTES : MAX_IMAGE_BYTES;
+  if (file.size > cap) {
+    return `${file.name || (video ? "That video" : "That photo")} is ${(file.size / 1048576).toFixed(0)} MB — the limit is ${cap / 1048576} MB`;
+  }
+  return "";
+}
+
 /**
- * Bulk-upload listing photos to Supabase Storage and return their public URLs.
- * Best-effort per file: a single failed upload is skipped, not fatal, so a flaky
- * photo never blocks publishing. `onProgress(done, total)` reports as it goes.
+ * Bulk-upload listing photos and videos to Supabase Storage and return their
+ * public URLs. Best-effort per file: a single failed upload is skipped, not
+ * fatal, so a flaky photo never blocks publishing. `onProgress(done, total)`
+ * reports as it goes.
+ *
+ * `onFileError(file, message)` is how a skipped file gets said out loud. It
+ * matters most for video: if the storage bucket rejects the type or the size,
+ * every photo still uploads and the walkthrough just isn't there — a poster who
+ * isn't told will believe they published it.
  */
-export async function uploadInventoryPhotos(files = [], propertyId, onProgress) {
+export async function uploadInventoryPhotos(files = [], propertyId, onProgress, onFileError) {
   if (!isSupabaseConfigured || !supabase || !files.length) return [];
   const urls = [];
   let done = 0;
@@ -25,12 +48,19 @@ export async function uploadInventoryPhotos(files = [], propertyId, onProgress) 
       const path = `inventory/${propertyId}/${Date.now()}-${safeName}`;
       const { data, error } = await supabase.storage
         .from(PHOTO_BUCKET)
-        .upload(path, file, { upsert: false, contentType: file.type || "image/jpeg" });
+        .upload(path, file, {
+          upsert: false,
+          contentType: file.type || (isVideoFile(file) ? "video/mp4" : "image/jpeg"),
+        });
       if (!error && data) {
         const { data: pub } = supabase.storage.from(PHOTO_BUCKET).getPublicUrl(data.path);
         if (pub?.publicUrl) urls.push(pub.publicUrl);
+      } else if (error) {
+        onFileError?.(file, error.message || "Upload failed");
       }
-    } catch { /* skip this file */ }
+    } catch (e) {
+      onFileError?.(file, e?.message || "Upload failed");
+    }
     done += 1;
     onProgress?.(done, files.length);
   }
@@ -98,8 +128,10 @@ export function buildInventoryRow(draft, poster) {
 
     title: String(draft.title || "").trim().slice(0, 160),
     description: String(draft.description || "").trim().slice(0, 2000),
-    images: list(draft.images),
-    cover_image_url: list(draft.images)[0] || "",
+    // Stored in the order they're shown in, so every reader — the app, an
+    // export, someone looking at the table — sees the same listing.
+    images: orderListingMedia(list(draft.images)),
+    cover_image_url: coverPhoto(list(draft.images)),
 
     status: "published",
     updated_at: new Date().toISOString(),
@@ -218,8 +250,11 @@ export async function hasOwnerListing(uid) {
 export function mapInventoryToListing(row) {
   if (!row) return null;
   const rent = num(row.rent, 0);
-  const images = list(row.images);
-  const cover = String(row.cover_image_url || images[0] || "").trim();
+  const images = orderListingMedia(list(row.images));
+  // A stored cover that turned out to be a video is ignored: a card showing a
+  // black frame reads as a broken listing.
+  const storedCover = String(row.cover_image_url || "").trim();
+  const cover = coverPhoto([storedCover, ...images]);
   const address =
     String(row.full_address || "").trim() ||
     [row.landmark, row.area].filter(Boolean).join(", ") ||

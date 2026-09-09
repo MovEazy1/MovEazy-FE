@@ -155,10 +155,9 @@ export function parseFormMediaUrls(form) {
   return out.slice(0, 24);
 }
 
-export function isVideoUrl(url) {
-  const u = String(url || "").toLowerCase();
-  return u.endsWith(".mp4") || u.endsWith(".webm") || u.endsWith(".ogg") || u.endsWith(".mov") || u.includes("video");
-}
+// One definition of "is this a video", in lib/listingMedia.js. Re-exported so
+// the editor's existing importers keep working.
+export { isVideoUrl } from "./listingMedia";
 
 export function ownerListingFormDefaults(user) {
   const email = String(user?.email || "").toLowerCase().trim();
