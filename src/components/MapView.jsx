@@ -283,13 +283,20 @@ function formatBudget(v) {
   return v >= 100000 ? "₹1L+" : `₹${Math.round(v / 1000)}k`;
 }
 
-/** "₹45k", "₹1.2L" — short enough that pins don't collide the way labels did. */
+/**
+ * "₹23.5k", "₹15k", "₹1.2L". Keeps the half-thousand: rounding ₹23,500 to
+ * "₹24k" quietly misreports the rent on the very control people compare on.
+ */
 function compactRent(value) {
   const n = Number(String(value ?? "").toString().replace(/[^0-9.]/g, "")) || 0;
   if (n >= 100000) return `₹${(n / 100000).toFixed(1).replace(/\.0$/, "")}L`;
-  if (n >= 1000) return `₹${Math.round(n / 1000)}k`;
+  if (n >= 1000) {
+    const k = n / 1000;
+    return `₹${(Math.round(k * 10) / 10).toString()}k`;
+  }
   return n > 0 ? `₹${n}` : "—";
 }
+
 
 /**
  * A single listing's pin.
@@ -298,26 +305,36 @@ function compactRent(value) {
  * around 200px wide and was the main reason pins piled into an unreadable heap.
  * The colour still encodes the flat type, which is what the filter chips key on.
  */
+/**
+ * A listing pin.
+ *
+ * iconSize used to be guessed from the label's character count, so the pill sat
+ * off-centre from its own coordinate by however much that guess was wrong —
+ * worse for wider labels, and different again at other font scales. Leaflet is
+ * given a zero-size anchor instead and the pill centres itself with a
+ * transform, so it lands on the point at any label width or screen size.
+ */
 function makeBhkIcon(bhk, rent, isSelected) {
-  const label = compactRent(rent).toUpperCase();
-  const w = Math.max(58, label.length * 9.5 + 26);
+  const label = compactRent(rent);
   const bg = isSelected ? "#EF4B2B" : "#FFFFFF";
   const fg = isSelected ? "#FFFFFF" : "#12211E";
   return L.divIcon({
-    className: "",
+    className: "mz-pin",
     html:
-      '<div style="display:flex;flex-direction:column;align-items:center;line-height:1">' +
-        '<div style="background:' + bg + ';color:' + fg + ';padding:6px 13px;border-radius:999px;' +
-          'font-size:13.5px;font-weight:800;white-space:nowrap;' +
-          'box-shadow:0 2px 6px rgba(18,33,30,0.28)">' + label + '</div>' +
-        '<div style="width:2px;height:6px;background:' + (isSelected ? "#EF4B2B" : "#EF4B2B") + '"></div>' +
-        '<div style="width:9px;height:9px;border-radius:50%;background:#EF4B2B;' +
-          'border:2px solid #fff;margin-top:-1px;box-shadow:0 1px 3px rgba(18,33,30,0.3)"></div>' +
-      "</div>",
-    iconSize: [w, 44],
-    iconAnchor: [w / 2, 44],
+      '<span style="position:absolute;left:0;top:0;transform:translate(-50%,-50%);' +
+        'display:inline-block;white-space:nowrap;' +
+        'background:' + bg + ';color:' + fg + ';' +
+        'padding:6px 13px;border-radius:999px;' +
+        'font-size:13px;font-weight:800;line-height:1.15;' +
+        'border:1.5px solid #12211E;' +
+        'box-shadow:0 2px 5px rgba(18,33,30,0.32)">' +
+        label +
+      "</span>",
+    iconSize: [0, 0],
+    iconAnchor: [0, 0],
   });
 }
+
 
 
 /**
@@ -326,19 +343,22 @@ function makeBhkIcon(bhk, rent, isSelected) {
  */
 
 function makeClusterIcon(count) {
-  const w = count > 99 ? 92 : count > 9 ? 82 : 74;
   return L.divIcon({
-    className: "",
+    className: "mz-pin",
     html:
-      '<div style="background:#0B3B32;color:#fff;padding:7px 15px;border-radius:22px;' +
-      'font-size:14px;font-weight:800;white-space:nowrap;border:2px solid #fff;' +
-      'box-shadow:0 4px 14px rgba(4,33,29,0.45)">' +
-      count + ' flat' + (count === 1 ? '' : 's') +
-      "</div>",
-    iconSize: [w, 32],
-    iconAnchor: [w / 2, 16],
+      '<span style="position:absolute;left:0;top:0;transform:translate(-50%,-50%);' +
+        'display:inline-block;white-space:nowrap;' +
+        'background:#0B3B32;color:#fff;padding:7px 15px;border-radius:999px;' +
+        'font-size:13px;font-weight:800;line-height:1.15;' +
+        'border:1.5px solid #12211E;' +
+        'box-shadow:0 2px 6px rgba(18,33,30,0.4)">' +
+        count + ' flat' + (count === 1 ? '' : 's') +
+      "</span>",
+    iconSize: [0, 0],
+    iconAnchor: [0, 0],
   });
 }
+
 
 /**
  * Group listings that would overlap at the current zoom.
@@ -452,6 +472,9 @@ function ChangeView({ center, zoom }) {
 /** Zoom map to show listing pins; optional fallback center when the filtered set is empty.
  *  Important: do not put `fallbackCenter` in the effect dependency array — it was tied to map pan/hover
  *  and caused fitBounds to re-run on every listing-card hover (zoomed-out map). */
+/** Below this, the map is all cluster pills and no homes. */
+const MIN_BROWSE_ZOOM = 13;
+
 function FitListingsBounds({ listings, enabled, fallbackCenter, fallbackZoom = 14 }) {
   const map = useMap();
   const signature = listings.map((l) => l.id).join(",");
@@ -476,6 +499,19 @@ function FitListingsBounds({ listings, enabled, fallbackCenter, fallbackZoom = 1
       if (pts.length > 1) {
         const b = L.latLngBounds(pts);
         map.fitBounds(b, { padding: [36, 36], maxZoom: 17, animate: false });
+
+        // Listings are scattered across the whole city, so fitting all of them
+        // lands around zoom 11 — where everything collapses into a couple of
+        // cluster pills and the map reads as almost empty. Drop into the
+        // busiest area instead, close enough that individual homes show.
+        if (map.getZoom() < MIN_BROWSE_ZOOM) {
+          const groups = clusterListings(
+            listings.map((l) => ({ ...l, lat: l.lat, lng: l.lng })),
+            MIN_BROWSE_ZOOM,
+          );
+          const busiest = groups.sort((a, c) => c.items.length - a.items.length)[0];
+          if (busiest) map.setView([busiest.lat, busiest.lng], MIN_BROWSE_ZOOM, { animate: false });
+        }
         return;
       }
       if (fc && Number.isFinite(fc[0]) && Number.isFinite(fc[1])) {
