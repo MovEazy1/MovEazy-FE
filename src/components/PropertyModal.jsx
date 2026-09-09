@@ -41,6 +41,121 @@ const T = {
   coralSoft: "#FBEEEB",
 };
 
+/** Viewing hours a lister would plausibly agree to. */
+const SUGGEST_HOURS = [9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19];
+
+const hourLabel = (h) => {
+  const period = h >= 12 ? "PM" : "AM";
+  const twelve = h % 12 === 0 ? 12 : h % 12;
+  return `${twelve}:00 ${period}`;
+};
+
+/**
+ * "Suggest Date & Time" — pick a day, then a time on that day.
+ *
+ * Replaces a free-text box that accepted anything: "tomorrow eve", "asap",
+ * "5", each of which someone then had to interpret before they could act on
+ * it. Reports a formatted string upward so the request it feeds is unchanged.
+ */
+function SuggestDateTime({ value, onChange, tokens }) {
+  const T = tokens;
+  const [open, setOpen] = useState(false);
+  const [day, setDay] = useState(null);
+
+  const days = useMemo(() => {
+    const out = [];
+    const base = new Date();
+    for (let i = 0; i < 14; i++) {
+      const d = new Date(base);
+      d.setDate(base.getDate() + i);
+      d.setHours(0, 0, 0, 0);
+      out.push(d);
+    }
+    return out;
+  }, []);
+
+  const dayLabel = (d, i) => {
+    if (i === 0) return "Today";
+    if (i === 1) return "Tomorrow";
+    return d.toLocaleDateString("en-IN", { weekday: "short", day: "numeric", month: "short" });
+  };
+
+  const choose = (d, hour) => {
+    const picked = new Date(d);
+    picked.setHours(hour, 0, 0, 0);
+    onChange(
+      `${picked.toLocaleDateString("en-IN", { weekday: "short", day: "numeric", month: "short" })}, ${hourLabel(hour)}`,
+    );
+    setOpen(false);
+    setDay(null);
+  };
+
+  const chip = (on) => ({
+    padding: "8px 12px", borderRadius: 999, fontSize: 12.5, fontWeight: 700,
+    cursor: "pointer", whiteSpace: "nowrap",
+    background: on ? T.mintSoft : "#fff",
+    border: `1.5px solid ${on ? T.teal : T.line}`,
+    color: on ? T.teal : T.textDim,
+  });
+
+  return (
+    <div>
+      <button
+        type="button"
+        onClick={() => setOpen((v) => !v)}
+        style={{
+          width: "100%", padding: "12px 14px", borderRadius: 8, cursor: "pointer",
+          display: "flex", alignItems: "center", justifyContent: "space-between", gap: 10,
+          border: `1px solid ${value ? T.teal : T.line}`,
+          background: "#fff", color: value ? T.text : T.textMute,
+          fontSize: 14, fontWeight: value ? 700 : 500, textAlign: "left",
+        }}
+      >
+        {value || "Suggest Date & Time"}
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round"
+          style={{ flexShrink: 0, transform: open ? "rotate(180deg)" : "none", transition: "transform .15s" }}>
+          <path d="m6 9 6 6 6-6" />
+        </svg>
+      </button>
+
+      {open && (
+        <div style={{ marginTop: 8, border: `1px solid ${T.line}`, borderRadius: 10, padding: 10, background: T.cream }}>
+          <p style={{ margin: "0 0 7px", fontSize: 11.5, fontWeight: 700, color: T.textMute, letterSpacing: ".04em" }}>
+            {day ? "PICK A TIME" : "PICK A DAY"}
+          </p>
+
+          {!day ? (
+            <div style={{ display: "flex", gap: 7, flexWrap: "wrap", maxHeight: 132, overflowY: "auto" }}>
+              {days.map((d, i) => (
+                <button key={d.toISOString()} type="button" onClick={() => setDay(d)} style={chip(false)}>
+                  {dayLabel(d, i)}
+                </button>
+              ))}
+            </div>
+          ) : (
+            <>
+              <div style={{ display: "flex", gap: 7, flexWrap: "wrap", maxHeight: 132, overflowY: "auto" }}>
+                {SUGGEST_HOURS.map((h) => (
+                  <button key={h} type="button" onClick={() => choose(day, h)} style={chip(false)}>
+                    {hourLabel(h)}
+                  </button>
+                ))}
+              </div>
+              <button
+                type="button"
+                onClick={() => setDay(null)}
+                style={{ marginTop: 9, fontSize: 12, fontWeight: 700, color: T.teal, background: "none", border: "none", cursor: "pointer", padding: 0 }}
+              >
+                ← Back to days
+              </button>
+            </>
+          )}
+        </div>
+      )}
+    </div>
+  );
+}
+
 function MediaElement({ src, alt, style, firstImage }) {
   if (!src) return null;
   const isVideo = src.match(/\.(mp4|webm|ogg|mov)$/i) || src.includes('video');
@@ -1121,11 +1236,26 @@ export default function PropertyModal({ property, onClose, listings = [], onSele
                           <p style={{ margin: "2px 0 0", fontSize: 12, color: T.textMute, lineHeight: 1.45 }}>
                             We&apos;ll ask them to open a time and confirm it with you. Or suggest one yourself:
                           </p>
-                          <input type="text" required placeholder="Date & Time (e.g. Tomorrow 5PM)" value={visitForm.time} onChange={(e) => setVisitForm({ ...visitForm, time: e.target.value })} style={{ width: "100%", padding: "10px", borderRadius: "8px", border: `1px solid ${T.line}`, boxSizing: "border-box", fontSize: "14px" }} />
+                          <SuggestDateTime
+                            tokens={T}
+                            value={visitForm.time}
+                            onChange={(time) => setVisitForm({ ...visitForm, time })}
+                          />
                           <textarea rows={2} placeholder="Any questions?" value={visitForm.notes} onChange={(e) => setVisitForm({ ...visitForm, notes: e.target.value })} style={{ width: "100%", padding: "10px", borderRadius: "8px", border: `1px solid ${T.line}`, boxSizing: "border-box", fontSize: "14px" }} />
                           <div style={{ display: "flex", gap: "8px", marginTop: "4px" }}>
                             <button type="button" onClick={() => setShowVisitForm(false)} style={{ flex: 1, padding: "12px", background: T.lineSoft, color: T.textDim, border: "none", borderRadius: "8px", fontWeight: 600, cursor: "pointer" }}>Cancel</button>
-                            <button type="submit" style={{ flex: 2, padding: "12px", background: T.teal, color: "white", border: "none", borderRadius: "8px", fontWeight: 700, cursor: "pointer" }}>Request</button>
+                            <button
+                              type="submit"
+                              disabled={!visitForm.time}
+                              style={{
+                                flex: 2, padding: "12px", borderRadius: "8px", border: "none", fontWeight: 700,
+                                background: visitForm.time ? T.teal : T.line,
+                                color: visitForm.time ? "white" : T.textMute,
+                                cursor: visitForm.time ? "pointer" : "not-allowed",
+                              }}
+                            >
+                              {visitForm.time ? "Request" : "Pick a time"}
+                            </button>
                           </div>
                         </>
                       )}
