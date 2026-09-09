@@ -80,16 +80,19 @@ const actionBtn = {
 };
 
 export function PropertyCard({ p, slotCount, onStatus, busy, onSlotCountChange, onShare }) {
-  const [open, setOpen] = useState(false);
+  // "" | "details" | "slots" — one panel at a time. The two are separate
+  // because they answer different questions: what is this listing, versus
+  // when can people come and see it.
+  const [panel, setPanel] = useState("");
   const slotsRef = useRef(null);
   const st = STATUS[p.status] || STATUS.published;
   const cover = p.cover_image_url || (p.images || [])[0] || "";
 
-  // "Set visit timing" opens the detail panel (if it isn't already) and
-  // scrolls straight to the slots editor at the bottom of it, instead of
-  // making the owner scroll past every other detail row to find it.
+  // "Visit slots" opens the slots editor on its own. It deliberately does not
+  // unfold the property's detail table first — the owner came to set times,
+  // and twenty rows of flat type, address and occupants were in the way.
   const goToSlots = () => {
-    setOpen(true);
+    setPanel((current) => (current === "slots" ? "" : "slots"));
     requestAnimationFrame(() => {
       setTimeout(() => slotsRef.current?.scrollIntoView({ behavior: "smooth", block: "center" }), 50);
     });
@@ -127,8 +130,8 @@ export function PropertyCard({ p, slotCount, onStatus, busy, onSlotCountChange, 
             </p>
             <button
               type="button"
-              aria-label={open ? "Hide details" : "Show details"}
-              onClick={() => setOpen((o) => !o)}
+              aria-label={panel === "details" ? "Hide details" : "Show details"}
+              onClick={() => setPanel((current) => (current === "details" ? "" : "details"))}
               style={{ flexShrink: 0, background: "none", border: "none", cursor: "pointer", color: T.textMute, padding: 2 }}
             >
               <MoreVertical size={18} />
@@ -179,7 +182,7 @@ export function PropertyCard({ p, slotCount, onStatus, busy, onSlotCountChange, 
         </button>
       </div>
 
-      {open && (
+      {panel === "details" && (
         <div style={{ padding: "0 14px 14px" }}>
           <div style={{ borderRadius: 12, border: `1px solid ${T.line}`, background: T.cream, padding: 14 }}>
             <div className="pb-1">
@@ -227,16 +230,16 @@ export function PropertyCard({ p, slotCount, onStatus, busy, onSlotCountChange, 
               </div>
             )}
           </div>
+        </div>
+      )}
 
-          {!isClosed(p.status) && (
-            <div ref={slotsRef}>
-              <PropertyVisitSlots
-                propertyId={p.property_id}
-                hideMarkSold
-                onSlotsChanged={(count) => onSlotCountChange?.(p.property_id, count)}
-              />
-            </div>
-          )}
+      {panel === "slots" && !isClosed(p.status) && (
+        <div ref={slotsRef} style={{ padding: "0 14px 14px" }}>
+          <PropertyVisitSlots
+            propertyId={p.property_id}
+            hideMarkSold
+            onSlotsChanged={(count) => onSlotCountChange?.(p.property_id, count)}
+          />
         </div>
       )}
     </div>

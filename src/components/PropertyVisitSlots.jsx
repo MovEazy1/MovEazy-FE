@@ -100,7 +100,7 @@ function DateGrid({ selected, onToggle }) {
   const selectedSet = useMemo(() => new Set(selected), [selected]);
 
   return (
-    <div className="max-h-64 overflow-y-auto pr-1">
+    <div className="max-h-48 overflow-y-auto pr-1">
       {groups.map(([month, ds]) => (
         <div key={month} className="mb-3 last:mb-0">
           <p className="text-[11px] font-bold text-gray-400 uppercase tracking-wide mb-1.5">{month}</p>
@@ -280,13 +280,13 @@ export default function PropertyVisitSlots({ propertyId, brandRed = "#e11d48", o
       .sort((a, b) => new Date(a.items[0].slot_at) - new Date(b.items[0].slot_at));
   }, [slots]);
 
-  const inp = "px-3 py-2.5 rounded-xl border border-gray-200 bg-white text-[14px] text-gray-900 outline-none focus:border-red-400 focus:ring-2 focus:ring-red-100";
+  const inp = "w-full px-2.5 py-2 rounded-lg border border-gray-200 bg-white text-[13px] text-gray-900 outline-none focus:border-red-400 focus:ring-2 focus:ring-red-100";
 
   return (
-    <div className="bg-white rounded-2xl border border-gray-200 shadow-sm overflow-hidden mb-4">
-      <div className="p-6">
-        <div className="flex items-center justify-between gap-3 mb-1 flex-wrap">
-          <p className="text-[15px] font-extrabold text-gray-900">Open visit slots</p>
+    <div className="bg-white rounded-xl border border-gray-200 shadow-sm overflow-hidden mb-3">
+      <div className="p-3.5">
+        <div className="flex items-center justify-between gap-2 mb-1 flex-wrap">
+          <p className="text-[13.5px] font-extrabold text-gray-900">Open visit slots</p>
           {sold ? (
             <span className="px-2.5 py-1 rounded-full text-[11px] font-bold" style={{ background: "#f1f5f9", color: "#475569" }}>Sold · removed from platform</span>
           ) : !hideMarkSold ? (
@@ -297,13 +297,13 @@ export default function PropertyVisitSlots({ propertyId, brandRed = "#e11d48", o
             </button>
           ) : null}
         </div>
-        <p className="text-[12px] text-gray-500 mb-4">Set a time window and which dates it applies to. Renters see slots for the next 7 days.</p>
+        <p className="text-[11.5px] text-gray-500 mb-3">Set a time window and the dates it applies to. Renters see the next 7 days.</p>
 
         {!sold && (
-          <div className="rounded-2xl border border-gray-200 p-4 sm:p-5 mb-4">
-            <p className="text-[12px] font-bold uppercase tracking-wide text-gray-400 mb-3">Add a time slot</p>
+          <div className="rounded-lg border border-gray-200 p-3 mb-3">
+            <p className="text-[11px] font-bold uppercase tracking-wide text-gray-400 mb-2">Add a time slot</p>
 
-            <div className="grid grid-cols-2 gap-3">
+            <div className="grid grid-cols-2 gap-2.5">
               <div>
                 <Label>From</Label>
                 <input type="time" value={fromT} onChange={(e) => setFromT(e.target.value)} className={inp} />
@@ -314,7 +314,7 @@ export default function PropertyVisitSlots({ propertyId, brandRed = "#e11d48", o
               </div>
             </div>
 
-            <div className="mt-4">
+            <div className="mt-3">
               <Label>Dates</Label>
               <select
                 value={dateMode}
@@ -335,7 +335,7 @@ export default function PropertyVisitSlots({ propertyId, brandRed = "#e11d48", o
               )}
 
               {dateMode === "custom" && !customConfirmed && (
-                <div className="mt-3 p-3 rounded-xl border border-gray-100 bg-gray-50">
+                <div className="mt-2.5 p-2.5 rounded-lg border border-gray-100 bg-gray-50">
                   <DateGrid selected={customDates} onToggle={toggleCustomDate} />
                   <div className="flex items-center justify-between gap-3 mt-3">
                     <span className="text-[12px] text-gray-500">{customDates.length} date{customDates.length === 1 ? "" : "s"} selected</span>
@@ -356,7 +356,7 @@ export default function PropertyVisitSlots({ propertyId, brandRed = "#e11d48", o
               )}
             </div>
 
-            <div className="flex flex-wrap items-center justify-between gap-3 mt-4 pt-4 border-t border-gray-100">
+            <div className="flex flex-wrap items-center justify-between gap-2.5 mt-3 pt-3 border-t border-gray-100">
               <p className="text-[12px] text-gray-500">
                 {times.length === 0
                   ? "Set an end time later than the start time."
@@ -365,7 +365,7 @@ export default function PropertyVisitSlots({ propertyId, brandRed = "#e11d48", o
                     : <>Creates <span className="font-extrabold text-gray-800">{willCreate}</span> visit time{willCreate === 1 ? "" : "s"} · {times[0]}–{toT} on {dates.length} date{dates.length === 1 ? "" : "s"}</>}
               </p>
               <button type="button" onClick={addSlotGroup} disabled={busy || !willCreate}
-                className="h-[46px] px-5 rounded-xl text-[13px] font-bold text-white disabled:opacity-60"
+                className="h-10 px-4 rounded-lg text-[12.5px] font-bold text-white disabled:opacity-60"
                 style={{ background: `linear-gradient(135deg,${brandRed},#ef4444)` }}>
                 {busy ? "Adding…" : "Add these times"}
               </button>
@@ -380,13 +380,13 @@ export default function PropertyVisitSlots({ propertyId, brandRed = "#e11d48", o
           ) : (
             <>
               <p className="text-[12px] font-bold uppercase tracking-wide text-gray-400 mb-2">Added times ({slots.length})</p>
-              <div className="space-y-3">
+              <div className="space-y-2">
                 {grouped.map((g) => (
-                  <div key={g.key} className="rounded-xl border border-gray-100 bg-gray-50 p-3">
+                  <div key={g.key} className="rounded-lg border border-gray-100 bg-gray-50 p-2.5">
                     <p className="text-[12px] font-extrabold text-gray-700 mb-2">{fmtDateChip(g.key)}</p>
                     <div className="flex flex-wrap gap-2">
                       {g.items.map((s) => (
-                        <span key={s.id} className="inline-flex items-center gap-2 pl-3 pr-2 py-1.5 rounded-full bg-white border border-gray-200 text-[12px] font-bold text-gray-800">
+                        <span key={s.id} className="inline-flex items-center gap-1.5 pl-2.5 pr-1.5 py-1 rounded-full bg-white border border-gray-200 text-[11.5px] font-bold text-gray-800">
                           {fmtTimeOnly(s.slot_at)}
                           {!sold && (
                             <button type="button" onClick={() => remove(s.id)} disabled={busy}
