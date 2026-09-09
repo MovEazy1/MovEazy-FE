@@ -16,6 +16,7 @@ import {
 } from "../../lib/crmClients";
 import { formatDuration } from "../../lib/sessionSync";
 import { SCOPES } from "../../lib/adminScopes";
+import { fetchNotifications, markNotificationRead } from "../../lib/crmPayments";
 import { buildTemplateCsv, downloadCsv, parseCsv, planImport, runImport } from "../../lib/crmImport";
 import { Btn, C, Chip, Empty, TempDot, Toast, shortDate } from "./crmUi";
 
@@ -183,6 +184,14 @@ export default function CrmClientsPage() {
   const [mobileTab, setMobileTab] = useState("list");
   const [localShortlists, setLocalShortlists] = useState(shortlists);
   const [reqDraft, setReqDraft] = useState(null);
+
+  // Visits booked on listings whose lister published no times — somebody has to
+  // arrange one, and nothing else on this screen would say so.
+  const [visitAlerts, setVisitAlerts] = useState([]);
+  const loadVisitAlerts = useCallback(() => {
+    fetchNotifications({ unreadOnly: true, type: "visit" }).then(setVisitAlerts);
+  }, []);
+  useEffect(loadVisitAlerts, [loadVisitAlerts]);
 
   useEffect(() => setLocalShortlists(shortlists), [shortlists]);
 
@@ -448,6 +457,32 @@ export default function CrmClientsPage() {
     );
   }
 
+  const visitBanner = visitAlerts.length > 0 && (
+    <div
+      style={{
+        margin: "12px 16px 0", padding: "11px 13px", borderRadius: 10,
+        background: "#FBF3E4", border: `1px solid ${C.gold}`,
+        display: "flex", flexDirection: "column", gap: 7,
+      }}
+    >
+      <span className="crm-label" style={{ color: C.gold }}>
+        Visits needing a time · {visitAlerts.length}
+      </span>
+      {visitAlerts.slice(0, 4).map((n) => (
+        <div key={n.id} style={{ display: "flex", alignItems: "baseline", gap: 8, flexWrap: "wrap" }}>
+          <button
+            type="button"
+            onClick={() => n.client_id && select(n.client_id)}
+            style={{ fontSize: 12, color: C.text, fontWeight: 600, textAlign: "left" }}
+          >
+            {n.body}
+          </button>
+          <Btn sm onClick={() => markNotificationRead(n.id).then(loadVisitAlerts)}>Done</Btn>
+        </div>
+      ))}
+    </div>
+  );
+
   const recordPane = (
     <ClientRecord
       key={selected.id}
@@ -489,6 +524,7 @@ export default function CrmClientsPage() {
             <Chip key={id} on={mobileTab === id} onClick={() => setMobileTab(id)}>{label}</Chip>
           ))}
         </div>
+        {visitBanner}
         <div style={{ flex: 1, minHeight: 0, display: "flex" }}>
           {mobileTab === "list" && listPane}
           {mobileTab === "record" && recordPane}
@@ -500,10 +536,13 @@ export default function CrmClientsPage() {
   }
 
   return (
-    <div style={{ display: "flex", flex: 1, minHeight: 0 }}>
-      {listPane}
-      {recordPane}
-      {matchesPane}
+    <div style={{ display: "flex", flexDirection: "column", flex: 1, minHeight: 0 }}>
+      {visitBanner}
+      <div style={{ display: "flex", flex: 1, minHeight: 0 }}>
+        {listPane}
+        {recordPane}
+        {matchesPane}
+      </div>
       <Toast {...(toast ?? {})} />
     </div>
   );

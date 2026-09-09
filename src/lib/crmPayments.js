@@ -54,7 +54,7 @@ export async function approvePayment(clientId) {
   if (error) throw error;
 }
 
-export async function fetchNotifications({ unreadOnly = false } = {}) {
+export async function fetchNotifications({ unreadOnly = false, type = null } = {}) {
   if (!isSupabaseConfigured || !supabase) return [];
   try {
     let q = supabase
@@ -63,6 +63,9 @@ export async function fetchNotifications({ unreadOnly = false } = {}) {
       .order("created_at", { ascending: false })
       .limit(200);
     if (unreadOnly) q = q.is("read_at", null);
+    // Payments and visit alerts share this table but belong on different
+    // screens; a visit that needs a time is not a payments item.
+    if (type) q = q.eq("type", type);
     const { data, error } = await q;
     if (error) return [];
     return data ?? [];

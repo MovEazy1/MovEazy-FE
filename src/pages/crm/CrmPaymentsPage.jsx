@@ -99,7 +99,7 @@ export default function CrmPaymentsPage() {
   };
 
   const loadNotes = useCallback(() => {
-    fetchNotifications({ unreadOnly: true }).then(setNotes);
+    fetchNotifications({ unreadOnly: true, type: "payment" }).then(setNotes);
   }, []);
   useEffect(loadNotes, [loadNotes]);
 

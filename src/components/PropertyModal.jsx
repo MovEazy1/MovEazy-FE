@@ -11,7 +11,7 @@ import {
 } from "lucide-react";
 import logoMint from "../assets/logo/moveazy-logo-mint-dark.png";
 import { useLoginModal } from "../context/LoginModalContext";
-import { bookIndividual, fetchOpenVisitsForProperty } from "../lib/visits";
+import { bookIndividual, fetchOpenVisitsForProperty, requestNextAvailableVisit } from "../lib/visits";
 import { findNearbyListings } from "../lib/geo";
 import { isListingSaved, toggleSavedListing } from "../lib/userActivity";
 import { submitListingInterestFull, logSavedListingChange } from "../lib/crmSync";
@@ -363,6 +363,25 @@ export default function PropertyModal({ property, onClose, listings = [], onSele
     }
   };
 
+  /**
+   * For a listing with no published times: register the interest with no slot.
+   * The lister is told someone wants to view and still needs to offer a time,
+   * and the CRM shows it as a visit awaiting scheduling.
+   */
+  const bookNextAvailable = async () => {
+    if (offMarket) return;
+    if (!user) { openLogin?.(() => bookNextAvailable()); return; }
+    setBooking(true);
+    try {
+      await requestNextAvailableVisit(user.uid, property.id);
+      setVisitSuccess("Requested. The lister will confirm a time with you shortly.");
+    } catch (err) {
+      alert(err?.message || "Could not send that request — please try again.");
+    } finally {
+      setBooking(false);
+    }
+  };
+
   const submitVisit = async (e) => {
     e.preventDefault();
     if (offMarket) {
@@ -425,12 +444,12 @@ export default function PropertyModal({ property, onClose, listings = [], onSele
 
   const scrollTo = (id) => {
     const el = document.getElementById(id);
-    if (el && scrollRef.current) {
-      scrollRef.current.scrollTo({
-        top: el.offsetTop - 50, // slightly offset for header
-        behavior: "smooth"
-      });
-    }
+    if (!el) return;
+    // scrollIntoView walks the real ancestor chain. offsetTop measures from the
+    // nearest *positioned* ancestor, which isn't the scroll container, so the
+    // old maths landed somewhere arbitrary — usually not moving at all, which
+    // made Schedule Visit look broken.
+    el.scrollIntoView({ behavior: "smooth", block: "center" });
   };
 
   const submitInterest = async () => {
@@ -1172,7 +1191,22 @@ export default function PropertyModal({ property, onClose, listings = [], onSele
                           {/* No published slots. Rather than invent times nobody
                               agreed to, fall back to asking for one. */}
                           <p style={{ margin: "0 0 2px", fontSize: 13, color: T.textDim, lineHeight: 1.5 }}>
-                            The lister hasn&apos;t published visit times yet. Tell us when suits you and we&apos;ll arrange it.
+                            The lister hasn&apos;t published visit times for this home yet.
+                          </p>
+                          <button
+                            type="button"
+                            onClick={bookNextAvailable}
+                            disabled={booking}
+                            style={{
+                              width: "100%", padding: "14px", borderRadius: 10, border: "none",
+                              background: T.teal, color: "#fff", fontSize: 15, fontWeight: 700,
+                              cursor: booking ? "not-allowed" : "pointer",
+                            }}
+                          >
+                            {booking ? "Sending…" : "Book the next available slot"}
+                          </button>
+                          <p style={{ margin: "2px 0 0", fontSize: 12, color: T.textMute, lineHeight: 1.45 }}>
+                            We&apos;ll ask them to open a time and confirm it with you. Or suggest one yourself:
                           </p>
                           <input type="text" required placeholder="Date & Time (e.g. Tomorrow 5PM)" value={visitForm.time} onChange={(e) => setVisitForm({ ...visitForm, time: e.target.value })} style={{ width: "100%", padding: "10px", borderRadius: "8px", border: `1px solid ${T.line}`, boxSizing: "border-box", fontSize: "14px" }} />
                           <textarea rows={2} placeholder="Any questions?" value={visitForm.notes} onChange={(e) => setVisitForm({ ...visitForm, notes: e.target.value })} style={{ width: "100%", padding: "10px", borderRadius: "8px", border: `1px solid ${T.line}`, boxSizing: "border-box", fontSize: "14px" }} />
