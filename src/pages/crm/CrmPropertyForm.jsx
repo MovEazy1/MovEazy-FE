@@ -15,7 +15,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import { useCrm } from "./CrmShell";
 import {
-  ALL_LOCALITIES, FLAT_TYPES, FURNISHINGS, MUST_HAVES, OCCUPANTS,
+  ALL_LOCALITIES, FLAT_TYPES, FURNISHINGS, LIFESTYLE, MUST_HAVES, OCCUPANTS,
 } from "../../data/preferenceOptions";
 import { cleanSourceUrl, detectSource, parseListingText } from "../../lib/listingImport";
 import { generatePropertyId, uploadInventoryPhotos } from "../../lib/inventory";
@@ -28,7 +28,8 @@ const BLANK = {
   area: "", nearby_areas: [], full_address: "", landmark: "",
   rent: "", deposit: "", available_from: "",
   flat_type: "", bedrooms: "", bathrooms: "", furnishing: "",
-  occupants_allowed: [], amenities: [],
+  max_flatmates: "", gender_pref: "any",
+  occupants_allowed: [], amenities: [], lifestyle: [], house_rules: [],
   poster_name: "", phone: "", posted_by: "owner",
   title: "", description: "", source_url: "", status: "published",
 };
@@ -36,6 +37,13 @@ const BLANK = {
 const DRAFT_KEY = "moveazy_crm_property_draft";
 
 const STATUSES = ["published", "paused", "rented"];
+const GENDER_PREFS = [["any", "Co-ed / Any"], ["female", "Girls only"], ["male", "Boys only"]];
+// Same wording the owner sees in the public List My Flat flow, so a listing
+// corrected here reads identically to one posted there.
+const HOUSE_RULES = [
+  "No Smoking", "No Pets", "No Alcohol", "Vegetarians Only",
+  "Working Professionals Only", "No Brokerage", "Fully Furnished",
+];
 
 /** A DB row → the form's shape. Nulls become "", arrays stay arrays, and the
  *  date arrives as a timestamp that <input type="date"> won't accept. */
@@ -53,8 +61,12 @@ function rowToForm(row) {
     bedrooms: row.bedrooms ?? "",
     bathrooms: row.bathrooms ?? "",
     furnishing: row.furnishing ?? "",
+    max_flatmates: row.max_flatmates ?? "",
+    gender_pref: row.gender_pref || "any",
     occupants_allowed: list(row.occupants_allowed),
     amenities: list(row.amenities),
+    lifestyle: list(row.lifestyle),
+    house_rules: list(row.house_rules),
     poster_name: row.poster_name ?? "",
     phone: row.phone ?? "",
     posted_by: row.posted_by || "owner",
@@ -263,8 +275,12 @@ export default function CrmPropertyForm() {
         bedrooms: Number(f.bedrooms) || 1,
         bathrooms: Number(f.bathrooms) || 1,
         furnishing: f.furnishing,
+        max_flatmates: Number(f.max_flatmates) || 0,
+        gender_pref: f.gender_pref || "any",
         occupants_allowed: f.occupants_allowed ?? [],
         amenities: f.amenities ?? [],
+        lifestyle: f.lifestyle ?? [],
+        house_rules: f.house_rules ?? [],
         title: f.title || `${f.flat_type} in ${f.area}`,
         description: f.description || "",
         images,
@@ -498,6 +514,19 @@ export default function CrmPropertyForm() {
               </div>
             </Field>
 
+            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8 }}>
+              <Field label="Flatmates" hint="0 for a whole unit">
+                <input className="crm-input crm-num" type="number" min="0" value={f.max_flatmates}
+                  onChange={(e) => set({ max_flatmates: e.target.value })} placeholder="0" />
+              </Field>
+              <Field label="Preferred gender">
+                <select className="crm-input" value={f.gender_pref}
+                  onChange={(e) => set({ gender_pref: e.target.value })}>
+                  {GENDER_PREFS.map(([v, l]) => <option key={v} value={v}>{l}</option>)}
+                </select>
+              </Field>
+            </div>
+
             <Field label="Occupants allowed">
               <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
                 {OCCUPANTS.map((o) => (
@@ -513,6 +542,26 @@ export default function CrmPropertyForm() {
                 {MUST_HAVES.map((a) => (
                   <Chip key={a} on={(f.amenities ?? []).includes(a)} onClick={() => toggle("amenities", a)}>
                     {a}
+                  </Chip>
+                ))}
+              </div>
+            </Field>
+
+            <Field label="Neighbourhood">
+              <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
+                {LIFESTYLE.map((x) => (
+                  <Chip key={x} on={(f.lifestyle ?? []).includes(x)} onClick={() => toggle("lifestyle", x)}>
+                    {x}
+                  </Chip>
+                ))}
+              </div>
+            </Field>
+
+            <Field label="House rules">
+              <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
+                {HOUSE_RULES.map((x) => (
+                  <Chip key={x} on={(f.house_rules ?? []).includes(x)} onClick={() => toggle("house_rules", x)}>
+                    {x}
                   </Chip>
                 ))}
               </div>
