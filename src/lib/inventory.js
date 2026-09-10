@@ -189,15 +189,24 @@ export async function createInventoryItem(draft, poster) {
 const OPTIONAL_INVENTORY_COLS = ["maintenance"];
 
 /**
- * "That column isn't there yet." Postgres says 42703 on a select; PostgREST
- * answers a write naming an unknown column with PGRST204 and its own wording,
- * so both shapes are matched.
+ * "The database won't give me that column."
+ *
+ * Two different causes, one response. Postgres says 42703 when the column
+ * doesn't exist, and PostgREST says PGRST204 on a write naming an unknown one.
+ * But a column can also exist and be ungranted: `inventory` gives the anon role
+ * an explicit column list, so a newly added column is readable by signed-in
+ * users and refused — 42501, "permission denied for table" — to everyone signed
+ * out. That failure hides completely from anyone testing while logged in, and
+ * it takes the whole select down with it, not just the one field. It cost the
+ * public map every listing until a signed-out visitor reported it.
  */
 export const isMissingColumn = (error) =>
   error?.code === "42703" ||
   error?.code === "PGRST204" ||
+  error?.code === "42501" ||
   /column .* does not exist/i.test(error?.message || "") ||
-  /could not find the '.*' column/i.test(error?.message || "");
+  /could not find the '.*' column/i.test(error?.message || "") ||
+  /permission denied for table/i.test(error?.message || "");
 
 /** The same row without the columns a pending migration hasn't added. */
 export function withoutOptionalColumns(row) {
@@ -267,12 +276,20 @@ export async function fetchMyInventory(uid) {
 
 /** A specific set of listings by property_id — for the "Shortlists" page, where
  * a liked listing may not be in the visit cart's own lightweight snapshots. */
+/**
+ * Listings by id, readable signed out.
+ *
+ * Not select("*"): the anon role holds column grants rather than table-wide
+ * select, so asking for every column is refused outright and the caller gets
+ * nothing. A shared link opened in a private window is exactly that case.
+ */
 export async function fetchInventoryByIds(propertyIds = []) {
   if (!isSupabaseConfigured || !supabase || !propertyIds.length) return [];
-  const { data, error } = await supabase
-    .from("inventory")
-    .select("*")
-    .in("property_id", propertyIds);
+  const { data, error } = await selectTolerantly(
+    "inventory",
+    PUBLIC_INVENTORY_COLS,
+    (q) => q.in("property_id", propertyIds),
+  );
   if (error) return [];
   return data || [];
 }
