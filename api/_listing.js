@@ -41,11 +41,18 @@ export async function fetchListing(propertyId) {
   }
 }
 
-/** Up to `max` usable photo URLs, cover first, de-duplicated. */
+// A listing's media lives in one array, videos included. Satori draws stills —
+// an <img> pointed at an .mp4 renders as a blank tile — so the collage takes
+// photos only, and a video-only listing falls through to the branded card.
+// Deliberately duplicated from src/lib/listingMedia.js: this runs in the edge
+// runtime, which bundles from api/ alone.
+const VIDEO_EXT = /\.(mp4|m4v|webm|ogv|ogg|mov|qt|3gp)(?:[?#]|$)/i;
+
+/** Up to `max` usable photo URLs, cover first, de-duplicated, no videos. */
 export function photosOf(listing, max = 4) {
   const all = [listing?.cover_image_url, ...(listing?.images ?? [])]
     .map((u) => String(u || "").trim())
-    .filter((u) => u.startsWith("http"));
+    .filter((u) => u.startsWith("http") && !VIDEO_EXT.test(u));
   return [...new Set(all)].slice(0, max);
 }
 

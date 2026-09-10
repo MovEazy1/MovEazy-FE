@@ -276,11 +276,10 @@ export default function ListMyFlatMobile({ user, onPublished }) {
       if (!marker) return "Drop a pin on the map to set the exact address.";
     }
     if (step === 4 && !rent) return "Enter the monthly rent.";
-    if (step === 6 && !photoFiles.some((f) => !isVideoFile(f))) {
-      // A video on its own leaves the listing with no cover to show on a card.
-      return photoFiles.length
-        ? "Add at least one photo — a video on its own leaves the listing with no cover."
-        : "Add at least one photo of your flat.";
+    // Photo or video, either will do — a video-only listing shows its
+    // walkthrough on the card rather than an empty box.
+    if (step === 6 && photoFiles.length === 0) {
+      return "Add at least one photo or a video of your flat.";
     }
     if (step === TOTAL_STEPS && slotCount < 1) return "Add at least one visit time slot — renters need a time to book before your flat can go live.";
     return "";
@@ -611,9 +610,11 @@ export default function ListMyFlatMobile({ user, onPublished }) {
                 <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 11 }}>
                   {photoPreviews.map((src, i) => {
                     const video = isVideoFile(photoFiles[i]);
-                    // The cover is the first photo, not the first file.
-                    const isCover = !video && photoFiles.findIndex((f) => !isVideoFile(f)) === i;
-                    const badge = video ? "VIDEO" : isCover ? "COVER" : "";
+                    // Mirrors coverMedia: the first photo takes the cover, and
+                    // only a listing with no photos lets a video have it.
+                    const firstPhoto = photoFiles.findIndex((f) => !isVideoFile(f));
+                    const isCover = i === (firstPhoto === -1 ? 0 : firstPhoto);
+                    const badge = video && !isCover ? "VIDEO" : isCover ? "COVER" : "";
                     return (
                       <div key={src} style={{ position: "relative", aspectRatio: "4/3", borderRadius: 14, overflow: "hidden", border: "1px solid rgba(255,255,255,.13)" }}>
                         {video ? (

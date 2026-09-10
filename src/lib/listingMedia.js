@@ -73,11 +73,25 @@ export function orderListingMedia(urls = []) {
 }
 
 /**
- * The cover: the first photo, never a video. A video frame can't be read at
- * card size, and a listing whose thumbnail is a black rectangle looks broken.
+ * The first photo, or nothing. Use where only a still will do — an Open Graph
+ * card, a CSS background — because those can't render a video at all.
  */
 export function coverPhoto(urls = []) {
   return (urls || []).find((u) => u && !isVideoUrl(u)) || "";
+}
+
+/**
+ * What to show as the listing's one thumbnail: the first photo, falling back
+ * to the first video when a listing has no photos at all.
+ *
+ * Photos are strongly preferred — a still reads at card size and a video frame
+ * often doesn't. But a listing may be video-only, and showing such a listing an
+ * empty grey box would be worse than showing its walkthrough. Callers must be
+ * able to render a video; use coverPhoto where they can't.
+ */
+export function coverMedia(urls = []) {
+  const list = (urls || []).filter(Boolean);
+  return coverPhoto(list) || list.find(isVideoUrl) || "";
 }
 
 /** "3 photos · 1 video" — for upload counters and admin hints. */

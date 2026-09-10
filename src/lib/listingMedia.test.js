@@ -4,7 +4,7 @@
  */
 import { describe, expect, it } from "vitest";
 import {
-  coverPhoto, describeMedia, isVideoUrl, orderListingMedia, splitMedia,
+  coverMedia, coverPhoto, describeMedia, isVideoUrl, orderListingMedia, splitMedia,
 } from "./listingMedia";
 
 const p = (n) => `https://cdn.test/inventory/MZ-1/photo-${n}.jpg`;
@@ -70,5 +70,21 @@ describe("cover and counts", () => {
     expect(splitMedia([p(1), v(1), p(2)])).toEqual({ photos: [p(1), p(2)], videos: [v(1)] });
     expect(describeMedia([p(1), v(1), p(2)])).toBe("2 photos · 1 video");
     expect(describeMedia([])).toBe("nothing yet");
+  });
+});
+
+describe("the one thumbnail a card gets", () => {
+  it("prefers a photo whenever there is one", () => {
+    expect(coverMedia([v(1), p(1), v(2)])).toBe(p(1));
+  });
+
+  it("falls back to the video rather than showing an empty box", () => {
+    // A listing may be video-only; requiring a photo was relaxed deliberately.
+    expect(coverMedia([v(1), v(2)])).toBe(v(1));
+  });
+
+  it("is empty only when the listing has no media at all", () => {
+    expect(coverMedia([])).toBe("");
+    expect(coverMedia(["", null])).toBe("");
   });
 });

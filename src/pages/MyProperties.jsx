@@ -15,7 +15,7 @@ import { useAuth } from "../context/AuthContext";
 import { useLoginModal } from "../context/LoginModalContext";
 import MovEazyNav from "../components/layout/MovEazyNav";
 import { fetchMyInventory, setInventoryStatus } from "../lib/inventory";
-import { coverPhoto } from "../lib/listingMedia";
+import { coverMedia, isVideoUrl } from "../lib/listingMedia";
 import { propertyLink, shareVia } from "../lib/crmSettings";
 import { fetchSlotsFor } from "../lib/visits";
 import { fetchMyListingStats } from "../lib/ownerDashboard";
@@ -88,8 +88,9 @@ export function PropertyCard({ p, slotCount, onStatus, busy, onSlotCountChange, 
   const [panel, setPanel] = useState("");
   const slotsRef = useRef(null);
   const st = STATUS[p.status] || STATUS.published;
-  // A video can't stand in for a thumbnail — take the first photo.
-  const cover = coverPhoto([p.cover_image_url, ...(p.images || [])]);
+  // Prefer a photo; a video-only listing shows its video rather than nothing.
+  const cover = coverMedia([p.cover_image_url, ...(p.images || [])]);
+  const coverIsVideo = isVideoUrl(cover);
 
   // "Visit slots" opens the slots editor on its own. It deliberately does not
   // unfold the property's detail table first — the owner came to set times,
@@ -107,7 +108,8 @@ export function PropertyCard({ p, slotCount, onStatus, busy, onSlotCountChange, 
         <div
           style={{
             width: 104, height: 104, borderRadius: 12, flexShrink: 0, position: "relative",
-            background: cover ? `url(${cover}) center/cover` : T.lineSoft,
+            background: cover && !coverIsVideo ? `url(${cover}) center/cover` : T.lineSoft,
+            overflow: "hidden",
           }}
         >
           <span
@@ -119,6 +121,10 @@ export function PropertyCard({ p, slotCount, onStatus, busy, onSlotCountChange, 
           >
             {st.label}
           </span>
+          {coverIsVideo && (
+            <video src={cover} muted playsInline preload="metadata"
+              style={{ width: "100%", height: "100%", objectFit: "cover" }} />
+          )}
           {!cover && (
             <div style={{ width: "100%", height: "100%", display: "grid", placeItems: "center", fontSize: 10, fontWeight: 700, color: T.textMute }}>
               No photo

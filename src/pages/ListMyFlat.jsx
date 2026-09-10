@@ -8,7 +8,9 @@ import ListingMapPicker from "../components/ListingMapPicker";
 import ListMyFlatMobile, { posterRoleFor } from "../components/ListMyFlatMobile";
 import { reverseGeocode, nearbyLandmarks } from "../lib/geocode";
 import { createInventoryItem, uploadInventoryPhotos, generatePropertyId, mediaRejectionReason } from "../lib/inventory";
-import { coverPhoto, describeMedia, isListingMediaFile, isVideoFile, orderListingMedia } from "../lib/listingMedia";
+import {
+  coverMedia, describeMedia, isListingMediaFile, isVideoFile, isVideoUrl, orderListingMedia,
+} from "../lib/listingMedia";
 import { fetchAllUserRequirements } from "../lib/userRequirements";
 import { matchListingToRequirements } from "../lib/inventoryMatch";
 import { fetchSlotsForProperty, addVisitSlot, deleteVisitSlot } from "../lib/visits";
@@ -211,9 +213,10 @@ export default function ListMyFlat() {
     setPhotoFiles((prev) => prev.filter((_, idx) => idx !== i));
   };
 
-  // A listing needs at least one photo — a video alone leaves nothing to put on
-  // the card, and the flat itself is what a renter scrolls for.
-  const photoCount = useMemo(() => photoFiles.filter((f) => !isVideoFile(f)).length, [photoFiles]);
+  // A listing needs at least one piece of media — photo or video, either will
+  // do. A video-only listing shows its walkthrough on the card (see coverMedia)
+  // rather than an empty box.
+  const photoCount = useMemo(() => photoFiles.length, [photoFiles]);
 
   const validateStep = () => {
     const e = {};
@@ -225,9 +228,7 @@ export default function ListMyFlat() {
       if (!rent) e.rent = "Enter the monthly rent";
     }
     if (step === 2 && photoCount === 0) {
-      e.photos = photoFiles.length
-        ? "Add at least one photo — a video on its own leaves the listing with no cover"
-        : "Add at least one photo of your flat";
+      e.photos = "Add at least one photo or a video of your flat";
     }
     setErrors(e);
     return Object.keys(e).length === 0;
@@ -315,7 +316,10 @@ export default function ListMyFlat() {
     const rewardEligible = WALLET_REWARD_TYPES.includes(flatType);
     const walletAmount = rewardEligible ? WALLET_REWARD_AMOUNT : 0;
     const listingTitle = row.title || title || `${flatType} in ${area || "Bengaluru"}`;
-    const successCover = coverPhoto([row.cover_image_url, ...(row.images || [])]);
+    const successCover = coverMedia([row.cover_image_url, ...(row.images || [])]);
+    // A CSS background can't play a video, so a video-only listing gets a real
+    // <video> in the same box rather than an empty tile.
+    const successCoverIsVideo = isVideoUrl(successCover);
     // Publishing succeeded; a file that didn't make it still has to be said.
     const skippedNote = skipped.length
       ? `${skipped.length} file${skipped.length === 1 ? "" : "s"} didn't upload — ${skipped[0]}`
@@ -358,7 +362,8 @@ export default function ListMyFlat() {
             <div
               style={{
                 width: 92, height: 92, borderRadius: 12, flexShrink: 0, position: "relative",
-                background: successCover ? `url(${successCover}) center/cover` : SUCCESS.lineSoft,
+                background: successCover && !successCoverIsVideo ? `url(${successCover}) center/cover` : SUCCESS.lineSoft,
+                overflow: "hidden",
               }}
             >
               <span style={{ position: "absolute", top: 7, left: 7, padding: "3px 9px", borderRadius: 999, fontSize: 11, fontWeight: 700, background: SUCCESS.teal, color: "#fff" }}>
@@ -854,9 +859,11 @@ export default function ListMyFlat() {
                   <div className="grid grid-cols-4 gap-2 mt-3">
                     {photoPreviews.map((src, i) => {
                       const video = isVideoFile(photoFiles[i]);
-                      // The cover is the first photo, not the first file — a
-                      // video picked first must not claim the thumbnail.
-                      const isCover = !video && photoFiles.findIndex((f) => !isVideoFile(f)) === i;
+                      // Mirrors coverMedia: the first photo takes the cover, so
+                      // a video picked first can't claim it — unless there are
+                      // no photos at all, when the video is all there is.
+                      const firstPhoto = photoFiles.findIndex((f) => !isVideoFile(f));
+                      const isCover = i === (firstPhoto === -1 ? 0 : firstPhoto);
                       return (
                         <div key={i} className="relative aspect-square rounded-lg overflow-hidden border border-gray-200 bg-gray-100">
                           {video ? (
@@ -866,8 +873,11 @@ export default function ListMyFlat() {
                           )}
                           <button type="button" onClick={() => removePhoto(i)}
                             className="absolute top-1 right-1 w-5 h-5 rounded-full bg-black/60 text-white text-[11px] leading-none flex items-center justify-center">×</button>
-                          {video && <span className="absolute bottom-1 left-1 px-1.5 py-0.5 rounded bg-black/60 text-white text-[9px] font-bold">VIDEO</span>}
-                          {isCover && <span className="absolute bottom-1 left-1 px-1.5 py-0.5 rounded bg-black/60 text-white text-[9px] font-bold">COVER</span>}
+                          {(video || isCover) && (
+                            <span className="absolute bottom-1 left-1 px-1.5 py-0.5 rounded bg-black/60 text-white text-[9px] font-bold">
+                              {isCover ? "COVER" : "VIDEO"}
+                            </span>
+                          )}
                         </div>
                       );
                     })}

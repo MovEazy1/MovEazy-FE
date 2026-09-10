@@ -1,5 +1,5 @@
 import { supabase, isSupabaseConfigured } from "./supabase";
-import { coverPhoto, isVideoFile, orderListingMedia } from "./listingMedia";
+import { coverMedia, coverPhoto, isVideoFile, orderListingMedia } from "./listingMedia";
 
 /**
  * Inventory = the supply side. One row per listed home in the Supabase
@@ -251,10 +251,10 @@ export function mapInventoryToListing(row) {
   if (!row) return null;
   const rent = num(row.rent, 0);
   const images = orderListingMedia(list(row.images));
-  // A stored cover that turned out to be a video is ignored: a card showing a
-  // black frame reads as a broken listing.
+  // Prefer a still, but a video-only listing still needs a thumbnail — the
+  // card components render either.
   const storedCover = String(row.cover_image_url || "").trim();
-  const cover = coverPhoto([storedCover, ...images]);
+  const cover = coverMedia([storedCover, ...images]);
   const address =
     String(row.full_address || "").trim() ||
     [row.landmark, row.area].filter(Boolean).join(", ") ||
