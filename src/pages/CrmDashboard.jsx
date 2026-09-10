@@ -1,6 +1,7 @@
 import { Fragment, useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import PageShell from "../components/layout/PageShell";
+import MovEazyLogo from "../components/branding/MovEAZYLogo";
 import { useAuth } from "../context/AuthContext";
 import { isFirebaseConfigured } from "../lib/firebase";
 import {
@@ -285,8 +286,9 @@ export default function CrmDashboard() {
   return (
     <PageShell variant="marketing" overlayOnly className="bg-slate-100 min-h-screen">
       <div style={{ background: "#000", color: "#e5e5e5", padding: "14px 20px", display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: 10 }}>
-        <div style={{ fontWeight: 800, fontSize: 18 }}>
-          Mov<span style={{ color: "#ff3131" }}>EAZY</span> · Staff CRM
+        <div style={{ display: "flex", alignItems: "center", gap: 10, fontWeight: 700, fontSize: 15 }}>
+          <MovEazyLogo variant="dark" size="sm" />
+          <span style={{ color: "#9aa3a1" }}>· Staff CRM</span>
         </div>
         <div style={{ display: "flex", gap: 8, flexWrap: "wrap", alignItems: "center" }}>
           {isFullAdmin ? (

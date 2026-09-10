@@ -6,6 +6,7 @@
 import { useState, useEffect } from "react";
 import { Link, useNavigate, useSearchParams } from "react-router-dom";
 import { motion, AnimatePresence } from "framer-motion";
+import MovEazyLogo from "../components/branding/MovEAZYLogo";
 import { useAuth } from "../context/AuthContext";
 import { getSupabaseAuthSettings } from "../lib/supabase";
 
@@ -369,12 +370,7 @@ export default function SupabaseLogin() {
 
       {/* Brand */}
       <Link to="/" style={{ textDecoration: "none", display: "flex", alignItems: "center", gap: 10, marginBottom: 32 }}>
-        <div style={{ width: 30, height: 30, border: `1.5px solid ${INK}`, borderRadius: "50%", display: "flex", alignItems: "center", justifyContent: "center", fontFamily: "JetBrains Mono, monospace", fontSize: 12, color: INK, fontWeight: 500 }}>
-          MZ
-        </div>
-        <div style={{ fontFamily: "Georgia, 'Times New Roman', serif", fontSize: 20, fontWeight: 600, color: INK }}>
-          Moveazy
-        </div>
+        <MovEazyLogo variant="light" size="md" />
       </Link>
 
       {/* Card */}

@@ -5,6 +5,7 @@ import { useAuth } from "../context/AuthContext";
 import { fetchCustomerSearchProfile, saveCustomerSearchProfile } from "../lib/customerSearchProfile";
 import SmartImage from "../components/SmartImage";
 import PropertyModal from "../components/PropertyModal";
+import MovEazyLogo from "../components/branding/MovEAZYLogo";
 import { getInterestsGlobal } from "../lib/store";
 import { isFirebaseConfigured } from "../lib/firebase";
 import { getInterestsForCustomerEmail } from "../lib/firestoreStore";
@@ -272,7 +273,7 @@ export default function Profile() {
             }}>
               MZ
             </div>
-            <div style={{ fontFamily: "Georgia, serif", fontSize: 19, fontWeight: 600 }}>Moveazy</div>
+            <MovEazyLogo variant="light" size="sm" />
           </Link>
           <div style={{ flex: 1 }} />
           <Link

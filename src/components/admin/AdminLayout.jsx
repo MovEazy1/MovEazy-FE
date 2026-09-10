@@ -1,4 +1,5 @@
 import { Link } from "react-router-dom";
+import MovEazyLogo from "../branding/MovEAZYLogo";
 
 const INK = "#0f172a";
 const SIDEBAR = "#111827";
@@ -140,24 +141,8 @@ export default function AdminLayout({
           }}
         >
           <Link to="/" style={{ display: "flex", alignItems: "center", gap: 10, padding: "0 8px 24px", textDecoration: "none" }}>
-            <div
-              style={{
-                width: 32,
-                height: 32,
-                borderRadius: "50%",
-                border: "1.5px solid #fff",
-                display: "flex",
-                alignItems: "center",
-                justifyContent: "center",
-                fontFamily: "JetBrains Mono, monospace",
-                fontSize: 11,
-                color: "#fff",
-              }}
-            >
-              MZ
-            </div>
             <div>
-              <div style={{ fontFamily: "Georgia, serif", fontSize: 16, fontWeight: 600, color: "#fff" }}>Moveazy</div>
+              <MovEazyLogo variant="dark" size="sm" />
               <div style={{ fontSize: 11, color: "#94a3b8" }}>Admin console</div>
             </div>
           </Link>

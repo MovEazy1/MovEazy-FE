@@ -12,6 +12,7 @@ import { useEffect, useRef, useState } from "react";
 import { Link, useNavigate, useSearchParams } from "react-router-dom";
 import { motion, AnimatePresence } from "framer-motion";
 import { useAuth } from "../context/AuthContext";
+import MovEazyLogo from "../components/branding/MovEAZYLogo";
 import { useLoginModal } from "../context/LoginModalContext";
 import AIBroker from "../components/AIBroker";
 import MovEazyNav from "../components/layout/MovEazyNav";
@@ -856,7 +857,7 @@ export default function ForkHome() {
 
       {/* ── FOOTER ── */}
       <footer className="mzn-footer" style={{ background: "#031916", borderTop: "1px solid rgba(255,255,255,.08)", padding: "44px clamp(20px,4vw,60px)", display: "flex", flexWrap: "wrap", gap: 20, justifyContent: "space-between", alignItems: "center" }}>
-        <div style={{ fontWeight: 800, fontSize: 20 }}>mov<span style={{ color: "#5EEAD4" }}>EAZY</span></div>
+        <MovEazyLogo variant="dark" size="footer" />
         <div style={{ color: "#6a8b84", fontSize: 14 }}>Redefining how people move into new cities.</div>
         <div style={{ display: "flex", gap: 22 }}>
           <a href="#" onClick={(e) => { e.preventDefault(); startFlatSearch(); }} style={{ color: "#9FB5B0", fontSize: 14 }}>Find a home</a>

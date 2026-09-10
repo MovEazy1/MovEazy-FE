@@ -19,6 +19,8 @@ import {
   useInView,
 } from "framer-motion";
 import MovEazyNav from "../components/layout/MovEazyNav";
+import logoMint from "../assets/logo/moveazy-logo-mint-dark.png";
+import MovEazyLogo from "../components/branding/MovEAZYLogo";
 import AIBroker from "../components/AIBroker";
 import { useAuth } from "../context/AuthContext";
 import { useLoginModal } from "../context/LoginModalContext";
@@ -539,8 +541,7 @@ function EcosystemSection() {
             <circle r="52" fill="none" stroke={C.gold} strokeWidth="1.5" strokeOpacity="0.6">
               <animate attributeName="r" values="52;58;52" dur="3s" repeatCount="indefinite" />
             </circle>
-            <text x="0" y="-2" textAnchor="middle" className="hiw-eco-hub" fill="#fff">Mov</text>
-            <text x="0" y="16" textAnchor="middle" className="hiw-eco-hub" fill={C.coral}>Eazy</text>
+            <image href={logoMint} x="-42" y="-13" width="84" height="26" preserveAspectRatio="xMidYMid meet" />
           </g>
         </svg>
       </Reveal>
@@ -642,7 +643,7 @@ function CompareSection() {
         <Reveal className="hiw-compare-card hiw-compare-new" delay={0.1}>
           <div className="hiw-compare-glow" aria-hidden />
           <div className="hiw-compare-head hiw-compare-head-new">
-            Mov<span style={{ color: C.coral }}>Eazy</span>
+            <MovEazyLogo variant="light" size="sm" />
           </div>
           <ul>
             {neu.map((t, i) => (

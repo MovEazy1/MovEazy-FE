@@ -4,7 +4,7 @@ import { doc, getDoc, setDoc, Timestamp, serverTimestamp } from "firebase/firest
 import { db } from "../lib/firebase";
 import { useAuth } from "../context/AuthContext";
 import { reportClientError } from "../lib/clientLog";
-import logoSvg from "../assets/logo/moveasy.svg";
+import MovEazyLogo from "../components/branding/MovEAZYLogo";
 
 const FLAT_TYPES = ["1BHK", "2BHK", "3BHK"];
 
@@ -154,11 +154,7 @@ export default function Onboarding() {
         {/* Header */}
         <div className="text-center mb-8">
           <a href="/" className="inline-block">
-            <img
-              src={logoSvg}
-              alt="MovEASY"
-              className="h-10 mx-auto mb-4"
-            />
+            <MovEazyLogo variant="light" size="md" className="mb-4" />
           </a>
           <h1 className="text-2xl font-bold text-gray-900">
             Complete Your Profile

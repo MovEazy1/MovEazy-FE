@@ -21,6 +21,7 @@ import { reverseGeocode, nearbyLandmarks } from "../lib/geocode";
 import { createInventoryItem, uploadInventoryPhotos, generatePropertyId, mediaRejectionReason } from "../lib/inventory";
 import { describeMedia, isListingMediaFile, isVideoFile, orderListingMedia } from "../lib/listingMedia";
 import { useBackClose } from "../hooks/useBackClose";
+import MovEazyLogo from "./branding/MovEAZYLogo";
 import { fetchAllUserRequirements } from "../lib/userRequirements";
 import { matchListingToRequirements } from "../lib/inventoryMatch";
 import {
@@ -365,9 +366,7 @@ export default function ListMyFlatMobile({ user, onPublished }) {
       <div style={{ position: "relative", padding: "18px 22px 26px", overflow: "hidden" }}>
         <div aria-hidden style={{ position: "absolute", inset: "-40px -20px auto", height: 340, background: "radial-gradient(70% 80% at 20% 30%,rgba(94,234,212,.12),transparent 70%)", pointerEvents: "none" }} />
         <div style={{ position: "relative", zIndex: 2 }}>
-          <div style={{ fontWeight: 800, fontSize: 24, letterSpacing: "-.02em", color: "#fff" }}>
-            mov<span style={{ color: MINT }}>EAZY</span>
-          </div>
+          <MovEazyLogo variant="dark" size="md" />
 
           {/* Reward banner — a stat badge, not a sentence: the number does the talking. */}
           <div style={{

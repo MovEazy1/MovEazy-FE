@@ -23,6 +23,7 @@ import {
   useMotionValue,
 } from "framer-motion";
 import MovEazyNav from "../components/layout/MovEazyNav";
+import logoMint from "../assets/logo/moveazy-logo-mint-dark.png";
 import AIBroker from "../components/AIBroker";
 import { useAuth } from "../context/AuthContext";
 import { useLoginModal } from "../context/LoginModalContext";
@@ -555,8 +556,7 @@ function Flywheel() {
           </linearGradient>
         </defs>
         <circle cx="160" cy="160" r="52" fill={C.ink} />
-        <text x="160" y="156" textAnchor="middle" className="ab-fw-hub">Mov</text>
-        <text x="160" y="174" textAnchor="middle" className="ab-fw-hub" fill={C.coral}>Eazy</text>
+        <image href={logoMint} x="118" y="147" width="84" height="26" preserveAspectRatio="xMidYMid meet" />
       </svg>
       {steps.map((s) => {
         const rad = (s.a * Math.PI) / 180;

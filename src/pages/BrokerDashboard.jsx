@@ -6,6 +6,7 @@
 import { useEffect, useState, useCallback, useRef } from "react";
 import { Link, useNavigate, useSearchParams } from "react-router-dom";
 import { useAuth } from "../context/AuthContext";
+import MovEazyLogo from "../components/branding/MovEAZYLogo";
 import { supabase, isSupabaseConfigured } from "../lib/supabase";
 
 /* ── Helpers ─────────────────────────────────────────────────────────────── */
@@ -1873,9 +1874,7 @@ export default function BrokerDashboard() {
           >
             MZ
           </div>
-          <div style={{ fontFamily: "Georgia, serif", fontSize: 16, fontWeight: 600, color: "#FFFEFB" }}>
-            Moveazy
-          </div>
+          <MovEazyLogo variant="dark" size="sm" />
         </div>
 
         {/* Nav */}
