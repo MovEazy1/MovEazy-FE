@@ -31,7 +31,7 @@ export default async function handler(req) {
   const description = listingDescription(listing);
   const image = listingId
     ? `${origin}/api/og?listingId=${encodeURIComponent(listingId)}`
-    : `${origin}/logo-moveazy-bar.png`;
+    : `${origin}/og-share.jpg`;
 
   const html = `<!doctype html>
 <html lang="en">

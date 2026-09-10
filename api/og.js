@@ -204,7 +204,7 @@ export default async function handler(req) {
     }
     // Never hand a crawler a broken image. One real photo of the flat beats a
     // zero-byte PNG, and the logo beats nothing at all.
-    const fallback = photos[0] || `${new URL(req.url).origin}/logo-moveazy-bar.png`;
+    const fallback = photos[0] || `${new URL(req.url).origin}/og-share.jpg`;
     return new Response(null, {
       status: 302,
       headers: { location: fallback, "cache-control": "public, max-age=60" },

@@ -17,12 +17,22 @@
     <meta property="og:type" content="website" />
     <meta property="og:title" content="MovEazy — Move to a New City Without the Chaos" />
     <meta property="og:description" content="Find trusted brokers, real-time listings, and deposit protection for your next move." />
-    <meta property="og:image" content="/logo-moveazy-bar.png" />
+    <!-- Absolute, because Facebook and WhatsApp resolve og:image against their
+         own crawler rather than the page, and a relative path is a coin flip.
+         1200x630 is the size both crop to. Listing links do NOT use this: /p/:id
+         serves its own tags with a collage of the flat's photos. -->
+    <meta property="og:image" content="https://www.moveazy.co.in/og-share.jpg" />
+    <meta property="og:image:width" content="1200" />
+    <meta property="og:image:height" content="800" />
+    <meta property="og:image:alt" content="MovEazy — your weekend shouldn't be spent hunting for a flat." />
+    <meta property="og:url" content="https://www.moveazy.co.in/" />
 
     <!-- Twitter Card -->
     <meta name="twitter:card" content="summary_large_image" />
     <meta name="twitter:title" content="MovEazy — Move to a New City Without the Chaos" />
     <meta name="twitter:description" content="Find trusted brokers, real-time listings, and deposit protection for your next move." />
+    <!-- summary_large_image without an image renders as a bare text card. -->
+    <meta name="twitter:image" content="https://www.moveazy.co.in/og-share.jpg" />
 
     <!-- Theme -->
     <meta name="theme-color" content="#E85A4F" />
