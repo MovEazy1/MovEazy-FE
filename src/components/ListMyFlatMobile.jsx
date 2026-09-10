@@ -20,7 +20,7 @@ import PropertyVisitSlots from "./PropertyVisitSlots";
 import { reverseGeocode, nearbyLandmarks } from "../lib/geocode";
 import { createInventoryItem, uploadInventoryPhotos, generatePropertyId, mediaRejectionReason } from "../lib/inventory";
 import { describeMedia, isListingMediaFile, isVideoFile, orderListingMedia } from "../lib/listingMedia";
-import { useBackClose } from "../hooks/useBackClose";
+import { useHistorySteps } from "../hooks/useBackClose";
 import MovEazyLogo from "./branding/MovEAZYLogo";
 import { fetchAllUserRequirements } from "../lib/userRequirements";
 import { matchListingToRequirements } from "../lib/inventoryMatch";
@@ -354,9 +354,9 @@ export default function ListMyFlatMobile({ user, onPublished }) {
   };
 
   // Swiping right mid-flow used to throw away a half-filled listing and leave
-  // the page. It now walks back one question at a time, like the Back button
-  // right there on screen.
-  useBackClose(step > 1, onBack, `post-flat-step-${step}`);
+  // the page. It walks back one question at a time, like the Back button right
+  // there on screen. Steps here are 1-based, so depth is one less.
+  useHistorySteps(step - 1, onBack);
 
   const [stepTitle, stepSub] = STEP_COPY[step - 1];
 

@@ -51,7 +51,72 @@ export function useBackClose(open, onClose, key = "overlay") {
       // the stack, and leaving it there costs the user a wasted back press.
       if (ours) window.history.back();
     };
-  }, [open, key]);
+    // `key` is deliberately NOT a dependency. It is a label, and re-running on
+    // a change to it tears the entry down and rebuilds it — the teardown's
+    // history.back() then lands, asynchronously, on the listener the rebuild
+    // just registered, which closes the thing that was only meant to move.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [open]);
+}
+
+/**
+ * The same idea for a multi-step flow, where "how deep am I" replaces "is it
+ * open". Used by both posting flows.
+ *
+ * Exactly one marker entry is kept, no matter how deep the flow goes: back
+ * pops it, the step drops by one, and a fresh marker is pushed if there are
+ * still steps to unwind. One entry per step would strand someone behind a pile
+ * of same-URL entries they'd have to press back through to leave the page.
+ *
+ * The flow's own Back button needs no special handling — dropping a step
+ * changes `depth`, and the marker is maintained from that.
+ *
+ * @param {number} depth      Steps deep, 0 meaning "the first step".
+ * @param {() => void} onBack Move back one step.
+ */
+/**
+ * What the history stack needs doing, given how deep the flow is and whether a
+ * marker is already down. Pure, so the invariant that matters — *one* marker,
+ * ever, however deep the flow goes — is testable without a browser.
+ *
+ * @returns {"push" | "pop" | "none"}
+ */
+export function markerPlan(depth, marked) {
+  if (depth > 0 && !marked) return "push";
+  if (depth <= 0 && marked) return "pop";
+  return "none";
+}
+
+export function useHistorySteps(depth, onBack) {
+  const onBackRef = useRef(onBack);
+  onBackRef.current = onBack;
+  const marked = useRef(false);
+
+  // Registered once. Re-registering per step is precisely the bug above.
+  useEffect(() => {
+    if (typeof window === "undefined") return undefined;
+    const onPop = () => {
+      if (!marked.current) return;
+      marked.current = false;
+      onBackRef.current?.();
+    };
+    window.addEventListener("popstate", onPop);
+    return () => window.removeEventListener("popstate", onPop);
+  }, []);
+
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    const plan = markerPlan(depth, marked.current);
+    if (plan === "push") {
+      marked.current = true;
+      window.history.pushState({ mzStep: depth }, "", window.location.href);
+    } else if (plan === "pop") {
+      // Back at the start: drop the marker so leaving takes one press. The
+      // popstate this fires is ignored — marked is already false.
+      marked.current = false;
+      window.history.back();
+    }
+  }, [depth]);
 }
 
 export default useBackClose;
