@@ -4,7 +4,7 @@ import { useLocation, useNavigate } from "react-router-dom";
 import L from "leaflet";
 import "leaflet/dist/leaflet.css";
 import { applyListingFilters, FILTER_OPTIONS, getFiltersInitialState } from "../lib/store";
-import { isVideoUrl } from "../lib/listingMedia";
+import { coverMedia, isVideoUrl, orderListingMedia } from "../lib/listingMedia";
 import { useAuth } from "../context/AuthContext";
 import { useLoginModal } from "../context/LoginModalContext";
 import { isFirebaseConfigured } from "../lib/firebase";
@@ -83,131 +83,211 @@ const sheetIcon = (d) => (
  * badly at phone widths — clipped by the map edge, with the text spilling out of
  * its own frame.
  */
-function MapListingSheet({ listing, saved, onSave, onDetails, onClose, bottomOffset }) {
-  if (!listing) return null;
-  const photos = (listing.images || []).filter(Boolean);
-  const cover = listing.image || photos[0] || "";
+/**
+ * One listing as a compact card inside the carousel.
+ *
+ * Sized so the map stays the larger half of the screen — the point of browsing
+ * on a map is seeing where things are, and a card tall enough to hide that
+ * turns the map into a decoration.
+ */
+function MapListingCard({ listing, saved, onSave, onDetails, width }) {
+  const photos = orderListingMedia(listing.images || []);
+  const cover = coverMedia([listing.image, ...photos]);
+  const coverIsVideo = isVideoUrl(cover);
   const rent = Number(String(listing.monthlyRent || listing.rent || 0).toString().replace(/[^0-9.]/g, "")) || 0;
-  const available = listing.availableFrom
-    ? new Date(listing.availableFrom).toLocaleDateString("en-IN", { day: "numeric", month: "short", year: "numeric" })
-    : (listing.availability || "Immediate");
 
   return (
     <div
       style={{
-        position: "fixed", left: 0, right: 0, bottom: bottomOffset, zIndex: 1200,
-        background: SHEET.card, borderRadius: "18px 18px 0 0",
-        boxShadow: "0 -8px 30px rgba(4,33,29,0.18)",
-        padding: "8px 16px 16px",
+        flex: `0 0 ${width}px`, width, scrollSnapAlign: "center",
+        background: SHEET.card, borderRadius: 16, overflow: "hidden",
+        boxShadow: "0 6px 22px rgba(4,33,29,0.16)",
       }}
     >
-      <div style={{ position: "relative" }}>
-        <div
-          role="button"
-          tabIndex={0}
-          aria-label="Close"
-          onClick={onClose}
-          onKeyDown={(e) => (e.key === "Enter" || e.key === " ") && onClose()}
-          style={{ width: 42, height: 4, borderRadius: 99, background: "#D8E2DF", margin: "0 auto 12px", cursor: "pointer" }}
-        />
-        {/* An explicit close: the drag handle was the only way out, and nothing
-            about it says so. */}
-        <button
-          type="button"
-          aria-label="Close"
-          onClick={onClose}
-          style={{
-            position: "absolute", top: -4, right: 0, width: 30, height: 30,
-            borderRadius: "50%", border: "none", background: "#F1F5F3",
-            color: SHEET.text, cursor: "pointer",
-            display: "flex", alignItems: "center", justifyContent: "center",
-          }}
-        >
-          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round">
-            <path d="M18 6 6 18M6 6l12 12" />
-          </svg>
-        </button>
-      </div>
-
-      <div style={{ display: "flex", gap: 13 }}>
+      <div style={{ display: "flex", gap: 11, padding: 10 }}>
         <div
           style={{
-            width: 108, height: 92, borderRadius: 12, flexShrink: 0, position: "relative",
-            background: cover ? `url(${cover}) center/cover` : "#EDF3F1",
+            width: 96, height: 88, borderRadius: 11, flexShrink: 0, position: "relative", overflow: "hidden",
+            background: cover && !coverIsVideo ? `url(${cover}) center/cover` : "#EDF3F1",
           }}
         >
+          {coverIsVideo && (
+            <video src={cover} muted playsInline preload="metadata"
+              style={{ width: "100%", height: "100%", objectFit: "cover" }} />
+          )}
           {photos.length > 1 && (
             <span
               style={{
-                position: "absolute", left: 6, bottom: 6, display: "flex", alignItems: "center", gap: 4,
-                background: "rgba(4,33,29,0.74)", color: "#fff", borderRadius: 7,
-                padding: "3px 7px", fontSize: 10.5, fontWeight: 700,
+                position: "absolute", left: 5, bottom: 5,
+                background: "rgba(4,33,29,0.74)", color: "#fff", borderRadius: 6,
+                padding: "2px 6px", fontSize: 10, fontWeight: 700,
               }}
             >
-              {photos.length} photos
+              {photos.length}
             </span>
           )}
         </div>
 
         <div style={{ minWidth: 0, flex: 1 }}>
-          <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", gap: 8 }}>
-            <p style={{ margin: 0, fontSize: 15.5, fontWeight: 800, color: SHEET.text, lineHeight: 1.25 }}>
-              {listing.title}
+          <div style={{ display: "flex", alignItems: "baseline", justifyContent: "space-between", gap: 8 }}>
+            <p style={{ margin: 0, fontSize: 15.5, fontWeight: 800, color: SHEET.text, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
+              {rent > 0 ? `₹${rent.toLocaleString("en-IN")}` : listing.price}
             </p>
+            <button
+              type="button"
+              aria-label={saved ? "Remove from saved" : "Save this home"}
+              onClick={onSave}
+              style={{
+                width: 28, height: 28, borderRadius: "50%", border: "none", flexShrink: 0,
+                background: SHEET.cream, cursor: "pointer",
+                display: "flex", alignItems: "center", justifyContent: "center",
+              }}
+            >
+              <svg width="15" height="15" viewBox="0 0 24 24" fill={saved ? SHEET.coral : "none"} stroke={saved ? SHEET.coral : SHEET.text} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M20.8 4.6a5.5 5.5 0 0 0-7.8 0L12 5.6l-1-1a5.5 5.5 0 0 0-7.8 7.8l1 1L12 21l7.8-7.6 1-1a5.5 5.5 0 0 0 0-7.8z" />
+              </svg>
+            </button>
           </div>
 
-          <p style={{ display: "flex", alignItems: "center", gap: 5, margin: "5px 0 0", fontSize: 12.5, color: SHEET.textMute }}>
+          <p style={{ margin: "3px 0 0", fontSize: 13, fontWeight: 700, color: SHEET.text, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
+            {listing.title}
+          </p>
+          <p style={{ display: "flex", alignItems: "center", gap: 4, margin: "3px 0 0", fontSize: 11.5, color: SHEET.textMute }}>
             {sheetIcon(<><path d="M20 10c0 6-8 12-8 12s-8-6-8-12a8 8 0 0 1 16 0Z" /><circle cx="12" cy="10" r="3" /></>)}
             <span style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{listing.address}</span>
           </p>
 
-          <p style={{ margin: "7px 0 0", fontSize: 19, fontWeight: 800, color: SHEET.text }}>
-            {rent > 0 ? `₹${rent.toLocaleString("en-IN")}` : listing.price}
-            <span style={{ fontSize: 12.5, fontWeight: 600, color: SHEET.textMute }}> / month</span>
-          </p>
+          <div style={{ display: "flex", gap: 9, margin: "6px 0 0", fontSize: 11, color: SHEET.textMute, minWidth: 0 }}>
+            {[listing.bhk || "Home", listing.furnishing || "Unfurnished"].filter(Boolean).map((label) => (
+              <span key={label} style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{label}</span>
+            ))}
+          </div>
         </div>
       </div>
 
-      <div style={{ display: "flex", gap: 12, margin: "14px 0", flexWrap: "wrap" }}>
-        {[
-          [<><path d="M2 9V7a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v2" key="a" /><path d="M2 11h20v6H2z" key="b" /><path d="M4 17v2M20 17v2" key="c" /></>, listing.bhk || "Home"],
-          [<><path d="M4 11V8a2 2 0 0 1 2-2h12a2 2 0 0 1 2 2v3" key="a" /><path d="M2 13h20v5H2z" key="b" /></>, listing.furnishing || "Unfurnished"],
-          [<><rect x="3" y="4" width="18" height="18" rx="2" key="a" /><path d="M16 2v4M8 2v4M3 10h18" key="b" /></>, available],
-        ].map(([d, label]) => (
-          <span key={String(label)} style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 12.5, color: SHEET.text, minWidth: 0 }}>
-            <span style={{ color: SHEET.text }}>{sheetIcon(d)}</span>
-            <span style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{label}</span>
-          </span>
-        ))}
+      <button
+        type="button"
+        onClick={onDetails}
+        style={{
+          width: "100%", height: 40, border: "none", cursor: "pointer",
+          background: SHEET.coral, color: "#fff", fontSize: 14, fontWeight: 700,
+          display: "flex", alignItems: "center", justifyContent: "center", gap: 8,
+        }}
+      >
+        View details
+        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.3" strokeLinecap="round" strokeLinejoin="round"><path d="M5 12h14M13 6l6 6-6 6" /></svg>
+      </button>
+    </div>
+  );
+}
+
+/**
+ * The selected pin opens a swipeable row of cards, not a single sheet.
+ *
+ * A one-card sheet meant every listing cost a tap on its pin and a tap to
+ * dismiss, and the pins are small. Sliding sideways through the same homes
+ * keeps the map where it is — the card changes, the map doesn't move — which is
+ * the whole reason someone is browsing on a map rather than in a list.
+ *
+ * Selection and scroll position are kept in step both ways: tapping a pin
+ * scrolls its card into view, and swiping to a card selects its pin. The
+ * `syncing` latch stops those two from chasing each other.
+ */
+function MapListingCarousel({ listings, selectedId, onSelect, onClose, savedFor, onSave, onDetails, bottomOffset, onHeight }) {
+  const trackRef = useRef(null);
+  const shellRef = useRef(null);
+  const syncing = useRef(false);
+  const cardWidth = typeof window !== "undefined"
+    ? Math.min(330, Math.round(window.innerWidth * 0.86))
+    : 300;
+  const index = Math.max(0, listings.findIndex((l) => l.id === selectedId));
+
+  // Tapping a pin brings its card over, without animating the very first time
+  // the strip appears — that would look like a jump from nowhere.
+  const firstRun = useRef(true);
+  useEffect(() => {
+    const track = trackRef.current;
+    if (!track || index < 0) return;
+    syncing.current = true;
+    track.scrollTo({ left: index * (cardWidth + 10), behavior: firstRun.current ? "auto" : "smooth" });
+    firstRun.current = false;
+    const t = setTimeout(() => { syncing.current = false; }, 400);
+    return () => clearTimeout(t);
+  }, [index, cardWidth]);
+
+  const onScroll = () => {
+    if (syncing.current) return;
+    const track = trackRef.current;
+    if (!track) return;
+    const at = Math.round(track.scrollLeft / (cardWidth + 10));
+    const landed = listings[at];
+    if (landed && landed.id !== selectedId) onSelect(landed);
+  };
+
+  // The Map/List toggle floats just above this strip. Its offset comes from
+  // what this actually measures, so the two can't drift apart when the card's
+  // contents change.
+  useEffect(() => {
+    const el = shellRef.current;
+    if (!el || !onHeight) return undefined;
+    const report = () => onHeight(el.getBoundingClientRect().height);
+    report();
+    const ro = typeof ResizeObserver !== "undefined" ? new ResizeObserver(report) : null;
+    ro?.observe(el);
+    return () => { ro?.disconnect(); onHeight(0); };
+  }, [onHeight]);
+
+  if (!listings.length) return null;
+
+  return (
+    <div ref={shellRef} style={{ position: "fixed", left: 0, right: 0, bottom: bottomOffset, zIndex: 1200 }}>
+      <div style={{ display: "flex", justifyContent: "center", marginBottom: 8 }}>
+        <span
+          style={{
+            background: "rgba(4,33,29,0.82)", color: "#fff", borderRadius: 999,
+            padding: "4px 12px", fontSize: 11.5, fontWeight: 700,
+          }}
+        >
+          {index + 1} of {listings.length}
+        </span>
+        <button
+          type="button"
+          aria-label="Close"
+          onClick={onClose}
+          style={{
+            marginLeft: 8, width: 26, height: 26, borderRadius: "50%", border: "none",
+            background: "rgba(4,33,29,0.82)", color: "#fff", cursor: "pointer",
+            display: "flex", alignItems: "center", justifyContent: "center",
+          }}
+        >
+          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.6" strokeLinecap="round">
+            <path d="M18 6 6 18M6 6l12 12" />
+          </svg>
+        </button>
       </div>
 
-      <div style={{ display: "flex", gap: 10 }}>
-        <button
-          type="button"
-          onClick={onSave}
-          style={{
-            flex: "0 0 40%", height: 48, borderRadius: 12, border: "none", cursor: "pointer",
-            display: "flex", alignItems: "center", justifyContent: "center", gap: 8,
-            background: SHEET.cream, color: SHEET.text, fontSize: 14.5, fontWeight: 700,
-          }}
-        >
-          <svg width="17" height="17" viewBox="0 0 24 24" fill={saved ? SHEET.coral : "none"} stroke={saved ? SHEET.coral : "currentColor"} strokeWidth="1.9" strokeLinecap="round" strokeLinejoin="round">
-            <path d="M20.8 4.6a5.5 5.5 0 0 0-7.8 0L12 5.6l-1-1a5.5 5.5 0 0 0-7.8 7.8l1 1L12 21l7.8-7.6 1-1a5.5 5.5 0 0 0 0-7.8z" />
-          </svg>
-          {saved ? "Saved" : "Save"}
-        </button>
-        <button
-          type="button"
-          onClick={onDetails}
-          style={{
-            flex: 1, height: 48, borderRadius: 12, border: "none", cursor: "pointer",
-            display: "flex", alignItems: "center", justifyContent: "center", gap: 9,
-            background: SHEET.coral, color: "#fff", fontSize: 15, fontWeight: 700,
-          }}
-        >
-          Details
-          <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.3" strokeLinecap="round" strokeLinejoin="round"><path d="M5 12h14M13 6l6 6-6 6" /></svg>
-        </button>
+      <div
+        ref={trackRef}
+        className="mv-hscroll"
+        onScroll={onScroll}
+        style={{
+          display: "flex", gap: 10, overflowX: "auto", scrollSnapType: "x mandatory",
+          // Half the leftover width each side, so a card sits centred rather
+          // than pinned to the left edge.
+          padding: `0 ${Math.max(8, Math.round((typeof window !== "undefined" ? window.innerWidth : 360) - cardWidth) / 2)}px 12px`,
+          scrollbarWidth: "none", WebkitOverflowScrolling: "touch",
+        }}
+      >
+        {listings.map((l) => (
+          <MapListingCard
+            key={l.id}
+            listing={l}
+            width={cardWidth}
+            saved={savedFor(l)}
+            onSave={() => onSave(l)}
+            onDetails={() => onDetails(l)}
+          />
+        ))}
       </div>
     </div>
   );
@@ -615,6 +695,34 @@ const mtBar = {
     cursor: "pointer",
     flexShrink: 0,
   },
+  // A phone-sized pill: same shape, less of it, and it must not shrink inside
+  // the horizontal scroller.
+  filtersBtnSm: {
+    display: "inline-flex",
+    alignItems: "center",
+    gap: 6,
+    border: "1px solid #e9e3db",
+    background: "#fff",
+    color: "#171412",
+    borderRadius: 999,
+    padding: "8px 14px",
+    fontSize: 13,
+    fontWeight: 600,
+    fontFamily: "'Plus Jakarta Sans', system-ui, sans-serif",
+    cursor: "pointer",
+    whiteSpace: "nowrap",
+    flexShrink: 0,
+  },
+  pillScroller: {
+    display: "flex",
+    alignItems: "center",
+    gap: 8,
+    width: "100%",
+    overflowX: "auto",
+    flexWrap: "nowrap",
+    scrollbarWidth: "none",
+    WebkitOverflowScrolling: "touch",
+  },
   filtersBtn: {
     display: "inline-flex",
     alignItems: "center",
@@ -889,6 +997,25 @@ export default function MapView() {
   const [showFlatTypeMenu, setShowFlatTypeMenu] = useState(false);
   /** Top-bar "Budget" min/max dropdown. */
   const [showBudgetMenu, setShowBudgetMenu] = useState(false);
+  /**
+   * A scroll container clips absolutely-positioned children, so on a phone the
+   * pill dropdowns can't hang off their pill — they'd be cut off by the very
+   * scroller that makes the row compact. They become fixed panels instead,
+   * pinned just under the pill row, which is measured when one opens.
+   */
+  const pillRowRef = useRef(null);
+  const [pillMenuTop, setPillMenuTop] = useState(0);
+  const openPillMenu = useCallback((setOpen) => {
+    const rect = pillRowRef.current?.getBoundingClientRect();
+    if (rect) setPillMenuTop(rect.bottom + 8);
+    setOpen((v) => !v);
+  }, []);
+  const pillMenuPosition = useCallback(
+    () => (isMobile
+      ? { position: "fixed", top: pillMenuTop, left: 12, right: 12, maxHeight: "58vh", overflowY: "auto" }
+      : { position: "absolute", top: "calc(100% + 8px)", left: 0 }),
+    [isMobile, pillMenuTop],
+  );
   /** 'local' = filter listings by area name; 'place' = geocode landmark / metro and radius filter */
   const [searchMode, setSearchMode] = useState("local");
   const [helpWidgetOpen, setHelpWidgetOpen] = useState(false);
@@ -1189,6 +1316,21 @@ export default function MapView() {
     if (requirement) return [...scoredPins].sort((a, b) => (b.matchScore || 0) - (a.matchScore || 0));
     return scoredPins;
   }, [scoredPins, sortBy, requirement]);
+
+  /**
+   * What the phone carousel slides through: the homes currently on the map, in
+   * the order the list shows them, so swiping matches what a tap on List would
+   * give. The selected home is forced in — one opened from a shared link may
+   * sit outside the current filters, and it must still have a card.
+   */
+  /** Measured height of the open card strip; 0 when nothing is open. */
+  const [carouselHeight, setCarouselHeight] = useState(0);
+
+  const carouselListings = useMemo(() => {
+    const rows = sortedDisplayPins.slice(0, 60);
+    if (selected && !rows.some((l) => l.id === selected.id)) return [selected, ...rows];
+    return rows;
+  }, [sortedDisplayPins, selected]);
 
   useEffect(() => {
     // Prefs handed over by Find My Flat win; otherwise load what we saved for
@@ -1591,6 +1733,9 @@ export default function MapView() {
       style={{ background: "#faf7f2", fontFamily: "'Plus Jakarta Sans', system-ui, sans-serif", color: "#171412" }}
     >
       <style>{`
+        /* The pill row and the card carousel both scroll horizontally; a
+           visible scrollbar under either reads as a rendering fault. */
+        .mv-hscroll::-webkit-scrollbar { display: none; }
         .mv-filter-num {
           width: 100%;
           padding: 10px 12px;
@@ -1809,8 +1954,14 @@ export default function MapView() {
             ) : null}
           </div>
 
+          {/* On a phone these pills used to wrap onto two more rows, pushing the
+              map most of the way off screen. One horizontally scrolling line
+              instead. `display: contents` keeps the desktop layout exactly as it
+              was — the wrapper isn't a box there at all. */}
+          <div ref={pillRowRef} className={isMobile ? "mv-hscroll" : undefined} style={isMobile ? mtBar.pillScroller : { display: "contents" }}>
+
           <div style={{ position: "relative", flexShrink: 0 }}>
-            <button type="button" onClick={() => setShowFlatTypeMenu((v) => !v)} style={mtBar.filtersBtn}>
+            <button type="button" onClick={() => openPillMenu(setShowFlatTypeMenu)} style={isMobile ? mtBar.filtersBtnSm : mtBar.filtersBtn}>
               Flat type
               <svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" strokeWidth="2.4" aria-hidden>
                 <path d="M6 9l6 6 6-6" strokeLinecap="round" strokeLinejoin="round" />
@@ -1827,11 +1978,9 @@ export default function MapView() {
                 />
                 <div
                   style={{
-                    position: "absolute",
-                    top: "calc(100% + 8px)",
-                    left: 0,
+                    ...pillMenuPosition(),
                     zIndex: 1005,
-                    minWidth: 280,
+                    minWidth: isMobile ? 0 : 280,
                     background: "#fff",
                     borderRadius: 14,
                     boxShadow: "0 20px 50px rgba(20,18,16,0.18), 0 0 0 1px rgba(20,18,16,0.06)",
@@ -1866,7 +2015,7 @@ export default function MapView() {
             <button
               type="button"
               onClick={() => { setShowFilterPanel((v) => !v); setShowMapSearchOverlay(false); }}
-              style={{ ...mtBar.filtersBtn, ...(activeFilterCount > 0 ? { borderColor: "#EF5A45", color: "#B23A28", background: "#fdeee9" } : null) }}
+              style={{ ...(isMobile ? mtBar.filtersBtnSm : mtBar.filtersBtn), ...(activeFilterCount > 0 ? { borderColor: "#EF5A45", color: "#B23A28", background: "#fdeee9" } : null) }}
             >
               <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden>
                 <path d="M4 6h16M7 12h10M10 18h4" strokeLinecap="round" />
@@ -1936,7 +2085,7 @@ export default function MapView() {
           </div>
 
           <div style={{ position: "relative", flexShrink: 0, marginLeft: isMobile ? 0 : "auto" }}>
-            <button type="button" onClick={() => setShowBudgetMenu((v) => !v)} style={mtBar.filtersBtn}>
+            <button type="button" onClick={() => openPillMenu(setShowBudgetMenu)} style={isMobile ? mtBar.filtersBtnSm : mtBar.filtersBtn}>
               Budget
               {(filters.minRent > 10000 || filters.maxRent < 100000) ? (
                 <span style={{ fontWeight: 700, color: "#c98f2c" }}>
@@ -1958,12 +2107,9 @@ export default function MapView() {
                 />
                 <div
                   style={{
-                    position: "absolute",
-                    top: "calc(100% + 8px)",
-                    right: isMobile ? "auto" : 0,
-                    left: isMobile ? 0 : "auto",
+                    ...pillMenuPosition(),
                     zIndex: 1005,
-                    minWidth: 260,
+                    minWidth: isMobile ? 0 : 260,
                     background: "#fff",
                     borderRadius: 14,
                     boxShadow: "0 20px 50px rgba(20,18,16,0.18), 0 0 0 1px rgba(20,18,16,0.06)",
@@ -2009,6 +2155,8 @@ export default function MapView() {
                 </div>
               </>
             ) : null}
+          </div>
+
           </div>
 
           {!isMobile && (
@@ -2561,7 +2709,12 @@ export default function MapView() {
         <div
           style={{
             position: "fixed",
-            bottom: "calc(74px + env(safe-area-inset-bottom, 0px))",
+            // Sits above the card strip when one is open, the way NoBroker's
+            // "List view" pill does — covering it would strand anyone who
+            // wanted the list back.
+            bottom: carouselHeight
+              ? `calc(${Math.round(carouselHeight + 78)}px + env(safe-area-inset-bottom, 0px))`
+              : "calc(74px + env(safe-area-inset-bottom, 0px))",
             left: "50%",
             transform: "translateX(-50%)",
             display: "flex",
@@ -2650,20 +2803,24 @@ export default function MapView() {
         </>
       )}
 
-      {/* On a phone the selected pin opens a bottom sheet instead of a Leaflet
-          popup. Sits above the app's own bottom bar rather than under it. */}
+      {/* On a phone the selected pin opens a swipeable row of the homes that
+          are on screen, not one card — sliding sideways beats hunting for the
+          next pin. Sits above the app's own bottom bar rather than under it. */}
       {isMobile && selected && !viewingProperty && (
-        <MapListingSheet
-          listing={selected}
-          saved={isListingSaved(user, selected.id)}
+        <MapListingCarousel
+          listings={carouselListings}
+          selectedId={selected.id}
+          onSelect={setSelected}
           bottomOffset="calc(70px + env(safe-area-inset-bottom, 0px))"
           onClose={() => setSelected(null)}
-          onSave={() => {
-            const now = toggleSavedListing(user, selected.id, selected.title);
-            void logSavedListingChange(user, selected.id, now, selected.title);
+          savedFor={(l) => isListingSaved(user, l.id)}
+          onSave={(l) => {
+            const now = toggleSavedListing(user, l.id, l.title);
+            void logSavedListingChange(user, l.id, now, l.title);
             setSavedRevision((v) => v + 1);
           }}
-          onDetails={() => setViewingProperty(selected)}
+          onDetails={(l) => setViewingProperty(l)}
+          onHeight={setCarouselHeight}
         />
       )}
 
