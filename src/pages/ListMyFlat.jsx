@@ -1,6 +1,7 @@
 import { useState, useEffect, useMemo } from "react";
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "../context/AuthContext";
+import { useBackClose } from "../hooks/useBackClose";
 import Navbar from "../components/layout/Navbar";
 import Footer from "../components/layout/Footer";
 import PageShell from "../components/layout/PageShell";
@@ -236,6 +237,11 @@ export default function ListMyFlat() {
 
   const next = () => { if (validateStep()) setStep((s) => Math.min(s + 1, 2)); };
   const back = () => { setErrors({}); setStep((s) => Math.max(s - 1, 0)); };
+
+  // A wizard step is a place, so back should return to the previous question
+  // rather than abandoning a half-filled listing. Registered per step, so each
+  // one is its own entry and back walks them in order.
+  useBackClose(step > 0, back, `list-flat-step-${step}`);
 
   const buildDraft = (images = []) => ({
     propertyId,

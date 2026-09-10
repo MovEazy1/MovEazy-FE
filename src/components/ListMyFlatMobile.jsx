@@ -20,6 +20,7 @@ import PropertyVisitSlots from "./PropertyVisitSlots";
 import { reverseGeocode, nearbyLandmarks } from "../lib/geocode";
 import { createInventoryItem, uploadInventoryPhotos, generatePropertyId, mediaRejectionReason } from "../lib/inventory";
 import { describeMedia, isListingMediaFile, isVideoFile, orderListingMedia } from "../lib/listingMedia";
+import { useBackClose } from "../hooks/useBackClose";
 import { fetchAllUserRequirements } from "../lib/userRequirements";
 import { matchListingToRequirements } from "../lib/inventoryMatch";
 import {
@@ -350,6 +351,11 @@ export default function ListMyFlatMobile({ user, onPublished }) {
     setStep((s) => Math.max(1, s - 1));
     window.scrollTo({ top: 0, behavior: "smooth" });
   };
+
+  // Swiping right mid-flow used to throw away a half-filled listing and leave
+  // the page. It now walks back one question at a time, like the Back button
+  // right there on screen.
+  useBackClose(step > 1, onBack, `post-flat-step-${step}`);
 
   const [stepTitle, stepSub] = STEP_COPY[step - 1];
 

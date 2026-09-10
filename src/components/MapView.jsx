@@ -5,6 +5,7 @@ import L from "leaflet";
 import "leaflet/dist/leaflet.css";
 import { applyListingFilters, FILTER_OPTIONS, getFiltersInitialState } from "../lib/store";
 import { coverMedia, isVideoUrl, orderListingMedia } from "../lib/listingMedia";
+import { useBackClose } from "../hooks/useBackClose";
 import { useAuth } from "../context/AuthContext";
 import { useLoginModal } from "../context/LoginModalContext";
 import { isFirebaseConfigured } from "../lib/firebase";
@@ -1159,8 +1160,54 @@ export default function MapView() {
     }
   }, []);
 
+  /**
+   * The property view is a place, so it lives in the URL rather than in state
+   * alone. Opening one pushes ?listingId=…; back drops it and this effect
+   * closes the modal, leaving the map exactly where it was.
+   */
+  const openProperty = useCallback((listing) => {
+    if (!listing?.id) return;
+    const qs = new URLSearchParams(location.search);
+    qs.set("listingId", String(listing.id));
+    navigate({ pathname: location.pathname, search: `?${qs.toString()}` });
+  }, [navigate, location.pathname, location.search]);
+
+  const closeProperty = useCallback(() => {
+    // Going back is what unwinds the entry we pushed. Stripping the parameter
+    // instead would leave it on the stack and cost a second back press.
+    if (listingIdFromUrl) navigate(-1);
+    else setViewingProperty(null);
+  }, [listingIdFromUrl, navigate]);
+
+  /**
+   * A link shared over WhatsApp opens straight into a flat, so the app's first
+   * history entry *is* the flat, and back leaves for WhatsApp. Put the map
+   * under it once, on arrival, so back has somewhere of ours to land.
+   *
+   * location.key is "default" only for the entry the app was loaded on — an
+   * in-app navigation already has a real history stack behind it.
+   */
+  const seededListEntry = useRef(false);
   useEffect(() => {
-    if (!listingIdFromUrl || !listings.length) return;
+    if (seededListEntry.current || !listingIdFromUrl || location.key !== "default") return;
+    seededListEntry.current = true;
+    const qs = new URLSearchParams(location.search);
+    qs.delete("listingId");
+    const rest = qs.toString();
+    navigate({ pathname: location.pathname, search: rest ? `?${rest}` : "" }, { replace: true });
+    navigate({ pathname: location.pathname, search: location.search });
+    // Runs once, on the entry the app was loaded on.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  useEffect(() => {
+    if (!listingIdFromUrl) {
+      // Back was pressed, or the parameter was cleared: leave the map alone
+      // and just close the flat.
+      setViewingProperty(null);
+      return;
+    }
+    if (!listings.length) return;
     const found = listings.find((l) => String(l.id) === String(listingIdFromUrl));
     if (!found) return;
     setViewingProperty(found);
@@ -1325,6 +1372,17 @@ export default function MapView() {
    */
   /** Measured height of the open card strip; 0 when nothing is open. */
   const [carouselHeight, setCarouselHeight] = useState(0);
+
+  // Everything on this screen that a back gesture should close rather than
+  // leave the page for. The property view isn't here: it's a URL, so routing
+  // already unwinds it.
+  useBackClose(showFilterPanel, () => setShowFilterPanel(false), "filters");
+  useBackClose(showMapSearchOverlay, () => setShowMapSearchOverlay(false), "map-search");
+  useBackClose(showAgentChat, () => setShowAgentChat(false), "agent");
+  useBackClose(showFlatTypeMenu, () => setShowFlatTypeMenu(false), "flat-type");
+  useBackClose(showBudgetMenu, () => setShowBudgetMenu(false), "budget");
+  // The phone card strip: back should put the map back, not exit the map.
+  useBackClose(isMobile && Boolean(selected) && !viewingProperty, () => setSelected(null), "cards");
 
   const carouselListings = useMemo(() => {
     const rows = sortedDisplayPins.slice(0, 60);
@@ -2387,7 +2445,7 @@ export default function MapView() {
                       ) : null}
                       <button
                         type="button"
-                        onClick={() => setViewingProperty(l)}
+                        onClick={() => openProperty(l)}
                         style={{
                           flex: 1,
                           padding: "10px 12px",
@@ -2687,13 +2745,13 @@ export default function MapView() {
                 // Tapping a result opens the property itself. It used to throw
                 // you onto the map with a summary card at the bottom, which is
                 // a step further from what you asked for, not closer.
-                onSelect={() => setViewingProperty(l)}
+                onSelect={() => openProperty(l)}
                 onSave={() => {
                   const now = toggleSavedListing(user, l.id, l.title);
                   void logSavedListingChange(user, l.id, now, l.title);
                   setSavedRevision((v) => v + 1);
                 }}
-                onDetails={() => setViewingProperty(l)}
+                onDetails={() => openProperty(l)}
               />
             );
           })}
@@ -2819,7 +2877,7 @@ export default function MapView() {
             void logSavedListingChange(user, l.id, now, l.title);
             setSavedRevision((v) => v + 1);
           }}
-          onDetails={(l) => setViewingProperty(l)}
+          onDetails={(l) => openProperty(l)}
           onHeight={setCarouselHeight}
         />
       )}
@@ -2828,17 +2886,9 @@ export default function MapView() {
         <PropertyModal
           property={viewingProperty}
           listings={listings}
-          onSelectListing={(l) => setViewingProperty(l)}
+          onSelectListing={(l) => openProperty(l)}
           onSavedChange={() => setSavedRevision((v) => v + 1)}
-          onClose={() => {
-            setViewingProperty(null);
-            if (listingIdFromUrl) {
-              const qs = new URLSearchParams(location.search);
-              qs.delete("listingId");
-              const next = qs.toString();
-              navigate({ pathname: location.pathname, search: next ? `?${next}` : "" }, { replace: true });
-            }
-          }}
+          onClose={closeProperty}
         />
       )}
 
