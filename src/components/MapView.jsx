@@ -10,7 +10,7 @@ import { useAuth } from "../context/AuthContext";
 import { useLoginModal } from "../context/LoginModalContext";
 import { isFirebaseConfigured } from "../lib/firebase";
 import { getListingsData, isListingPubliclyVisible } from "../lib/firestoreStore";
-import { fetchInventoryAsListings } from "../lib/inventory";
+import { fetchInventoryAsListings, fetchInventoryByIds, mapInventoryToListing } from "../lib/inventory";
 import { geocodePlace, searchPlaces, reverseGeocode } from "../lib/geocode";
 import { haversineKm } from "../lib/geo";
 import { scoreMatch, listingForScoring } from "../lib/inventoryMatch";
@@ -1195,11 +1195,33 @@ export default function MapView() {
       return;
     }
     if (!listings.length) return;
+
     const found = listings.find((l) => String(l.id) === String(listingIdFromUrl));
-    if (!found) return;
-    setViewingProperty(found);
-    setSelected(found);
-    setMapState(mapStateForListingFocus(found.lat, found.lng, isMobile));
+    if (found) {
+      setViewingProperty(found);
+      setSelected(found);
+      setMapState(mapStateForListingFocus(found.lat, found.lng, isMobile));
+      return;
+    }
+
+    /**
+     * A shared link must open its flat even when the map can't plot it.
+     *
+     * The map's feed drops any listing without coordinates, and a listing
+     * added through the CRM has none — so every link the CRM sent landed on
+     * a map that quietly showed nothing. The listing exists and is published;
+     * it just isn't on the feed. Fetch that one and open it. Nothing is
+     * pinned, because there is nowhere to pin it.
+     */
+    let cancelled = false;
+    fetchInventoryByIds([String(listingIdFromUrl)])
+      .then((rows) => {
+        if (cancelled || !rows.length) return;
+        const mapped = mapInventoryToListing(rows[0]);
+        if (mapped) setViewingProperty(mapped);
+      })
+      .catch(() => { /* the map stays as it is */ });
+    return () => { cancelled = true; };
   }, [listingIdFromUrl, listings, isMobile]);
 
   useEffect(() => {

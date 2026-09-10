@@ -18,6 +18,7 @@ import {
   ALL_LOCALITIES, FLAT_TYPES, FURNISHINGS, LIFESTYLE, MUST_HAVES, OCCUPANTS,
 } from "../../data/preferenceOptions";
 import { cleanSourceUrl, detectSource, parseListingText } from "../../lib/listingImport";
+import { geocodePlace } from "../../lib/geocode";
 import {
   generatePropertyId, isMissingColumn, mediaRejectionReason, uploadInventoryPhotos,
   withoutOptionalColumns,
@@ -32,6 +33,7 @@ import { Btn, C, Chip, Empty, Toast, inr } from "./crmUi";
 
 const BLANK = {
   area: "", nearby_areas: [], full_address: "", landmark: "",
+  latitude: "", longitude: "",
   rent: "", deposit: "", maintenance: "", available_from: "",
   flat_type: "", bedrooms: "", bathrooms: "", furnishing: "",
   max_flatmates: "", gender_pref: "any",
@@ -60,6 +62,8 @@ function rowToForm(row) {
     nearby_areas: list(row.nearby_areas),
     full_address: row.full_address ?? "",
     landmark: row.landmark ?? "",
+    latitude: row.latitude ?? "",
+    longitude: row.longitude ?? "",
     rent: row.rent ?? "",
     deposit: row.deposit ?? "",
     maintenance: row.maintenance ?? "",
@@ -290,6 +294,27 @@ export default function CrmPropertyForm() {
       const images = orderListingMedia(isEdit ? [...keptImages, ...uploaded] : uploaded);
       const sourceUrl = cleanSourceUrl(f.source_url);
 
+      // Resolve a pin from whatever address detail there is, most specific
+      // first. A locality centre is a worse pin than a street address, and a
+      // far better one than none.
+      let coords = { lat: Number(f.latitude) || null, lng: Number(f.longitude) || null };
+      if (coords.lat == null || coords.lng == null) {
+        for (const q of [
+          [f.full_address, f.area, "Bengaluru"].filter(Boolean).join(", "),
+          [f.landmark, f.area, "Bengaluru"].filter(Boolean).join(", "),
+          [f.area, "Bengaluru"].filter(Boolean).join(", "),
+        ]) {
+          if (!q) continue;
+          try {
+            const hit = await geocodePlace(q);
+            if (hit?.ok && Number.isFinite(hit.lat) && Number.isFinite(hit.lng)) {
+              coords = { lat: hit.lat, lng: hit.lng };
+              break;
+            }
+          } catch { /* try the next, less specific, query */ }
+        }
+      }
+
       const row = {
         property_id: propertyId,
         posted_by: f.posted_by || "owner",
@@ -302,6 +327,11 @@ export default function CrmPropertyForm() {
         nearby_areas: f.nearby_areas ?? [],
         full_address: f.full_address || "",
         landmark: f.landmark || "",
+        // Without these the listing is published but invisible: the map's feed
+        // drops anything it can't plot, so a flat added here never appeared and
+        // the links this CRM sent opened an empty map.
+        latitude: coords.lat,
+        longitude: coords.lng,
         rent: Number(f.rent) || 0,
         deposit: Number(f.deposit) || 0,
         // Blank stays null: "not stated" is not "zero".
@@ -325,6 +355,10 @@ export default function CrmPropertyForm() {
         source: sourceUrl ? detectSource(sourceUrl) : "crm",
         source_url: sourceUrl,
       };
+
+      if (coords.lat == null || coords.lng == null) {
+        showToast("Couldn't place this address on the map — add coordinates or it won't show", "error");
+      }
 
       if (isEdit) {
         // The MZ- code identifies the listing and the poster owns it — an edit
@@ -504,6 +538,18 @@ export default function CrmPropertyForm() {
             <Field label="Landmark">
               <input className="crm-input" value={f.landmark}
                 onChange={(e) => set({ landmark: e.target.value })} placeholder="Nearest landmark" />
+            </Field>
+
+            <Field
+              label="Map pin"
+              hint="Found from the address when you save. A listing without one is published but never appears on the map."
+            >
+              <div style={{ display: "flex", gap: 6 }}>
+                <input className="crm-input crm-num" value={f.latitude} inputMode="decimal"
+                  onChange={(e) => set({ latitude: e.target.value })} placeholder="Latitude" />
+                <input className="crm-input crm-num" value={f.longitude} inputMode="decimal"
+                  onChange={(e) => set({ longitude: e.target.value })} placeholder="Longitude" />
+              </div>
             </Field>
           </Column>
 
