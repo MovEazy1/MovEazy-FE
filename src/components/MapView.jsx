@@ -103,81 +103,61 @@ function MapListingCard({ listing, saved, onSave, onDetails, width }) {
         flex: `0 0 ${width}px`, width, scrollSnapAlign: "center",
         background: SHEET.card, borderRadius: 16, overflow: "hidden",
         boxShadow: "0 6px 22px rgba(4,33,29,0.16)",
+        display: "flex", alignItems: "center", gap: 12, padding: 10,
       }}
     >
-      <div style={{ display: "flex", gap: 11, padding: 10 }}>
-        <div
-          style={{
-            width: 96, height: 88, borderRadius: 11, flexShrink: 0, position: "relative", overflow: "hidden",
-            background: cover && !coverIsVideo ? `url(${cover}) center/cover` : "#EDF3F1",
-          }}
-        >
-          {coverIsVideo && (
-            <video src={cover} muted playsInline preload="metadata"
-              style={{ width: "100%", height: "100%", objectFit: "cover" }} />
-          )}
-          {photos.length > 1 && (
-            <span
-              style={{
-                position: "absolute", left: 5, bottom: 5,
-                background: "rgba(4,33,29,0.74)", color: "#fff", borderRadius: 6,
-                padding: "2px 6px", fontSize: 10, fontWeight: 700,
-              }}
-            >
-              {photos.length}
-            </span>
-          )}
-        </div>
-
-        <div style={{ minWidth: 0, flex: 1 }}>
-          <div style={{ display: "flex", alignItems: "baseline", justifyContent: "space-between", gap: 8 }}>
-            <p style={{ margin: 0, fontSize: 15.5, fontWeight: 800, color: SHEET.text, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
-              {rent > 0 ? `₹${rent.toLocaleString("en-IN")}` : listing.price}
-            </p>
-            <button
-              type="button"
-              aria-label={saved ? "Remove from saved" : "Save this home"}
-              onClick={onSave}
-              style={{
-                width: 28, height: 28, borderRadius: "50%", border: "none", flexShrink: 0,
-                background: SHEET.cream, cursor: "pointer",
-                display: "flex", alignItems: "center", justifyContent: "center",
-              }}
-            >
-              <svg width="15" height="15" viewBox="0 0 24 24" fill={saved ? SHEET.coral : "none"} stroke={saved ? SHEET.coral : SHEET.text} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                <path d="M20.8 4.6a5.5 5.5 0 0 0-7.8 0L12 5.6l-1-1a5.5 5.5 0 0 0-7.8 7.8l1 1L12 21l7.8-7.6 1-1a5.5 5.5 0 0 0 0-7.8z" />
-              </svg>
-            </button>
-          </div>
-
-          <p style={{ margin: "3px 0 0", fontSize: 13, fontWeight: 700, color: SHEET.text, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
-            {listing.title}
-          </p>
-          <p style={{ display: "flex", alignItems: "center", gap: 4, margin: "3px 0 0", fontSize: 11.5, color: SHEET.textMute }}>
-            {sheetIcon(<><path d="M20 10c0 6-8 12-8 12s-8-6-8-12a8 8 0 0 1 16 0Z" /><circle cx="12" cy="10" r="3" /></>)}
-            <span style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{listing.address}</span>
-          </p>
-
-          <div style={{ display: "flex", gap: 9, margin: "6px 0 0", fontSize: 11, color: SHEET.textMute, minWidth: 0 }}>
-            {[listing.bhk || "Home", listing.furnishing || "Unfurnished"].filter(Boolean).map((label) => (
-              <span key={label} style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{label}</span>
-            ))}
-          </div>
-        </div>
-      </div>
-
-      <button
-        type="button"
-        onClick={onDetails}
+      <div
         style={{
-          width: "100%", height: 40, border: "none", cursor: "pointer",
-          background: SHEET.coral, color: "#fff", fontSize: 14, fontWeight: 700,
-          display: "flex", alignItems: "center", justifyContent: "center", gap: 8,
+          width: 84, height: 74, borderRadius: 12, flexShrink: 0, position: "relative", overflow: "hidden",
+          background: cover && !coverIsVideo ? `url(${cover}) center/cover` : "#EDF3F1",
         }}
       >
-        View details
-        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.3" strokeLinecap="round" strokeLinejoin="round"><path d="M5 12h14M13 6l6 6-6 6" /></svg>
-      </button>
+        {coverIsVideo && (
+          <video src={cover} muted playsInline preload="metadata"
+            style={{ width: "100%", height: "100%", objectFit: "cover" }} />
+        )}
+      </div>
+
+      {/* Price, then what it is, then where — the three things the design keeps
+          and the only three readable at this size. */}
+      <div style={{ minWidth: 0, flex: 1 }}>
+        <p style={{ margin: 0, fontSize: 19, fontWeight: 800, color: SHEET.text, lineHeight: 1.15 }}>
+          {rent > 0 ? `₹${rent.toLocaleString("en-IN")}` : listing.price}
+        </p>
+        <p style={{ margin: "3px 0 0", fontSize: 13, fontWeight: 600, color: SHEET.text, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
+          {listing.bhk || "Home"}
+          {listing.furnishing ? <span style={{ color: SHEET.textMute }}> · {listing.furnishing}</span> : null}
+        </p>
+        <p style={{ display: "flex", alignItems: "center", gap: 4, margin: "3px 0 0", fontSize: 12, color: SHEET.textMute }}>
+          {sheetIcon(<><path d="M20 10c0 6-8 12-8 12s-8-6-8-12a8 8 0 0 1 16 0Z" /><circle cx="12" cy="10" r="3" /></>)}
+          <span style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{listing.address}</span>
+        </p>
+      </div>
+
+      <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 10, flexShrink: 0 }}>
+        <button
+          type="button"
+          aria-label={saved ? "Remove from saved" : "Save this home"}
+          onClick={onSave}
+          style={{ border: "none", background: "none", padding: 0, cursor: "pointer", lineHeight: 0 }}
+        >
+          <svg width="20" height="20" viewBox="0 0 24 24" fill={saved ? SHEET.coral : "none"} stroke={saved ? SHEET.coral : SHEET.textMute} strokeWidth="1.9" strokeLinecap="round" strokeLinejoin="round">
+            <path d="M20.8 4.6a5.5 5.5 0 0 0-7.8 0L12 5.6l-1-1a5.5 5.5 0 0 0-7.8 7.8l1 1L12 21l7.8-7.6 1-1a5.5 5.5 0 0 0 0-7.8z" />
+          </svg>
+        </button>
+        <button
+          type="button"
+          aria-label="View details"
+          onClick={onDetails}
+          style={{
+            width: 34, height: 34, borderRadius: "50%", border: "none", cursor: "pointer",
+            background: SHEET.text, color: "#fff",
+            display: "flex", alignItems: "center", justifyContent: "center",
+          }}
+        >
+          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.6" strokeLinecap="round" strokeLinejoin="round"><path d="M9 6l6 6-6 6" /></svg>
+        </button>
+      </div>
     </div>
   );
 }
@@ -960,6 +940,11 @@ export default function MapView() {
   const { openLogin } = useLoginModal();
   const [showAgentChat, setShowAgentChat] = useState(false);
   const [listings, setListings] = useState([]);
+  /** True until the first fetch settles — otherwise "No properties found"
+   *  flashes over the map on every load, before any data has arrived. */
+  const [listingsLoading, setListingsLoading] = useState(true);
+  /** Geolocation is asked for on press, never on load. */
+  const [locating, setLocating] = useState(false);
   /** Central Bangalore — street-level default for local inventory */
   const [mapState, setMapState] = useState({ center: [12.9716, 77.5946], zoom: 15 });
   const [selected, setSelected] = useState(null);
@@ -1069,11 +1054,13 @@ export default function MapView() {
         for (const l of feed) byId.set(String(l.id), l);
         for (const l of inventoryRows) byId.set(String(l.id), l);
         setListings(Array.from(byId.values()));
+        setListingsLoading(false);
       }
     }
     loadListings().catch((err) => {
       reportClientWarn("map_listings_query", "Listings query failed", err);
       setListings([]);
+      setListingsLoading(false);
     });
     return () => { alive = false; };
   }, [filters.bhkTypes, filters.maxRent, filters.neighborhoods, isMobile]);
@@ -1653,6 +1640,25 @@ export default function MapView() {
     return n;
   }, [filters, listingType]);
 
+  /**
+   * Recentre on the user. Asked for only when the button is pressed, so nobody
+   * gets a permission prompt just for opening the map.
+   */
+  const locateMe = useCallback(() => {
+    if (!navigator.geolocation) return;
+    setLocating(true);
+    navigator.geolocation.getCurrentPosition(
+      ({ coords }) => {
+        setLocating(false);
+        setMapState({ center: [coords.latitude, coords.longitude], zoom: 15 });
+      },
+      // A refusal or a timeout is not an error worth interrupting anyone over —
+      // the map simply stays where it was.
+      () => setLocating(false),
+      { enableHighAccuracy: true, timeout: 8000, maximumAge: 60000 },
+    );
+  }, []);
+
   const clearAllFilters = useCallback(() => {
     setFilters(getFiltersInitialState());
     setListingType("all");
@@ -1920,14 +1926,19 @@ export default function MapView() {
                 ))}
               </div>
             </div>
-            <button
-              type="button"
-              disabled={mapSearchLoading}
-              onClick={() => { submitMapSearch(); setShowMapSearchOverlay(false); }}
-              style={mtBar.searchBtn}
-            >
-              {mapSearchLoading ? "…" : "Search"}
-            </button>
+            {/* The design has no Search button on a phone: the suggestions do
+                the work, and Enter submits. Dropping it gives the input the
+                width it needs to show a real locality name. */}
+            {!isMobile && (
+              <button
+                type="button"
+                disabled={mapSearchLoading}
+                onClick={() => { submitMapSearch(); setShowMapSearchOverlay(false); }}
+                style={mtBar.searchBtn}
+              >
+                {mapSearchLoading ? "…" : "Search"}
+              </button>
+            )}
 
             {officeResultsOpen && mapSearchInput.trim().length >= 3 ? (
               <div
@@ -2018,7 +2029,7 @@ export default function MapView() {
               was — the wrapper isn't a box there at all. */}
           <div ref={pillRowRef} className={isMobile ? "mv-hscroll" : undefined} style={isMobile ? mtBar.pillScroller : { display: "contents" }}>
 
-          <div style={{ position: "relative", flexShrink: 0 }}>
+          <div style={{ position: "relative", flexShrink: 0, ...(isMobile ? { order: 1 } : null) }}>
             <button type="button" onClick={() => openPillMenu(setShowFlatTypeMenu)} style={isMobile ? mtBar.filtersBtnSm : mtBar.filtersBtn}>
               Flat type
               <svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" strokeWidth="2.4" aria-hidden>
@@ -2069,16 +2080,17 @@ export default function MapView() {
             ) : null}
           </div>
 
-          <div style={{ position: "relative", flexShrink: 0 }}>
+          <div style={{ position: "relative", flexShrink: 0, ...(isMobile ? { order: 3 } : null) }}>
             <button
               type="button"
               onClick={() => { setShowFilterPanel((v) => !v); setShowMapSearchOverlay(false); }}
               style={{ ...(isMobile ? mtBar.filtersBtnSm : mtBar.filtersBtn), ...(activeFilterCount > 0 ? { borderColor: "#EF5A45", color: "#B23A28", background: "#fdeee9" } : null) }}
             >
               <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden>
-                <path d="M4 6h16M7 12h10M10 18h4" strokeLinecap="round" />
+                <circle cx="12" cy="12" r="3" />
+                <path d="M19.4 15a1.7 1.7 0 0 0 .3 1.8l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-1.8-.3 1.7 1.7 0 0 0-1 1.5V21a2 2 0 1 1-4 0v-.1A1.7 1.7 0 0 0 9 19.4a1.7 1.7 0 0 0-1.8.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.7 1.7 0 0 0 .3-1.8 1.7 1.7 0 0 0-1.5-1H3a2 2 0 1 1 0-4h.1A1.7 1.7 0 0 0 4.6 9a1.7 1.7 0 0 0-.3-1.8l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.7 1.7 0 0 0 1.8.3H9a1.7 1.7 0 0 0 1-1.5V3a2 2 0 1 1 4 0v.1a1.7 1.7 0 0 0 1 1.5 1.7 1.7 0 0 0 1.8-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0-.3 1.8V9a1.7 1.7 0 0 0 1.5 1H21a2 2 0 1 1 0 4h-.1a1.7 1.7 0 0 0-1.5 1z" strokeLinecap="round" strokeLinejoin="round" />
               </svg>
-              {showFilterPanel ? "Hide filters" : "All filters"}
+              {showFilterPanel ? "Hide" : "Filters"}
               {activeFilterCount > 0 ? (
                 <span style={{ display: "inline-flex", alignItems: "center", justifyContent: "center", minWidth: 18, height: 18, padding: "0 5px", borderRadius: 999, background: "#EF5A45", color: "#fff", fontSize: 11, fontWeight: 800 }}>
                   {activeFilterCount}
@@ -2142,7 +2154,7 @@ export default function MapView() {
             ) : null}
           </div>
 
-          <div style={{ position: "relative", flexShrink: 0, marginLeft: isMobile ? 0 : "auto" }}>
+          <div style={{ position: "relative", flexShrink: 0, marginLeft: isMobile ? 0 : "auto", ...(isMobile ? { order: 2 } : null) }}>
             <button type="button" onClick={() => openPillMenu(setShowBudgetMenu)} style={isMobile ? mtBar.filtersBtnSm : mtBar.filtersBtn}>
               Budget
               {(filters.minRent > 10000 || filters.maxRent < 100000) ? (
@@ -2468,6 +2480,66 @@ export default function MapView() {
             ))}
           </MapContainer>
 
+          {/* Recentre on the user. Absolute over the map, opposite the zoom
+              control, as the design places it. Permission is asked for only
+              when it's pressed — never on load. */}
+          {isMobile && (
+            <button
+              type="button"
+              aria-label="Show my location"
+              onClick={locateMe}
+              disabled={locating}
+              style={{
+                position: "absolute", top: 12, right: 12, zIndex: 1001,
+                width: 40, height: 40, borderRadius: "50%", border: "1px solid #e9e3db",
+                background: "#fff", color: "#17140f", cursor: "pointer",
+                display: "flex", alignItems: "center", justifyContent: "center",
+                boxShadow: "0 2px 10px rgba(4,33,29,0.18)",
+                opacity: locating ? 0.6 : 1,
+              }}
+            >
+              <svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.9" strokeLinecap="round">
+                <circle cx="12" cy="12" r="3.2" />
+                <circle cx="12" cy="12" r="8" />
+                <path d="M12 1.5v3M12 19.5v3M1.5 12h3M19.5 12h3" />
+              </svg>
+            </button>
+          )}
+
+          {/* Nothing matched. An empty map with no words on it reads as a
+              failure to load rather than a search that found nothing. */}
+          {isMobile && !listingsLoading && sortedDisplayPins.length === 0 && (
+            <div
+              style={{
+                position: "absolute", inset: 0, zIndex: 1000,
+                display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center",
+                gap: 10, padding: 28, textAlign: "center",
+                background: "rgba(250,247,242,0.94)",
+              }}
+            >
+              <svg width="46" height="46" viewBox="0 0 24 24" fill="none" stroke="#b9b2a6" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M9 3 3 5.5v15L9 18l6 3 6-2.5v-15L15 6 9 3z" />
+                <path d="M9 3v15M15 6v15" />
+              </svg>
+              <p style={{ margin: 0, fontSize: 17, fontWeight: 800, color: "#17140f" }}>No properties found</p>
+              <p style={{ margin: 0, fontSize: 13, color: "#8a857c", maxWidth: "28ch", lineHeight: 1.5 }}>
+                Try a different area, or loosen the filters you have on.
+              </p>
+              {activeFilterCount > 0 && (
+                <button
+                  type="button"
+                  onClick={clearAllFilters}
+                  style={{
+                    marginTop: 4, padding: "10px 20px", borderRadius: 999,
+                    border: "1px solid #e9e3db", background: "#fff", color: "#17140f",
+                    fontSize: 13.5, fontWeight: 700, cursor: "pointer", fontFamily: "inherit",
+                  }}
+                >
+                  Clear filters
+                </button>
+              )}
+            </div>
+          )}
 
           {helpWidgetOpen ? (
             <div
@@ -2582,7 +2654,7 @@ export default function MapView() {
           )}
           
           {isMobile && (
-            <div style={{ position: "absolute", top: 12, right: 12, zIndex: 1000, display: "flex", gap: "8px", flexWrap: "wrap", justifyContent: "flex-end", maxWidth: "calc(100% - 24px)" }}>
+            <div style={{ position: "absolute", top: isMobile ? 62 : 12, right: 12, zIndex: 1000, display: "flex", gap: "8px", flexWrap: "wrap", justifyContent: "flex-end", maxWidth: "calc(100% - 24px)" }}>
               <button className="mobile-filter-btn" onClick={() => setShowFilterPanel(true)} style={{ position: "static", transform: "none", margin: 0 }}>
                 Filters{activeFilterCount > 0 ? ` · ${activeFilterCount}` : ""}
               </button>
