@@ -29,6 +29,7 @@ const CrmClientsPage = lazy(() => import("./pages/crm/CrmClientsPage"));
 const CrmPipelinePage = lazy(() => import("./pages/crm/CrmPipelinePage"));
 const CrmPropertiesPage = lazy(() => import("./pages/crm/CrmPropertiesPage"));
 const CrmPropertyForm = lazy(() => import("./pages/crm/CrmPropertyForm"));
+const CrmVisitsPage = lazy(() => import("./pages/crm/CrmVisitsPage"));
 const CrmTeamPage = lazy(() => import("./pages/crm/CrmTeamPage"));
 const CrmPaymentsPage = lazy(() => import("./pages/crm/CrmPaymentsPage"));
 const CrmSettingsPage = lazy(() => import("./pages/crm/CrmSettingsPage"));
@@ -118,6 +119,7 @@ function AppRoutes() {
           <Route path="properties" element={<CrmPropertiesPage />} />
           <Route path="properties/new" element={<CrmPropertyForm />} />
           <Route path="properties/:propertyId/edit" element={<CrmPropertyForm />} />
+          <Route path="visits" element={<CrmVisitsPage />} />
           <Route path="payments" element={<CrmPaymentsPage />} />
           <Route path="team" element={<CrmTeamPage />} />
           <Route path="settings" element={<CrmSettingsPage />} />

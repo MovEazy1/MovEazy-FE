@@ -32,10 +32,18 @@ export const DEFAULT_TEMPLATES = [
       "in {{localities}} — I have a few that fit. Is now a good time to talk?",
   },
   {
-    id: "visit_confirmation",
-    name: "Visit confirmation",
+    id: "visit_reminder",
+    name: "Visit reminder (1 day before)",
     body:
-      "Hi {{client_name}}, your visit is confirmed for {{visit_time}}.\n\n" +
+      "Hi {{client_name}}, a quick reminder — your visit is tomorrow at {{visit_time}}.\n\n" +
+      "{{property_title}} — {{rent}}\n{{link}}\n\n" +
+      "Does that still work for you? Reply here if you'd rather move it.",
+  },
+  {
+    id: "visit_confirmation",
+    name: "Visit confirmation (2 hrs before)",
+    body:
+      "Hi {{client_name}}, your visit is confirmed for {{visit_time}} — about 2 hours from now.\n\n" +
       "{{property_title}} — {{rent}}\n{{link}}\n\nI'll meet you there. Reply here if anything changes.",
   },
   {
@@ -67,8 +75,13 @@ export const DEFAULT_CRM_SETTINGS = {
   closedOutsideReasons: DEFAULT_CLOSED_OUTSIDE_REASONS,
 };
 
+/** Templates a feature sends by id — these have to exist or a button does
+ *  nothing. Anything else in DEFAULT_TEMPLATES is a starting point the team is
+ *  free to delete. */
+const REQUIRED_TEMPLATE_IDS = ["send_property", "visit_reminder", "visit_confirmation"];
+
 function normalize(data) {
-  const templates = Array.isArray(data?.templates) && data.templates.length
+  const saved = Array.isArray(data?.templates) && data.templates.length
     ? data.templates
         .map((t) => ({
           id: String(t?.id || "").trim() || `t_${Math.random().toString(36).slice(2, 8)}`,
@@ -77,6 +90,15 @@ function normalize(data) {
         }))
         .filter((t) => t.body)
     : DEFAULT_TEMPLATES;
+
+  // A team that saved settings before a feature shipped would otherwise never
+  // see the template that feature sends. Only the required ids are filled in,
+  // so a template someone deliberately deleted stays deleted.
+  const have = new Set(saved.map((t) => t.id));
+  const templates = [
+    ...saved,
+    ...DEFAULT_TEMPLATES.filter((t) => REQUIRED_TEMPLATE_IDS.includes(t.id) && !have.has(t.id)),
+  ];
 
   const reasons = Array.isArray(data?.closedOutsideReasons) && data.closedOutsideReasons.length
     ? data.closedOutsideReasons.map((r) => String(r).trim().slice(0, 80)).filter(Boolean)
