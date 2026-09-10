@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef, useMemo } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { coverPhoto, isVideoUrl, orderListingMedia } from "../lib/listingMedia";
+import { propertyLink, shareVia } from "../lib/crmSettings";
 import { useAuth } from "../context/AuthContext";
 import { addVisitRequestData, getListingPrivateData, isListingPubliclyVisible } from "../lib/firestoreStore";
 import { canReadListingPrivatePhones } from "../lib/accessControl";
@@ -269,8 +270,12 @@ export default function PropertyModal({ property, onClose, listings = [], onSele
   }, [property?.id, property, user]);
 
   const handleShare = () => {
-    const origin = window.location.origin;
-    const url = `${origin}/map?listingId=${encodeURIComponent(String(property?.id || ""))}`;
+    // Built by propertyLink like every other share: /p/:id so WhatsApp previews
+    // the flat, and attributed so the open isn't anonymous. This one used to
+    // hand out a bare /map?listingId= — no preview, no attribution.
+    const id = String(property?.id || "");
+    const method = navigator.share ? "native" : "copy";
+    const url = propertyLink(id, shareVia("listing", method));
     const title = property?.title ? `MovEazy · ${property.title}` : "MovEazy listing";
 
     const done = () => {

@@ -16,6 +16,7 @@ import { useLoginModal } from "../context/LoginModalContext";
 import MovEazyNav from "../components/layout/MovEazyNav";
 import { fetchMyInventory, setInventoryStatus } from "../lib/inventory";
 import { coverPhoto } from "../lib/listingMedia";
+import { propertyLink, shareVia } from "../lib/crmSettings";
 import { fetchSlotsFor } from "../lib/visits";
 import { fetchMyListingStats } from "../lib/ownerDashboard";
 import PropertyVisitSlots from "../components/PropertyVisitSlots";
@@ -330,7 +331,8 @@ export default function MyProperties() {
   };
 
   const share = async (p) => {
-    const url = `${window.location.origin}/p/${encodeURIComponent(p.property_id)}`;
+    const method = navigator.share ? "native" : "copy";
+    const url = propertyLink(p.property_id, shareVia("owner", method));
     const title = p.title || `${p.flat_type || "Home"} in ${p.area || "Bengaluru"}`;
     try {
       if (navigator.share) {

@@ -143,34 +143,65 @@ const inr = (n) =>
   Number.isFinite(Number(n)) && Number(n) > 0 ? `₹${Number(n).toLocaleString("en-IN")}` : "";
 
 /**
- * Public, shareable link to one listing.
+ * The only way a listing link is built, anywhere in the app.
  *
- * `/map?listingId=` is the URL the property modal already shares, so the landing
- * behaviour is unchanged. What's added is attribution:
+ * Everything shared points at `/p/:id` — a tiny server-rendered page carrying
+ * that property's own Open Graph tags, so WhatsApp previews the flat instead of
+ * our logo. It forwards on to /map?listingId=…, token included, so the landing
+ * behaviour is unchanged.
  *
- *  - UTM parameters, so this shows up as CRM traffic in any analytics tool and
- *    reads as deliberate to anyone who inspects the link.
- *  - `mz_s`, an opaque per-share token. UTMs can only say "someone came from the
- *    CRM"; the recipient is signed out when they tap a WhatsApp link, so the
- *    token is the only thing that ties the open back to one client and one
- *    property. Omit it and you get a plain campaign-tagged link.
+ * Every link is attributed, because a link that escapes without parameters is
+ * traffic nobody can account for:
+ *
+ *  - UTM parameters name the surface the share came from — the CRM, an owner
+ *    sharing their own flat, a renter sending one to a friend — so those read
+ *    as three different things in analytics rather than one anonymous blob.
+ *  - `mz_s`, an opaque per-share token, is what ties an open back to one client
+ *    and one property. The recipient is signed out when they tap a WhatsApp
+ *    link, so UTMs alone can only say "someone came from the CRM". Only CRM
+ *    sends carry one; there is no client to tie an owner's share to.
+ *
+ * `options` accepts a bare token string too, which is how the CRM's callers
+ * already spell it.
  */
-export function propertyLink(propertyId, shareToken = "") {
+export function propertyLink(propertyId, options = {}) {
+  const o = typeof options === "string" ? { token: options } : (options || {});
   const origin =
     typeof window !== "undefined" && window.location?.origin
       ? window.location.origin
       : "https://www.moveazy.co.in";
   const q = new URLSearchParams({
-    utm_source: "crm",
-    utm_medium: "whatsapp",
-    utm_campaign: "property_share",
+    utm_source: o.source || "crm",
+    utm_medium: o.medium || "whatsapp",
+    utm_campaign: o.campaign || "property_share",
     utm_content: propertyId,
   });
-  if (shareToken) q.set("mz_s", shareToken);
-  // /p/:id is a tiny server-rendered page carrying this property's own Open
-  // Graph tags, so WhatsApp previews the flat's photos instead of our logo.
-  // It forwards everything here — token included — on to /map?listingId=…
+  if (o.token) q.set("mz_s", o.token);
   return `${origin}/p/${encodeURIComponent(propertyId)}?${q.toString()}`;
+}
+
+/**
+ * Where a share came from. Named rather than spelled out at each call site, so
+ * a new share button can't invent its own vocabulary — or forget to attribute
+ * itself, which is how a bare /map?listingId= link reached a customer.
+ */
+export const SHARE_SOURCES = {
+  /** An agent sending a flat from a client's record. */
+  crm: { source: "crm", medium: "whatsapp", campaign: "property_share" },
+  /** A poster sharing their own listing from My Properties. */
+  owner: { source: "owner", medium: "share", campaign: "listing_share" },
+  /** Anyone sharing a listing from the property page. */
+  listing: { source: "app", medium: "share", campaign: "listing_share" },
+};
+
+/**
+ * The same source, distinguishing the OS share sheet from a copied link —
+ * worth separating, because one lands in a chat and the other could go
+ * anywhere.
+ */
+export function shareVia(sourceKey, method) {
+  const base = SHARE_SOURCES[sourceKey] || SHARE_SOURCES.listing;
+  return { ...base, medium: method === "copy" ? "copy_link" : base.medium };
 }
 
 /** Opaque, unguessable id for one send of one property to one client. */
