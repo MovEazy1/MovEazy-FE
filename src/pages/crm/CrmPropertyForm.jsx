@@ -14,6 +14,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import { useCrm } from "./CrmShell";
+import PropertyVisitSlots from "../../components/PropertyVisitSlots";
 import {
   ALL_LOCALITIES, FLAT_TYPES, FURNISHINGS, LIFESTYLE, MUST_HAVES, OCCUPANTS,
 } from "../../data/preferenceOptions";
@@ -817,6 +818,21 @@ export default function CrmPropertyForm() {
             </span>
           </div>
         </div>
+
+        {/* Visit times. Only in edit mode: property_visit_slots keys on a
+            property_id, so there has to be a listing before there can be a
+            slot. A CRM manager needs crm_visit_slots.sql to write these — the
+            component says so if the policy is missing. */}
+        {isEdit && (
+          <div style={{ padding: "0 16px 20px", maxWidth: 720 }}>
+            <span className="crm-label">Open visit times</span>
+            <p className="crm-mute" style={{ fontSize: 11.5, margin: "4px 0 10px", lineHeight: 1.5 }}>
+              What a renter can book. Nothing here means the only way in is
+              "next available slot", which lands on you to arrange by hand.
+            </p>
+            <PropertyVisitSlots propertyId={editId} hideMarkSold />
+          </div>
+        )}
       </div>
 
       <Toast {...(toast ?? {})} />
