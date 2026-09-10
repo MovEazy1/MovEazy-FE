@@ -2,6 +2,7 @@ import { useState, useEffect, useMemo } from "react";
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "../context/AuthContext";
 import { useHistorySteps } from "../hooks/useBackClose";
+import { autoTitle, bedroomsForFlatType, flatmatesForFlatType } from "../lib/listingDraft";
 import Navbar from "../components/layout/Navbar";
 import Footer from "../components/layout/Footer";
 import PageShell from "../components/layout/PageShell";
@@ -137,12 +138,14 @@ export default function ListMyFlat() {
   // Step 2 — the home (Train My Broker parity)
   const [flatType, setFlatType] = useState("2 BHK");
   const [bedrooms, setBedrooms] = useState(2);
+  const [bedroomsTouched, setBedroomsTouched] = useState(false);
   const [bathrooms, setBathrooms] = useState(1);
   const [furnishing, setFurnishing] = useState("Fully Furnished");
   const [rent, setRent] = useState("");
   const [deposit, setDeposit] = useState("");
   const [availableFrom, setAvailableFrom] = useState("");
-  const [maxFlatmates, setMaxFlatmates] = useState(1);
+  const [maxFlatmates, setMaxFlatmates] = useState(0);
+  const [flatmatesTouched, setFlatmatesTouched] = useState(false);
   const [genderPref, setGenderPref] = useState("any");
   const [occupantsAllowed, setOccupantsAllowed] = useState([...OCCUPANTS]);
   const [amenities, setAmenities] = useState([]);
@@ -151,6 +154,8 @@ export default function ListMyFlat() {
 
   // Step 3 — describe
   const [title, setTitle] = useState("");
+  /** Set once the poster types their own title — after that we never touch it. */
+  const [titleTouched, setTitleTouched] = useState(false);
   const [description, setDescription] = useState("");
   const [photoFiles, setPhotoFiles] = useState([]);
   const [photoPreviews, setPhotoPreviews] = useState([]);
@@ -162,9 +167,29 @@ export default function ListMyFlat() {
     if (!user) navigate(`/auth?next=${encodeURIComponent("/list-my-flat")}`, { replace: true });
   }, [user, navigate]);
 
+  /**
+    * Keep the suggested title tracking what's been picked, until the poster
+    * writes their own. The old `t || …` guard wrote it once — the moment an
+    * address resolved, while the flat type was still the default — and then
+    * froze, so choosing 3 BHK afterwards left the listing titled "2 BHK".
+    */
   useEffect(() => {
-    if (area) setTitle((t) => t || `${flatType} in ${area}`);
-  }, [area, flatType]);
+    if (titleTouched) return;
+    setTitle(autoTitle(flatType, area));
+  }, [area, flatType, titleTouched]);
+
+  /** Same rule for bedrooms: follow the flat type until it's set by hand. */
+  useEffect(() => {
+    if (bedroomsTouched) return;
+    const implied = bedroomsForFlatType(flatType);
+    if (implied != null) setBedrooms(implied);
+  }, [flatType, bedroomsTouched]);
+
+  /** And for flatmates — an entire flat has none. */
+  useEffect(() => {
+    if (flatmatesTouched) return;
+    setMaxFlatmates(flatmatesForFlatType(flatType));
+  }, [flatType, flatmatesTouched]);
 
   const toggleIn = (setter) => (v) =>
     setter((prev) => (prev.includes(v) ? prev.filter((x) => x !== v) : [...prev, v]));
@@ -732,7 +757,7 @@ export default function ListMyFlat() {
                 <div className="grid grid-cols-2 gap-4">
                   <div>
                     <Label>Bedrooms</Label>
-                    <select value={bedrooms} onChange={(e) => setBedrooms(Number(e.target.value))} className={inp}>
+                    <select value={bedrooms} onChange={(e) => { setBedroomsTouched(true); setBedrooms(Number(e.target.value)); }} className={inp}>
                       {[1, 2, 3, 4, 5].map((n) => <option key={n} value={n}>{n}</option>)}
                     </select>
                   </div>
@@ -769,7 +794,7 @@ export default function ListMyFlat() {
                 </div>
                 <div>
                   <Label>Max Flatmates</Label>
-                  <select value={maxFlatmates} onChange={(e) => setMaxFlatmates(Number(e.target.value))} className={inp}>
+                  <select value={maxFlatmates} onChange={(e) => { setFlatmatesTouched(true); setMaxFlatmates(Number(e.target.value)); }} className={inp}>
                     {[0, 1, 2, 3, 4, 5, 6].map((n) => <option key={n} value={n}>{n}</option>)}
                   </select>
                 </div>
@@ -821,7 +846,7 @@ export default function ListMyFlat() {
               <div className="p-6">
                 <div className="mb-4">
                   <Label>Listing Title</Label>
-                  <input value={title} onChange={(e) => setTitle(e.target.value)}
+                  <input value={title} onChange={(e) => { setTitleTouched(true); setTitle(e.target.value); }}
                     placeholder="e.g. Bright 2 BHK in HSR" className={inp} />
                 </div>
                 <div>

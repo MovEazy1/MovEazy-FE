@@ -21,6 +21,7 @@ import { reverseGeocode, nearbyLandmarks } from "../lib/geocode";
 import { createInventoryItem, uploadInventoryPhotos, generatePropertyId, mediaRejectionReason } from "../lib/inventory";
 import { describeMedia, isListingMediaFile, isVideoFile, orderListingMedia } from "../lib/listingMedia";
 import { useHistorySteps } from "../hooks/useBackClose";
+import { autoTitle, bedroomsForFlatType, flatmatesForFlatType } from "../lib/listingDraft";
 import MovEazyLogo from "./branding/MovEAZYLogo";
 import { fetchAllUserRequirements } from "../lib/userRequirements";
 import { matchListingToRequirements } from "../lib/inventoryMatch";
@@ -199,9 +200,11 @@ export default function ListMyFlatMobile({ user, onPublished }) {
   // 3 — the home
   const [flatType, setFlatType] = useState("2 BHK");
   const [bedrooms, setBedrooms] = useState(2);
+  const [bedroomsTouched, setBedroomsTouched] = useState(false);
   const [bathrooms, setBathrooms] = useState(1);
   const [furnishing, setFurnishing] = useState("Fully Furnished");
-  const [maxFlatmates, setMaxFlatmates] = useState(1);
+  const [maxFlatmates, setMaxFlatmates] = useState(0);
+  const [flatmatesTouched, setFlatmatesTouched] = useState(false);
   const [genderPref, setGenderPref] = useState("any");
 
   // 4 — money
@@ -217,15 +220,37 @@ export default function ListMyFlatMobile({ user, onPublished }) {
 
   // 6 — describe
   const [title, setTitle] = useState("");
+  /** Set once the poster types their own title — after that we never touch it. */
+  const [titleTouched, setTitleTouched] = useState(false);
   const [description, setDescription] = useState("");
   const [photoFiles, setPhotoFiles] = useState([]);
   const [photoPreviews, setPhotoPreviews] = useState([]);
 
   const propertyId = useMemo(() => generatePropertyId(), []);
 
+  /**
+   * Keep the suggested title tracking what's been picked, until the poster
+   * writes their own. The old `t || …` guard wrote it once — the moment an
+   * address resolved, while the flat type was still the default — and then
+   * froze, so choosing 3 BHK afterwards left the listing titled "2 BHK".
+   */
   useEffect(() => {
-    if (area) setTitle((t) => t || `${flatType} in ${area}`);
-  }, [area, flatType]);
+    if (titleTouched) return;
+    setTitle(autoTitle(flatType, area));
+  }, [area, flatType, titleTouched]);
+
+  /** Same rule for bedrooms: follow the flat type until it's set by hand. */
+  useEffect(() => {
+    if (bedroomsTouched) return;
+    const implied = bedroomsForFlatType(flatType);
+    if (implied != null) setBedrooms(implied);
+  }, [flatType, bedroomsTouched]);
+
+  /** And for flatmates — an entire flat has none. */
+  useEffect(() => {
+    if (flatmatesTouched) return;
+    setMaxFlatmates(flatmatesForFlatType(flatType));
+  }, [flatType, flatmatesTouched]);
 
   useEffect(() => () => photoPreviews.forEach((u) => URL.revokeObjectURL(u)), [photoPreviews]);
 
@@ -513,7 +538,7 @@ export default function ListMyFlatMobile({ user, onPublished }) {
                 <ChipRow options={FLAT_TYPES} value={flatType} onPick={setFlatType} />
               </div>
               <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 14 }}>
-                <SelectField label="Bedrooms" value={String(bedrooms)} onChange={(v) => setBedrooms(Number(v))}>
+                <SelectField label="Bedrooms" value={String(bedrooms)} onChange={(v) => { setBedroomsTouched(true); setBedrooms(Number(v)); }}>
                   {[1, 2, 3, 4, 5].map((n) => <option key={n} value={n} style={optionStyle}>{n}</option>)}
                 </SelectField>
                 <SelectField label="Bathrooms" value={String(bathrooms)} onChange={(v) => setBathrooms(Number(v))}>
@@ -525,7 +550,7 @@ export default function ListMyFlatMobile({ user, onPublished }) {
                 <ChipRow options={FURNISHINGS} value={furnishing} onPick={setFurnishing} />
               </div>
               <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 14 }}>
-                <SelectField label="Max flatmates" value={String(maxFlatmates)} onChange={(v) => setMaxFlatmates(Number(v))}>
+                <SelectField label="Max flatmates" value={String(maxFlatmates)} onChange={(v) => { setFlatmatesTouched(true); setMaxFlatmates(Number(v)); }}>
                   {[0, 1, 2, 3, 4, 5, 6].map((n) => <option key={n} value={n} style={optionStyle}>{n}</option>)}
                 </SelectField>
                 <SelectField label="Preferred gender" value={genderPref} onChange={setGenderPref}>
@@ -591,7 +616,7 @@ export default function ListMyFlatMobile({ user, onPublished }) {
                 <Q>Listing title</Q>
                 <Field>
                   <input type="text" placeholder="e.g. Bright 2 BHK in HSR" value={title}
-                    onChange={(e) => setTitle(e.target.value)} style={inputStyle} />
+                    onChange={(e) => { setTitleTouched(true); setTitle(e.target.value); }} style={inputStyle} />
                 </Field>
               </div>
               <div>
