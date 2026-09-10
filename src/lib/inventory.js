@@ -113,6 +113,9 @@ export function buildInventoryRow(draft, poster) {
 
     rent: num(draft.rent, 0),
     deposit: num(draft.deposit, 0),
+    // Null, not 0: "the lister didn't say" is not "the lister said zero", and
+    // the property page shows no maintenance row for the former.
+    maintenance: draft.maintenance === "" || draft.maintenance == null ? null : num(draft.maintenance, 0),
     available_from: draft.availableFrom || null,
 
     flat_type: String(draft.flatType || "").trim(),
@@ -152,6 +155,13 @@ export async function createInventoryItem(draft, poster) {
       row = { ...row, property_id: generatePropertyId() };
       continue;
     }
+    // A column a pending migration hasn't added must not stop someone
+    // publishing. Drop it and post the listing without that one field.
+    if (isMissingColumn(error)) {
+      console.warn(`[inventory] insert: ${error.message} — publishing without it. Run the pending migration.`);
+      row = withoutOptionalColumns(row);
+      continue;
+    }
     throw error;
   }
   throw new Error("Could not generate a unique property id — please try again.");
@@ -165,22 +175,73 @@ export async function createInventoryItem(draft, poster) {
 // the whole request for signed-out visitors — so name the safe columns instead.
 // Contact details are resolved separately, only for a viewer who's entitled to
 // them (canReadListingPrivatePhones), never from this public list.
+/**
+ * Columns added by a migration that may not have been applied yet.
+ *
+ * Migrations here are run by hand in the Supabase editor, out of band from a
+ * deploy, so for a window the code asks for a column the database hasn't got.
+ * PostgREST answers a select naming an unknown column by rejecting the whole
+ * request — which empties the public map, not just the one field. Measured:
+ * 54 listings became 0.
+ *
+ * So these are asked for, and dropped on the one error that means "not yet".
+ */
+const OPTIONAL_INVENTORY_COLS = ["maintenance"];
+
+/**
+ * "That column isn't there yet." Postgres says 42703 on a select; PostgREST
+ * answers a write naming an unknown column with PGRST204 and its own wording,
+ * so both shapes are matched.
+ */
+export const isMissingColumn = (error) =>
+  error?.code === "42703" ||
+  error?.code === "PGRST204" ||
+  /column .* does not exist/i.test(error?.message || "") ||
+  /could not find the '.*' column/i.test(error?.message || "");
+
+/** The same row without the columns a pending migration hasn't added. */
+export function withoutOptionalColumns(row) {
+  const copy = { ...row };
+  for (const col of OPTIONAL_INVENTORY_COLS) delete copy[col];
+  return copy;
+}
+
+/**
+ * Run a select, and if the database is missing one of the optional columns,
+ * run it once more without them rather than returning nothing.
+ */
+async function selectTolerantly(table, cols, shape = (q) => q) {
+  const attempt = (columns) => shape(supabase.from(table).select(columns));
+  const { data, error } = await attempt(cols);
+  if (!error) return { data, error: null };
+  if (!isMissingColumn(error)) return { data: null, error };
+
+  const trimmed = cols
+    .split(",")
+    .map((c) => c.trim())
+    .filter((c) => !OPTIONAL_INVENTORY_COLS.includes(c))
+    .join(", ");
+  console.warn(
+    `[inventory] ${table}: ${error.message} — retrying without ${OPTIONAL_INVENTORY_COLS.join(", ")}. Run the pending migration.`,
+  );
+  return attempt(trimmed);
+}
+
 const PUBLIC_INVENTORY_COLS =
   "property_id, posted_by, city, area, nearby_areas, full_address, landmark, " +
   "latitude, longitude, rent, deposit, available_from, flat_type, bedrooms, " +
-  "bathrooms, furnishing, max_flatmates, gender_pref, occupants_allowed, " +
+  "bathrooms, furnishing, max_flatmates, gender_pref, occupants_allowed, maintenance, " +
   "amenities, lifestyle, house_rules, title, description, images, " +
   "cover_image_url, status, is_verified, view_count, created_at, updated_at";
 
 /** All published inventory (for matching / listings) — public, no poster PII. */
 export async function fetchPublishedInventory({ limit = 500 } = {}) {
   if (!isSupabaseConfigured || !supabase) return [];
-  const { data, error } = await supabase
-    .from("inventory")
-    .select(PUBLIC_INVENTORY_COLS)
-    .eq("status", "published")
-    .order("created_at", { ascending: false })
-    .limit(limit);
+  const { data, error } = await selectTolerantly(
+    "inventory",
+    PUBLIC_INVENTORY_COLS,
+    (q) => q.eq("status", "published").order("created_at", { ascending: false }).limit(limit),
+  );
   if (error) return [];
   return data || [];
 }
@@ -290,6 +351,7 @@ export function mapInventoryToListing(row) {
     // rendered the same placeholder marketing paragraph instead of its own
     // description. Pass them through.
     securityDeposit: num(row.deposit, 0),
+    maintenanceCost: row.maintenance == null ? "" : String(row.maintenance),
     description: String(row.description || "").trim(),
     houseRules: list(row.house_rules),
     preferredTenants: list(row.occupants_allowed),

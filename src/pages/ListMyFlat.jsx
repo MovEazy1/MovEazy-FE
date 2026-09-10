@@ -143,6 +143,8 @@ export default function ListMyFlat() {
   const [furnishing, setFurnishing] = useState("Fully Furnished");
   const [rent, setRent] = useState("");
   const [deposit, setDeposit] = useState("");
+  /** Left blank means "not stated" — the listing then shows no maintenance. */
+  const [maintenance, setMaintenance] = useState("");
   const [availableFrom, setAvailableFrom] = useState("");
   const [maxFlatmates, setMaxFlatmates] = useState(0);
   const [flatmatesTouched, setFlatmatesTouched] = useState(false);
@@ -279,6 +281,7 @@ export default function ListMyFlat() {
     longitude: marker?.[1] ?? null,
     rent,
     deposit,
+    maintenance,
     availableFrom,
     flatType,
     bedrooms,
@@ -781,6 +784,10 @@ export default function ListMyFlat() {
                 <div>
                   <Label>Security Deposit (₹)</Label>
                   <input type="number" min="0" value={deposit} onChange={(e) => setDeposit(e.target.value)} placeholder="1,00,000" className={inp} />
+                </div>
+                <div>
+                  <Label>Monthly maintenance (₹)</Label>
+                  <input type="number" min="0" value={maintenance} onChange={(e) => setMaintenance(e.target.value)} placeholder="Optional — leave blank if none" className={inp} />
                 </div>
                 <div>
                   <Label>Available From</Label>

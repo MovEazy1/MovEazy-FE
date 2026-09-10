@@ -210,6 +210,8 @@ export default function ListMyFlatMobile({ user, onPublished }) {
   // 4 — money
   const [rent, setRent] = useState("");
   const [deposit, setDeposit] = useState("");
+  /** Left blank means "not stated" — the listing then shows no maintenance. */
+  const [maintenance, setMaintenance] = useState("");
   const [availableFrom, setAvailableFrom] = useState("");
 
   // 5 — features
@@ -337,7 +339,7 @@ export default function ListMyFlatMobile({ user, onPublished }) {
       const row = await createInventoryItem({
         propertyId, postedBy, phone: user?.phone || "", area, nearbyAreas: [], fullAddress, landmark,
         latitude: marker?.[0] ?? null, longitude: marker?.[1] ?? null,
-        rent, deposit, availableFrom, flatType, bedrooms, bathrooms, furnishing,
+        rent, deposit, maintenance, availableFrom, flatType, bedrooms, bathrooms, furnishing,
         maxFlatmates, genderPref, occupantsAllowed, amenities, lifestyle, houseRules,
         title, description, images,
       }, user);
@@ -578,6 +580,13 @@ export default function ListMyFlatMobile({ user, onPublished }) {
                 <Field prefix={<span style={{ color: "#6F8681", fontSize: 16, fontWeight: 700, flex: "none" }}>₹</span>}>
                   <input type="number" min="0" placeholder="1,00,000" value={deposit}
                     onChange={(e) => setDeposit(e.target.value)} style={inputStyle} />
+                </Field>
+              </div>
+              <div>
+                <Q sub="Leave blank if there isn't one — we never invent a figure.">Monthly maintenance</Q>
+                <Field prefix={<span style={{ color: "#6F8681", fontSize: 16, fontWeight: 700, flex: "none" }}>₹</span>}>
+                  <input type="number" min="0" placeholder="Optional" value={maintenance}
+                    onChange={(e) => setMaintenance(e.target.value)} style={inputStyle} />
                 </Field>
               </div>
               <div>

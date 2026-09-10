@@ -30,18 +30,44 @@ const RAIL = [
   { to: "/crm/settings",   code: "ST", label: "Settings" },
 ];
 
+/** One retry without the optional columns — see lib/inventory.js for why. */
+/**
+ * One retry without a column a pending migration hasn't added yet.
+ *
+ * PostgREST rejects a whole select over one unknown name, so asking for
+ * `maintenance` before its migration runs would blank every CRM screen that
+ * reads inventory — not merely hide that one field. Measured on the public
+ * map: 54 listings became 0.
+ */
+const OPTIONAL_INVENTORY_COLS = ["maintenance"];
+
+const isMissingColumn = (error) =>
+  error?.code === "42703" ||
+  error?.code === "PGRST204" ||
+  /column .* does not exist/i.test(error?.message || "") ||
+  /could not find the '.*' column/i.test(error?.message || "");
+
 async function fetchInventory() {
   if (!isSupabaseConfigured || !supabase) return [];
-  const { data, error } = await supabase
-    .from("inventory")
-    .select(
-      "property_id,posted_by,poster_name,poster_email,phone,city,area,nearby_areas,full_address,landmark," +
-        "rent,deposit,available_from,flat_type,bedrooms,bathrooms,furnishing,max_flatmates,gender_pref,occupants_allowed," +
-        "amenities,house_rules,lifestyle,title,description,images,cover_image_url,status,is_verified," +
-        "source,source_url,created_at",
-    )
-    .order("created_at", { ascending: false })
-    .limit(3000);
+  const cols =
+    "property_id,posted_by,poster_name,poster_email,phone,city,area,nearby_areas,full_address,landmark," +
+    "rent,deposit,maintenance,available_from,flat_type,bedrooms,bathrooms,furnishing,max_flatmates,gender_pref,occupants_allowed," +
+    "amenities,house_rules,lifestyle,title,description,images,cover_image_url,status,is_verified," +
+    "source,source_url,created_at";
+
+  const run = (c) =>
+    supabase.from("inventory").select(c).order("created_at", { ascending: false }).limit(3000);
+
+  let { data, error } = await run(cols);
+  if (error && isMissingColumn(error)) {
+    console.warn(`[crm] inventory: ${error.message} — retrying without it. Run the pending migration.`);
+    const trimmed = cols
+      .split(",")
+      .map((c) => c.trim())
+      .filter((c) => !OPTIONAL_INVENTORY_COLS.includes(c))
+      .join(",");
+    ({ data, error } = await run(trimmed));
+  }
   if (error) {
     console.warn(`[crm] inventory: ${error.message}`);
     return [];

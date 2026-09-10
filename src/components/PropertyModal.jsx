@@ -362,11 +362,13 @@ export default function PropertyModal({ property, onClose, listings = [], onSele
   const depositFromField = parseMoney(property.securityDeposit);
   const maintenanceFromField = parseMoney(property.maintenanceCost);
   const securityDeposit = depositFromField ?? (numericRent > 0 ? Math.round(numericRent * 2.5) : 0);
-  const maintenance = maintenanceFromField ?? (numericRent > 0 ? Math.round(numericRent * 0.08) : 0);
+  // Maintenance is whatever the lister quoted, or nothing at all. It used to
+  // default to 8% of rent, which put a monthly charge on every listing that
+  // nobody had asked for and the owner would then have to deny. Read through
+  // maintenanceSidebar below, which is blank when there is no figure.
   // A figure we derived is not a figure the owner quoted. Say which is which
   // rather than presenting our arithmetic as the listing's terms.
   const depositIsEstimate = depositFromField == null;
-  const maintenanceIsEstimate = maintenanceFromField == null;
   const formatInr = (n) => `₹ ${Number(n || 0).toLocaleString("en-IN")}`;
   /** Just the amount — the "per month" is a separate label everywhere it shows. */
   const toggleSave = () => {
@@ -406,12 +408,11 @@ export default function PropertyModal({ property, onClose, listings = [], onSele
   }
 
   const depositSidebar = finalDeposit;
+  // Blank when the lister didn't quote one — the row is then dropped entirely.
   const maintenanceSidebar =
     maintenanceFromField != null
       ? formatInr(maintenanceFromField)
-      : String(property.maintenanceCost || "").trim()
-        ? String(property.maintenanceCost)
-        : formatInr(maintenance);
+      : String(property.maintenanceCost || "").trim();
   const dash = (v) => {
     if (v == null || v === "") return "—";
     if (Array.isArray(v) && v.length === 0) return "—";
@@ -425,6 +426,8 @@ export default function PropertyModal({ property, onClose, listings = [], onSele
   ).toLowerCase();
   const listedByLabel =
     listedByRaw === "broker" ? "Broker" : listedByRaw === "tenant" ? "Tenant" : listedByRaw === "owner" ? "Owner" : "";
+  /** A real date if the listing gave one, otherwise its availability wording. */
+  const moveInLabel = String(property.availableFrom || property.availability || "").trim();
   const builtUpLabel = property.builtUpArea
     ? `${property.builtUpArea}${property.areaUnit ? ` ${property.areaUnit}` : ""}`
     : "—";
@@ -432,24 +435,31 @@ export default function PropertyModal({ property, onClose, listings = [], onSele
     property.floorNumber || property.totalFloors
       ? `${dash(property.floorNumber)} of ${dash(property.totalFloors)} floors`
       : "—";
+  /**
+   * Only what the listing actually says. Every field was printed regardless,
+   * so a listing that had answered six of sixteen showed ten headers over an
+   * em dash — which reads as missing data rather than as a field that doesn't
+   * apply to this home.
+   */
   const detailRows = [
     ["Security deposit", depositSidebar],
-    ["Area unit", dash(property.areaUnit) !== "—" ? property.areaUnit : "sq ft"],
     ["Brokerage", dash(property.brokerage)],
-    ["Maintenance", property.maintenanceCost ? dash(property.maintenanceCost) : formatInr(maintenance)],
-    ["Built-up area", builtUpLabel],
+    ["Maintenance", maintenanceSidebar],
+    ["Built-up area", property.builtUpArea ? builtUpLabel : ""],
     ["Furnishing (type)", dash(property.furnishing)],
     ["Bathrooms", dash(property.bathrooms)],
     ["Balcony", dash(property.balcony)],
-    ["Available from", dash(property.availableFrom || property.availability)],
-    ["Floor / total floors", floorLabel],
+    ["Floor / total floors", property.floorNumber || property.totalFloors ? floorLabel : ""],
     ["Lease type", dash(property.leaseType)],
     ["Age of property", dash(property.ageOfProperty)],
-    ["Parking", dash(property.parkingInfo) !== "—" ? property.parkingInfo : property.parking?.join(", ") || "—"],
+    ["Parking", dash(property.parkingInfo) !== "—" ? property.parkingInfo : (property.parking?.join(", ") || "")],
     ["Gas pipeline", dash(property.gasPipeline)],
     ["Gated community", dash(property.gatedCommunity)],
-    ["Source URL", property.sourceUrl ? property.sourceUrl : "—"],
-  ];
+    ["Source URL", property.sourceUrl || ""],
+  ].filter(([, value]) => {
+    const v = String(value ?? "").trim();
+    return v && v !== "—" && v !== "0" && v !== "₹ 0";
+  });
 
   const slotLabel = (iso) => {
     const d = new Date(iso);
@@ -1043,41 +1053,21 @@ export default function PropertyModal({ property, onClose, listings = [], onSele
                   </div>
                 ) : null}
 
-                <div id="facts" style={{ marginBottom: "32px" }}>
-                  <h2 style={{ margin: "0 0 16px", fontSize: "18px", color: T.text }}>Facts, features & policies</h2>
-                  <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "16px" }}>
-                    <div style={{ background: T.lineSoft, padding: "12px", borderRadius: "8px" }}>
-                      <div style={{ fontSize: "12px", color: T.textMute, marginBottom: "4px" }}>Availability</div>
-                      <div style={{ fontWeight: 600, color: T.text }}>{property.availability || "Immediate"}</div>
-                    </div>
-                    <div style={{ background: T.lineSoft, padding: "12px", borderRadius: "8px" }}>
-                      <div style={{ fontSize: "12px", color: T.textMute, marginBottom: "4px" }}>Listed By</div>
-                      <div style={{ fontWeight: 600, color: T.text }}>{property.seller || property.company || "Owner"}</div>
-                    </div>
-                    <div style={{ background: T.lineSoft, padding: "12px", borderRadius: "8px" }}>
-                      <div style={{ fontSize: "12px", color: T.textMute, marginBottom: "4px" }}>Broker contact</div>
-                      <div style={{ fontWeight: 600, color: T.text }}>
-                        {showBrokerDirectLine
-                          ? brokerCallLine
-                          : "Not published on the public map — request a visit or apply and MovEazy coordinates with the broker."}
-                      </div>
-                    </div>
-                    <div style={{ background: T.lineSoft, padding: "12px", borderRadius: "8px" }}>
-                      <div style={{ fontSize: "12px", color: T.textMute, marginBottom: "4px" }}>Source</div>
-                      <div style={{ fontWeight: 600, color: T.text }}>{property.source || "Direct"}</div>
-                    </div>
-                    <div style={{ background: T.lineSoft, padding: "12px", borderRadius: "8px" }}>
-                      <div style={{ fontSize: "12px", color: T.textMute, marginBottom: "4px" }}>Coordinates</div>
-                      <div style={{ fontWeight: 600, color: T.text }}>{property.lat && property.lng ? `${property.lat}, ${property.lng}` : "Not available"}</div>
-                    </div>
-                    <div style={{ background: T.lineSoft, padding: "12px", borderRadius: "8px" }}>
-                      <div style={{ fontSize: "12px", color: T.textMute, marginBottom: "4px" }}>Move-in</div>
-                      <div style={{ fontWeight: 600, color: T.text }}>{property.availableFrom || property.availability || "Immediate"}</div>
+                {/* "Facts, features & policies" used to sit here: eight tiles, of
+                    which Listed By, Broker contact, Source and Coordinates were
+                    either internal plumbing or a paragraph explaining that we
+                    weren't showing a phone number. Only the move-in date was
+                    something a renter came for, so only that is left. */}
+                {moveInLabel && (
+                  <div style={{ marginBottom: "32px" }}>
+                    <div style={{ display: "inline-flex", alignItems: "baseline", gap: 10, background: T.lineSoft, padding: "12px 16px", borderRadius: "8px" }}>
+                      <span style={{ fontSize: "12px", color: T.textMute }}>Move-in</span>
+                      <span style={{ fontWeight: 600, color: T.text }}>{moveInLabel}</span>
                     </div>
                   </div>
-                </div>
+                )}
 
-                <div style={{ marginBottom: "32px", background: T.cream, borderRadius: "12px", border: `1px solid ${T.line}`, overflow: "hidden" }}>
+                <div id="facts" style={{ marginBottom: "32px", background: T.cream, borderRadius: "12px", border: `1px solid ${T.line}`, overflow: "hidden" }}>
                   <div style={{ padding: "14px 16px", fontSize: "18px", fontWeight: 700, color: T.text, borderBottom: `1px solid ${T.line}` }}>
                     Listing specifications <span style={{ fontSize: "13px", fontWeight: 500, color: T.textMute }}>(from listing / broker)</span>
                   </div>
@@ -1161,9 +1151,11 @@ export default function PropertyModal({ property, onClose, listings = [], onSele
                     <div style={{ display: "flex", justifyContent: "space-between", fontSize: "12px", color: T.textDim, marginBottom: "6px" }}>
                       <span>Security deposit</span><strong style={{ color: T.text }}>{depositSidebar}</strong>
                     </div>
-                    <div style={{ display: "flex", justifyContent: "space-between", fontSize: "12px", color: T.textDim, marginBottom: "6px" }}>
-                      <span>Maintenance{maintenanceIsEstimate ? " (est.)" : ""}</span><strong style={{ color: T.text }}>{maintenanceSidebar}</strong>
-                    </div>
+                    {maintenanceSidebar ? (
+                      <div style={{ display: "flex", justifyContent: "space-between", fontSize: "12px", color: T.textDim, marginBottom: "6px" }}>
+                        <span>Maintenance</span><strong style={{ color: T.text }}>{maintenanceSidebar}</strong>
+                      </div>
+                    ) : null}
 
                   </div>
 

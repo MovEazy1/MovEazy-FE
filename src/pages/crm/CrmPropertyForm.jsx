@@ -18,7 +18,10 @@ import {
   ALL_LOCALITIES, FLAT_TYPES, FURNISHINGS, LIFESTYLE, MUST_HAVES, OCCUPANTS,
 } from "../../data/preferenceOptions";
 import { cleanSourceUrl, detectSource, parseListingText } from "../../lib/listingImport";
-import { generatePropertyId, mediaRejectionReason, uploadInventoryPhotos } from "../../lib/inventory";
+import {
+  generatePropertyId, isMissingColumn, mediaRejectionReason, uploadInventoryPhotos,
+  withoutOptionalColumns,
+} from "../../lib/inventory";
 import {
   coverPhoto, describeMedia, isListingMediaFile, isVideoFile, isVideoUrl, orderListingMedia,
 } from "../../lib/listingMedia";
@@ -29,7 +32,7 @@ import { Btn, C, Chip, Empty, Toast, inr } from "./crmUi";
 
 const BLANK = {
   area: "", nearby_areas: [], full_address: "", landmark: "",
-  rent: "", deposit: "", available_from: "",
+  rent: "", deposit: "", maintenance: "", available_from: "",
   flat_type: "", bedrooms: "", bathrooms: "", furnishing: "",
   max_flatmates: "", gender_pref: "any",
   occupants_allowed: [], amenities: [], lifestyle: [], house_rules: [],
@@ -59,6 +62,7 @@ function rowToForm(row) {
     landmark: row.landmark ?? "",
     rent: row.rent ?? "",
     deposit: row.deposit ?? "",
+    maintenance: row.maintenance ?? "",
     available_from: String(row.available_from ?? "").slice(0, 10),
     flat_type: row.flat_type ?? "",
     bedrooms: row.bedrooms ?? "",
@@ -300,6 +304,8 @@ export default function CrmPropertyForm() {
         landmark: f.landmark || "",
         rent: Number(f.rent) || 0,
         deposit: Number(f.deposit) || 0,
+        // Blank stays null: "not stated" is not "zero".
+        maintenance: String(f.maintenance).trim() === "" ? null : Number(f.maintenance) || 0,
         available_from: f.available_from || null,
         flat_type: f.flat_type,
         bedrooms: Number(f.bedrooms) || 1,
@@ -328,12 +334,16 @@ export default function CrmPropertyForm() {
         delete changes.property_id;
         delete changes.poster_id;
         delete changes.poster_email;
-        const { data, error } = await supabase
-          .from("inventory")
-          .update(changes)
-          .eq("property_id", editId)
-          .select()
-          .single();
+        let { data, error } = await supabase
+          .from("inventory").update(changes).eq("property_id", editId).select().single();
+        // A column a pending migration hasn't added must not block an edit to
+        // the fifteen fields that do exist.
+        if (error && isMissingColumn(error)) {
+          console.warn(`[crm] update: ${error.message} — saving without it. Run the pending migration.`);
+          ({ data, error } = await supabase
+            .from("inventory").update(withoutOptionalColumns(changes)).eq("property_id", editId)
+            .select().single());
+        }
         if (error) throw error;
         setKeptImages(Array.isArray(data.images) ? data.images : []);
         setPhotos([]);
@@ -507,6 +517,10 @@ export default function CrmPropertyForm() {
               <Field label="Deposit">
                 <input className="crm-input crm-num" type="number" inputMode="numeric" value={f.deposit}
                   onChange={(e) => set({ deposit: e.target.value })} placeholder="200000" />
+              </Field>
+              <Field label="Maintenance" hint="Blank if the owner didn't quote one.">
+                <input className="crm-input crm-num" type="number" inputMode="numeric" value={f.maintenance}
+                  onChange={(e) => set({ maintenance: e.target.value })} placeholder="Optional" />
               </Field>
             </div>
 
