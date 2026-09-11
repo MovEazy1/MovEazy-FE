@@ -1,5 +1,10 @@
 /**
- * /login/supabase — Supabase-first sign-in page.
+ * /auth — sign in.
+ *
+ * Google, and only Google. There is no separate sign-up because a first Google
+ * sign-in is the sign-up: no password to set, forget or reset, no verification
+ * email to chase, and no half-finished accounts sitting unverified.
+ *
  * Styled to match the fork home (paper/rust/verified palette + Georgia serif).
  * Falls back gracefully if Supabase is not configured.
  */
@@ -8,7 +13,6 @@ import { Link, useNavigate, useSearchParams } from "react-router-dom";
 import { motion, AnimatePresence } from "framer-motion";
 import MovEazyLogo from "../components/branding/MovEAZYLogo";
 import { useAuth } from "../context/AuthContext";
-import { getSupabaseAuthSettings } from "../lib/supabase";
 
 const INK     = "#1A2421";
 const PAPER   = "#F7F4ED";
@@ -103,15 +107,6 @@ function GoogleBtn({ onClick, loading }) {
   );
 }
 
-function Divider() {
-  return (
-    <div style={{ display: "flex", alignItems: "center", gap: 12, margin: "18px 0" }}>
-      <div style={{ flex: 1, height: 1, background: LINE }} />
-      <span style={{ fontSize: 12, color: MUTED, fontFamily: "JetBrains Mono, monospace" }}>or</span>
-      <div style={{ flex: 1, height: 1, background: LINE }} />
-    </div>
-  );
-}
 
 function Alert({ type, children }) {
   const colors = {
@@ -134,202 +129,12 @@ function Alert({ type, children }) {
 
 /* ── Tabs ─────────────────────────────────────────────────────────────────── */
 
-function TabBar({ tab, setTab }) {
-  return (
-    <div style={{ display: "flex", background: PAPER, borderRadius: 10, padding: 4, marginBottom: 20 }}>
-      {["sign-in", "sign-up"].map((t) => (
-        <button
-          key={t}
-          type="button"
-          onClick={() => setTab(t)}
-          style={{
-            flex: 1, height: 36, borderRadius: 8, border: "none", cursor: "pointer",
-            background: tab === t ? WHITE : "transparent",
-            color: tab === t ? INK : MUTED,
-            fontSize: 13, fontWeight: tab === t ? 700 : 500,
-            boxShadow: tab === t ? `0 1px 4px rgba(0,0,0,0.1)` : "none",
-            transition: "all 0.15s",
-          }}
-        >
-          {t === "sign-in" ? "Sign in" : "Create account"}
-        </button>
-      ))}
-    </div>
-  );
-}
 
 /* ── Sign-in form ──────────────────────────────────────────────────────────── */
 
-function SignInForm({ onSuccess, googleEnabled }) {
-  const { loginWithSupabase, loginWithSupabaseGoogle, forgotPasswordSupabase } = useAuth();
-  const [email, setEmail]   = useState("");
-  const [pw,    setPw]      = useState("");
-  const [showPw, setShowPw] = useState(false);
-  const [busy,   setBusy]   = useState(false);
-  const [error,  setError]  = useState("");
-  const [info,   setInfo]   = useState("");
-
-  const onSubmit = async (e) => {
-    e.preventDefault();
-    setError(""); setInfo("");
-    setBusy(true);
-    const r = await loginWithSupabase(email, pw);
-    setBusy(false);
-    if (r.success) { onSuccess(r.role || "tenant"); }
-    else { setError(r.error || "Sign-in failed."); }
-  };
-
-  const onGoogle = async () => {
-    setError("");
-    setBusy(true);
-    const r = await loginWithSupabaseGoogle();
-    setBusy(false);
-    if (!r.success) setError(r.error || "Google sign-in failed.");
-    // on success the browser redirects — no further action needed
-  };
-
-  const onForgot = async () => {
-    if (!email) { setError("Enter your email first."); return; }
-    setError(""); setInfo("");
-    setBusy(true);
-    const r = await forgotPasswordSupabase(email);
-    setBusy(false);
-    if (r.success) setInfo(r.info || "Reset email sent.");
-    else setError(r.error || "Could not send reset email.");
-  };
-
-  return (
-    <form onSubmit={onSubmit}>
-      <AnimatePresence>
-        {error && <Alert type="error" key="e">{error}</Alert>}
-        {info  && <Alert type="info"  key="i">{info}</Alert>}
-      </AnimatePresence>
-
-      <Input label="Email" required type="email" value={email} onChange={(e) => setEmail(e.target.value)} placeholder="you@email.com" autoFocus disabled={busy} />
-
-      <div style={{ marginBottom: 14 }}>
-        <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 6 }}>
-          <Label>Password</Label>
-          <button type="button" onClick={onForgot} disabled={busy}
-            style={{ fontSize: 12, fontWeight: 600, color: RUST, background: "none", border: "none", cursor: "pointer", padding: 0 }}>
-            Forgot?
-          </button>
-        </div>
-        <div style={{ position: "relative" }}>
-          <input
-            type={showPw ? "text" : "password"}
-            value={pw}
-            onChange={(e) => setPw(e.target.value)}
-            required disabled={busy} placeholder="Your password" minLength={6}
-            style={{ ...inputStyle, paddingRight: 40 }}
-          />
-          <button type="button" onClick={() => setShowPw(v => !v)}
-            style={{ position: "absolute", right: 12, top: "50%", transform: "translateY(-50%)", background: "none", border: "none", cursor: "pointer", color: MUTED, padding: 0, display: "flex" }}>
-            {showPw
-              ? <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94"/><path d="M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19"/><line x1="1" y1="1" x2="23" y2="23"/></svg>
-              : <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>}
-          </button>
-        </div>
-      </div>
-
-      <PrimaryBtn loading={busy}>Sign in →</PrimaryBtn>
-      {googleEnabled && <><Divider /><GoogleBtn onClick={onGoogle} loading={busy} /></>}
-    </form>
-  );
-}
 
 /* ── Sign-up form ─────────────────────────────────────────────────────────── */
 
-function SignUpForm({ onSuccess, googleEnabled }) {
-  const { signupWithSupabase, loginWithSupabaseGoogle } = useAuth();
-  const [phone, setPhone]  = useState("");
-  const [name,  setName]   = useState("");
-  const [email, setEmail]  = useState("");
-  const [pw,    setPw]     = useState("");
-  const [role,  setRole]   = useState("tenant");
-  const [showPw, setShowPw] = useState(false);
-  const [busy,   setBusy]  = useState(false);
-  const [error,  setError] = useState("");
-  const [info,   setInfo]  = useState("");
-
-  const onSubmit = async (e) => {
-    e.preventDefault();
-    if (!phone.trim()) { setError("Please enter your phone number."); return; }
-    if (!name.trim()) { setError("Please enter your name."); return; }
-    setError(""); setInfo("");
-    setBusy(true);
-    const r = await signupWithSupabase(email, pw, name.trim(), role, phone.trim());
-    setBusy(false);
-    if (r.success) {
-      if (r.requiresVerification) { setInfo(r.info || "Verify your email, then sign in."); }
-      else { onSuccess(r.role || role); }
-    } else {
-      setError(r.error || "Sign-up failed.");
-    }
-  };
-
-  const onGoogle = async () => {
-    setError("");
-    setBusy(true);
-    const r = await loginWithSupabaseGoogle();
-    setBusy(false);
-    if (!r.success) setError(r.error || "Google sign-in failed.");
-  };
-
-  return (
-    <form onSubmit={onSubmit}>
-      <AnimatePresence>
-        {error && <Alert type="error" key="e">{error}</Alert>}
-        {info  && <Alert type="success" key="i">{info}</Alert>}
-      </AnimatePresence>
-
-      {/* Role picker */}
-      <div style={{ marginBottom: 14 }}>
-        <Label>I am a</Label>
-        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 8 }}>
-          {[{ id: "tenant", label: "Tenant" }, { id: "owner", label: "Owner" }, { id: "broker", label: "Broker" }].map((c) => (
-            <button
-              key={c.id} type="button" onClick={() => setRole(c.id)}
-              style={{
-                height: 38, borderRadius: 8, border: `1.5px solid ${role === c.id ? RUST : LINE}`,
-                background: role === c.id ? RUST_BG : WHITE,
-                color: role === c.id ? RUST : MUTED,
-                fontSize: 13, fontWeight: 600, cursor: "pointer",
-              }}
-            >
-              {c.label}
-            </button>
-          ))}
-        </div>
-      </div>
-
-      <Input label="Phone Number" required type="tel"      value={phone} onChange={(e) => setPhone(e.target.value)} placeholder="+91 98765 43210" autoFocus disabled={busy} />
-      <Input label="Full Name"   required type="text"     value={name}  onChange={(e) => setName(e.target.value)}  placeholder="Your name"      disabled={busy} />
-      <Input label="Email"       required type="email"    value={email} onChange={(e) => setEmail(e.target.value)} placeholder="you@email.com"  disabled={busy} />
-
-      <div style={{ marginBottom: 14 }}>
-        <Label required>Password</Label>
-        <div style={{ position: "relative" }}>
-          <input
-            type={showPw ? "text" : "password"}
-            value={pw} onChange={(e) => setPw(e.target.value)}
-            required disabled={busy} placeholder="Min 6 characters" minLength={6}
-            style={{ ...inputStyle, paddingRight: 40 }}
-          />
-          <button type="button" onClick={() => setShowPw(v => !v)}
-            style={{ position: "absolute", right: 12, top: "50%", transform: "translateY(-50%)", background: "none", border: "none", cursor: "pointer", color: MUTED, padding: 0, display: "flex" }}>
-            {showPw
-              ? <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94"/><path d="M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19"/><line x1="1" y1="1" x2="23" y2="23"/></svg>
-              : <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>}
-          </button>
-        </div>
-      </div>
-
-      <PrimaryBtn loading={busy}>Create account →</PrimaryBtn>
-      {googleEnabled && <><Divider /><GoogleBtn onClick={onGoogle} loading={busy} /></>}
-    </form>
-  );
-}
 
 /* ── Main page ──────────────────────────────────────────────────────────────── */
 
@@ -337,15 +142,21 @@ export default function SupabaseLogin() {
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
   const { user, supabaseSession, isSupabaseConfigured: sbConfigured } = useAuth();
-  const [tab, setTab] = useState("sign-in");
-  const [googleEnabled, setGoogleEnabled] = useState(false);
+  const { loginWithGoogle } = useAuth();
+  const [error, setError] = useState("");
+  const [busy, setBusy] = useState(false);
 
-  // Check which providers are enabled
-  useEffect(() => {
-    getSupabaseAuthSettings().then((s) => {
-      setGoogleEnabled(Boolean(s?.external?.google));
-    });
-  }, []);
+  const onGoogle = async () => {
+    setError("");
+    setBusy(true);
+    const r = await loginWithGoogle();
+    // On success the browser leaves for Google's account picker and nothing
+    // below runs; AuthContext picks the session up when it comes back.
+    if (!r?.success) {
+      setBusy(false);
+      setError(r?.error || "Google sign-in is unavailable right now.");
+    }
+  };
 
   // If already logged in, redirect away
   useEffect(() => {
@@ -354,16 +165,6 @@ export default function SupabaseLogin() {
     if (next) { navigate(next); return; }
     navigate(user ? "/profile" : "/");
   }, [user, supabaseSession, navigate, searchParams]);
-
-  function onSuccess(role) {
-    const next = searchParams.get("next");
-    if (next) { navigate(next); return; }
-    // Route based on user role
-    if (role === "tenant") navigate("/recommendations");
-    else if (role === "owner") navigate("/my-properties");
-    else if (role === "broker") navigate("/broker");
-    else navigate("/profile");
-  }
 
   return (
     <div style={{ minHeight: "100dvh", background: PAPER, fontFamily: "Inter, sans-serif", display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", padding: "24px 16px" }}>
@@ -395,28 +196,24 @@ export default function SupabaseLogin() {
           </div>
         ) : (
           <>
+            {/* Google is the only way in — there is no separate sign-up, because
+                a first Google sign-in is the sign-up. No password to set, forget
+                or reset, and no unverified half-accounts. */}
             <h1 style={{ fontFamily: "Georgia, 'Times New Roman', serif", fontSize: 24, fontWeight: 600, color: INK, marginBottom: 4, lineHeight: 1.2 }}>
-              {tab === "sign-in" ? "Welcome back." : "Join Moveazy."}
+              Welcome to MovEazy.
             </h1>
             <p style={{ fontSize: 14, color: MUTED, marginBottom: 22, lineHeight: 1.5 }}>
-              {tab === "sign-in"
-                ? "Sign in to find your next home or manage your listings."
-                : "Create a free account — it takes 30 seconds."}
+              Sign in with Google to find your next home or manage your listings.
+              First time? This creates your account too.
             </p>
 
-            <TabBar tab={tab} setTab={setTab} />
+            {error && (
+              <div style={{ marginBottom: 16, borderRadius: 10, border: "1px solid #FBD5C8", background: "#FDF1EC", padding: "10px 12px", fontSize: 13, color: "#9C3A1B" }}>
+                {error}
+              </div>
+            )}
 
-            <AnimatePresence mode="wait">
-              {tab === "sign-in" ? (
-                <motion.div key="in" initial={{ opacity: 0, x: 14 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: -14 }} transition={{ duration: 0.2, ease: EASE }}>
-                  <SignInForm onSuccess={onSuccess} googleEnabled={googleEnabled} />
-                </motion.div>
-              ) : (
-                <motion.div key="up" initial={{ opacity: 0, x: 14 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: -14 }} transition={{ duration: 0.2, ease: EASE }}>
-                  <SignUpForm onSuccess={onSuccess} googleEnabled={googleEnabled} />
-                </motion.div>
-              )}
-            </AnimatePresence>
+            <GoogleBtn onClick={onGoogle} loading={busy} />
 
             <p style={{ fontSize: 12, color: MUTED, textAlign: "center", marginTop: 16 }}>
               By continuing you agree to our{" "}
