@@ -191,6 +191,8 @@ export default function PropertyModal({ property, onClose, listings = [], onSele
   const [visitSlots, setVisitSlots] = useState([]);
   const [slotsLoading, setSlotsLoading] = useState(false);
   const [chosenSlot, setChosenSlot] = useState("");
+  /** Which day's times are open. "" until one is tapped. */
+  const [openDay, setOpenDay] = useState("");
   const [booking, setBooking] = useState(false);
   const [isMobile, setIsMobile] = useState(typeof window !== "undefined" ? window.innerWidth <= 768 : false);
 
@@ -208,12 +210,54 @@ export default function PropertyModal({ property, onClose, listings = [], onSele
     let alive = true;
     setSlotsLoading(true);
     setChosenSlot("");
+    setOpenDay("");
     fetchOpenVisitsForProperty(property.id, { days: 21 })
-      .then((rows) => { if (alive) setVisitSlots((rows || []).slice(0, 5)); })
+      .then((rows) => { if (alive) setVisitSlots(rows || []); })
       .catch(() => { if (alive) setVisitSlots([]); })
       .finally(() => { if (alive) setSlotsLoading(false); });
     return () => { alive = false; };
   }, [property?.id]);
+
+  /**
+   * The next five days the lister has opened, each with its own times.
+   *
+   * Showing the next five *slots* meant five consecutive hours of one morning:
+   * a renter free only at the weekend saw nothing that suited and assumed the
+   * flat had no availability. Days first, times second, matches how someone
+   * actually decides — which day can I go, then when.
+   */
+  const visitDays = useMemo(() => {
+    const byDay = new Map();
+    for (const slot of visitSlots) {
+      if (!slot?.slot_at) continue;
+      const d = new Date(slot.slot_at);
+      if (Number.isNaN(d.getTime())) continue;
+      // Local calendar day: through UTC, an evening slot lands on the day before.
+      const key = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+      if (!byDay.has(key)) byDay.set(key, []);
+      byDay.get(key).push(slot);
+    }
+    return [...byDay.entries()]
+      .map(([key, slots]) => ({
+        key,
+        slots: slots.sort((a, b) => new Date(a.slot_at) - new Date(b.slot_at)),
+      }))
+      .sort((a, b) => a.key.localeCompare(b.key))
+      .slice(0, 5);
+  }, [visitSlots]);
+
+  const dayLabel = (key) => {
+    const d = new Date(`${key}T00:00`);
+    const today = new Date(); today.setHours(0, 0, 0, 0);
+    const diff = Math.round((d - today) / 86400000);
+    if (diff === 0) return "Today";
+    if (diff === 1) return "Tomorrow";
+    return d.toLocaleDateString("en-IN", { weekday: "short", day: "numeric", month: "short" });
+  };
+
+  const timeOnly = (iso) =>
+    new Date(iso).toLocaleTimeString("en-IN", { hour: "numeric", minute: "2-digit", hour12: true });
+
 
   useEffect(() => {
     const onResize = () => setIsMobile(window.innerWidth <= 768);
@@ -1171,30 +1215,71 @@ export default function PropertyModal({ property, onClose, listings = [], onSele
                       ) : visitSlots.length > 0 ? (
                         <>
                           <p style={{ margin: "0 0 2px", fontSize: 13, color: T.textDim, lineHeight: 1.5 }}>
-                            Pick a time the lister has opened up:
+                            {openDay ? "Now pick a time:" : "Pick a day the lister has opened up:"}
                           </p>
                           <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
-                            {visitSlots.map((slot) => {
-                              const { day, time } = slotLabel(slot.slot_at);
-                              const on = chosenSlot === slot.slot_at;
+                            {visitDays.map((day) => {
+                              const expanded = openDay === day.key;
+                              const chosenHere = day.slots.some((sl) => sl.slot_at === chosenSlot);
                               return (
-                                <button
-                                  key={slot.id}
-                                  type="button"
-                                  onClick={() => setChosenSlot(slot.slot_at)}
-                                  style={{
-                                    display: "flex", alignItems: "center", justifyContent: "space-between",
-                                    gap: 10, padding: "12px 14px", borderRadius: 10, cursor: "pointer",
-                                    background: on ? T.mintSoft : "#fff",
-                                    border: `1.5px solid ${on ? T.teal : T.line}`,
-                                    color: T.text, textAlign: "left",
-                                  }}
-                                >
-                                  <span style={{ fontSize: 13.5, fontWeight: 700 }}>{day}</span>
-                                  <span style={{ fontSize: 13.5, fontWeight: on ? 800 : 600, color: on ? T.teal : T.textDim }}>
-                                    {time}
-                                  </span>
-                                </button>
+                                <div key={day.key}>
+                                  <button
+                                    type="button"
+                                    aria-expanded={expanded}
+                                    onClick={() => {
+                                      // Collapsing a day drops a time chosen inside it —
+                                      // leaving it selected but hidden is how someone
+                                      // books a slot they can no longer see.
+                                      if (expanded) { setOpenDay(""); if (chosenHere) setChosenSlot(""); }
+                                      else setOpenDay(day.key);
+                                    }}
+                                    style={{
+                                      width: "100%",
+                                      display: "flex", alignItems: "center", justifyContent: "space-between",
+                                      gap: 10, padding: "12px 14px", borderRadius: 10, cursor: "pointer",
+                                      background: chosenHere ? T.mintSoft : "#fff",
+                                      border: `1.5px solid ${expanded || chosenHere ? T.teal : T.line}`,
+                                      color: T.text, textAlign: "left",
+                                    }}
+                                  >
+                                    <span style={{ fontSize: 13.5, fontWeight: 700 }}>{dayLabel(day.key)}</span>
+                                    <span style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                                      <span style={{ fontSize: 13, fontWeight: chosenHere ? 800 : 600, color: chosenHere ? T.teal : T.textDim }}>
+                                        {chosenHere
+                                          ? timeOnly(chosenSlot)
+                                          : `${day.slots.length} time${day.slots.length === 1 ? "" : "s"}`}
+                                      </span>
+                                      <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke={T.textMute} strokeWidth="2.6" strokeLinecap="round" strokeLinejoin="round"
+                                        style={{ transform: expanded ? "rotate(180deg)" : "none", transition: "transform .15s" }} aria-hidden>
+                                        <path d="M6 9l6 6 6-6" />
+                                      </svg>
+                                    </span>
+                                  </button>
+
+                                  {expanded && (
+                                    <div style={{ display: "flex", flexWrap: "wrap", gap: 7, padding: "9px 2px 2px" }}>
+                                      {day.slots.map((sl) => {
+                                        const on = chosenSlot === sl.slot_at;
+                                        return (
+                                          <button
+                                            key={sl.id}
+                                            type="button"
+                                            onClick={() => setChosenSlot(sl.slot_at)}
+                                            style={{
+                                              padding: "8px 13px", borderRadius: 999, cursor: "pointer",
+                                              fontSize: 13, fontWeight: on ? 800 : 600,
+                                              background: on ? T.teal : "#fff",
+                                              color: on ? "#fff" : T.textDim,
+                                              border: `1.5px solid ${on ? T.teal : T.line}`,
+                                            }}
+                                          >
+                                            {timeOnly(sl.slot_at)}
+                                          </button>
+                                        );
+                                      })}
+                                    </div>
+                                  )}
+                                </div>
                               );
                             })}
                           </div>
@@ -1211,7 +1296,7 @@ export default function PropertyModal({ property, onClose, listings = [], onSele
                                 cursor: chosenSlot && !booking ? "pointer" : "not-allowed",
                               }}
                             >
-                              {booking ? "Booking…" : chosenSlot ? "Confirm visit" : "Pick a time"}
+                              {booking ? "Booking…" : chosenSlot ? "Confirm visit" : openDay ? "Pick a time" : "Pick a day"}
                             </button>
                           </div>
                         </>
