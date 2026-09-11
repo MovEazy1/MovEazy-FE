@@ -26,7 +26,7 @@ import MovEazyLogo from "./branding/MovEAZYLogo";
 import { fetchAllUserRequirements } from "../lib/userRequirements";
 import { matchListingToRequirements } from "../lib/inventoryMatch";
 import {
-  ALL_LOCALITIES, FLAT_TYPES, FURNISHINGS, OCCUPANTS, OCCUPANT_OPTIONS, MUST_HAVES, LIFESTYLE,
+  ALL_LOCALITIES, DEFAULT_POSTING_AMENITIES, FLAT_TYPES, FURNISHINGS, OCCUPANTS, OCCUPANT_OPTIONS, MUST_HAVES, LIFESTYLE,
 } from "../data/preferenceOptions";
 
 const MINT = "#5EEAD4";
@@ -222,7 +222,8 @@ export default function ListMyFlatMobile({ user, onPublished }) {
   // Only the occupant types start on. The exclusions below them are a claim
   // the poster has to make deliberately.
   const [occupantsAllowed, setOccupantsAllowed] = useState([...OCCUPANTS]);
-  const [amenities, setAmenities] = useState([]);
+  // Ticked for the poster; theirs to remove. See DEFAULT_POSTING_AMENITIES.
+  const [amenities, setAmenities] = useState([...DEFAULT_POSTING_AMENITIES]);
   const [lifestyle, setLifestyle] = useState([]);
   const [houseRules, setHouseRules] = useState([]);
 

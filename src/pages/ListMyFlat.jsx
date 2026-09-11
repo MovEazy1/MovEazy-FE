@@ -18,7 +18,7 @@ import { matchListingToRequirements } from "../lib/inventoryMatch";
 import { fetchSlotsForProperty, addVisitSlot, deleteVisitSlot } from "../lib/visits";
 import { fetchMyListingStats, fetchPropertyVisits } from "../lib/ownerDashboard";
 import {
-  ALL_LOCALITIES, FLAT_TYPES, FURNISHINGS, OCCUPANTS, OCCUPANT_OPTIONS,
+  ALL_LOCALITIES, DEFAULT_POSTING_AMENITIES, FLAT_TYPES, FURNISHINGS, OCCUPANTS, OCCUPANT_OPTIONS,
   MUST_HAVES, LIFESTYLE,
 } from "../data/preferenceOptions";
 
@@ -154,7 +154,8 @@ export default function ListMyFlat() {
   const [genderPref, setGenderPref] = useState("any");
   // Only the occupant types start on; the exclusions are opt-in.
   const [occupantsAllowed, setOccupantsAllowed] = useState([...OCCUPANTS]);
-  const [amenities, setAmenities] = useState([]);
+  // Ticked for the poster; theirs to remove. See DEFAULT_POSTING_AMENITIES.
+  const [amenities, setAmenities] = useState([...DEFAULT_POSTING_AMENITIES]);
   const [lifestyle, setLifestyle] = useState([]);
   const [houseRules, setHouseRules] = useState([]);
 

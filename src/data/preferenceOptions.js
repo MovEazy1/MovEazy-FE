@@ -25,8 +25,18 @@ export const OCCUPANT_RESTRICTIONS = ["Bachelor Boys Not Allowed", "Bachelor Gir
 
 /** What a posting flow shows: who may live there, then who may not. */
 export const OCCUPANT_OPTIONS = [...OCCUPANTS, ...OCCUPANT_RESTRICTIONS];
+
+/**
+ * Amenities a posting flow ticks on the poster's behalf.
+ *
+ * Only for things almost every Bengaluru building has, where the useful
+ * question is "is this one the exception?". The poster can untick it, and the
+ * demand side never pre-selects anything — a seeker's must-haves are theirs to
+ * state.
+ */
+export const DEFAULT_POSTING_AMENITIES = ["Outside Car Parking"];
 export const FLAT_TYPES = ["1 RK", "1 BHK", "2 BHK", "3 BHK", "Villa", "Room in Preoccupied flat"];
-export const MUST_HAVES = ["Balcony", "Gym", "Swimming Pool", "Lift", "Covered Parking", "Power Backup", "Security", "Terrace", "Garden", "Maid Room", "Modular Kitchen", "Study Room", "Pet Friendly", "Near Metro", "Near Office", "Gated Society", "Good Sunlight", "Quiet Area", "High Floor", "Low Floor"];
+export const MUST_HAVES = ["Balcony", "Gym", "Swimming Pool", "Lift", "Covered Parking", "Outside Car Parking", "Power Backup", "Security", "Terrace", "Garden", "Maid Room", "Modular Kitchen", "Study Room", "Pet Friendly", "Near Metro", "Near Office", "Gated Society", "Good Sunlight", "Quiet Area", "High Floor", "Low Floor"];
 export const LIFESTYLE = ["Walkable cafes", "Nightlife", "Parks", "Running Track", "Office Commute", "Schools", "Hospitals", "Grocery Nearby", "Peaceful Area", "Young Crowd", "Community Living"];
 export const DEALBREAKERS = ["No Sunlight", "Ground Floor", "Too Far From Metro", "Bachelor Restrictions", "Old Buildings", "Small Kitchen", "Traffic Heavy Roads", "Water Problems", "Poor Mobile Network"];
 export const OFFICE_CHIPS = ["Manyata Tech Park", "Embassy Tech Village", "Bagmane Tech Park", "Electronic City", "RMZ Ecoworld", "Prestige Tech Park"];

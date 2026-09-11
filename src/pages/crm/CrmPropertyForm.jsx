@@ -16,7 +16,7 @@ import { useNavigate, useParams } from "react-router-dom";
 import { useCrm } from "./CrmShell";
 import PropertyVisitSlots from "../../components/PropertyVisitSlots";
 import {
-  ALL_LOCALITIES, FLAT_TYPES, FURNISHINGS, LIFESTYLE, MUST_HAVES, OCCUPANT_OPTIONS,
+  ALL_LOCALITIES, DEFAULT_POSTING_AMENITIES, FLAT_TYPES, FURNISHINGS, LIFESTYLE, MUST_HAVES, OCCUPANT_OPTIONS,
   parentAreaOf, withParentArea,
 } from "../../data/preferenceOptions";
 import { cleanSourceUrl, detectSource, parseListingText } from "../../lib/listingImport";
@@ -39,7 +39,7 @@ const BLANK = {
   rent: "", deposit: "", maintenance: "", available_from: "",
   flat_type: "", bedrooms: "", bathrooms: "", floor_number: "", total_floors: "", furnishing: "",
   max_flatmates: "", gender_pref: "any",
-  occupants_allowed: [], amenities: [], lifestyle: [], house_rules: [],
+  occupants_allowed: [], amenities: [...DEFAULT_POSTING_AMENITIES], lifestyle: [], house_rules: [],
   poster_name: "", phone: "", posted_by: "owner",
   title: "", description: "", source_url: "", status: "published",
 };
