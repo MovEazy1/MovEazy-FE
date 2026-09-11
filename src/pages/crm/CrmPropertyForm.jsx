@@ -36,7 +36,7 @@ const BLANK = {
   area: "", nearby_areas: [], full_address: "", landmark: "",
   latitude: "", longitude: "",
   rent: "", deposit: "", maintenance: "", available_from: "",
-  flat_type: "", bedrooms: "", bathrooms: "", furnishing: "",
+  flat_type: "", bedrooms: "", bathrooms: "", floor_number: "", total_floors: "", furnishing: "",
   max_flatmates: "", gender_pref: "any",
   occupants_allowed: [], amenities: [], lifestyle: [], house_rules: [],
   poster_name: "", phone: "", posted_by: "owner",
@@ -72,6 +72,8 @@ function rowToForm(row) {
     flat_type: row.flat_type ?? "",
     bedrooms: row.bedrooms ?? "",
     bathrooms: row.bathrooms ?? "",
+    floor_number: row.floor_number ?? "",
+    total_floors: row.total_floors ?? "",
     furnishing: row.furnishing ?? "",
     max_flatmates: row.max_flatmates ?? "",
     gender_pref: row.gender_pref || "any",
@@ -341,6 +343,9 @@ export default function CrmPropertyForm() {
         flat_type: f.flat_type,
         bedrooms: Number(f.bedrooms) || 1,
         bathrooms: Number(f.bathrooms) || 1,
+        // Null, not 0 — the ground floor is a real answer.
+        floor_number: String(f.floor_number).trim() === "" ? null : Number(f.floor_number),
+        total_floors: String(f.total_floors).trim() === "" ? null : Number(f.total_floors),
         furnishing: f.furnishing,
         max_flatmates: Number(f.max_flatmates) || 0,
         gender_pref: f.gender_pref || "any",
@@ -592,6 +597,14 @@ export default function CrmPropertyForm() {
               <Field label="Bathrooms">
                 <input className="crm-input crm-num" type="number" min="0" value={f.bathrooms}
                   onChange={(e) => set({ bathrooms: e.target.value })} placeholder="2" />
+              </Field>
+              <Field label="Floor" hint="0 is the ground floor. Blank if the owner didn't say.">
+                <input className="crm-input crm-num" type="number" min="0" value={f.floor_number}
+                  onChange={(e) => set({ floor_number: e.target.value })} placeholder="Optional" />
+              </Field>
+              <Field label="Floors in building">
+                <input className="crm-input crm-num" type="number" min="0" value={f.total_floors}
+                  onChange={(e) => set({ total_floors: e.target.value })} placeholder="Optional" />
               </Field>
             </div>
 

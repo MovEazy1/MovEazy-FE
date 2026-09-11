@@ -116,6 +116,10 @@ export function buildInventoryRow(draft, poster) {
     // Null, not 0: "the lister didn't say" is not "the lister said zero", and
     // the property page shows no maintenance row for the former.
     maintenance: draft.maintenance === "" || draft.maintenance == null ? null : num(draft.maintenance, 0),
+    // Null rather than 0 — the ground floor is a real answer, so 0 can't
+    // double as "not stated".
+    floor_number: draft.floorNumber === "" || draft.floorNumber == null ? null : num(draft.floorNumber, 0),
+    total_floors: draft.totalFloors === "" || draft.totalFloors == null ? null : num(draft.totalFloors, 0),
     available_from: draft.availableFrom || null,
 
     flat_type: String(draft.flatType || "").trim(),
@@ -186,7 +190,7 @@ export async function createInventoryItem(draft, poster) {
  *
  * So these are asked for, and dropped on the one error that means "not yet".
  */
-const OPTIONAL_INVENTORY_COLS = ["maintenance"];
+const OPTIONAL_INVENTORY_COLS = ["maintenance", "floor_number", "total_floors"];
 
 /**
  * "The database won't give me that column."
@@ -240,6 +244,7 @@ const PUBLIC_INVENTORY_COLS =
   "property_id, posted_by, city, area, nearby_areas, full_address, landmark, " +
   "latitude, longitude, rent, deposit, available_from, flat_type, bedrooms, " +
   "bathrooms, furnishing, max_flatmates, gender_pref, occupants_allowed, maintenance, " +
+  "floor_number, total_floors, " +
   "amenities, lifestyle, house_rules, title, description, images, " +
   "cover_image_url, status, is_verified, view_count, created_at, updated_at";
 
@@ -369,6 +374,9 @@ export function mapInventoryToListing(row) {
     // description. Pass them through.
     securityDeposit: num(row.deposit, 0),
     maintenanceCost: row.maintenance == null ? "" : String(row.maintenance),
+    // The property page has always had a Floor row; until now nothing filled it.
+    floorNumber: row.floor_number == null ? "" : String(row.floor_number),
+    totalFloors: row.total_floors == null ? "" : String(row.total_floors),
     description: String(row.description || "").trim(),
     houseRules: list(row.house_rules),
     preferredTenants: list(row.occupants_allowed),

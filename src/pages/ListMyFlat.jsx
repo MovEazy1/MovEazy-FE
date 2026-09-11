@@ -140,6 +140,9 @@ export default function ListMyFlat() {
   const [bedrooms, setBedrooms] = useState(2);
   const [bedroomsTouched, setBedroomsTouched] = useState(false);
   const [bathrooms, setBathrooms] = useState(1);
+  // "" rather than 0 — the ground floor is a real answer.
+  const [floorNumber, setFloorNumber] = useState("");
+  const [totalFloors, setTotalFloors] = useState("");
   const [furnishing, setFurnishing] = useState("Fully Furnished");
   const [rent, setRent] = useState("");
   const [deposit, setDeposit] = useState("");
@@ -286,6 +289,8 @@ export default function ListMyFlat() {
     flatType,
     bedrooms,
     bathrooms,
+    floorNumber,
+    totalFloors,
     furnishing,
     maxFlatmates,
     genderPref,
@@ -762,6 +767,21 @@ export default function ListMyFlat() {
                     <Label>Bedrooms</Label>
                     <select value={bedrooms} onChange={(e) => { setBedroomsTouched(true); setBedrooms(Number(e.target.value)); }} className={inp}>
                       {[1, 2, 3, 4, 5].map((n) => <option key={n} value={n}>{n}</option>)}
+                    </select>
+                  </div>
+                  <div>
+                    <Label>Floor</Label>
+                    <select value={floorNumber} onChange={(e) => setFloorNumber(e.target.value)} className={inp}>
+                      <option value="">Not sure</option>
+                      <option value="0">Ground</option>
+                      {[0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20].slice(1).map((n) => <option key={n} value={n}>{n}</option>)}
+                    </select>
+                  </div>
+                  <div>
+                    <Label>Floors in building</Label>
+                    <select value={totalFloors} onChange={(e) => setTotalFloors(e.target.value)} className={inp}>
+                      <option value="">Not sure</option>
+                      {[0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20].slice(1).map((n) => <option key={n} value={n}>{n}</option>)}
                     </select>
                   </div>
                   <div>

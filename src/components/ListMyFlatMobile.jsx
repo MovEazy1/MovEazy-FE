@@ -202,6 +202,10 @@ export default function ListMyFlatMobile({ user, onPublished }) {
   const [bedrooms, setBedrooms] = useState(2);
   const [bedroomsTouched, setBedroomsTouched] = useState(false);
   const [bathrooms, setBathrooms] = useState(1);
+  // "" rather than 0 — the ground floor is a real answer, so 0 cannot also
+  // mean "didn't say".
+  const [floorNumber, setFloorNumber] = useState("");
+  const [totalFloors, setTotalFloors] = useState("");
   const [furnishing, setFurnishing] = useState("Fully Furnished");
   const [maxFlatmates, setMaxFlatmates] = useState(0);
   const [flatmatesTouched, setFlatmatesTouched] = useState(false);
@@ -339,7 +343,7 @@ export default function ListMyFlatMobile({ user, onPublished }) {
       const row = await createInventoryItem({
         propertyId, postedBy, phone: user?.phone || "", area, nearbyAreas: [], fullAddress, landmark,
         latitude: marker?.[0] ?? null, longitude: marker?.[1] ?? null,
-        rent, deposit, maintenance, availableFrom, flatType, bedrooms, bathrooms, furnishing,
+        rent, deposit, maintenance, availableFrom, flatType, bedrooms, bathrooms, floorNumber, totalFloors, furnishing,
         maxFlatmates, genderPref, occupantsAllowed, amenities, lifestyle, houseRules,
         title, description, images,
       }, user);
@@ -545,6 +549,13 @@ export default function ListMyFlatMobile({ user, onPublished }) {
                 </SelectField>
                 <SelectField label="Bathrooms" value={String(bathrooms)} onChange={(v) => setBathrooms(Number(v))}>
                   {[1, 2, 3, 4].map((n) => <option key={n} value={n} style={optionStyle}>{n}</option>)}
+                </SelectField>
+                <SelectField label="Floor" value={floorNumber} onChange={setFloorNumber} placeholder="Not sure">
+                  <option value="0" style={optionStyle}>Ground</option>
+                  {[0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20].slice(1).map((n) => <option key={n} value={n} style={optionStyle}>{n}</option>)}
+                </SelectField>
+                <SelectField label="Floors in building" value={totalFloors} onChange={setTotalFloors} placeholder="Not sure">
+                  {[0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20].slice(1).map((n) => <option key={n} value={n} style={optionStyle}>{n}</option>)}
                 </SelectField>
               </div>
               <div>
