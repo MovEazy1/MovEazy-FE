@@ -16,7 +16,7 @@ import { useNavigate, useParams } from "react-router-dom";
 import { useCrm } from "./CrmShell";
 import PropertyVisitSlots from "../../components/PropertyVisitSlots";
 import {
-  ALL_LOCALITIES, FLAT_TYPES, FURNISHINGS, LIFESTYLE, MUST_HAVES, OCCUPANTS,
+  ALL_LOCALITIES, FLAT_TYPES, FURNISHINGS, LIFESTYLE, MUST_HAVES, OCCUPANT_OPTIONS,
   parentAreaOf, withParentArea,
 } from "../../data/preferenceOptions";
 import { cleanSourceUrl, detectSource, parseListingText } from "../../lib/listingImport";
@@ -643,7 +643,7 @@ export default function CrmPropertyForm() {
 
             <Field label="Occupants allowed">
               <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
-                {OCCUPANTS.map((o) => (
+                {OCCUPANT_OPTIONS.map((o) => (
                   <Chip key={o} on={(f.occupants_allowed ?? []).includes(o)} onClick={() => toggle("occupants_allowed", o)}>
                     {o}
                   </Chip>

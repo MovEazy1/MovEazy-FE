@@ -26,7 +26,7 @@ import MovEazyLogo from "./branding/MovEAZYLogo";
 import { fetchAllUserRequirements } from "../lib/userRequirements";
 import { matchListingToRequirements } from "../lib/inventoryMatch";
 import {
-  ALL_LOCALITIES, FLAT_TYPES, FURNISHINGS, OCCUPANTS, MUST_HAVES, LIFESTYLE,
+  ALL_LOCALITIES, FLAT_TYPES, FURNISHINGS, OCCUPANTS, OCCUPANT_OPTIONS, MUST_HAVES, LIFESTYLE,
 } from "../data/preferenceOptions";
 
 const MINT = "#5EEAD4";
@@ -219,6 +219,8 @@ export default function ListMyFlatMobile({ user, onPublished }) {
   const [availableFrom, setAvailableFrom] = useState("");
 
   // 5 — features
+  // Only the occupant types start on. The exclusions below them are a claim
+  // the poster has to make deliberately.
   const [occupantsAllowed, setOccupantsAllowed] = useState([...OCCUPANTS]);
   const [amenities, setAmenities] = useState([]);
   const [lifestyle, setLifestyle] = useState([]);
@@ -613,7 +615,7 @@ export default function ListMyFlatMobile({ user, onPublished }) {
             <>
               <div>
                 <Q>Who can live here?</Q>
-                <ChipMulti options={OCCUPANTS} selected={occupantsAllowed} onToggle={toggleIn(setOccupantsAllowed)} />
+                <ChipMulti options={OCCUPANT_OPTIONS} selected={occupantsAllowed} onToggle={toggleIn(setOccupantsAllowed)} />
               </div>
               <div>
                 <Q>Amenities</Q>

@@ -18,7 +18,7 @@ import { matchListingToRequirements } from "../lib/inventoryMatch";
 import { fetchSlotsForProperty, addVisitSlot, deleteVisitSlot } from "../lib/visits";
 import { fetchMyListingStats, fetchPropertyVisits } from "../lib/ownerDashboard";
 import {
-  ALL_LOCALITIES, FLAT_TYPES, FURNISHINGS, OCCUPANTS,
+  ALL_LOCALITIES, FLAT_TYPES, FURNISHINGS, OCCUPANTS, OCCUPANT_OPTIONS,
   MUST_HAVES, LIFESTYLE,
 } from "../data/preferenceOptions";
 
@@ -152,6 +152,7 @@ export default function ListMyFlat() {
   const [maxFlatmates, setMaxFlatmates] = useState(0);
   const [flatmatesTouched, setFlatmatesTouched] = useState(false);
   const [genderPref, setGenderPref] = useState("any");
+  // Only the occupant types start on; the exclusions are opt-in.
   const [occupantsAllowed, setOccupantsAllowed] = useState([...OCCUPANTS]);
   const [amenities, setAmenities] = useState([]);
   const [lifestyle, setLifestyle] = useState([]);
@@ -839,7 +840,7 @@ export default function ListMyFlat() {
             <Card>
               <div className="p-6">
                 <p className="text-[14px] font-extrabold text-gray-900 mb-3">Who can live here?</p>
-                <ChipMulti options={OCCUPANTS} selected={occupantsAllowed} onToggle={toggleIn(setOccupantsAllowed)} />
+                <ChipMulti options={OCCUPANT_OPTIONS} selected={occupantsAllowed} onToggle={toggleIn(setOccupantsAllowed)} />
               </div>
             </Card>
 

@@ -12,6 +12,19 @@
 export const LOCALITIES = ["HSR", "Koramangala", "Indiranagar", "Bellandur", "Whitefield", "Electronic City", "Sarjapur", "BTM", "JP Nagar", "Marathahalli"];
 export const LOCALITIES_MORE = ["HSR Extension", "Kudlu Gate", "Harlur Road", "Silver County Road", "ITI Layout", "Jayanagar", "Hebbal", "Mahadevpura", "Bannerghatta Rd", "Yelahanka", "Rajajinagar"];
 export const OCCUPANTS = ["Bachelor", "Family", "Couple", "Working Professionals", "Students", "Pet Owner"];
+
+/**
+ * Exclusions a poster can state, listed beside the occupant types but never
+ * pre-selected — unlike the types above, which start all-on.
+ *
+ * They belong to the supply side only. A seeker answering "who'll be living
+ * there?" describes themselves; "bachelor girls not allowed" is a rule about
+ * someone else, and has no meaning as an answer to that question.
+ */
+export const OCCUPANT_RESTRICTIONS = ["Bachelor Boys Not Allowed", "Bachelor Girls Not Allowed"];
+
+/** What a posting flow shows: who may live there, then who may not. */
+export const OCCUPANT_OPTIONS = [...OCCUPANTS, ...OCCUPANT_RESTRICTIONS];
 export const FLAT_TYPES = ["1 RK", "1 BHK", "2 BHK", "3 BHK", "Villa", "Room in Preoccupied flat"];
 export const MUST_HAVES = ["Balcony", "Gym", "Swimming Pool", "Lift", "Covered Parking", "Power Backup", "Security", "Terrace", "Garden", "Maid Room", "Modular Kitchen", "Study Room", "Pet Friendly", "Near Metro", "Near Office", "Gated Society", "Good Sunlight", "Quiet Area", "High Floor", "Low Floor"];
 export const LIFESTYLE = ["Walkable cafes", "Nightlife", "Parks", "Running Track", "Office Commute", "Schools", "Hospitals", "Grocery Nearby", "Peaceful Area", "Young Crowd", "Community Living"];
