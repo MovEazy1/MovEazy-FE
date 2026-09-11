@@ -9,6 +9,7 @@
  */
 
 const lower = (s) => String(s || "").trim().toLowerCase();
+import { expandAreas } from "../data/preferenceOptions";
 
 function toArr(v) {
   if (Array.isArray(v)) return v.map((x) => String(x || "").trim()).filter(Boolean);
@@ -33,7 +34,9 @@ function num(v) {
  */
 export function normalizeRequirement(raw) {
   const r = raw || {};
-  const areas = toArr(r.preferred_areas ?? r.preferredAreas ?? r.localities);
+  // Asking for a wider area means taking anything inside it: someone who
+  // wants HSR Extension will take Kudlu Gate.
+  const areas = expandAreas(toArr(r.preferred_areas ?? r.preferredAreas ?? r.localities));
   const flatTypes = toArr(r.flat_types ?? r.flatTypes ?? r.property_type ?? r.propertyType ?? r.bhk);
   const mustHaves = toArr(r.mustHaves ?? r.must_haves);
   const dealBreakers = toArr(r.dealBreakers ?? r.deal_breakers);

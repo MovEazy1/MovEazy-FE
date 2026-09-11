@@ -1,5 +1,6 @@
 import { supabase, isSupabaseConfigured } from "./supabase";
 import { coverMedia, coverPhoto, isVideoFile, orderListingMedia } from "./listingMedia";
+import { withParentArea } from "../data/preferenceOptions";
 
 /**
  * Inventory = the supply side. One row per listed home in the Supabase
@@ -105,7 +106,9 @@ export function buildInventoryRow(draft, poster) {
 
     city: "Bengaluru",
     area: String(draft.area || "").trim(),
-    nearby_areas: list(draft.nearbyAreas),
+    // Listing "Kudlu Gate" also means the flat is in HSR Extension. The area
+    // itself keeps the precise name — a renter should still read Kudlu Gate.
+    nearby_areas: withParentArea(String(draft.area || "").trim(), list(draft.nearbyAreas)),
     full_address: String(draft.fullAddress || "").trim().slice(0, 400),
     landmark: String(draft.landmark || "").trim().slice(0, 200),
     latitude: num(draft.latitude),

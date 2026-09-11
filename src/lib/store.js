@@ -1,4 +1,5 @@
 import seedListings from "../data/listingsData";
+import { expandAreas } from "../data/preferenceOptions";
 
 const KEYS = {
   listings: "moveasy_listings_v2",
@@ -302,11 +303,13 @@ export function getSellerRequests() {
 
 function listingMatchesNeighborhoods(listing, neighborhoods) {
   if (!neighborhoods?.length) return true;
-  const hay = [listing.title, listing.address, listing.location]
+  const hay = [listing.title, listing.address, listing.location, ...(listing.nearbyAreas || [])]
     .filter(Boolean)
     .join(" ")
     .toLowerCase();
-  return neighborhoods.some((n) => hay.includes(String(n).toLowerCase()));
+  // Filtering on a wider area has to find its children too, or picking
+  // "HSR Extension" on the map hides every flat actually in it.
+  return expandAreas(neighborhoods).some((n) => hay.includes(String(n).toLowerCase()));
 }
 
 /** --- Local CRM (used when Firebase is off or as browser cache) --- */

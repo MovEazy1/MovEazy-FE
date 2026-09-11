@@ -17,6 +17,7 @@ import { useCrm } from "./CrmShell";
 import PropertyVisitSlots from "../../components/PropertyVisitSlots";
 import {
   ALL_LOCALITIES, FLAT_TYPES, FURNISHINGS, LIFESTYLE, MUST_HAVES, OCCUPANTS,
+  parentAreaOf, withParentArea,
 } from "../../data/preferenceOptions";
 import { cleanSourceUrl, detectSource, parseListingText } from "../../lib/listingImport";
 import { geocodePlace } from "../../lib/geocode";
@@ -327,7 +328,9 @@ export default function CrmPropertyForm() {
         phone: f.phone || "",
         city: "Bengaluru",
         area: f.area,
-        nearby_areas: f.nearby_areas ?? [],
+        // A flat in Kudlu Gate is also in HSR Extension, so a client asking
+        // for the wider area finds it. The area keeps the precise name.
+        nearby_areas: withParentArea(f.area, f.nearby_areas ?? []),
         full_address: f.full_address || "",
         landmark: f.landmark || "",
         // Without these the listing is published but invisible: the map's feed
@@ -526,6 +529,13 @@ export default function CrmPropertyForm() {
                 {ALL_LOCALITIES.map((l) => <option key={l} value={l}>{l}</option>)}
               </select>
             </Field>
+
+            {parentAreaOf(f.area) && (
+              <span className="crm-mute" style={{ fontSize: 10.5, lineHeight: 1.45 }}>
+                Also counted as <strong>{parentAreaOf(f.area)}</strong>, so a client
+                asking for the wider area sees this flat.
+              </span>
+            )}
 
             <Field label="Also maps to">
               <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
