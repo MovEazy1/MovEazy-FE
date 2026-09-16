@@ -25,7 +25,16 @@ let timer = null;
 let started = false;
 let current = { userId: null, email: "" };
 
-function anonId() {
+/**
+ * A stable id for this browser, created on first need.
+ *
+ * Exported because marketing click counting has to answer "how many people"
+ * rather than "how many page loads", and it has to answer it for visitors who
+ * are signed out — which is nearly all of them at the moment they tap a link.
+ * Sharing this id rather than minting a second one keeps a click and the session
+ * it belongs to pointing at the same person.
+ */
+export function anonId() {
   try {
     let id = localStorage.getItem(ANON_KEY);
     if (!id) {

@@ -3,6 +3,7 @@ import { useLocation } from "react-router-dom";
 import { sessionTracker } from "../lib/sessionTracking";
 import { identifySession, startSessionSync } from "../lib/sessionSync";
 import { recordShareOpenFromUrl } from "../lib/shareAttribution";
+import { recordMarketingClickFromUrl } from "../lib/marketingClicks";
 import { captureAttribution } from "../lib/attribution";
 import { useAuth } from "../context/AuthContext";
 
@@ -30,6 +31,11 @@ export function useSessionTracking() {
 
   // A link shared from the CRM carries mz_s; tell the CRM it was opened.
   useEffect(() => { recordShareOpenFromUrl(); }, []);
+
+  // A link from a tracked marketing channel carries utm_campaign. Most people
+  // who tap one never sign up, so this arrival is the only trace they leave —
+  // count it now or lose it.
+  useEffect(() => { recordMarketingClickFromUrl(); }, []);
 
   // Remember where this visitor came from before the UTM parameters fall off
   // the address bar. Signup reads it back; without this, everyone who browses

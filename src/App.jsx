@@ -25,6 +25,11 @@ const BrokerRegister = lazy(() => import("./pages/BrokerRegister"));
 const MyProperties = lazy(() => import("./pages/MyProperties"));
 const SuperAdminPanel = lazy(() => import("./pages/SuperAdminPanel"));
 const AnalyticsDashboard = lazy(() => import("./pages/AnalyticsDashboard"));
+const MarketingShell = lazy(() => import("./pages/marketing/MarketingShell"));
+const MarketingIndex = lazy(() =>
+  import("./pages/marketing/MarketingShell").then((m) => ({ default: m.MarketingIndex })),
+);
+const MarketingChannel = lazy(() => import("./pages/marketing/MarketingChannel"));
 const CrmShell = lazy(() => import("./pages/crm/CrmShell"));
 const CrmClientsPage = lazy(() => import("./pages/crm/CrmClientsPage"));
 const CrmPipelinePage = lazy(() => import("./pages/crm/CrmPipelinePage"));
@@ -113,6 +118,17 @@ function AppRoutes() {
         <Route path="/my-properties" element={<MyProperties />} />
         <Route path="/superadmin" element={<SuperAdminPanel />} />
         <Route path="/analytics" element={<AnalyticsDashboard />} />
+        {/* Marketing channel dashboards. Access is per-email and per-channel,
+            gated inside MarketingShell and again in Postgres — the people who
+            open these are channel owners, not staff. ":slug" is deliberate:
+            adding a channel in /superadmin gives it a working URL with no
+            deploy. */}
+        <Route path="/marketing" element={<MarketingShell />}>
+          <Route index element={<MarketingIndex />} />
+          {/* /marketing/head included: it is a channel row like any other, flagged
+              as the roll-up, so one route carries one access check. */}
+          <Route path=":slug" element={<MarketingChannel />} />
+        </Route>
         {/* Internal CRM. Access is gated inside CrmShell (staff roles), not here. */}
         <Route path="/crm" element={<CrmShell />}>
           <Route index element={<Navigate to="/crm/clients" replace />} />
