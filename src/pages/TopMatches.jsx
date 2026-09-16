@@ -6,11 +6,12 @@
  * session rather than the usual site chrome — closer to the reference flow
  * than a marketing page with a nav bar bolted on top.
  */
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 import { X, Heart } from "lucide-react";
 import PropertyModal from "../components/PropertyModal";
 import SwipeDeck from "../components/SwipeDeck";
+import Toast from "../components/Toast";
 import { useAuth } from "../context/AuthContext";
 import { fetchAllListings } from "../lib/listingsFeed";
 import { matchRequirementToListings, normalizeRequirement } from "../lib/inventoryMatch";
@@ -83,6 +84,9 @@ export default function TopMatches() {
   const [phase, setPhase] = useState("swiping"); // swiping | relax
   const [seenIds, setSeenIds] = useState([]);
   const [viewing, setViewing] = useState(null); // { listing, openVisitForm }
+  const [visitToast, setVisitToast] = useState("");
+  const [advanceOn, setAdvanceOn] = useState(null);
+  const visitToastTimer = useRef(null);
 
   // Prefs handed over by the wizard win; otherwise load what's saved for this account.
   useEffect(() => {
@@ -112,6 +116,15 @@ export default function TopMatches() {
   const goToMap = () => navigate("/map", { state: { prefs, seenListingIds: seenIds } });
 
   const recordSeen = (listing) => setSeenIds((ids) => (ids.includes(listing.id) ? ids : [...ids, listing.id]));
+
+  const onVisitBooked = useCallback((message, listing) => {
+    setVisitToast(message);
+    setAdvanceOn({ id: listing.id, ts: Date.now() });
+    recordSeen(listing);
+    clearTimeout(visitToastTimer.current);
+    visitToastTimer.current = setTimeout(() => setVisitToast(""), 2800);
+  }, []);
+  useEffect(() => () => clearTimeout(visitToastTimer.current), []);
 
   const loading = authLoading || listingsLoading || !prefsChecked;
   const total = topMatches.length;
@@ -157,6 +170,7 @@ export default function TopMatches() {
               onOpenDetails={(l) => setViewing({ listing: l, openVisitForm: false })}
               onScheduleVisit={(l) => setViewing({ listing: l, openVisitForm: true })}
               onExhausted={() => setPhase("relax")}
+              advanceOn={advanceOn}
             />
           </>
         ) : (
@@ -193,8 +207,11 @@ export default function TopMatches() {
           onSelectListing={(l) => setViewing({ listing: l, openVisitForm: false })}
           onClose={() => setViewing(null)}
           initialShowVisitForm={viewing.openVisitForm}
+          onVisitBooked={onVisitBooked}
         />
       )}
+
+      <Toast message={visitToast} />
     </div>
   );
 }

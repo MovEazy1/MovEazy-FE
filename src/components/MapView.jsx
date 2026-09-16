@@ -29,6 +29,7 @@ import { setReaction } from "../lib/visits";
 import { reportClientWarn } from "../lib/clientLog";
 import MovEazyNav from "./layout/MovEazyNav";
 import SwipeDeck from "./SwipeDeck";
+import Toast from "./Toast";
 
 const MAP_NEARBY_KM = 12;
 /** Default max distance (km) from workplace / geocoded pin; user-adjustable in search panel. */
@@ -952,6 +953,17 @@ export default function MapView() {
    */
   const [requirement, setRequirement] = useState(null);
   const [viewingProperty, setViewingProperty] = useState(null);
+  /** Confirmation shown after the modal closes itself post-booking, and which card it was for. */
+  const [visitToast, setVisitToast] = useState("");
+  const [advanceOn, setAdvanceOn] = useState(null);
+  const visitToastTimer = useRef(null);
+  const onVisitBooked = useCallback((message, listing) => {
+    setVisitToast(message);
+    setAdvanceOn({ id: listing.id, ts: Date.now() });
+    clearTimeout(visitToastTimer.current);
+    visitToastTimer.current = setTimeout(() => setVisitToast(""), 2800);
+  }, []);
+  useEffect(() => () => clearTimeout(visitToastTimer.current), []);
   /** Single "all filters" panel — a dropdown on desktop, a bottom sheet on mobile. Never occupies map layout. */
   const [showFilterPanel, setShowFilterPanel] = useState(false);
   /** "map" | "list" — replaces the old slide-up toggle; on mobile these are fully separate screens */
@@ -2801,6 +2813,7 @@ export default function MapView() {
               onOpenDetails={(l) => openProperty(l)}
               onScheduleVisit={(l) => openProperty(l, { openVisitForm: true })}
               emptyLabel="No more homes match your filters right now."
+              advanceOn={advanceOn}
             />
           </div>
         </div>
@@ -2937,8 +2950,11 @@ export default function MapView() {
           onSavedChange={() => setSavedRevision((v) => v + 1)}
           onClose={closeProperty}
           initialShowVisitForm={openVisitFormFromUrl}
+          onVisitBooked={onVisitBooked}
         />
       )}
+
+      <Toast message={visitToast} />
 
       {/* ── AI Broker consultant ── */}
       <AIBroker open={showAgentChat} onClose={() => setShowAgentChat(false)} />

@@ -181,7 +181,7 @@ function MediaElement({ src, alt, style, firstImage }) {
   );
 }
 
-export default function PropertyModal({ property, onClose, listings = [], onSelectListing, onSavedChange, initialShowVisitForm = false }) {
+export default function PropertyModal({ property, onClose, listings = [], onSelectListing, onSavedChange, initialShowVisitForm = false, onVisitBooked }) {
   const { user } = useAuth();
   const { openLogin } = useLoginModal();
   const [visitForm, setVisitForm] = useState({ time: "", timeISO: "" });
@@ -504,6 +504,22 @@ export default function PropertyModal({ property, onClose, listings = [], onSele
   };
 
   /**
+   * A visit action succeeded — flash the confirmation inside the card for a
+   * beat so the tap feels acknowledged, then hand off to the page: close this
+   * modal and let it show its own toast over whatever's next, rather than
+   * leaving the success message sitting here until someone taps away.
+   */
+  const finishVisitSuccess = (message) => {
+    setVisitSuccess(message);
+    setTimeout(() => {
+      setVisitSuccess("");
+      setShowVisitForm(false);
+      onVisitBooked?.(message, property);
+      onClose?.();
+    }, 900);
+  };
+
+  /**
    * Book one of the lister's published slots.
    *
    * Writes a visit_bookings row, which is the record everything else reads:
@@ -519,7 +535,7 @@ export default function PropertyModal({ property, onClose, listings = [], onSele
     try {
       await bookIndividual(user.uid, property.id, chosenSlot);
       const { day, time } = slotLabel(chosenSlot);
-      setVisitSuccess(`Visit booked for ${day} at ${time}. The lister has been notified.`);
+      finishVisitSuccess(`Visit booked for ${day} at ${time}`);
     } catch (err) {
       setVisitSuccess("");
       alert(err?.message || "Could not book that slot — please try another.");
@@ -539,7 +555,7 @@ export default function PropertyModal({ property, onClose, listings = [], onSele
     setBooking(true);
     try {
       await requestNextAvailableVisit(user.uid, property.id);
-      setVisitSuccess("Requested. The lister will confirm a time with you shortly.");
+      finishVisitSuccess("Visit requested — the lister will confirm a time shortly");
     } catch (err) {
       alert(err?.message || "Could not send that request — please try again.");
     } finally {
@@ -558,17 +574,12 @@ export default function PropertyModal({ property, onClose, listings = [], onSele
     setBooking(true);
     try {
       await requestNextAvailableVisit(user.uid, property.id, visitForm.timeISO || null);
-      setVisitSuccess(`Requested for ${visitForm.time}. The lister will confirm with you shortly.`);
+      finishVisitSuccess(`Visit requested for ${visitForm.time}`);
     } catch (err) {
       alert(err?.message || "Could not submit your request — please try again.");
+    } finally {
       setBooking(false);
-      return;
     }
-    setBooking(false);
-    setTimeout(() => {
-      setVisitSuccess("");
-      setShowVisitForm(false);
-    }, 2500);
   };
 
   const badgeStyles = {

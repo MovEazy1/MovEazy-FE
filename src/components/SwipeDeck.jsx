@@ -183,6 +183,7 @@ export default function SwipeDeck({
   onScheduleVisit,
   onExhausted,
   emptyLabel = "No homes to show right now.",
+  advanceOn,
 }) {
   const [index, setIndex] = useState(0);
   const [position, setPosition] = useState(1);
@@ -204,6 +205,15 @@ export default function SwipeDeck({
       onExhausted?.();
     }
   }, [done, listings.length, onExhausted]);
+
+  // Something outside the deck (a visit just booked from this card) is done
+  // with the current card — move past it, but only if it's still the one on
+  // top; a deep-linked property opened out of order shouldn't skip a card.
+  useEffect(() => {
+    if (advanceOn == null) return;
+    setIndex((i) => (listings[i]?.id === advanceOn.id ? i + 1 : i));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [advanceOn]);
 
   useEffect(() => () => clearTimeout(toastTimer.current), []);
 
