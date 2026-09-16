@@ -656,7 +656,7 @@ export default function MovEazyNav({ active = "", transparentAtTop = false, onFi
               <button type="button" onClick={listMyFlat}>
                 <span className="mzn-bb-icon">
                   <OwnerIcon />
-                  <span className="mzn-bb-badge">&#8377;10,000</span>
+                  <span className="mzn-bb-badge">&#8377;7,000</span>
                 </span>
                 <span>List my flat</span>
               </button>

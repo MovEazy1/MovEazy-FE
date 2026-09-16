@@ -423,7 +423,7 @@ export default function ListMyFlatMobile({ user, onPublished }) {
             </span>
             <div style={{ minWidth: 0 }}>
               <div style={{ display: "flex", alignItems: "baseline", gap: 7 }}>
-                <span style={{ color: GOLD, fontSize: 25, fontWeight: 900, letterSpacing: "-.02em", lineHeight: 1 }}>₹10,000</span>
+                <span style={{ color: GOLD, fontSize: 25, fontWeight: 900, letterSpacing: "-.02em", lineHeight: 1 }}>₹7,000</span>
                 <span style={{ color: "#F1F6F4", fontSize: 13.5, fontWeight: 800 }}>Cash Reward</span>
               </div>
               <div style={{ color: "#C9AE85", fontSize: 12.5, fontWeight: 600, marginTop: 3 }}>for every room you list</div>
@@ -782,7 +782,7 @@ export default function ListMyFlatMobile({ user, onPublished }) {
             <path d="M8 10.5V7.5a4 4 0 0 1 8 0v3" strokeLinecap="round" />
           </svg>
           <span style={{ color: "#8AA5A0", fontSize: 12.5, fontWeight: 600 }}>
-            <span style={{ color: GOLD, fontWeight: 800 }}>₹10,000 Cash Reward</span> for every room you list
+            <span style={{ color: GOLD, fontWeight: 800 }}>₹7,000 Cash Reward</span> for every room you list
           </span>
         </div>
       </div>

@@ -33,9 +33,9 @@ const POSTER_ROLES = [
   ["broker", "Broker / Agent", "I'm listing on behalf of an owner"],
 ];
 
-/** Compact / affordable homes earn a ₹10,000 wallet reward, credited on a successful sale. */
+/** Compact / affordable homes earn a ₹7,000 wallet reward, credited on a successful sale. */
 const WALLET_REWARD_TYPES = ["1 RK", "1 BHK", "Room in Preoccupied flat"];
-const WALLET_REWARD_AMOUNT = 10000;
+const WALLET_REWARD_AMOUNT = 7000;
 const fmtWallet = (n) => `₹${Number(n || 0).toLocaleString("en-IN")}`;
 
 const inp = "w-full px-4 py-3 rounded-xl border border-gray-200 bg-white text-[14px] text-gray-900 placeholder:text-gray-400 outline-none transition-all focus:border-red-400 focus:ring-2 focus:ring-red-100";
