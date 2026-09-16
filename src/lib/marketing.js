@@ -38,6 +38,10 @@ function unconfigured(where) {
  * look identical otherwise, and the fix is completely different.
  */
 export function isMissingMigration(error) {
+  // One missing column is not a missing migration, and saying so is what sent
+  // the super admin to the SQL editor when the panel could have simply dropped
+  // a field and carried on.
+  if (isMissingColumn(error)) return false;
   const msg = String(error?.message || "").toLowerCase();
   return (
     error?.code === "42883" ||
@@ -48,6 +52,38 @@ export function isMissingMigration(error) {
     msg.includes("schema cache")
   );
 }
+
+/**
+ * A column a pending migration adds, which this build already asks for.
+ *
+ * Distinct from isMissingMigration() on purpose, and the distinction matters:
+ * PostgREST reports both as "does not exist", so a frontend that shipped ahead
+ * of its migration told the super admin the whole marketing system was
+ * unavailable when in fact only one column was. That is a worse failure than
+ * the missing column — the panel went dark rather than losing a field.
+ */
+function isMissingColumn(error) {
+  const msg = String(error?.message || "").toLowerCase();
+  return (
+    error?.code === "42703" ||
+    error?.code === "PGRST204" ||
+    /column .* does not exist/.test(msg) ||
+    /could not find the '.*' column/.test(msg)
+  );
+}
+
+/** Columns the marketing migration adds after the frontend starts asking. */
+const OPTIONAL_CHANNEL_COLS = ["platform"];
+
+const withoutOptional = (cols) =>
+  cols
+    .split(",")
+    .map((c) => c.trim())
+    .filter((c) => !OPTIONAL_CHANNEL_COLS.includes(c))
+    .join(",");
+
+/** Defaults for whatever the retry had to drop, so callers see one shape. */
+const fillOptional = (rows) => rows.map((r) => ({ platform: "other", ...r }));
 
 async function rpc(name, args = {}) {
   if (!isSupabaseConfigured || !supabase) throw unconfigured(name);
@@ -75,15 +111,28 @@ export const fetchChannelLeads = (slug) => rpc("marketing_channel_leads", { p_sl
 
 /* ── Managing channels (super admin) ──────────────────────────────────────── */
 
+const CHANNEL_COLS =
+  "slug,label,description,utm_source,utm_medium,utm_campaign,landing_path,is_overview,active,platform,created_at";
+
 export async function fetchAllChannels() {
   if (!isSupabaseConfigured || !supabase) throw unconfigured("marketing_channels");
-  const { data, error } = await supabase
-    .from("marketing_channels")
-    .select("slug,label,description,utm_source,utm_medium,utm_campaign,landing_path,is_overview,active,platform,created_at")
-    .order("is_overview", { ascending: false })
-    .order("label");
+
+  const run = (cols) =>
+    supabase
+      .from("marketing_channels")
+      .select(cols)
+      .order("is_overview", { ascending: false })
+      .order("label");
+
+  let { data, error } = await run(CHANNEL_COLS);
+  if (error && isMissingColumn(error)) {
+    // Frontend ahead of the migration. Drop the column and carry on — losing
+    // "Posted to" is a far smaller loss than the panel refusing to open.
+    console.warn(`[marketing] ${error.message} — retrying without it. Re-run marketing_schema.sql.`);
+    ({ data, error } = await run(withoutOptional(CHANNEL_COLS)));
+  }
   if (error) throw error;
-  return data ?? [];
+  return fillOptional(data ?? []);
 }
 
 /**
@@ -97,18 +146,29 @@ export async function fetchAllChannels() {
  */
 export async function fetchShareChannels() {
   if (!isSupabaseConfigured || !supabase) return [];
-  try {
-    const { data, error } = await supabase
+
+  const cols = "slug,label,platform,utm_source,utm_medium,utm_campaign,landing_path,is_overview,active";
+  const run = (c) =>
+    supabase
       .from("marketing_channels")
-      .select("slug,label,platform,utm_source,utm_medium,utm_campaign,landing_path,is_overview,active")
+      .select(c)
       .eq("active", true)
       .eq("is_overview", false)
       .order("label");
+
+  try {
+    let { data, error } = await run(cols);
+    if (error && isMissingColumn(error)) {
+      // Without platform every channel falls into "other", which still gives
+      // the agent a tracked link — just not grouped under Facebook yet.
+      console.warn(`[crm] ${error.message} — retrying without it. Re-run marketing_schema.sql.`);
+      ({ data, error } = await run(withoutOptional(cols)));
+    }
     if (error) {
       console.warn(`[crm] marketing_channels: ${error.message}`);
       return [];
     }
-    return data ?? [];
+    return fillOptional(data ?? []);
   } catch (e) {
     console.warn(`[crm] marketing_channels threw: ${e?.message}`);
     return [];
@@ -161,23 +221,30 @@ export async function createChannel({
   if (!String(label || "").trim()) throw new Error("Give the channel a name.");
   if (!isSupabaseConfigured || !supabase) throw unconfigured("marketing_channels");
 
-  const { data, error } = await supabase
-    .from("marketing_channels")
-    .insert({
-      slug: s,
-      label: String(label).trim().slice(0, 80),
-      description: String(description || "").trim().slice(0, 240),
-      utm_source: String(utmSource || s).trim().slice(0, 60) || s,
-      utm_medium: String(utmMedium || "social").trim().slice(0, 60),
-      platform: PLATFORMS.some((p) => p.id === platform) ? platform : "other",
-      // Derived, never typed. The campaign string is the join key every signup
-      // is matched on, so letting it be edited by hand is letting a channel's
-      // whole history be detached by a typo.
-      utm_campaign: `mkt_${s}`,
-      landing_path: String(landingPath || "/").trim().slice(0, 120) || "/",
-    })
-    .select("slug,label,description,utm_source,utm_medium,utm_campaign,landing_path,is_overview,active,platform,created_at")
-    .single();
+  const row = {
+    slug: s,
+    label: String(label).trim().slice(0, 80),
+    description: String(description || "").trim().slice(0, 240),
+    utm_source: String(utmSource || s).trim().slice(0, 60) || s,
+    utm_medium: String(utmMedium || "social").trim().slice(0, 60),
+    platform: PLATFORMS.some((p) => p.id === platform) ? platform : "other",
+    // Derived, never typed. The campaign string is the join key every signup
+    // is matched on, so letting it be edited by hand is letting a channel's
+    // whole history be detached by a typo.
+    utm_campaign: `mkt_${s}`,
+    landing_path: String(landingPath || "/").trim().slice(0, 120) || "/",
+  };
+
+  const run = (payload, cols) =>
+    supabase.from("marketing_channels").insert(payload).select(cols).single();
+
+  let { data, error } = await run(row, CHANNEL_COLS);
+  if (error && isMissingColumn(error)) {
+    // Same retry as the reads: creating a channel must not be blocked by a
+    // column the migration has not added yet.
+    const { platform: _dropped, ...rest } = row;
+    ({ data, error } = await run(rest, withoutOptional(CHANNEL_COLS)));
+  }
 
   if (error) {
     if (String(error.message || "").toLowerCase().includes("duplicate")) {
@@ -185,7 +252,7 @@ export async function createChannel({
     }
     throw error;
   }
-  return data;
+  return { platform: "other", ...data };
 }
 
 export async function setChannelActive(slug, active) {
