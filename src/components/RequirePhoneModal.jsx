@@ -80,8 +80,11 @@ export default function RequirePhoneModal() {
 
   return (
     <div
-      className="fixed inset-0 z-[9500] flex items-center justify-center p-4 overflow-y-auto"
-      style={{ background: "rgba(26,36,33,0.45)", backdropFilter: "blur(4px)", WebkitBackdropFilter: "blur(4px)" }}
+      className="fixed inset-0 flex items-center justify-center p-4 overflow-y-auto"
+      // Above PropertyModal's own z-index (99999) — a signed-in, phoneless
+      // account opening a property from a share link should still hit this
+      // gate, not have the property render over it.
+      style={{ background: "rgba(26,36,33,0.45)", backdropFilter: "blur(4px)", WebkitBackdropFilter: "blur(4px)", zIndex: 999998 }}
       role="dialog"
       aria-modal="true"
       aria-labelledby="reqphone-title"

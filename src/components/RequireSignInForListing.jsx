@@ -65,8 +65,11 @@ export default function RequireSignInForListing() {
 
   return (
     <div
-      className="fixed inset-0 z-[9500] flex items-center justify-center p-4 overflow-y-auto"
-      style={{ background: INK }}
+      className="fixed inset-0 flex items-center justify-center p-4 overflow-y-auto"
+      // Above PropertyModal's own z-index (99999) — otherwise a property
+      // opened straight from the URL renders on top of this gate instead
+      // of being hidden behind it.
+      style={{ background: INK, zIndex: 999999 }}
       role="dialog"
       aria-modal="true"
       aria-labelledby="reqsignin-title"
