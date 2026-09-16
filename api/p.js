@@ -29,10 +29,33 @@ export default async function handler(req) {
   const origin = url.origin;
 
   // Everything except our own routing parameter goes on to the app.
-  const onward = new URLSearchParams(url.searchParams);
-  onward.delete("listingId");
+  const tracking = new URLSearchParams(url.searchParams);
+  tracking.delete("listingId");
+
+  const onward = new URLSearchParams(tracking);
   if (listingId) onward.set("listingId", listingId);
   const target = `${origin}/map?${onward.toString()}`;
+
+  /**
+   * This page's own address, which is what og:url has to say.
+   *
+   * Pointing og:url at the onward /map URL is what made Facebook show the
+   * site-wide marketing card instead of the flat: Facebook treats og:url as the
+   * object's canonical address and re-scrapes it, landing on the SPA's
+   * index.html and its one set of static tags. WhatsApp reads the tags it was
+   * served and never re-resolves, which is why the same link previewed
+   * correctly there and hid the bug for as long as WhatsApp was the only
+   * surface we shared from.
+   *
+   * The tracking parameters stay on: Facebook can rewrite the link in the post
+   * to og:url, so a bare /p/:id here would strip the UTMs off every click and
+   * take the attribution with them. Vercel rewrote the path to /api/p before we
+   * saw it, so this is rebuilt rather than read off the request.
+   */
+  const qs = tracking.toString();
+  const selfUrl = listingId
+    ? `${origin}/p/${encodeURIComponent(listingId)}${qs ? `?${qs}` : ""}`
+    : target;
 
   const title = listingTitle(listing);
   const description = listingDescription(listing);
@@ -66,14 +89,14 @@ export default async function handler(req) {
 <meta property="og:image:width" content="${dims.w}" />
 <meta property="og:image:height" content="${dims.h}" />
 <meta property="og:image:alt" content="${esc(title)}" />
-<meta property="og:url" content="${esc(target)}" />
+<meta property="og:url" content="${esc(selfUrl)}" />
 
 <meta name="twitter:card" content="summary_large_image" />
 <meta name="twitter:title" content="${esc(title)}" />
 <meta name="twitter:description" content="${esc(description)}" />
 <meta name="twitter:image" content="${esc(image)}" />
 
-<link rel="canonical" href="${esc(target)}" />
+<link rel="canonical" href="${esc(selfUrl)}" />
 <script>window.location.replace(${JSON.stringify(target)});</script>
 </head>
 <body style="margin:0;font-family:system-ui,sans-serif;background:#04211D;color:#F4F2ED">
