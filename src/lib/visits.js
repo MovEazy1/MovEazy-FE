@@ -122,6 +122,25 @@ export async function fetchBookings(uid) {
   return data || [];
 }
 
+/**
+ * This user's existing booking for one property, if any — so the UI can
+ * show "you're already scheduled" instead of offering the day/time picker
+ * again. The upsert in bookIndividual/requestNextAvailableVisit already
+ * prevents a duplicate row (unique on user_id+property_id); this is what
+ * was missing on the read side to actually reflect that back.
+ */
+export async function fetchBookingForProperty(uid, propertyId) {
+  if (!isSupabaseConfigured || !supabase || !uid || !propertyId) return null;
+  const { data, error } = await supabase
+    .from("visit_bookings")
+    .select("*")
+    .eq("user_id", uid)
+    .eq("property_id", propertyId)
+    .maybeSingle();
+  if (error) return null;
+  return data || null;
+}
+
 /** Schedule (or reschedule) a single-property visit at a chosen slot. */
 export async function bookIndividual(uid, propertyId, slotAt) {
   if (!isSupabaseConfigured || !supabase || !uid) throw new Error("Not signed in");

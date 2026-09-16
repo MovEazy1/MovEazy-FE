@@ -13,7 +13,7 @@ import {
 } from "lucide-react";
 import logoMint from "../assets/logo/moveazy-logo-mint-dark.png";
 import { useLoginModal } from "../context/LoginModalContext";
-import { bookIndividual, fetchOpenVisitsForProperty, requestNextAvailableVisit } from "../lib/visits";
+import { bookIndividual, fetchBookingForProperty, fetchOpenVisitsForProperty, requestNextAvailableVisit } from "../lib/visits";
 import { findNearbyListings } from "../lib/geo";
 import { isListingSaved, toggleSavedListing } from "../lib/userActivity";
 import { logSavedListingChange } from "../lib/crmSync";
@@ -195,6 +195,13 @@ export default function PropertyModal({ property, onClose, listings = [], onSele
   const [openDay, setOpenDay] = useState("");
   const [booking, setBooking] = useState(false);
   const [isMobile, setIsMobile] = useState(typeof window !== "undefined" ? window.innerWidth <= 768 : false);
+  // This account's own booking for this property, if one already exists — the
+  // upsert in bookIndividual/requestNextAvailableVisit already stops a second
+  // row from being created, but nothing was checking for it on the way in, so
+  // a returning visitor just saw the empty picker again instead of what they'd
+  // already booked.
+  const [myBooking, setMyBooking] = useState(null);
+  const [myBookingLoading, setMyBookingLoading] = useState(false);
 
   useEffect(() => {
     document.body.style.overflow = "hidden";
@@ -213,6 +220,16 @@ export default function PropertyModal({ property, onClose, listings = [], onSele
       .finally(() => { if (alive) setSlotsLoading(false); });
     return () => { alive = false; };
   }, [property?.id]);
+
+  useEffect(() => {
+    if (!property?.id || !user?.uid) { setMyBooking(null); return; }
+    let alive = true;
+    setMyBookingLoading(true);
+    fetchBookingForProperty(user.uid, property.id)
+      .then((row) => { if (alive) setMyBooking(row); })
+      .finally(() => { if (alive) setMyBookingLoading(false); });
+    return () => { alive = false; };
+  }, [property?.id, user?.uid]);
 
   /**
    * The next five days the lister has opened, each with its own times.
@@ -497,6 +514,18 @@ export default function PropertyModal({ property, onClose, listings = [], onSele
     const time = d.toLocaleTimeString("en-IN", { hour: "numeric", minute: "2-digit", hour12: true });
     return { day, time };
   };
+
+  const myBookingLabel = !myBooking
+    ? ""
+    : myBooking.slot_at
+      ? `Your visit is scheduled for ${slotLabel(myBooking.slot_at).day} at ${slotLabel(myBooking.slot_at).time}.`
+      : "Visit requested — the lister will confirm a time shortly.";
+  // Compact form of the same fact, for the mobile sticky button's tighter width.
+  const myBookingShortLabel = !myBooking
+    ? ""
+    : myBooking.slot_at
+      ? `Visit: ${new Date(myBooking.slot_at).toLocaleDateString("en-IN", { day: "numeric", month: "short" })}, ${slotLabel(myBooking.slot_at).time}`
+      : "Visit requested";
 
   /**
    * A visit action succeeded — flash the confirmation inside the card for a
@@ -1182,8 +1211,13 @@ export default function PropertyModal({ property, onClose, listings = [], onSele
                       <div style={{ background: T.mintSoft, color: T.teal, padding: "12px", borderRadius: "8px", fontWeight: 600, textAlign: "center", fontSize: "13px" }}>
                         {visitSuccess}
                       </div>
-                    ) : slotsLoading ? (
+                    ) : myBookingLoading || slotsLoading ? (
                       <p style={{ margin: 0, fontSize: 13, color: T.textMute }}>Loading visit times…</p>
+                    ) : myBooking ? (
+                      <div style={{ display: "flex", alignItems: "center", gap: 8, background: T.mintSoft, color: T.teal, padding: "14px", borderRadius: "10px", fontWeight: 700, textAlign: "center", fontSize: "13.5px", lineHeight: 1.4, justifyContent: "center" }}>
+                        <CalendarCheck size={17} strokeWidth={2.2} style={{ flexShrink: 0 }} />
+                        {myBookingLabel}
+                      </div>
                     ) : visitSlots.length > 0 ? (
                       <>
                         <p style={{ margin: "0 0 2px", fontSize: 13, color: T.textDim, lineHeight: 1.5 }}>
@@ -1395,13 +1429,13 @@ export default function PropertyModal({ property, onClose, listings = [], onSele
                   style={{
                     flex: 1, padding: "15px", borderRadius: "12px", border: "none",
                     display: "flex", alignItems: "center", justifyContent: "center", gap: "10px",
-                    background: offMarket ? T.line : T.coral, color: "#fff",
+                    background: offMarket ? T.line : myBooking ? T.teal : T.coral, color: "#fff",
                     fontSize: "16px", fontWeight: 700,
                     cursor: offMarket ? "not-allowed" : "pointer",
                   }}
                 >
                   <CalendarCheck size={19} strokeWidth={2.1} />
-                  {offMarket ? "Off market" : "Schedule Visit"}
+                  {offMarket ? "Off market" : myBooking ? myBookingShortLabel : "Schedule Visit"}
                 </button>
               </div>
             )}
