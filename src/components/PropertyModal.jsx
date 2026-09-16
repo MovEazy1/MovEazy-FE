@@ -4,10 +4,9 @@ import { coverPhoto, isVideoUrl, orderListingMedia } from "../lib/listingMedia";
 import { formatPostedAgo } from "../lib/formatTime";
 import { propertyLink, shareVia } from "../lib/crmSettings";
 import { useAuth } from "../context/AuthContext";
-import { addVisitRequestData, getListingPrivateData, isListingPubliclyVisible } from "../lib/firestoreStore";
+import { getListingPrivateData, isListingPubliclyVisible } from "../lib/firestoreStore";
 import { canReadListingPrivatePhones } from "../lib/accessControl";
 import { isSupabaseConfigured } from "../lib/supabase";
-import { triggerVisitNotificationEmail } from "../lib/emailService";
 import {
   ArrowLeft, Share2, Heart, BedDouble, Users, Home as HomeIcon, CalendarDays,
   MapPin, ChevronRight, CalendarCheck, Images,
@@ -88,6 +87,7 @@ function SuggestDateTime({ value, onChange, tokens }) {
     picked.setHours(hour, 0, 0, 0);
     onChange(
       `${picked.toLocaleDateString("en-IN", { weekday: "short", day: "numeric", month: "short" })}, ${hourLabel(hour)}`,
+      picked.toISOString(),
     );
     setOpen(false);
     setDay(null);
@@ -184,7 +184,7 @@ function MediaElement({ src, alt, style, firstImage }) {
 export default function PropertyModal({ property, onClose, listings = [], onSelectListing, onSavedChange, initialShowVisitForm = false }) {
   const { user } = useAuth();
   const { openLogin } = useLoginModal();
-  const [visitForm, setVisitForm] = useState({ time: "", notes: "" });
+  const [visitForm, setVisitForm] = useState({ time: "", timeISO: "" });
   const [visitSuccess, setVisitSuccess] = useState("");
   const [showVisitForm, setShowVisitForm] = useState(false);
   // The times the lister has actually published. Only these are offered — the
@@ -553,37 +553,18 @@ export default function PropertyModal({ property, onClose, listings = [], onSele
       alert("This listing is no longer on the market.");
       return;
     }
-    if (!user) {
-      alert("Please log in to schedule a visit.");
-      return;
-    }
-    if (!isSupabaseConfigured) {
-      alert("Booking isn't available right now — please try again later.");
-      return;
-    }
+    // Signing in mid-flow shouldn't lose the time they suggested.
+    if (!user) { openLogin?.(() => submitVisit(e)); return; }
+    setBooking(true);
     try {
-      await addVisitRequestData({
-        listingId: property.id,
-        listingTitle: property.title,
-        customerEmail: user.email,
-        customerPhone: user.phone || "",
-        sellerEmail: property.sellerEmail || property.ownerEmail || "",
-        visitTime: visitForm.time,
-        notes: visitForm.notes
-      });
-      triggerVisitNotificationEmail({
-        customerEmail: user.email,
-        customerPhone: user.phone || "",
-        sellerEmail: property.sellerEmail || property.ownerEmail || "",
-        visitTime: visitForm.time,
-        notes: visitForm.notes,
-        listingId: property.id
-      });
+      await requestNextAvailableVisit(user.uid, property.id, visitForm.timeISO || null);
+      setVisitSuccess(`Requested for ${visitForm.time}. The lister will confirm with you shortly.`);
     } catch (err) {
       alert(err?.message || "Could not submit your request — please try again.");
+      setBooking(false);
       return;
     }
-    setVisitSuccess("Visit scheduled successfully! The seller has been notified.");
+    setBooking(false);
     setTimeout(() => {
       setVisitSuccess("");
       setShowVisitForm(false);
@@ -1316,9 +1297,8 @@ export default function PropertyModal({ property, onClose, listings = [], onSele
                           <SuggestDateTime
                             tokens={T}
                             value={visitForm.time}
-                            onChange={(time) => setVisitForm({ ...visitForm, time })}
+                            onChange={(time, timeISO) => setVisitForm({ ...visitForm, time, timeISO })}
                           />
-                          <textarea rows={2} placeholder="Any questions?" value={visitForm.notes} onChange={(e) => setVisitForm({ ...visitForm, notes: e.target.value })} style={{ width: "100%", padding: "10px", borderRadius: "8px", border: `1px solid ${T.line}`, boxSizing: "border-box", fontSize: "14px" }} />
                           <div style={{ display: "flex", gap: "8px", marginTop: "4px" }}>
                             <button type="button" onClick={() => setShowVisitForm(false)} style={{ flex: 1, padding: "12px", background: T.lineSoft, color: T.textDim, border: "none", borderRadius: "8px", fontWeight: 600, cursor: "pointer" }}>Cancel</button>
                             <button

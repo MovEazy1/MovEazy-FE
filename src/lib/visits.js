@@ -134,17 +134,18 @@ export async function bookIndividual(uid, propertyId, slotAt) {
 
 /**
  * "Book the next available slot" — for a listing whose lister hasn't published
- * any times yet.
+ * any times yet. `preferredSlotAt` is optional: a renter can suggest a time
+ * they'd like, still unconfirmed by the lister, rather than leaving it blank.
  *
- * Same visit_bookings row, with no slot_at and status 'preference'. That status
- * is what my_recent_activity() reads as a visit *request* rather than a
- * confirmed booking, so the lister is told someone wants to view and still needs
- * a time — and the CRM trigger files it the same way.
+ * Same visit_bookings row, status 'preference'. That status is what
+ * my_recent_activity() reads as a visit *request* rather than a confirmed
+ * booking, so the lister is told someone wants to view and still needs to
+ * confirm a time — and the CRM trigger files it the same way.
  */
-export async function requestNextAvailableVisit(uid, propertyId) {
+export async function requestNextAvailableVisit(uid, propertyId, preferredSlotAt = null) {
   if (!isSupabaseConfigured || !supabase || !uid) throw new Error("Not signed in");
   const { error } = await supabase.from("visit_bookings").upsert(
-    { user_id: uid, property_id: propertyId, slot_at: null, kind: "individual", group_id: null, amount: 0, status: "preference" },
+    { user_id: uid, property_id: propertyId, slot_at: preferredSlotAt, kind: "individual", group_id: null, amount: 0, status: "preference" },
     { onConflict: "user_id,property_id" }
   );
   if (error) throw error;
