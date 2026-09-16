@@ -6,6 +6,7 @@ import { VisitCartProvider } from "./context/VisitCartContext";
 import ForkHome from "./pages/ForkHome";
 import ErrorBoundary from "./components/ErrorBoundary";
 import RequirePhoneModal from "./components/RequirePhoneModal";
+import RequireSignInForListing from "./components/RequireSignInForListing";
 import { useSessionTracking } from "./hooks/useSessionTracking";
 
 const Profile = lazy(() => import("./pages/Profile"));
@@ -83,6 +84,10 @@ function SessionTrackerComponent() {
   useSessionTracking();
   return (
     <>
+      {/* A signed-out visitor whose session opened directly on a property
+          (a shared /p/:id link) must sign in before seeing it. If they do,
+          the phone gate below picks up next for an account with none on file. */}
+      <RequireSignInForListing />
       {/* Sits above every route: a signed-in account with no mobile number
           saved is asked for one before it can use the app. */}
       <RequirePhoneModal />
