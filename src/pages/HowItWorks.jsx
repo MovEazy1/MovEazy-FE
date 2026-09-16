@@ -320,7 +320,8 @@ function EngineSection({ innerRef }) {
   const done = index >= DEMO_HOMES.length;
   const intensity = Math.min(1, signals / 6);
   const learned = Math.min(PREFS.length, signals * 2);
-  const match = Math.min(96, 40 + signals * 8);
+  // Qualitative, not a percentage — match scores are for ranking, not for display.
+  const matchLabel = signals === 0 ? "Just getting started" : signals < 3 ? "Learning your taste" : signals < 5 ? "Getting warmer" : "Dialed in";
 
   const vote = (dir) => {
     if (done) return;
@@ -400,7 +401,7 @@ function EngineSection({ innerRef }) {
 
             {done && (
               <motion.div className="hiw-card hiw-card-done" initial={{ opacity: 0, scale: 0.9 }} animate={{ opacity: 1, scale: 1 }} transition={{ duration: 0.5, ease: EASE }}>
-                <div className="hiw-done-badge">{match}% match</div>
+                <div className="hiw-done-badge">{matchLabel}</div>
                 <div className="hiw-done-title">Now we're talking.</div>
                 <p className="hiw-done-sub">MovEazy has your taste. Real recommendations would look like these — not 500 random flats.</p>
                 <button type="button" className="hiw-btn hiw-btn-ghost hiw-btn-sm" onClick={reset}>
@@ -433,7 +434,7 @@ function EngineSection({ innerRef }) {
           <div className="hiw-profile">
             <div className="hiw-profile-top">
               <span>Your taste profile</span>
-              <span className="hiw-profile-match" style={{ color: signals ? C.sage : C.muted }}>{match}% match</span>
+              <span className="hiw-profile-match" style={{ color: signals ? C.sage : C.muted }}>{matchLabel}</span>
             </div>
             <div className="hiw-profile-bar">
               <motion.div className="hiw-profile-fill" animate={{ width: `${(learned / PREFS.length) * 100}%` }} transition={{ duration: 0.5, ease: EASE }} />

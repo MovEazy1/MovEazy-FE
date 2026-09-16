@@ -127,18 +127,6 @@ function SwipeCard({ listing, index, top, onSwiped, onOpenDetails, position }) {
               </span>
             ) : null}
           </div>
-
-          {Number.isFinite(listing.matchScore) && (
-            <span
-              style={{
-                position: "absolute", bottom: 10, left: 10,
-                background: "rgba(4,33,29,0.85)", color: T.mint,
-                fontSize: 12, fontWeight: 800, padding: "5px 11px", borderRadius: 999,
-              }}
-            >
-              {Math.round(listing.matchScore)}% match
-            </span>
-          )}
         </div>
 
         <div style={{ flex: 1, minWidth: 0, padding: "14px 16px", display: "flex", flexDirection: "column", gap: 5, overflow: "hidden" }}>

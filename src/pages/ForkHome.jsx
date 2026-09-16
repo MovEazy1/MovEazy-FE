@@ -791,7 +791,7 @@ export default function ForkHome() {
                 <div className="mzn-mj-listing">
                   <div className="mzn-mj-listing-img" style={{ backgroundImage: `url(${livingRoomImg})` }} />
                   <div className="mzn-mj-listing-body">
-                    <span className="mzn-mj-match">96% match</span>
+                    <span className="mzn-mj-match">Top pick</span>
                     <p className="mzn-mj-listing-title">2 BHK &middot; Koramangala</p>
                     <p className="mzn-mj-listing-rent">&#8377;28,000/mo</p>
                   </div>
@@ -799,7 +799,7 @@ export default function ForkHome() {
                 <div className="mzn-mj-listing">
                   <div className="mzn-mj-listing-img" style={{ backgroundImage: `url(${sofaImg})` }} />
                   <div className="mzn-mj-listing-body">
-                    <span className="mzn-mj-match">91% match</span>
+                    <span className="mzn-mj-match">Great fit</span>
                     <p className="mzn-mj-listing-title">1 BHK &middot; HSR Layout</p>
                     <p className="mzn-mj-listing-rent">&#8377;22,000/mo</p>
                   </div>

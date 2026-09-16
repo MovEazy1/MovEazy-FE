@@ -1005,7 +1005,6 @@ function Reveal({ prefs, onBrokerPoint, navigate, onClose }) {
               {m.image && (
                 <img src={m.image} alt="" loading="lazy" onError={(e) => { e.currentTarget.style.display = "none"; }} />
               )}
-              <span className="brk-pcard-match">{m.pct}% match</span>
             </div>
             <div className="brk-pcard-body">
               <div className="brk-pcard-title">{m.title}</div>
