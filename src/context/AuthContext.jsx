@@ -141,12 +141,24 @@ export function AuthProvider({ children }) {
       cacheSessionUser(null);
       return;
     }
+    // Best-effort repair/attribution steps — must never be able to block or
+    // corrupt the real profile read below. They used to share handleSession's
+    // one try/catch with getProfileForUser, so any transient failure here (a
+    // rate limit, a cold start, a not-yet-applied migration column) skipped
+    // the real read entirely and fell into the phone-less fallback further
+    // down — which then got cached, so someone who'd already saved a phone
+    // number was asked for it again on the next page load.
+    try { await ensureUserProfileDocuments(sbUser); } catch { /* best-effort */ }
     try {
-      await ensureUserProfileDocuments(sbUser);
       // Google sign-in never passes through signup(), so this is the only place
       // an OAuth account can be credited to the post that produced it. Ignores
       // anyone whose account is not minutes old, and never overwrites a source.
+      // (Already self-protecting internally — wrapped again here too, so a
+      // change to that function can't reopen the bug above.)
       await recordSignupAttribution(sbUser);
+    } catch { /* best-effort */ }
+
+    try {
       const profile = await getProfileForUser(sbUser);
       const allowed = await isEmailAdminAllowed(profile.email);
       setAdminAllowed(allowed);
@@ -468,7 +480,12 @@ export function AuthProvider({ children }) {
         phone: trimmedPhone,
         flatSearch: flatSearchMirror || undefined,
       });
-      setUser(prev => ({ ...prev, name: trimmedName, phone: trimmedPhone }));
+      // setUser alone left the sessionStorage snapshot stale — a page reload
+      // right after saving could briefly start from that old, phone-less
+      // cached value again.
+      const next = { ...user, name: trimmedName, phone: trimmedPhone };
+      setUser(next);
+      cacheSessionUser(next);
       return { success: true };
     } catch (err) {
       return { success: false, error: err.message || "Failed to save profile." };

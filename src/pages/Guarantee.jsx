@@ -11,11 +11,11 @@ import GuaranteeFAQ from "../components/sections/GuaranteeFAQ";
 import GuaranteeEnrollCTA from "../components/sections/GuaranteeEnrollCTA";
 import { db, isFirebaseConfigured } from "../lib/firebase";
 import { addDoc, collection, serverTimestamp } from "firebase/firestore";
-import { updateUserProfileData } from "../lib/firestoreStore";
 
 const INIT = { name: "", phone: "", email: "" };
 
-function GuaranteeModal({ onClose, user, onPhoneSaved: _onPhoneSaved }) {
+function GuaranteeModal({ onClose, user }) {
+  const { updateUserProfile } = useAuth();
   const [form, setForm] = useState({
     name: user?.name || "",
     phone: user?.phone || "",
@@ -39,9 +39,13 @@ function GuaranteeModal({ onClose, user, onPhoneSaved: _onPhoneSaved }) {
           status: "pending",
           createdAt: serverTimestamp(),
         });
-        if (user?.email && !user?.phone && form.phone.trim()) {
-          await updateUserProfileData(user.email, { phone: form.phone.trim() }).catch(() => {});
-        }
+      }
+      // Real profile save (was previously a no-op stub, keyed by email
+      // instead of uid, gated behind Firebase instead of the Supabase
+      // account this app actually runs on) — so a name/phone entered here
+      // never reached user_profiles, and RequirePhoneModal asked again later.
+      if (user?.uid && !user?.phone && form.phone.trim()) {
+        await updateUserProfile(form.name.trim(), form.phone.trim()).catch(() => {});
       }
       setStatus("done");
     } catch {
