@@ -9,7 +9,9 @@
  * them back to the channel that earned them.
  */
 import { afterEach, describe, expect, it } from "vitest";
-import { channelLink, isMissingMigration, normalizeSlug, pct } from "./marketing.js";
+import {
+  channelLink, groupByPlatform, isMissingMigration, normalizeChannels, normalizeSlug, pct,
+} from "./marketing.js";
 
 const PROD = "https://www.moveazy.co.in";
 
@@ -96,5 +98,50 @@ describe("pct", () => {
     expect(pct(3, 12)).toBe("25%");
     expect(pct(0, 12)).toBe("0%");
     expect(pct(5, 0)).toBe("—");
+  });
+});
+
+/**
+ * The CRM's Facebook button lists the channels beneath it, and where each one
+ * lands is decided here. Worth pinning because the failure is silent: a channel
+ * filed under the wrong platform doesn't error, it just never appears where the
+ * agent looks for it — which is exactly how "Facebook shows no channels" got
+ * reported instead of "the migration hasn't run".
+ */
+describe("filing channels under a share menu", () => {
+  const withPlatform = [
+    { slug: "rishav", utm_source: "rishav", platform: "facebook" },
+    { slug: "fbpage", utm_source: "facebook", platform: "facebook" },
+    { slug: "fbprofile", utm_source: "facebook", platform: "facebook" },
+    { slug: "reddithsrkora", utm_source: "reddit", platform: "reddit" },
+  ];
+
+  it("puts all three Facebook surfaces under Facebook", () => {
+    const g = groupByPlatform(normalizeChannels(withPlatform));
+    expect(g.get("facebook").map((c) => c.slug)).toEqual(["rishav", "fbpage", "fbprofile"]);
+    expect(g.get("reddit").map((c) => c.slug)).toEqual(["reddithsrkora"]);
+  });
+
+  it("still fills the menu from utm_source when the platform column is missing", () => {
+    // What the frontend sees between shipping and the migration being run. The
+    // menu has to keep working rather than dumping everything into "Other".
+    const noColumn = withPlatform.map(({ platform: _p, ...rest }) => rest);
+    const g = groupByPlatform(normalizeChannels(noColumn));
+    expect(g.get("facebook").map((c) => c.slug)).toEqual(["fbpage", "fbprofile"]);
+    expect(g.get("reddit").map((c) => c.slug)).toEqual(["reddithsrkora"]);
+  });
+
+  it("marks a guessed placement, and cannot guess the one that matters", () => {
+    // Rishav's group is sourced "rishav" and posted to Facebook. No amount of
+    // inference gets that from utm_source — which is why platform is a column.
+    const noColumn = withPlatform.map(({ platform: _p, ...rest }) => rest);
+    const out = normalizeChannels(noColumn);
+    expect(out.every((c) => c.platform_derived)).toBe(true);
+    expect(out.find((c) => c.slug === "rishav").platform).toBe("other");
+  });
+
+  it("leaves a stored platform alone", () => {
+    const out = normalizeChannels(withPlatform);
+    expect(out.some((c) => c.platform_derived)).toBe(false);
   });
 });

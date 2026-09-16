@@ -109,7 +109,9 @@ function SocialShare({ listing }) {
   if (listing.status !== "published") return null;
   const title = socialShareTitle(listing);
 
-  const byPlatform = groupByPlatform(marketingChannels || []);
+  const channelList = marketingChannels || [];
+  const guessing = channelList.some((c) => c.platform_derived);
+  const byPlatform = groupByPlatform(channelList);
   const platforms = [
     ...PLATFORM_ORDER.filter((p) => byPlatform.has(p) || p === "facebook" || p === "reddit"),
     ...[...byPlatform.keys()].filter((p) => !PLATFORM_ORDER.includes(p)),
@@ -178,6 +180,17 @@ function SocialShare({ listing }) {
                       onPicked={() => setOpenPlatform("")}
                     />
                   ))}
+
+                  {/* The platform column is what says "Rishav's group is posted
+                      to Facebook"; without it that channel can only be guessed
+                      at from its source, and lands under Other. Say so here
+                      rather than leaving an agent wondering where it went. */}
+                  {guessing && (
+                    <span className="crm-mute" style={{ fontSize: 10.5, lineHeight: 1.35, padding: "2px 4px" }}>
+                      Some channels are placed by guesswork — re-run
+                      marketing_schema.sql to file them properly.
+                    </span>
+                  )}
                 </span>
               </>
             )}

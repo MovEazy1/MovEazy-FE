@@ -82,8 +82,36 @@ const withoutOptional = (cols) =>
     .filter((c) => !OPTIONAL_CHANNEL_COLS.includes(c))
     .join(",");
 
+/**
+ * The best guess at a channel's platform from its utm_source alone.
+ *
+ * Only used when the platform column isn't there yet. It gets the obvious ones
+ * right — a channel sourced "facebook" is posted to Facebook — and cannot get
+ * the interesting one right: Rishav's group is sourced "rishav" and posted to
+ * Facebook, which is the entire reason platform is a column rather than being
+ * inferred. So this keeps the menu useful while the migration is pending, and
+ * `platform_derived` marks the rows it had to guess at so the UI can say so
+ * rather than quietly filing them under "Other".
+ */
+const PLATFORM_BY_SOURCE = {
+  facebook: "facebook",
+  fb: "facebook",
+  reddit: "reddit",
+  instagram: "instagram",
+  whatsapp: "whatsapp",
+  linkedin: "linkedin",
+  twitter: "twitter",
+  x: "twitter",
+};
+
+const derivePlatform = (row) =>
+  PLATFORM_BY_SOURCE[String(row?.utm_source || "").toLowerCase()] || "other";
+
 /** Defaults for whatever the retry had to drop, so callers see one shape. */
-const fillOptional = (rows) => rows.map((r) => ({ platform: "other", ...r }));
+export const normalizeChannels = (rows) =>
+  rows.map((r) =>
+    r.platform ? r : { ...r, platform: derivePlatform(r), platform_derived: true },
+  );
 
 async function rpc(name, args = {}) {
   if (!isSupabaseConfigured || !supabase) throw unconfigured(name);
@@ -132,7 +160,7 @@ export async function fetchAllChannels() {
     ({ data, error } = await run(withoutOptional(CHANNEL_COLS)));
   }
   if (error) throw error;
-  return fillOptional(data ?? []);
+  return normalizeChannels(data ?? []);
 }
 
 /**
@@ -168,7 +196,7 @@ export async function fetchShareChannels() {
       console.warn(`[crm] marketing_channels: ${error.message}`);
       return [];
     }
-    return fillOptional(data ?? []);
+    return normalizeChannels(data ?? []);
   } catch (e) {
     console.warn(`[crm] marketing_channels threw: ${e?.message}`);
     return [];
