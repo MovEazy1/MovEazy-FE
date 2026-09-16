@@ -71,7 +71,7 @@ function SwipeCard({ listing, index, top, onSwiped, onOpenDetails, position }) {
   return (
     <motion.div
       drag={top ? "x" : false}
-      style={{ position: "absolute", inset: 0, cursor: top ? "grab" : "default", zIndex: 10 - index, isolation: "isolate" }}
+      style={{ position: "absolute", inset: 0, cursor: top ? "pointer" : "default", zIndex: 10 - index, isolation: "isolate" }}
       dragConstraints={{ left: 0, right: 0 }}
       dragElastic={0.7}
       onDrag={top ? (_e, info) => setDragX(info.offset.x) : undefined}
@@ -80,6 +80,9 @@ function SwipeCard({ listing, index, top, onSwiped, onOpenDetails, position }) {
         if (info.offset.x > 120) onSwiped(1, listing);
         else if (info.offset.x < -120) onSwiped(-1, listing);
       }}
+      // A real tap, not a drag — framer-motion only fires this when the
+      // pointer barely moved, so a swipe never also opens the card.
+      onTap={top ? () => onOpenDetails?.(listing) : undefined}
       initial={{ scale: 0.94, y: 20, opacity: 0 }}
       animate={{ scale: 1 - index * 0.04, y: index * 14, opacity: 1 }}
       exit={{ x: position * 420, y: -60, rotate: position * 14, opacity: 0, transition: { duration: 0.4, ease: EASE } }}
@@ -158,17 +161,15 @@ function SwipeCard({ listing, index, top, onSwiped, onOpenDetails, position }) {
             </div>
           ) : null}
 
-          <button
-            type="button"
-            onClick={() => onOpenDetails?.(listing)}
+          <span
+            aria-hidden
             style={{
               marginTop: "auto", alignSelf: "flex-start",
-              border: "none", background: "none", padding: 0, cursor: "pointer",
               fontSize: 12.5, fontWeight: 700, color: T.coral,
             }}
           >
             View details →
-          </button>
+          </span>
         </div>
       </div>
     </motion.div>
