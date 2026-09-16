@@ -7,9 +7,55 @@ import { useMemo, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { useCrm } from "./CrmShell";
 import { matchListingToRequirements } from "../../lib/inventoryMatch";
-import { propertyLink } from "../../lib/crmSettings";
+import {
+  facebookShareUrl,
+  propertyLink,
+  redditShareUrl,
+  socialShareTitle,
+} from "../../lib/crmSettings";
 import { SCOPES } from "../../lib/adminScopes";
 import { Btn, C, Chip, Empty, ScoreRing, inr, shortDate } from "./crmUi";
+
+/**
+ * Post a flat to Facebook or Reddit.
+ *
+ * Both open a composer with the /p/:id link already in it, so the card they
+ * render is the same four-photo collage WhatsApp gets — one OG image, built
+ * once, used by every surface.
+ *
+ * Only published listings get these. A paused or rented flat posted to a public
+ * feed outlives the share: the post stays up, and people keep arriving at
+ * something they cannot rent.
+ */
+function SocialShare({ listing }) {
+  if (listing.status !== "published") return null;
+  const title = socialShareTitle(listing);
+
+  return (
+    <>
+      <a
+        className="crm-btn crm-btn--sm crm-btn--fb"
+        href={facebookShareUrl(listing.property_id)}
+        target="_blank"
+        rel="noopener noreferrer"
+        style={{ textDecoration: "none" }}
+        title={`Share ${listing.property_id} on Facebook`}
+      >
+        Facebook
+      </a>
+      <a
+        className="crm-btn crm-btn--sm crm-btn--reddit"
+        href={redditShareUrl(listing.property_id, title)}
+        target="_blank"
+        rel="noopener noreferrer"
+        style={{ textDecoration: "none" }}
+        title={`Post ${listing.property_id} to Reddit`}
+      >
+        Reddit
+      </a>
+    </>
+  );
+}
 
 export default function CrmPropertiesPage() {
   const { inventory, requirements, clients, access } = useCrm();
@@ -87,7 +133,7 @@ export default function CrmPropertiesPage() {
                     <td className="crm-mute">{l.source || "—"}</td>
                     <td className="crm-mute crm-num">{shortDate(l.created_at)}</td>
                     <td>
-                      <div style={{ display: "flex", gap: 5 }}>
+                      <div style={{ display: "flex", gap: 5, flexWrap: "wrap" }}>
                         <Btn sm onClick={() => setOpenId(l.property_id)}>Who fits</Btn>
                         {canEdit && (
                           <Link to={`/crm/properties/${l.property_id}/edit`}
@@ -95,6 +141,7 @@ export default function CrmPropertiesPage() {
                         )}
                         <a className="crm-btn crm-btn--sm" href={propertyLink(l.property_id)}
                            target="_blank" rel="noopener noreferrer" style={{ textDecoration: "none" }}>Open</a>
+                        <SocialShare listing={l} />
                       </div>
                     </td>
                   </tr>

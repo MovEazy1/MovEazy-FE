@@ -7,12 +7,14 @@ import {
   getPendingSellerBadgeApplicationsRemote,
   getProfileForUser,
   normalizeSignupRole,
+  recordSignupAttribution,
   setRoleForEmail,
   setSellerBadgeStatusForEmail,
   submitSellerBadgeApplicationRemote,
   updateUserProfileFields,
 } from "../lib/profileService";
 import { saveCustomerSearchProfile } from "../lib/customerSearchProfile";
+import { attributionToken } from "../lib/attribution";
 import { isEmailAdminAllowed, getEnvAdminEmails } from "../lib/adminAccess";
 import { supabase, isSupabaseConfigured, normalizeSupabaseError, getSupabaseAuthSettings } from "../lib/supabase";
 
@@ -141,6 +143,10 @@ export function AuthProvider({ children }) {
     }
     try {
       await ensureUserProfileDocuments(sbUser);
+      // Google sign-in never passes through signup(), so this is the only place
+      // an OAuth account can be credited to the post that produced it. Ignores
+      // anyone whose account is not minutes old, and never overwrites a source.
+      await recordSignupAttribution(sbUser);
       const profile = await getProfileForUser(sbUser);
       const allowed = await isEmailAdminAllowed(profile.email);
       setAdminAllowed(allowed);
@@ -339,15 +345,28 @@ export function AuthProvider({ children }) {
       return { success: true, role: normalizedRole };
     }
     try {
+      // The token also rides along in user_metadata, which needs no migration
+      // and no session — so a signup that stops at "confirm your email" is still
+      // attributable even if the profile write below finds nowhere to land.
+      const signupToken = attributionToken();
       const { data, error } = await supabase.auth.signUp({
         email: e,
         password,
-        options: { data: { full_name: name || e.split("@")[0], role: normalizedRole } },
+        options: {
+          data: {
+            full_name: name || e.split("@")[0],
+            role: normalizedRole,
+            ...(signupToken ? { attribution_token: signupToken } : {}),
+          },
+        },
       });
       if (error) return { success: false, error: normalizeSupabaseError(error) };
       const sbUser = data?.user;
       if (!sbUser) return { success: false, error: "Sign-up failed." };
       await createProfileAfterSignup({ sbUser, name: name || e.split("@")[0], role: normalizedRole, phone });
+      // force: this is unambiguously a signup, so don't make it prove the
+      // account is new by its timestamp.
+      await recordSignupAttribution(sbUser, { force: true });
 
       if (normalizedRole === "customer" && searchProfile && isSupabaseConfigured && sbUser.id) {
         try {

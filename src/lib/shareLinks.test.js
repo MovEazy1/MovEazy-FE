@@ -11,7 +11,14 @@
 import { readFileSync, readdirSync, statSync } from "node:fs";
 import { join } from "node:path";
 import { describe, expect, it } from "vitest";
-import { SHARE_SOURCES, propertyLink, shareVia } from "./crmSettings";
+import {
+  SHARE_SOURCES,
+  facebookShareUrl,
+  propertyLink,
+  redditShareUrl,
+  shareVia,
+  socialShareTitle,
+} from "./crmSettings";
 
 const paramsOf = (url) => new URL(url).searchParams;
 
@@ -49,6 +56,51 @@ describe("a shared listing link", () => {
 
   it("carries a token only when a send has one to carry", () => {
     expect(paramsOf(propertyLink("MZ-ABC123")).get("mz_s")).toBeNull();
+  });
+});
+
+describe("posting a flat to a social feed", () => {
+  /** The listing URL a composer was handed, pulled back out of its own link. */
+  const shared = (composerUrl, param) =>
+    new URL(new URL(composerUrl).searchParams.get(param));
+
+  it("hands Facebook our OG page, so the card is the collage and not our logo", () => {
+    const url = shared(facebookShareUrl("MZ-ABC123"), "u");
+    expect(url.pathname).toBe("/p/MZ-ABC123");
+    expect(url.searchParams.get("utm_source")).toBe("facebook");
+  });
+
+  it("hands Reddit the same page, with a title already filled in", () => {
+    const composer = new URL(redditShareUrl("MZ-ABC123", "2 BHK for rent in Bellandur"));
+    expect(shared(composer.href, "url").pathname).toBe("/p/MZ-ABC123");
+    expect(composer.searchParams.get("title")).toBe("2 BHK for rent in Bellandur");
+    expect(shared(composer.href, "url").searchParams.get("utm_source")).toBe("reddit");
+  });
+
+  it("carries no mz_s, because a public post has no one client to credit", () => {
+    // A WhatsApp send goes to one person; a feed post is read by strangers, so
+    // a per-client token on it would attribute every one of them to that client.
+    expect(shared(facebookShareUrl("MZ-ABC123"), "u").searchParams.get("mz_s")).toBeNull();
+    expect(shared(redditShareUrl("MZ-ABC123", "t"), "url").searchParams.get("mz_s")).toBeNull();
+  });
+
+  it("asks for the large collage, since a feed card is not a chat thumbnail", () => {
+    // api/p.js reads utm_source to pick the OG image size — this is the input
+    // that makes it serve 1200x630 rather than WhatsApp's 600x315.
+    for (const url of [shared(facebookShareUrl("MZ-A"), "u"), shared(redditShareUrl("MZ-A", "t"), "url")]) {
+      expect(["facebook", "reddit"]).toContain(url.searchParams.get("utm_source"));
+    }
+  });
+
+  it("gives an empty string rather than a broken composer link with no listing", () => {
+    expect(facebookShareUrl("")).toBe("");
+    expect(redditShareUrl(undefined, "t")).toBe("");
+  });
+
+  it("writes a Reddit title a human would have typed", () => {
+    expect(socialShareTitle({ flat_type: "2 BHK", area: "Bellandur", rent: 22500 }))
+      .toBe("2 BHK for rent in Bellandur — ₹22,500/mo");
+    expect(socialShareTitle({ area: "HSR Layout" })).toBe("Home for rent in HSR Layout");
   });
 });
 

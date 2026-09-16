@@ -3,6 +3,7 @@ import { useLocation } from "react-router-dom";
 import { sessionTracker } from "../lib/sessionTracking";
 import { identifySession, startSessionSync } from "../lib/sessionSync";
 import { recordShareOpenFromUrl } from "../lib/shareAttribution";
+import { captureAttribution } from "../lib/attribution";
 import { useAuth } from "../context/AuthContext";
 
 export function useSessionTracking() {
@@ -29,6 +30,13 @@ export function useSessionTracking() {
 
   // A link shared from the CRM carries mz_s; tell the CRM it was opened.
   useEffect(() => { recordShareOpenFromUrl(); }, []);
+
+  // Remember where this visitor came from before the UTM parameters fall off
+  // the address bar. Signup reads it back; without this, everyone who browses
+  // first and registers later is recorded as having arrived out of nowhere.
+  // Mount only: /p/:id redirects with a real page load, so the parameters are
+  // present here, and re-running per route would inflate the touch count.
+  useEffect(() => { captureAttribution(); }, []);
 
   return sessionTracker;
 }

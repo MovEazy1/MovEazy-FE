@@ -1,5 +1,6 @@
 import { supabase, isSupabaseConfigured } from "./supabase";
 import { isEmailAdminAllowed } from "./adminAccess";
+import { signupAttribution } from "./attribution";
 
 export const VALID_ROLES = ["admin", "broker", "seller", "customer", "consultant", "sub_admin", "tenant", "owner"];
 
@@ -77,6 +78,53 @@ export async function createProfileAfterSignup({ sbUser, name, role, phone }) {
   } catch {
     /* trigger already created the row; this enrichment can retry via ensureUserProfileDocuments */
   }
+}
+
+/**
+ * An account created in the last quarter of an hour. Attribution belongs to a
+ * signup, but Google sign-in has no signup path of its own — the first return
+ * from OAuth looks exactly like the hundredth — so the age of the auth row is
+ * what separates the two.
+ */
+function isFreshAccount(sbUser) {
+  const created = Date.parse(sbUser?.created_at || "");
+  if (!Number.isFinite(created)) return false;
+  return Date.now() - created < 15 * 60 * 1000;
+}
+
+/**
+ * Credit this account to the source that first brought the visitor in.
+ *
+ * Kept apart from the profile upsert on purpose. This writes columns that only
+ * exist once db/2026-09-16_signup_attribution.sql has been applied, and a
+ * rejected write must not take the account's name and phone down with it —
+ * attribution is the least important thing happening at signup.
+ *
+ * `.is("attribution_token", null)` makes it first-write-wins in the database
+ * rather than in our heads: calling it twice, or on a later sign-in, cannot
+ * relabel someone who already has a source.
+ */
+export async function recordSignupAttribution(sbUser, { force = false } = {}) {
+  if (!sbUser?.id || !isSupabaseConfigured || !supabase) return null;
+  if (!force && !isFreshAccount(sbUser)) return null;
+
+  const attribution = signupAttribution();
+  if (!attribution) return null;
+
+  try {
+    // The returned error is deliberately not read: an unmigrated column or an
+    // RLS refusal both come back this way, and neither is worth surfacing to
+    // someone who is in the middle of creating an account. The catch is for the
+    // network failing, which PostgREST reports by rejecting instead.
+    await supabase
+      .from("user_profiles")
+      .update({ ...attribution, updated_at: new Date().toISOString() })
+      .eq("id", sbUser.id)
+      .is("attribution_token", null);
+  } catch {
+    /* never block a signup for analytics */
+  }
+  return attribution.attribution_token;
 }
 
 export async function getProfileForUser(sbUser) {

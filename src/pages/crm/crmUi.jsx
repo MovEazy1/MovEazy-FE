@@ -29,6 +29,8 @@ export const C = {
   gold:       "#B0740F",  // darkened from the site's #E8A33D to stay legible on white
   coral:      "#CC3F28",
   wa:         "#128C4A",  // WhatsApp green, darkened for contrast; used nowhere else
+  fb:         "#145DBF",  // Facebook blue, darkened: #1877F2 is 4.2:1 on white, under AA
+  reddit:     "#C0390B",  // Reddit orange, darkened hard: #FF4500 is only 3.4:1 on white
 };
 
 /** Match score → colour. Deep teal ≥80, teal 60–79, gold 40–59, grey below. */
@@ -78,6 +80,12 @@ textarea.crm-input { resize:vertical; line-height:1.55; }
 .crm .crm-btn--primary:hover:not(:disabled) { background:#0B6353; border-color:#0B6353; color:#fff; }
 .crm .crm-btn--wa { background:${C.wa}; border-color:${C.wa}; color:#fff; }
 .crm .crm-btn--wa:hover:not(:disabled) { background:#0E7A40; border-color:#0E7A40; color:#fff; }
+/* Outlined rather than filled, unlike --wa: three solid brand colours in one
+   table row shout over the listing itself. The colour alone is enough to find. */
+.crm .crm-btn--fb { border-color:${C.fb}; color:${C.fb}; }
+.crm .crm-btn--fb:hover:not(:disabled) { background:#EAF1FC; border-color:${C.fb}; color:${C.fb}; }
+.crm .crm-btn--reddit { border-color:${C.reddit}; color:${C.reddit}; }
+.crm .crm-btn--reddit:hover:not(:disabled) { background:#FDEEE8; border-color:${C.reddit}; color:${C.reddit}; }
 .crm .crm-btn--call { background:${C.bg}; border-color:${C.accent}; color:${C.accent}; }
 .crm .crm-btn--call:hover:not(:disabled) { background:${C.accentSoft}; border-color:${C.accent}; color:${C.accent}; }
 .crm .crm-btn--danger { border-color:#E8C4BC; color:${C.coral}; }

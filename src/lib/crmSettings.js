@@ -192,7 +192,54 @@ export const SHARE_SOURCES = {
   owner: { source: "owner", medium: "share", campaign: "listing_share" },
   /** Anyone sharing a listing from the property page. */
   listing: { source: "app", medium: "share", campaign: "listing_share" },
+  /** Posted to a Facebook feed, group or page from the CRM. */
+  facebook: { source: "facebook", medium: "social", campaign: "property_share" },
+  /** Posted to a subreddit from the CRM. */
+  reddit: { source: "reddit", medium: "social", campaign: "property_share" },
 };
+
+/**
+ * A social post is read by strangers, so unlike a WhatsApp send there is no one
+ * client to tie it to — the UTM parameters are the whole of the attribution.
+ * They survive all the way to signup because lib/attribution.js keeps the first
+ * touch and stamps it onto the account, which is the only way a post made today
+ * gets credited for an account created next week.
+ */
+function socialLink(propertyId, sourceKey) {
+  return propertyLink(propertyId, SHARE_SOURCES[sourceKey]);
+}
+
+/**
+ * Facebook's sharer takes a URL and nothing else — the card's title, blurb and
+ * picture all come from the Open Graph tags /p/:id serves, which is why the
+ * preview is the four-photo collage rather than our logo.
+ */
+export function facebookShareUrl(propertyId) {
+  if (!propertyId) return "";
+  return `https://www.facebook.com/sharer/sharer.php?u=${encodeURIComponent(socialLink(propertyId, "facebook"))}`;
+}
+
+/**
+ * Reddit wants a title typed by the sharer; pre-filling it from the listing
+ * saves the agent the retype and keeps posts reading the same across
+ * subreddits. The picture still comes from the same OG tags.
+ */
+export function redditShareUrl(propertyId, title) {
+  if (!propertyId) return "";
+  const u = encodeURIComponent(socialLink(propertyId, "reddit"));
+  const t = encodeURIComponent(String(title || "").slice(0, 280));
+  return `https://www.reddit.com/submit?url=${u}&title=${t}`;
+}
+
+/** "2 BHK for rent in Bellandur — ₹22,500/mo": a headline a subreddit reads well. */
+export function socialShareTitle(listing) {
+  if (!listing) return "Home for rent on MovEazy";
+  const kind = listing.flat_type || "Home";
+  const where = listing.area || listing.city || "Bengaluru";
+  const rent = inr(listing.rent);
+  const head = `${kind} for rent in ${where}`;
+  return rent ? `${head} — ${rent}/mo` : head;
+}
 
 /**
  * The same source, distinguishing the OS share sheet from a copied link —

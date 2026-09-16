@@ -65,15 +65,23 @@ const h = (type, props = {}, ...children) => ({
 const INK = "#04211D";
 const MINT = "#5EEAD4";
 const CREAM = "#F4F2ED";
-// WhatsApp commonly declines to render a preview image much over ~600KB, and a
-// four-photo collage as PNG is heavy — resvg gives us no JPEG or quality knob,
-// so output dimensions are the only lever. 800x420 still came out at 748KB, so
-// this drops to 600x315 — Facebook's own documented minimum for an OG image,
-// holding the same 1.91:1 ratio. WhatsApp renders a preview around 500px wide,
-// so this is still above display size and nothing visible is lost.
-const W = 600;
-const H = 315;
-const GAP = 4;
+/**
+ * Two sizes of the same picture, because the limit is WhatsApp's, not ours.
+ *
+ * `sm` is the default: 600x315, Facebook's documented minimum, holding the same
+ * 1.91:1 ratio. 800x420 came out at 748KB and WhatsApp commonly declines to
+ * render a preview much over ~600KB — resvg gives us no JPEG or quality knob, so
+ * output dimensions are the only lever. WhatsApp displays around 500px wide, so
+ * nothing visible is lost.
+ *
+ * `lg` is 1200x630 for a Facebook or Reddit feed card, which is shown far
+ * larger and on desktop, where 600px wide is visibly soft. Neither has
+ * WhatsApp's size ceiling, so there is no reason to send them the small one.
+ */
+const SIZES = {
+  sm: { W: 600, H: 315, GAP: 4, rent: 30, line: 15, pad: "14px 18px", foot: 13, mark: 32 },
+  lg: { W: 1200, H: 630, GAP: 8, rent: 60, line: 30, pad: "28px 36px", foot: 26, mark: 64 },
+};
 
 const tile = (src, width, height) =>
   h(
@@ -86,7 +94,7 @@ const tile = (src, width, height) =>
  * Arrange 1–4 photos so none of them look like a mistake: one fills the frame,
  * two split it, three give the first the left half, four make a grid.
  */
-function collage(photos) {
+function collage(photos, { W, H, GAP }) {
   if (photos.length === 1) return tile(photos[0], W, H);
 
   const halfW = (W - GAP) / 2;
@@ -122,6 +130,8 @@ function collage(photos) {
 
 export default async function handler(req) {
   const { searchParams } = new URL(req.url);
+  const size = SIZES[searchParams.get("size")] || SIZES.sm;
+  const { W, H } = size;
   const listing = await fetchListing(searchParams.get("listingId"));
   const photos = photosOf(listing, 4);
 
@@ -129,14 +139,14 @@ export default async function handler(req) {
   const line = [listing?.flat_type, listing?.area].filter(Boolean).join(" · ");
 
   const body = photos.length
-    ? collage(photos)
+    ? collage(photos, size)
     : h(
         "div",
         {
           style: {
             display: "flex", width: W, height: H, alignItems: "center",
             justifyContent: "center", background: INK, color: MINT,
-            fontSize: 32, fontWeight: 700,
+            fontSize: size.mark, fontWeight: 700,
           },
         },
         "MovEazy",
@@ -152,17 +162,17 @@ export default async function handler(req) {
             style: {
               position: "absolute", left: 0, right: 0, bottom: 0,
               display: "flex", alignItems: "flex-end", justifyContent: "space-between",
-              padding: "14px 18px",
+              padding: size.pad,
               background: "linear-gradient(transparent, rgba(4,33,29,0.92))",
             },
           },
           h(
             "div",
             { style: { display: "flex", flexDirection: "column" } },
-            rent && h("div", { style: { display: "flex", color: CREAM, fontSize: 30, fontWeight: 700 } }, rent),
-            line && h("div", { style: { display: "flex", color: MINT, fontSize: 15, marginTop: 3 } }, line),
+            rent && h("div", { style: { display: "flex", color: CREAM, fontSize: size.rent, fontWeight: 700 } }, rent),
+            line && h("div", { style: { display: "flex", color: MINT, fontSize: size.line, marginTop: 3 } }, line),
           ),
-          h("div", { style: { display: "flex", color: CREAM, fontSize: 13, opacity: 0.85 } }, "moveazy.co.in"),
+          h("div", { style: { display: "flex", color: CREAM, fontSize: size.foot, opacity: 0.85 } }, "moveazy.co.in"),
         )
       : null;
 

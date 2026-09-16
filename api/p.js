@@ -14,6 +14,13 @@ import { fetchListing, listingTitle, listingDescription, esc } from "./_listing.
 
 export const config = { runtime: "edge" };
 
+/**
+ * Surfaces whose link preview is rendered large and on desktop. They get the
+ * full-size collage; a WhatsApp send keeps the small one, which is the only
+ * place the ~600KB preview ceiling bites.
+ */
+const FEED_SOURCES = new Set(["facebook", "reddit", "twitter", "linkedin", "instagram"]);
+
 export default async function handler(req) {
   const url = new URL(req.url);
   const listingId = String(url.searchParams.get("listingId") || "").trim().toUpperCase();
@@ -29,8 +36,16 @@ export default async function handler(req) {
 
   const title = listingTitle(listing);
   const description = listingDescription(listing);
+
+  // Which crawler is about to read this is knowable from the link itself: a
+  // share built for a feed carries utm_source=facebook or =reddit.
+  const size = FEED_SOURCES.has(String(url.searchParams.get("utm_source") || "").toLowerCase())
+    ? "lg"
+    : "sm";
+  const dims = size === "lg" ? { w: 1200, h: 630 } : { w: 600, h: 315 };
+
   const image = listingId
-    ? `${origin}/api/og?listingId=${encodeURIComponent(listingId)}`
+    ? `${origin}/api/og?listingId=${encodeURIComponent(listingId)}&size=${size}`
     : `${origin}/og-share.jpg`;
 
   const html = `<!doctype html>
@@ -46,8 +61,11 @@ export default async function handler(req) {
 <meta property="og:title" content="${esc(title)}" />
 <meta property="og:description" content="${esc(description)}" />
 <meta property="og:image" content="${esc(image)}" />
-<meta property="og:image:width" content="600" />
-<meta property="og:image:height" content="315" />
+<meta property="og:image:secure_url" content="${esc(image)}" />
+<meta property="og:image:type" content="image/png" />
+<meta property="og:image:width" content="${dims.w}" />
+<meta property="og:image:height" content="${dims.h}" />
+<meta property="og:image:alt" content="${esc(title)}" />
 <meta property="og:url" content="${esc(target)}" />
 
 <meta name="twitter:card" content="summary_large_image" />
