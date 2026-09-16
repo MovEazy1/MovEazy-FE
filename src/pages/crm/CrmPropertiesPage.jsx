@@ -110,8 +110,12 @@ function SocialShare({ listing }) {
   const title = socialShareTitle(listing);
 
   const channelList = marketingChannels || [];
-  const guessing = channelList.some((c) => c.platform_derived);
   const byPlatform = groupByPlatform(channelList);
+
+  // Channels whose platform had to be guessed and couldn't be — they exist and
+  // are tracked, but no menu claims them. Surfaced so a missing channel reads
+  // as a missing channel rather than as one that was never created.
+  const unplaced = channelList.filter((c) => c.platform_derived && c.platform === "other");
   const platforms = [
     ...PLATFORM_ORDER.filter((p) => byPlatform.has(p) || p === "facebook" || p === "reddit"),
     ...[...byPlatform.keys()].filter((p) => !PLATFORM_ORDER.includes(p)),
@@ -166,8 +170,12 @@ function SocialShare({ listing }) {
                 <span
                   style={{
                     position: "absolute", top: "calc(100% + 4px)", right: 0, zIndex: 41,
-                    background: C.card, border: `1px solid ${C.line}`, borderRadius: 8,
-                    padding: 6, minWidth: 210, display: "flex", flexDirection: "column", gap: 4,
+                    // C.bg, not C.card — there is no C.card, and an undefined
+                    // background renders transparent, which put this menu's text
+                    // straight on top of the rows behind it.
+                    background: C.bg, border: `1px solid ${C.line}`, borderRadius: 8,
+                    padding: 6, minWidth: 210, maxWidth: 280,
+                    display: "flex", flexDirection: "column", gap: 4,
                     boxShadow: "0 8px 24px rgba(0,0,0,0.18)",
                   }}
                 >
@@ -183,12 +191,18 @@ function SocialShare({ listing }) {
 
                   {/* The platform column is what says "Rishav's group is posted
                       to Facebook"; without it that channel can only be guessed
-                      at from its source, and lands under Other. Say so here
-                      rather than leaving an agent wondering where it went. */}
-                  {guessing && (
-                    <span className="crm-mute" style={{ fontSize: 10.5, lineHeight: 1.35, padding: "2px 4px" }}>
-                      Some channels are placed by guesswork — re-run
-                      marketing_schema.sql to file them properly.
+                      at from its source and ends up unplaced. Name the missing
+                      channels rather than the migration — an agent can act on
+                      "Rishav's group is missing", not on a filename. */}
+                  {unplaced.length > 0 && (
+                    <span
+                      className="crm-mute"
+                      style={{
+                        fontSize: 10.5, lineHeight: 1.4, padding: "4px 4px 2px",
+                        borderTop: `1px solid ${C.lineSoft}`, marginTop: 2,
+                      }}
+                    >
+                      Not placed yet: {unplaced.map((c) => c.label).join(", ")}
                     </span>
                   )}
                 </span>
