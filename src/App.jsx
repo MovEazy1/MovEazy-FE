@@ -12,6 +12,7 @@ const Profile = lazy(() => import("./pages/Profile"));
 const SupabaseLogin = lazy(() => import("./pages/SupabaseLogin"));
 const BrokerDashboard = lazy(() => import("./pages/BrokerDashboard"));
 const MapPage = lazy(() => import("./pages/MapPage"));
+const TopMatches = lazy(() => import("./pages/TopMatches"));
 const HowItWorks = lazy(() => import("./pages/HowItWorks"));
 const About = lazy(() => import("./pages/About"));
 const ListMyFlat = lazy(() => import("./pages/ListMyFlat"));
@@ -91,6 +92,7 @@ function AppRoutes() {
       <Routes>
         <Route path="/" element={<ForkHome />} />
         <Route path="/map" element={<MapPage />} />
+        <Route path="/matches" element={<TopMatches />} />
         <Route path="/how-it-works" element={<HowItWorks />} />
         <Route path="/about" element={<About />} />
         <Route

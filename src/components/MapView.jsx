@@ -8,9 +8,8 @@ import { coverMedia, isVideoUrl, orderListingMedia } from "../lib/listingMedia";
 import { useBackClose } from "../hooks/useBackClose";
 import { useAuth } from "../context/AuthContext";
 import { useLoginModal } from "../context/LoginModalContext";
-import { isFirebaseConfigured } from "../lib/firebase";
-import { getListingsData, isListingPubliclyVisible } from "../lib/firestoreStore";
-import { fetchInventoryAsListings, fetchInventoryByIds, mapInventoryToListing } from "../lib/inventory";
+import { fetchInventoryByIds, mapInventoryToListing } from "../lib/inventory";
+import { fetchAllListings } from "../lib/listingsFeed";
 import { geocodePlace, searchPlaces, reverseGeocode } from "../lib/geocode";
 import { haversineKm } from "../lib/geo";
 import { scoreMatch, listingForScoring } from "../lib/inventoryMatch";
@@ -26,9 +25,10 @@ import {
   toggleSavedListing,
 } from "../lib/userActivity";
 import { logSavedListingChange } from "../lib/crmSync";
+import { setReaction } from "../lib/visits";
 import { reportClientWarn } from "../lib/clientLog";
 import MovEazyNav from "./layout/MovEazyNav";
-import ListingCard from "./ListingCard";
+import SwipeDeck from "./SwipeDeck";
 
 const MAP_NEARBY_KM = 12;
 /** Default max distance (km) from workplace / geocoded pin; user-adjustable in search panel. */
@@ -287,16 +287,6 @@ function MediaElement({ src, alt, style }) {
     return <video src={src} style={style} autoPlay muted loop playsInline />;
   }
   return <img src={src} alt={alt} loading="lazy" style={style} />;
-}
-
-function listingCoverSrc(listing) {
-  const primary = String(listing?.image || "").trim();
-  if (primary) return primary;
-  if (Array.isArray(listing?.images)) {
-    const first = listing.images.map((x) => String(x || "").trim()).find(Boolean);
-    if (first) return first;
-  }
-  return "";
 }
 
 delete L.Icon.Default.prototype._getIconUrl;
@@ -1034,26 +1024,10 @@ export default function MapView() {
       // Extract primary filters for server-side optimization
       const bhk = filters.bhkTypes.length === 1 ? filters.bhkTypes[0] : null;
       const maxRent = filters.maxRent < 100000 ? filters.maxRent : null;
-      
-      const options = {
-        limitCount: isMobile ? 250 : 500,
-        bhk,
-        maxRent
-      };
 
-      // Static/verified feed + user-uploaded inventory (Supabase), merged so newly
-      // listed homes show on the map. Both are fetched in parallel; either can be empty.
-      const [staticRows, inventoryRows] = await Promise.all([
-        isFirebaseConfigured ? getListingsData(options) : Promise.resolve([]),
-        fetchInventoryAsListings({ limit: isMobile ? 250 : 500 }).catch(() => []),
-      ]);
+      const rows = await fetchAllListings({ limit: isMobile ? 250 : 500, bhk, maxRent });
       if (alive) {
-        const feed = staticRows.filter(isListingPubliclyVisible);
-        // De-dupe by id, letting uploaded inventory win over any static row with the same id.
-        const byId = new Map();
-        for (const l of feed) byId.set(String(l.id), l);
-        for (const l of inventoryRows) byId.set(String(l.id), l);
-        setListings(Array.from(byId.values()));
+        setListings(rows);
         setListingsLoading(false);
       }
     }
@@ -1073,6 +1047,7 @@ export default function MapView() {
   }, []);
 
   const listingIdFromUrl = useMemo(() => new URLSearchParams(location.search).get("listingId") || "", [location.search]);
+  const openVisitFormFromUrl = useMemo(() => new URLSearchParams(location.search).get("visit") === "1", [location.search]);
 
   /** Hero / deep link: always derive filters from URL (avoids stale BHK/rent from a previous session). */
   useEffect(() => {
@@ -1152,10 +1127,12 @@ export default function MapView() {
    * alone. Opening one pushes ?listingId=…; back drops it and this effect
    * closes the modal, leaving the map exactly where it was.
    */
-  const openProperty = useCallback((listing) => {
+  const openProperty = useCallback((listing, { openVisitForm } = {}) => {
     if (!listing?.id) return;
     const qs = new URLSearchParams(location.search);
     qs.set("listingId", String(listing.id));
+    if (openVisitForm) qs.set("visit", "1");
+    else qs.delete("visit");
     navigate({ pathname: location.pathname, search: `?${qs.toString()}` });
   }, [navigate, location.pathname, location.search]);
 
@@ -1372,6 +1349,14 @@ export default function MapView() {
     if (requirement) return [...scoredPins].sort((a, b) => (b.matchScore || 0) - (a.matchScore || 0));
     return scoredPins;
   }, [scoredPins, sortBy, requirement]);
+
+  /** Listings already swiped through on /matches shouldn't reappear in this deck. */
+  const seenListingIds = location.state?.seenListingIds;
+  const swipeDeckListings = useMemo(() => {
+    if (!seenListingIds?.length) return sortedDisplayPins;
+    const seen = new Set(seenListingIds.map(String));
+    return sortedDisplayPins.filter((l) => !seen.has(String(l.id)));
+  }, [sortedDisplayPins, seenListingIds]);
 
   /**
    * What the phone carousel slides through: the homes currently on the map, in
@@ -2801,54 +2786,22 @@ export default function MapView() {
             </div>
           </div>
 
-          <div
-            style={{
-              display: "grid",
-              gridTemplateColumns: "1fr",
-              gap: isMobile ? 14 : 16,
-              marginTop: 18,
-            }}
-          >
-          {sortedDisplayPins.map((l) => {
-            const anchor = workplaceAnchor || placeAnchor;
-            const distanceRaw = anchor && Number.isFinite(Number(l.lat)) && Number.isFinite(Number(l.lng))
-              ? haversineKm(anchor.lat, anchor.lng, Number(l.lat), Number(l.lng))
-              : null;
-            const distanceKm = distanceRaw != null ? distanceRaw.toFixed(1) : null;
-            const commuteLabel = distanceRaw != null && workplaceAnchor ? formatCommute(distanceRaw) : null;
-            const saved = isListingSaved(user, l.id);
-            return (
-              <ListingCard
-                key={l.id}
-                listing={l}
-                saved={saved}
-                isActive={selected?.id === l.id}
-                isMobile={isMobile}
-                commuteLabel={commuteLabel}
-                distanceKm={distanceKm}
-                cover={listingCoverSrc(l)}
-                badges={l.matchReasons?.length ? (
-                  <div style={{ display: "flex", flexWrap: "wrap", gap: 5, marginTop: 6 }}>
-                    {l.matchReasons.slice(0, isMobile ? 2 : 3).map((reason) => (
-                      <span key={reason} style={{ background: "#E4F6F1", color: "#0E7C68", fontSize: 11, fontWeight: 700, padding: "3px 9px", borderRadius: 999 }}>
-                        {reason}
-                      </span>
-                    ))}
-                  </div>
-                ) : null}
-                // Tapping a result opens the property itself. It used to throw
-                // you onto the map with a summary card at the bottom, which is
-                // a step further from what you asked for, not closer.
-                onSelect={() => openProperty(l)}
-                onSave={() => {
-                  const now = toggleSavedListing(user, l.id, l.title);
-                  void logSavedListingChange(user, l.id, now, l.title);
-                  setSavedRevision((v) => v + 1);
-                }}
-                onDetails={() => openProperty(l)}
-              />
-            );
-          })}
+          <div style={{ marginTop: 18 }}>
+            <SwipeDeck
+              listings={swipeDeckListings}
+              onSwipeRight={(l) => {
+                const now = toggleSavedListing(user, l.id, l.title);
+                void logSavedListingChange(user, l.id, now, l.title);
+                void setReaction(user?.uid, l.id, "like", null);
+                setSavedRevision((v) => v + 1);
+              }}
+              onSwipeLeft={(l) => {
+                void setReaction(user?.uid, l.id, "dislike", null);
+              }}
+              onOpenDetails={(l) => openProperty(l)}
+              onScheduleVisit={(l) => openProperty(l, { openVisitForm: true })}
+              emptyLabel="No more homes match your filters right now."
+            />
           </div>
         </div>
         )}
@@ -2878,7 +2831,7 @@ export default function MapView() {
             zIndex: 1010,
           }}
         >
-          {[["list", "List"], ["map", "Map"]].map(([tab, label]) => (
+          {[["list", "Swipe"], ["map", "Map"]].map(([tab, label]) => (
             <button
               key={tab}
               type="button"
@@ -2983,6 +2936,7 @@ export default function MapView() {
           onSelectListing={(l) => openProperty(l)}
           onSavedChange={() => setSavedRevision((v) => v + 1)}
           onClose={closeProperty}
+          initialShowVisitForm={openVisitFormFromUrl}
         />
       )}
 

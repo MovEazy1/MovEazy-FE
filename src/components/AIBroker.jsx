@@ -296,11 +296,10 @@ export default function AIBroker({ open, onClose }) {
       setAck("");
       if (stepIdx + 1 >= STEPS.length) {
         // Questionnaire complete — persist the requirement (best-effort) and take
-        // the user straight to the recommendations listings page (map + scored
-        // listings), instead of the in-modal reveal.
+        // the user to their top 5 swipeable matches, instead of the in-modal reveal.
         saveUserRequirement(user, prefs);
         onClose?.();
-        navigate("/recommendations", { state: { prefs, justSubmitted: true } });
+        navigate("/matches", { state: { prefs, justSubmitted: true } });
       } else {
         setStepIdx((i) => i + 1);
         setBrokerState("thinking");
@@ -340,7 +339,7 @@ export default function AIBroker({ open, onClose }) {
     setSaved(true);
     setTimeout(() => {
       onClose?.();
-      navigate("/recommendations", { state: { prefs, justSubmitted: true } });
+      navigate("/matches", { state: { prefs, justSubmitted: true } });
     }, 900);
   };
 
