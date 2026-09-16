@@ -95,6 +95,22 @@ export async function fetchUserRequirement(uid) {
   return data;
 }
 
+/**
+ * Marks that this account has been shown the one-time "top 5 matches" swipe
+ * screen, so the next time they'd land there they go straight to the map
+ * instead. Best-effort and silent: if the matches_seen migration hasn't run
+ * yet, this just fails quietly and they keep seeing the swipe screen — never
+ * something worth breaking the page over.
+ */
+export async function markMatchesSeen(uid) {
+  if (!isSupabaseConfigured || !supabase || !uid) return;
+  try {
+    await supabase.from("user_requirements").update({ matches_seen: true }).eq("user_id", uid);
+  } catch {
+    // ignore — see comment above
+  }
+}
+
 /** Every user's requirement (for the List my Flat "who does this match" step). */
 export async function fetchAllUserRequirements({ limit = 1000 } = {}) {
   if (!isSupabaseConfigured || !supabase) return [];

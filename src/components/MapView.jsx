@@ -25,10 +25,10 @@ import {
   toggleSavedListing,
 } from "../lib/userActivity";
 import { logSavedListingChange } from "../lib/crmSync";
-import { setReaction } from "../lib/visits";
+import { fetchReactions, setReaction } from "../lib/visits";
 import { reportClientWarn } from "../lib/clientLog";
 import MovEazyNav from "./layout/MovEazyNav";
-import SwipeDeck from "./SwipeDeck";
+import ListingCard from "./ListingCard";
 import Toast from "./Toast";
 
 const MAP_NEARBY_KM = 12;
@@ -288,6 +288,16 @@ function MediaElement({ src, alt, style }) {
     return <video src={src} style={style} autoPlay muted loop playsInline />;
   }
   return <img src={src} alt={alt} loading="lazy" style={style} />;
+}
+
+function listingCoverSrc(listing) {
+  const primary = String(listing?.image || "").trim();
+  if (primary) return primary;
+  if (Array.isArray(listing?.images)) {
+    const first = listing.images.map((x) => String(x || "").trim()).find(Boolean);
+    if (first) return first;
+  }
+  return "";
 }
 
 delete L.Icon.Default.prototype._getIconUrl;
@@ -953,17 +963,23 @@ export default function MapView() {
    */
   const [requirement, setRequirement] = useState(null);
   const [viewingProperty, setViewingProperty] = useState(null);
-  /** Confirmation shown after the modal closes itself post-booking, and which card it was for. */
+  /** Confirmation shown after the modal closes itself post-booking. */
   const [visitToast, setVisitToast] = useState("");
-  const [advanceOn, setAdvanceOn] = useState(null);
   const visitToastTimer = useRef(null);
-  const onVisitBooked = useCallback((message, listing) => {
+  const onVisitBooked = useCallback((message) => {
     setVisitToast(message);
-    setAdvanceOn({ id: listing.id, ts: Date.now() });
     clearTimeout(visitToastTimer.current);
     visitToastTimer.current = setTimeout(() => setVisitToast(""), 2800);
   }, []);
   useEffect(() => () => clearTimeout(visitToastTimer.current), []);
+  /** { [propertyId]: 'like'|'dislike' } — drives the list's dislike button state. */
+  const [reactions, setReactions] = useState({});
+  useEffect(() => {
+    if (!user?.uid) { setReactions({}); return; }
+    let alive = true;
+    fetchReactions(user.uid).then((r) => { if (alive) setReactions(r || {}); });
+    return () => { alive = false; };
+  }, [user?.uid]);
   /** Single "all filters" panel — a dropdown on desktop, a bottom sheet on mobile. Never occupies map layout. */
   const [showFilterPanel, setShowFilterPanel] = useState(false);
   /** "map" | "list" — replaces the old slide-up toggle; on mobile these are fully separate screens */
@@ -1362,9 +1378,9 @@ export default function MapView() {
     return scoredPins;
   }, [scoredPins, sortBy, requirement]);
 
-  /** Listings already swiped through on /matches shouldn't reappear in this deck. */
+  /** Listings already swiped through on /matches shouldn't reappear in this list. */
   const seenListingIds = location.state?.seenListingIds;
-  const swipeDeckListings = useMemo(() => {
+  const listPanelListings = useMemo(() => {
     if (!seenListingIds?.length) return sortedDisplayPins;
     const seen = new Set(seenListingIds.map(String));
     return sortedDisplayPins.filter((l) => !seen.has(String(l.id)));
@@ -2798,24 +2814,66 @@ export default function MapView() {
             </div>
           </div>
 
-          <div style={{ marginTop: 18 }}>
-            <SwipeDeck
-              listings={swipeDeckListings}
-              onSwipeRight={(l) => {
-                const now = toggleSavedListing(user, l.id, l.title);
-                void logSavedListingChange(user, l.id, now, l.title);
-                void setReaction(user?.uid, l.id, "like", null);
-                setSavedRevision((v) => v + 1);
+          {listPanelListings.length === 0 ? (
+            <div style={{ padding: "48px 20px", textAlign: "center", color: "#948c83", fontSize: 14.5 }}>
+              No more homes match your filters right now.
+            </div>
+          ) : (
+            <div
+              style={{
+                display: "grid",
+                gridTemplateColumns: "1fr",
+                gap: isMobile ? 14 : 16,
+                marginTop: 18,
               }}
-              onSwipeLeft={(l) => {
-                void setReaction(user?.uid, l.id, "dislike", null);
-              }}
-              onOpenDetails={(l) => openProperty(l)}
-              onScheduleVisit={(l) => openProperty(l, { openVisitForm: true })}
-              emptyLabel="No more homes match your filters right now."
-              advanceOn={advanceOn}
-            />
-          </div>
+            >
+              {listPanelListings.map((l) => {
+                const anchor = workplaceAnchor || placeAnchor;
+                const distanceRaw = anchor && Number.isFinite(Number(l.lat)) && Number.isFinite(Number(l.lng))
+                  ? haversineKm(anchor.lat, anchor.lng, Number(l.lat), Number(l.lng))
+                  : null;
+                const distanceKm = distanceRaw != null ? distanceRaw.toFixed(1) : null;
+                const commuteLabel = distanceRaw != null && workplaceAnchor ? formatCommute(distanceRaw) : null;
+                const saved = isListingSaved(user, l.id);
+                const disliked = reactions[l.id] === "dislike";
+                return (
+                  <ListingCard
+                    key={l.id}
+                    listing={l}
+                    saved={saved}
+                    disliked={disliked}
+                    isActive={selected?.id === l.id}
+                    isMobile={isMobile}
+                    commuteLabel={commuteLabel}
+                    distanceKm={distanceKm}
+                    cover={listingCoverSrc(l)}
+                    badges={l.matchReasons?.length ? (
+                      <div style={{ display: "flex", flexWrap: "wrap", gap: 5, marginTop: 6 }}>
+                        {l.matchReasons.slice(0, isMobile ? 2 : 3).map((reason) => (
+                          <span key={reason} style={{ background: "#E4F6F1", color: "#0E7C68", fontSize: 11, fontWeight: 700, padding: "3px 9px", borderRadius: 999 }}>
+                            {reason}
+                          </span>
+                        ))}
+                      </div>
+                    ) : null}
+                    onSelect={() => openProperty(l)}
+                    onSave={async () => {
+                      const now = toggleSavedListing(user, l.id, l.title);
+                      void logSavedListingChange(user, l.id, now, l.title);
+                      const nextReaction = await setReaction(user?.uid, l.id, "like", reactions[l.id]);
+                      setReactions((r) => ({ ...r, [l.id]: nextReaction || undefined }));
+                      setSavedRevision((v) => v + 1);
+                    }}
+                    onDislike={async () => {
+                      const nextReaction = await setReaction(user?.uid, l.id, "dislike", reactions[l.id]);
+                      setReactions((r) => ({ ...r, [l.id]: nextReaction || undefined }));
+                    }}
+                    onDetails={() => openProperty(l)}
+                  />
+                );
+              })}
+            </div>
+          )}
         </div>
         )}
       </div>
@@ -2844,7 +2902,7 @@ export default function MapView() {
             zIndex: 1010,
           }}
         >
-          {[["list", "Swipe"], ["map", "Map"]].map(([tab, label]) => (
+          {[["list", "List"], ["map", "Map"]].map(([tab, label]) => (
             <button
               key={tab}
               type="button"

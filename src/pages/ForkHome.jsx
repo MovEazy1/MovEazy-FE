@@ -134,7 +134,8 @@ export default function ForkHome() {
     try {
       const saved = await fetchUserRequirement(uid);
       if (saved) {
-        navigate("/matches", { state: { prefs: saved } });
+        // Already shown the one-time top-5 swipe screen — straight to the map.
+        navigate(saved.matches_seen ? "/map" : "/matches", { state: { prefs: saved } });
       } else {
         // First-timer, no saved requirement yet — straight into the AI agent
         // chat instead of the map-vs-agent choice. The choice modal (below)

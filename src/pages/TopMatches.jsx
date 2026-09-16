@@ -15,7 +15,7 @@ import Toast from "../components/Toast";
 import { useAuth } from "../context/AuthContext";
 import { fetchAllListings } from "../lib/listingsFeed";
 import { matchRequirementToListings, normalizeRequirement } from "../lib/inventoryMatch";
-import { fetchUserRequirement, rowToPrefs } from "../lib/userRequirements";
+import { fetchUserRequirement, markMatchesSeen, rowToPrefs } from "../lib/userRequirements";
 import { toggleSavedListing } from "../lib/userActivity";
 import { logSavedListingChange } from "../lib/crmSync";
 import { setReaction } from "../lib/visits";
@@ -98,6 +98,14 @@ export default function TopMatches() {
       .finally(() => { if (alive) setPrefsChecked(true); });
     return () => { alive = false; };
   }, [prefs, user?.uid, authLoading]);
+
+  // This is the one-time screen — mark it seen as soon as it's actually
+  // shown, so a returning visit (even one that never finishes swiping)
+  // lands on the map next time instead of back here.
+  useEffect(() => {
+    if (!prefs || !user?.uid) return;
+    void markMatchesSeen(user.uid);
+  }, [prefs, user?.uid]);
 
   useEffect(() => {
     let alive = true;

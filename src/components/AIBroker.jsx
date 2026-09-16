@@ -296,10 +296,14 @@ export default function AIBroker({ open, onClose }) {
       setAck("");
       if (stepIdx + 1 >= STEPS.length) {
         // Questionnaire complete — persist the requirement (best-effort) and take
-        // the user to their top 5 swipeable matches, instead of the in-modal reveal.
-        saveUserRequirement(user, prefs);
+        // the user to their top 5 swipeable matches, instead of the in-modal
+        // reveal. Unless they've already been shown that screen once before
+        // (saveUserRequirement's upsert leaves matches_seen untouched, so the
+        // returned row still reflects it) — then straight to the map.
+        saveUserRequirement(user, prefs).then((row) => {
+          navigate(row?.matches_seen ? "/map" : "/matches", { state: { prefs, justSubmitted: true } });
+        });
         onClose?.();
-        navigate("/matches", { state: { prefs, justSubmitted: true } });
       } else {
         setStepIdx((i) => i + 1);
         setBrokerState("thinking");
@@ -334,12 +338,12 @@ export default function AIBroker({ open, onClose }) {
   const saveReview = async () => {
     if (!prefsComplete(prefs) || saving) return;
     setSaving(true);
-    await saveUserRequirement(user, prefs);
+    const row = await saveUserRequirement(user, prefs);
     setSaving(false);
     setSaved(true);
     setTimeout(() => {
       onClose?.();
-      navigate("/matches", { state: { prefs, justSubmitted: true } });
+      navigate(row?.matches_seen ? "/map" : "/matches", { state: { prefs, justSubmitted: true } });
     }, 900);
   };
 

@@ -15,8 +15,8 @@ function Media({ src, alt, style }) {
 }
 
 export default function ListingCard({
-  listing: l, saved, isActive, isMobile, commuteLabel, distanceKm,
-  onSelect, onSave, onDetails, cover,
+  listing: l, saved, disliked, isActive, isMobile, commuteLabel, distanceKm,
+  onSelect, onSave, onDislike, onDetails, cover,
   // Slots so a caller can add what only its own flow has — match reasons on the
   // recommendations page, for instance — without forking the card's layout.
   badges = null, extra = null, onHover,
@@ -59,24 +59,46 @@ export default function ListingCard({
           >
             {isFlatmate ? "Flatmate" : "Entire flat"}
           </span>
-          <button
-            type="button"
-            aria-label={saved ? "Remove from saved" : "Save listing"}
-            onClick={(e) => {
-              e.stopPropagation();
-              onSave?.(l);
-            }}
-            style={{
-              position: "absolute", top: 8, right: 8, width: 30, height: 30, borderRadius: "50%",
-              border: "none", background: "rgba(255,255,255,.9)", boxShadow: "0 1px 2px rgba(23,20,18,.05)",
-              cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center",
-              color: saved ? "#ee5b45" : "#5c554e",
-            }}
-          >
-            <svg width="15" height="15" viewBox="0 0 24 24" fill={saved ? "currentColor" : "none"} stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-              <path d="M12 21s-7-4.4-9.5-8.5C.7 9 2 5.5 5 5.5c2 0 3.2 1.3 4 2.5.8-1.2 2-2.5 4-2.5 3 0 4.3 3.5 2.5 7C19 16.6 12 21 12 21z" />
-            </svg>
-          </button>
+          <div style={{ position: "absolute", top: 8, right: 8, display: "flex", flexDirection: "column", gap: 6 }}>
+            <button
+              type="button"
+              aria-label={saved ? "Remove from saved" : "Save listing"}
+              onClick={(e) => {
+                e.stopPropagation();
+                onSave?.(l);
+              }}
+              style={{
+                width: 30, height: 30, borderRadius: "50%",
+                border: "none", background: "rgba(255,255,255,.9)", boxShadow: "0 1px 2px rgba(23,20,18,.05)",
+                cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center",
+                color: saved ? "#ee5b45" : "#5c554e",
+              }}
+            >
+              <svg width="15" height="15" viewBox="0 0 24 24" fill={saved ? "currentColor" : "none"} stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M12 21s-7-4.4-9.5-8.5C.7 9 2 5.5 5 5.5c2 0 3.2 1.3 4 2.5.8-1.2 2-2.5 4-2.5 3 0 4.3 3.5 2.5 7C19 16.6 12 21 12 21z" />
+              </svg>
+            </button>
+            {onDislike ? (
+              <button
+                type="button"
+                aria-label={disliked ? "Remove dislike" : "Not interested"}
+                onClick={(e) => {
+                  e.stopPropagation();
+                  onDislike(l);
+                }}
+                style={{
+                  width: 30, height: 30, borderRadius: "50%",
+                  border: "none", background: disliked ? "#171412" : "rgba(255,255,255,.9)", boxShadow: "0 1px 2px rgba(23,20,18,.05)",
+                  cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center",
+                  color: disliked ? "#fff" : "#5c554e",
+                }}
+              >
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round">
+                  <path d="M6 6l12 12M18 6L6 18" />
+                </svg>
+              </button>
+            ) : null}
+          </div>
         </div>
         <div style={{ flex: 1, minWidth: 0, padding: "10px 13px", display: "flex", flexDirection: "column" }}>
           <div style={{ display: "flex", alignItems: "baseline", justifyContent: "space-between", gap: 8, flexWrap: "wrap" }}>
