@@ -15,7 +15,7 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { Link } from "react-router-dom";
 import {
-  channelLink, createChannel, dashboardPath, fetchAccessGrants, fetchAllChannels,
+  PLATFORMS, channelLink, createChannel, dashboardPath, fetchAccessGrants, fetchAllChannels,
   grantAccess, isMissingMigration, normalizeSlug, revokeAccess, setChannelActive, fmtDate,
 } from "../../lib/marketing";
 
@@ -67,6 +67,7 @@ export default function MarketingAccessPanel({ adminEmail = "" }) {
   const [description, setDescription] = useState("");
   const [utmSource, setUtmSource] = useState("");
   const [utmMedium, setUtmMedium] = useState("social");
+  const [platform, setPlatform] = useState("facebook");
 
   // new grant
   const [grantEmail, setGrantEmail] = useState("");
@@ -122,7 +123,7 @@ export default function MarketingAccessPanel({ adminEmail = "" }) {
     e.preventDefault();
     const created = normalizeSlug(slug);
     const ok = await run(
-      () => createChannel({ slug, label, description, utmSource, utmMedium }),
+      () => createChannel({ slug, label, description, utmSource, utmMedium, platform }),
       `Created /marketing/${created}.`,
     );
     if (!ok) return;
@@ -202,6 +203,14 @@ export default function MarketingAccessPanel({ adminEmail = "" }) {
                     >
                       {dashboardPath(c.slug)} →
                     </Link>
+                    {!c.is_overview && (
+                      <p className="text-[11px] text-gray-400 mt-0.5">
+                        Posted to{" "}
+                        <span className="font-bold text-gray-600">
+                          {(PLATFORMS.find((p) => p.id === c.platform)?.label || c.platform).split(" — ")[0]}
+                        </span>
+                      </p>
+                    )}
                   </div>
                   <div className="flex items-center gap-2">
                     <span
@@ -265,6 +274,13 @@ export default function MarketingAccessPanel({ adminEmail = "" }) {
             </Field>
             <Field label="utm_medium">
               <input className={input} value={utmMedium} onChange={(e) => setUtmMedium(e.target.value)} placeholder="social" />
+            </Field>
+            <Field label="Posted to" hint="Which share menu this sits under in the CRM's property share.">
+              <select className={input} value={platform} onChange={(e) => setPlatform(e.target.value)}>
+                {PLATFORMS.map((p) => (
+                  <option key={p.id} value={p.id}>{p.label}</option>
+                ))}
+              </select>
             </Field>
             <div className="sm:col-span-2">
               <Field label="Description" hint="Shown at the top of the dashboard.">

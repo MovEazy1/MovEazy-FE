@@ -13,6 +13,7 @@ import { join } from "node:path";
 import { describe, expect, it } from "vitest";
 import {
   SHARE_SOURCES,
+  channelPropertyLink,
   facebookShareUrl,
   propertyLink,
   redditShareUrl,
@@ -119,5 +120,65 @@ describe("nothing builds its own absolute listing URL", () => {
       .filter((f) => !f.endsWith("shareLinks.test.js"))
       .filter((f) => /(origin|https?:\/\/[^`"']+)\}?\/map\?listingId=/.test(readFileSync(f, "utf8")));
     expect(offenders).toEqual([]);
+  });
+});
+
+/**
+ * Posting to a named channel is what separates /marketing/fbpage from
+ * /marketing/fbprofile. Both surfaces are utm_source=facebook, so the campaign
+ * is the only thing that tells them apart — and it has to survive into the
+ * composer URL, not just the raw link, or a share made through the Facebook
+ * dialog is credited to nobody.
+ */
+describe("posting a listing to a marketing channel", () => {
+  const fbpage = {
+    slug: "fbpage",
+    label: "Facebook page",
+    platform: "facebook",
+    utm_source: "facebook",
+    utm_medium: "page",
+    utm_campaign: "mkt_fbpage",
+  };
+  const rishav = { ...fbpage, slug: "rishav", utm_source: "rishav", utm_medium: "group", utm_campaign: "mkt_rishav" };
+
+  it("carries the channel's own parameters, plus the property", () => {
+    const q = paramsOf(channelPropertyLink("MZ-ABC123", fbpage));
+    expect(q.get("utm_source")).toBe("facebook");
+    expect(q.get("utm_medium")).toBe("page");
+    expect(q.get("utm_campaign")).toBe("mkt_fbpage");
+    expect(q.get("utm_content")).toBe("MZ-ABC123");
+    expect(new URL(channelPropertyLink("MZ-ABC123", fbpage)).pathname).toBe("/p/MZ-ABC123");
+  });
+
+  it("tells two channels on the same platform apart", () => {
+    // The reason platform and campaign are separate fields at all.
+    const a = paramsOf(channelPropertyLink("MZ-1", fbpage)).get("utm_campaign");
+    const b = paramsOf(channelPropertyLink("MZ-1", rishav)).get("utm_campaign");
+    expect(a).not.toBe(b);
+  });
+
+  it("survives the trip through Facebook's sharer", () => {
+    const outer = new URL(facebookShareUrl("MZ-ABC123", fbpage));
+    const inner = new URL(outer.searchParams.get("u"));
+    expect(inner.searchParams.get("utm_campaign")).toBe("mkt_fbpage");
+    expect(inner.pathname).toBe("/p/MZ-ABC123");
+  });
+
+  it("survives the trip through Reddit's submit form", () => {
+    const outer = new URL(redditShareUrl("MZ-ABC123", "2 BHK in HSR", {
+      ...fbpage, platform: "reddit", utm_source: "reddit", utm_medium: "community",
+      utm_campaign: "mkt_reddithsrkora",
+    }));
+    const inner = new URL(outer.searchParams.get("url"));
+    expect(inner.searchParams.get("utm_campaign")).toBe("mkt_reddithsrkora");
+    expect(outer.searchParams.get("title")).toBe("2 BHK in HSR");
+  });
+
+  it("still produces an attributable link when no channel is given", () => {
+    // Before any channel exists for a platform, the share must still work and
+    // still be attributed — just to the platform rather than to a surface.
+    const q = paramsOf(channelPropertyLink("MZ-ABC123", null, "facebook"));
+    expect(q.get("utm_source")).toBe("facebook");
+    expect(q.get("utm_campaign")).toBeTruthy();
   });
 });

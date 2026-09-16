@@ -14,6 +14,7 @@ import {
   fetchClients, fetchClientRequirements, fetchEngagement, fetchShortlists, fetchLastTouch,
 } from "../../lib/crmClients";
 import { fetchCrmSettings } from "../../lib/crmSettings";
+import { fetchShareChannels } from "../../lib/marketing";
 import { supabase, isSupabaseConfigured } from "../../lib/supabase";
 import { C, CrmStyles, Empty, Loading } from "./crmUi";
 
@@ -151,11 +152,19 @@ export default function CrmShell() {
 
   const load = useCallback(async () => {
     try {
-      const [clients, requirements, inventory, engagement, shortlists, touches, settings] = await Promise.all([
-        fetchClients(), fetchClientRequirements(), fetchInventory(),
-        fetchEngagement(), fetchShortlists(), fetchLastTouch(), fetchCrmSettings(),
-      ]);
-      setData({ clients, requirements, inventory, engagement, shortlists, touches, settings });
+      // marketingChannels is the one that may legitimately come back empty: it
+      // resolves to [] on a project without the marketing migration, and the
+      // share menu then degrades to the plain per-platform link rather than
+      // leaving an agent with no way to post at all.
+      const [clients, requirements, inventory, engagement, shortlists, touches, settings, marketingChannels] =
+        await Promise.all([
+          fetchClients(), fetchClientRequirements(), fetchInventory(),
+          fetchEngagement(), fetchShortlists(), fetchLastTouch(), fetchCrmSettings(),
+          fetchShareChannels(),
+        ]);
+      setData({
+        clients, requirements, inventory, engagement, shortlists, touches, settings, marketingChannels,
+      });
       setError("");
     } catch (e) {
       setError(e?.message || "Could not load the CRM.");

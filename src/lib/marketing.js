@@ -79,11 +79,51 @@ export async function fetchAllChannels() {
   if (!isSupabaseConfigured || !supabase) throw unconfigured("marketing_channels");
   const { data, error } = await supabase
     .from("marketing_channels")
-    .select("slug,label,description,utm_source,utm_medium,utm_campaign,landing_path,is_overview,active,created_at")
+    .select("slug,label,description,utm_source,utm_medium,utm_campaign,landing_path,is_overview,active,platform,created_at")
     .order("is_overview", { ascending: false })
     .order("label");
   if (error) throw error;
   return data ?? [];
+}
+
+/**
+ * The channels an agent can post a property to, grouped by where they post it.
+ *
+ * Deliberately forgiving: a missing table, a pending migration or an account
+ * with no marketing access all resolve to an empty list rather than throwing.
+ * The CRM's share menu then falls back to the plain per-platform link, which is
+ * worse attribution but still a working share — a blank Facebook button because
+ * analytics is unavailable would be the wrong trade.
+ */
+export async function fetchShareChannels() {
+  if (!isSupabaseConfigured || !supabase) return [];
+  try {
+    const { data, error } = await supabase
+      .from("marketing_channels")
+      .select("slug,label,platform,utm_source,utm_medium,utm_campaign,landing_path,is_overview,active")
+      .eq("active", true)
+      .eq("is_overview", false)
+      .order("label");
+    if (error) {
+      console.warn(`[crm] marketing_channels: ${error.message}`);
+      return [];
+    }
+    return data ?? [];
+  } catch (e) {
+    console.warn(`[crm] marketing_channels threw: ${e?.message}`);
+    return [];
+  }
+}
+
+/** Channels bucketed by platform, in the order the share menu should show them. */
+export function groupByPlatform(channels) {
+  const m = new Map();
+  for (const c of channels) {
+    const key = c.platform || "other";
+    if (!m.has(key)) m.set(key, []);
+    m.get(key).push(c);
+  }
+  return m;
 }
 
 /** Slugs are the URL — normalise before they become one, not after. */
@@ -95,8 +135,24 @@ export function normalizeSlug(raw) {
     .slice(0, 40);
 }
 
+/**
+ * Where an agent goes to post, which decides the share menu a channel appears
+ * under in the CRM. Kept apart from utm_source on purpose: Rishav's group is
+ * posted to Facebook while still deserving a source of its own.
+ */
+export const PLATFORMS = [
+  { id: "facebook", label: "Facebook — page, profile or group" },
+  { id: "reddit", label: "Reddit" },
+  { id: "instagram", label: "Instagram" },
+  { id: "whatsapp", label: "WhatsApp" },
+  { id: "linkedin", label: "LinkedIn" },
+  { id: "twitter", label: "X / Twitter" },
+  { id: "other", label: "Somewhere else — link only" },
+];
+
 export async function createChannel({
   slug, label, description = "", utmSource, utmMedium = "social", landingPath = "/",
+  platform = "other",
 }) {
   const s = normalizeSlug(slug);
   if (!/^[a-z0-9][a-z0-9-]{1,40}$/.test(s)) {
@@ -113,13 +169,14 @@ export async function createChannel({
       description: String(description || "").trim().slice(0, 240),
       utm_source: String(utmSource || s).trim().slice(0, 60) || s,
       utm_medium: String(utmMedium || "social").trim().slice(0, 60),
+      platform: PLATFORMS.some((p) => p.id === platform) ? platform : "other",
       // Derived, never typed. The campaign string is the join key every signup
       // is matched on, so letting it be edited by hand is letting a channel's
       // whole history be detached by a typo.
       utm_campaign: `mkt_${s}`,
       landing_path: String(landingPath || "/").trim().slice(0, 120) || "/",
     })
-    .select("slug,label,description,utm_source,utm_medium,utm_campaign,landing_path,is_overview,active,created_at")
+    .select("slug,label,description,utm_source,utm_medium,utm_campaign,landing_path,is_overview,active,platform,created_at")
     .single();
 
   if (error) {

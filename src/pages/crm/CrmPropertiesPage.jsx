@@ -8,51 +8,182 @@ import { Link, useNavigate } from "react-router-dom";
 import { useCrm } from "./CrmShell";
 import { matchListingToRequirements } from "../../lib/inventoryMatch";
 import {
-  facebookShareUrl,
+  SHARE_COMPOSERS,
+  channelPropertyLink,
   propertyLink,
-  redditShareUrl,
   socialShareTitle,
 } from "../../lib/crmSettings";
+import { groupByPlatform } from "../../lib/marketing";
 import { SCOPES } from "../../lib/adminScopes";
 import { Btn, C, Chip, Empty, ScoreRing, inr, shortDate } from "./crmUi";
 
+/** Platforms we show first, and what the button says. Anything else follows. */
+const PLATFORM_ORDER = ["facebook", "reddit", "instagram", "whatsapp", "linkedin", "twitter"];
+const PLATFORM_LABEL = {
+  facebook: "Facebook",
+  reddit: "Reddit",
+  instagram: "Instagram",
+  whatsapp: "WhatsApp",
+  linkedin: "LinkedIn",
+  twitter: "X",
+  other: "Other",
+};
+const PLATFORM_CLASS = { facebook: "crm-btn--fb", reddit: "crm-btn--reddit" };
+
 /**
- * Post a flat to Facebook or Reddit.
+ * One tracked surface to post this flat to.
  *
- * Both open a composer with the /p/:id link already in it, so the card they
- * render is the same four-photo collage WhatsApp gets — one OG image, built
- * once, used by every surface.
+ * The name opens the platform's composer with the channel's link already in it;
+ * Copy hands over the same link for a surface with no composer worth using — a
+ * Facebook group, where the sharer dialog is more friction than pasting.
  *
- * Only published listings get these. A paused or rented flat posted to a public
- * feed outlives the share: the post stays up, and people keep arriving at
- * something they cannot rent.
+ * Both carry identical parameters. Which one an agent uses must not change what
+ * the dashboard later sees, or the numbers would quietly depend on habit.
+ */
+function ChannelRow({ channel, listing, title, onPicked }) {
+  const [copied, setCopied] = useState(false);
+  const link = channelPropertyLink(listing.property_id, channel);
+  const composer = SHARE_COMPOSERS[channel.platform];
+
+  const copy = async (e) => {
+    e.stopPropagation();
+    try {
+      await navigator.clipboard.writeText(link);
+      setCopied(true);
+      setTimeout(() => setCopied(false), 1500);
+    } catch {
+      /* clipboard blocked — the composer link still works */
+    }
+  };
+
+  return (
+    <div style={{ display: "flex", alignItems: "center", gap: 4 }}>
+      {composer ? (
+        <a
+          className="crm-btn crm-btn--sm"
+          href={composer.build(listing.property_id, title, channel)}
+          target="_blank"
+          rel="noopener noreferrer"
+          onClick={onPicked}
+          style={{ textDecoration: "none", flex: 1, justifyContent: "flex-start" }}
+          title={link}
+        >
+          {channel.label}
+        </a>
+      ) : (
+        <span className="crm-btn crm-btn--sm" style={{ flex: 1, justifyContent: "flex-start", cursor: "default" }}
+              title={link}>
+          {channel.label}
+        </span>
+      )}
+      <button type="button" className="crm-btn crm-btn--sm" onClick={copy}
+              title={`Copy the tracked link for ${channel.label}`}>
+        {copied ? "✓" : "Copy"}
+      </button>
+    </div>
+  );
+}
+
+/**
+ * Post a flat to a marketing channel.
+ *
+ * One button per platform; opening it lists that platform's channels, because
+ * "posted to Facebook" is not an answer anyone can act on — the page, the
+ * founder's profile and Rishav's group are three different audiences with three
+ * different costs, and the whole point of /marketing is telling them apart.
+ * Picking one stamps its utm_campaign on the link, which is the key a signup is
+ * credited by weeks later.
+ *
+ * The list comes from the database, so a channel added in /superadmin appears
+ * here with no deploy. A platform with no channels yet still gets its plain
+ * button, attributed to the platform and nothing finer — worse, but not broken.
+ *
+ * Only published listings get any of this. A paused or rented flat posted to a
+ * public feed outlives the share: the post stays up, and people keep arriving
+ * at something they cannot rent.
  */
 function SocialShare({ listing }) {
+  const { marketingChannels } = useCrm();
+  const [openPlatform, setOpenPlatform] = useState("");
+
   if (listing.status !== "published") return null;
   const title = socialShareTitle(listing);
 
+  const byPlatform = groupByPlatform(marketingChannels || []);
+  const platforms = [
+    ...PLATFORM_ORDER.filter((p) => byPlatform.has(p) || p === "facebook" || p === "reddit"),
+    ...[...byPlatform.keys()].filter((p) => !PLATFORM_ORDER.includes(p)),
+  ];
+
   return (
     <>
-      <a
-        className="crm-btn crm-btn--sm crm-btn--fb"
-        href={facebookShareUrl(listing.property_id)}
-        target="_blank"
-        rel="noopener noreferrer"
-        style={{ textDecoration: "none" }}
-        title={`Share ${listing.property_id} on Facebook`}
-      >
-        Facebook
-      </a>
-      <a
-        className="crm-btn crm-btn--sm crm-btn--reddit"
-        href={redditShareUrl(listing.property_id, title)}
-        target="_blank"
-        rel="noopener noreferrer"
-        style={{ textDecoration: "none" }}
-        title={`Post ${listing.property_id} to Reddit`}
-      >
-        Reddit
-      </a>
+      {platforms.map((platform) => {
+        const channels = byPlatform.get(platform) || [];
+        const open = openPlatform === platform;
+
+        // No channels for this platform yet: keep the original one-click share
+        // rather than opening an empty menu.
+        if (!channels.length) {
+          const composer = SHARE_COMPOSERS[platform];
+          if (!composer) return null;
+          return (
+            <a
+              key={platform}
+              className={`crm-btn crm-btn--sm ${PLATFORM_CLASS[platform] || ""}`}
+              href={composer.build(listing.property_id, title, null)}
+              target="_blank"
+              rel="noopener noreferrer"
+              style={{ textDecoration: "none" }}
+              title={`Share ${listing.property_id} on ${PLATFORM_LABEL[platform] || platform}`}
+            >
+              {PLATFORM_LABEL[platform] || platform}
+            </a>
+          );
+        }
+
+        return (
+          <span key={platform} style={{ position: "relative" }}>
+            <button
+              type="button"
+              className={`crm-btn crm-btn--sm ${PLATFORM_CLASS[platform] || ""}`}
+              onClick={() => setOpenPlatform(open ? "" : platform)}
+              title={`Post ${listing.property_id} to a tracked ${PLATFORM_LABEL[platform] || platform} channel`}
+            >
+              {PLATFORM_LABEL[platform] || platform} ▾
+            </button>
+
+            {open && (
+              <>
+                {/* Click-away. Sits under the menu, over everything else, so a
+                    second click anywhere closes it without each row needing a
+                    document listener. */}
+                <span
+                  onClick={() => setOpenPlatform("")}
+                  style={{ position: "fixed", inset: 0, zIndex: 40 }}
+                />
+                <span
+                  style={{
+                    position: "absolute", top: "calc(100% + 4px)", right: 0, zIndex: 41,
+                    background: C.card, border: `1px solid ${C.line}`, borderRadius: 8,
+                    padding: 6, minWidth: 210, display: "flex", flexDirection: "column", gap: 4,
+                    boxShadow: "0 8px 24px rgba(0,0,0,0.18)",
+                  }}
+                >
+                  {channels.map((c) => (
+                    <ChannelRow
+                      key={c.slug}
+                      channel={c}
+                      listing={listing}
+                      title={title}
+                      onPicked={() => setOpenPlatform("")}
+                    />
+                  ))}
+                </span>
+              </>
+            )}
+          </span>
+        );
+      })}
     </>
   );
 }

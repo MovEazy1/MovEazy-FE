@@ -210,13 +210,41 @@ function socialLink(propertyId, sourceKey) {
 }
 
 /**
+ * The link for posting one property to one tracked marketing channel.
+ *
+ * This is where the two attribution systems meet. The channel supplies source,
+ * medium and campaign; utm_campaign is what the marketing dashboards join a
+ * later signup on, so posting through here is what makes /marketing/fbpage
+ * different from /marketing/fbprofile rather than both reading "facebook".
+ * propertyLink then adds utm_content=<property id>, so the same post is still
+ * traceable to the flat that produced it.
+ *
+ * Falls back to the generic per-platform source when no channel is given, which
+ * is what an agent gets before any channel exists for that platform.
+ */
+export function channelPropertyLink(propertyId, channel, fallbackKey = "listing") {
+  if (!propertyId) return "";
+  if (!channel?.utm_campaign) return socialLink(propertyId, fallbackKey);
+  return propertyLink(propertyId, {
+    source: channel.utm_source,
+    medium: channel.utm_medium,
+    campaign: channel.utm_campaign,
+  });
+}
+
+/**
  * Facebook's sharer takes a URL and nothing else — the card's title, blurb and
  * picture all come from the Open Graph tags /p/:id serves, which is why the
  * preview is the four-photo collage rather than our logo.
+ *
+ * `channel` picks which Facebook surface is being credited: the page, the
+ * profile, or a group. Without one the post is attributed to "facebook" and
+ * nothing finer, which is exactly the blur the channels exist to remove.
  */
-export function facebookShareUrl(propertyId) {
+export function facebookShareUrl(propertyId, channel) {
   if (!propertyId) return "";
-  return `https://www.facebook.com/sharer/sharer.php?u=${encodeURIComponent(socialLink(propertyId, "facebook"))}`;
+  const url = channelPropertyLink(propertyId, channel, "facebook");
+  return `https://www.facebook.com/sharer/sharer.php?u=${encodeURIComponent(url)}`;
 }
 
 /**
@@ -224,12 +252,24 @@ export function facebookShareUrl(propertyId) {
  * saves the agent the retype and keeps posts reading the same across
  * subreddits. The picture still comes from the same OG tags.
  */
-export function redditShareUrl(propertyId, title) {
+export function redditShareUrl(propertyId, title, channel) {
   if (!propertyId) return "";
-  const u = encodeURIComponent(socialLink(propertyId, "reddit"));
+  const u = encodeURIComponent(channelPropertyLink(propertyId, channel, "reddit"));
   const t = encodeURIComponent(String(title || "").slice(0, 280));
   return `https://www.reddit.com/submit?url=${u}&title=${t}`;
 }
+
+/**
+ * How a platform's share composer is opened, by platform id.
+ *
+ * A channel whose platform has no composer here (WhatsApp, a forum, anywhere
+ * an agent pastes by hand) still gets a correct tracked link — it just has no
+ * "open the composer" step, so the UI offers Copy instead of pretending.
+ */
+export const SHARE_COMPOSERS = {
+  facebook: { label: "Facebook", build: (id, title, ch) => facebookShareUrl(id, ch) },
+  reddit: { label: "Reddit", build: (id, title, ch) => redditShareUrl(id, title, ch) },
+};
 
 /** "2 BHK for rent in Bellandur — ₹22,500/mo": a headline a subreddit reads well. */
 export function socialShareTitle(listing) {
