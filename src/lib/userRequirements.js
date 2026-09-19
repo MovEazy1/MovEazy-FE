@@ -35,7 +35,10 @@ export function prefsToRow(prefs, user, extra = {}) {
     lifestyle: arr(p.lifestyle),
     deal_breakers: arr(p.dealBreakers),
     priority: arr(p.priority),
-    notes: p.notes && typeof p.notes === "object" ? p.notes : {},
+    // commuteMinutes has no column of its own — it rides inside the same
+    // notes jsonb blob the per-step "anything else?" text already uses, so
+    // this preference doesn't need its own migration.
+    notes: { ...(p.notes && typeof p.notes === "object" ? p.notes : {}), commuteMinutes: num(p.commuteMinutes) ?? 30 },
     updated_at: new Date().toISOString(),
     ...extra,
   };
@@ -60,6 +63,7 @@ export function rowToPrefs(row) {
     lifestyle: arr(row.lifestyle),
     dealBreakers: arr(row.deal_breakers),
     priority: arr(row.priority),
+    commuteMinutes: num(row.notes?.commuteMinutes) ?? 30,
     notes: row.notes && typeof row.notes === "object" ? row.notes : {},
   };
 }

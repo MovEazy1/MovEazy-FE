@@ -39,7 +39,7 @@ export const FLAT_TYPES = ["1 RK", "1 BHK", "2 BHK", "3 BHK", "Villa", "Room in 
 export const MUST_HAVES = ["Balcony", "Gym", "Swimming Pool", "Lift", "Covered Parking", "Outside Car Parking", "Power Backup", "Security", "Terrace", "Garden", "Maid Room", "Modular Kitchen", "Study Room", "Pet Friendly", "Near Metro", "Near Office", "Gated Society", "Good Sunlight", "Quiet Area", "High Floor", "Low Floor"];
 export const LIFESTYLE = ["Walkable cafes", "Nightlife", "Parks", "Running Track", "Office Commute", "Schools", "Hospitals", "Grocery Nearby", "Peaceful Area", "Young Crowd", "Community Living"];
 export const DEALBREAKERS = ["No Sunlight", "Ground Floor", "Too Far From Metro", "Bachelor Restrictions", "Old Buildings", "Small Kitchen", "Traffic Heavy Roads", "Water Problems", "Poor Mobile Network"];
-export const OFFICE_CHIPS = ["Manyata Tech Park", "Embassy Tech Village", "Bagmane Tech Park", "Electronic City", "RMZ Ecoworld", "Prestige Tech Park"];
+export const OFFICE_CHIPS = ["HSR Layout", "Koramangala", "Manyata Tech Park", "Embassy Tech Village", "Bagmane Tech Park", "Electronic City", "RMZ Ecoworld", "Prestige Tech Park"];
 export const AGES = ["18–24", "25–30", "31–35", "36–45", "46+"];
 export const FURNISHINGS = ["Fully Furnished", "Semi Furnished", "Unfurnished"];
 
