@@ -121,9 +121,17 @@ export default function TopMatches() {
     return ranked.slice(0, TOP_N).map((r) => ({ ...r.listing, matchScore: r.score, matchReasons: r.reasons }));
   }, [prefs, listings]);
 
-  const goToMap = () => navigate("/map", { state: { prefs, seenListingIds: seenIds } });
-
   const recordSeen = (listing) => setSeenIds((ids) => (ids.includes(listing.id) ? ids : [...ids, listing.id]));
+
+  const goToPriorityWhatsapp = () => {
+    const rupee = (n) => `₹${Number(n || 0).toLocaleString("en-IN")}`;
+    const flatType = prefs?.flatTypes?.length ? prefs.flatTypes.join("/") : "flat";
+    const budget = prefs ? `${rupee(prefs.budgetMin)} - ${rupee(prefs.budgetMax)}` : "";
+    const message =
+      "Priority Move In\n" +
+      `Hey Team, I'm looking to move-in ASAP in a ${flatType}. My budget is ${budget}.`;
+    window.open(`https://wa.me/919146969162?text=${encodeURIComponent(message)}`, "_blank", "noopener,noreferrer");
+  };
 
   const onVisitBooked = useCallback((message, listing) => {
     setVisitToast(message);
@@ -199,10 +207,10 @@ export default function TopMatches() {
             </div>
             <button
               type="button"
-              onClick={goToMap}
+              onClick={goToPriorityWhatsapp}
               style={{ padding: "14px 28px", borderRadius: 999, border: "none", background: T.ink, color: "#fff", fontWeight: 700, fontSize: 14.5, cursor: "pointer" }}
             >
-              Explore more homes
+              No, I&apos;m in hurry &amp; I can&apos;t Relax
             </button>
           </div>
         )}
