@@ -22,6 +22,39 @@ import { setReaction } from "../lib/visits";
 
 const TOP_N = 5;
 const T = { ink: "#04211D", teal: "#0E7C68", gold: "#E8A33D", text: "#171412", textDim: "#5c554e" };
+const SHORTLIST_WINDOW_MS = 6 * 60 * 60 * 1000;
+
+function formatCountdown(ms) {
+  const total = Math.max(0, Math.floor(ms / 1000));
+  const h = String(Math.floor(total / 3600)).padStart(2, "0");
+  const m = String(Math.floor((total % 3600) / 60)).padStart(2, "0");
+  const s = String(total % 60).padStart(2, "0");
+  return `${h}:${m}:${s}`;
+}
+
+/** Counts down from a 6-hour deadline that's set the first time the relax
+ * screen shows and then persisted, so a refresh (or coming back later)
+ * doesn't hand the person a fresh 6 hours every time. */
+function useShortlistCountdown(active, storageKey) {
+  const [remaining, setRemaining] = useState(SHORTLIST_WINDOW_MS);
+  useEffect(() => {
+    if (!active) return undefined;
+    let deadline = null;
+    try {
+      const stored = Number(localStorage.getItem(storageKey));
+      if (stored && stored > Date.now()) deadline = stored;
+    } catch { /* private mode / storage blocked — fall through to a fresh deadline */ }
+    if (!deadline) {
+      deadline = Date.now() + SHORTLIST_WINDOW_MS;
+      try { localStorage.setItem(storageKey, String(deadline)); } catch { /* best-effort */ }
+    }
+    const tick = () => setRemaining(Math.max(0, deadline - Date.now()));
+    tick();
+    const id = setInterval(tick, 1000);
+    return () => clearInterval(id);
+  }, [active, storageKey]);
+  return remaining;
+}
 
 function TopBar({ center }) {
   const navigate = useNavigate();
@@ -86,7 +119,9 @@ export default function TopMatches() {
   const [viewing, setViewing] = useState(null); // { listing, openVisitForm }
   const [visitToast, setVisitToast] = useState("");
   const [advanceOn, setAdvanceOn] = useState(null);
+  const [likedListings, setLikedListings] = useState([]);
   const visitToastTimer = useRef(null);
+  const countdownMs = useShortlistCountdown(phase === "relax", `moveazy_shortlist_deadline_${user?.uid || "anon"}`);
 
   // Prefs handed over by the wizard win; otherwise load what's saved for this account.
   useEffect(() => {
@@ -137,6 +172,7 @@ export default function TopMatches() {
     setVisitToast(message);
     setAdvanceOn({ id: listing.id, ts: Date.now() });
     recordSeen(listing);
+    setLikedListings((ls) => (ls.some((x) => x.id === listing.id) ? ls : [...ls, listing]));
     clearTimeout(visitToastTimer.current);
     visitToastTimer.current = setTimeout(() => setVisitToast(""), 2800);
   }, []);
@@ -178,6 +214,7 @@ export default function TopMatches() {
                 void logSavedListingChange(user, l.id, now, l.title);
                 void setReaction(user?.uid, l.id, "like", null);
                 recordSeen(l);
+                setLikedListings((ls) => (ls.some((x) => x.id === l.id) ? ls : [...ls, l]));
               }}
               onSwipeLeft={(l) => {
                 void setReaction(user?.uid, l.id, "dislike", null);
@@ -199,12 +236,29 @@ export default function TopMatches() {
             <p style={{ color: T.textDim, fontSize: 15.5, lineHeight: 1.5, margin: "0 0 2px" }}>
               while our team is figuring out the
             </p>
-            <p style={{ color: T.teal, fontWeight: 800, fontSize: 17, margin: "0 0 32px" }}>
+            <p style={{ color: T.teal, fontWeight: 800, fontSize: 17, margin: "0 0 20px" }}>
               Best flat for you.
             </p>
+            <div style={{ display: "inline-flex", flexDirection: "column", alignItems: "center", gap: 6, background: "#EAF6F2", border: `1px solid ${T.teal}33`, borderRadius: 16, padding: "14px 22px", margin: "0 0 32px" }}>
+              <p style={{ color: T.text, fontSize: 14, lineHeight: 1.5, margin: 0, maxWidth: 320 }}>
+                Our team will be sharing a curated shortlist of <strong>30 flats</strong> in
+              </p>
+              <span style={{ fontVariantNumeric: "tabular-nums", fontWeight: 800, fontSize: 24, letterSpacing: "0.02em", color: T.teal }}>
+                {formatCountdown(countdownMs)}
+              </span>
+            </div>
             <div style={{ display: "flex", justifyContent: "center", margin: "0 0 36px" }}>
               <RelaxCup />
             </div>
+            {likedListings.length > 0 && (
+              <button
+                type="button"
+                onClick={() => navigate("/shortlists")}
+                style={{ display: "block", width: "100%", maxWidth: 320, margin: "0 auto 12px", padding: "14px 28px", borderRadius: 999, border: "none", background: T.teal, color: "#fff", fontWeight: 700, fontSize: 14.5, cursor: "pointer" }}
+              >
+                Finalize your visits ({likedListings.length} shortlisted)
+              </button>
+            )}
             <button
               type="button"
               onClick={goToPriorityWhatsapp}
