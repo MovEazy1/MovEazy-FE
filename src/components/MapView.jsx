@@ -31,6 +31,9 @@ import MovEazyNav from "./layout/MovEazyNav";
 import ListingCard from "./ListingCard";
 import Toast from "./Toast";
 
+/** Toggled off for now — the map is the only browsing surface; flip this back
+ * on to restore the list/split view and its toggles. */
+const SHOW_LIST_VIEW = false;
 const MAP_NEARBY_KM = 12;
 /** Default max distance (km) from workplace / geocoded pin; user-adjustable in search panel. */
 const DEFAULT_COMMUTE_RADIUS_KM = 10;
@@ -983,7 +986,7 @@ export default function MapView() {
   /** Single "all filters" panel — a dropdown on desktop, a bottom sheet on mobile. Never occupies map layout. */
   const [showFilterPanel, setShowFilterPanel] = useState(false);
   /** "map" | "list" — replaces the old slide-up toggle; on mobile these are fully separate screens */
-  const [mobileTab, setMobileTab] = useState("list");
+  const [mobileTab, setMobileTab] = useState(SHOW_LIST_VIEW ? "list" : "map");
   /** "all" | "flatmate" | "entire" */
   const [listingType, setListingType] = useState("all");
   const [filters, setFilters] = useState(getFiltersInitialState());
@@ -993,8 +996,8 @@ export default function MapView() {
   const [mapSearchLoading, setMapSearchLoading] = useState(false);
   const [mapSearchError, setMapSearchError] = useState("");
   const [placeAnchor, setPlaceAnchor] = useState(null);
-  const [desktopMode, setDesktopMode] = useState("split");
-  const [showDesktopListings, setShowDesktopListings] = useState(true);
+  const [desktopMode, setDesktopMode] = useState(SHOW_LIST_VIEW ? "split" : "map");
+  const [showDesktopListings, setShowDesktopListings] = useState(SHOW_LIST_VIEW);
   /** Search suggestions dropdown (campuses / employers / commute radius), anchored under the top-bar search box. */
   const [showMapSearchOverlay, setShowMapSearchOverlay] = useState(false);
   /** Top-bar "Flat type" checklist dropdown (1/2/3 BHK + Roommate). */
@@ -2264,7 +2267,7 @@ export default function MapView() {
 
           </div>
 
-          {!isMobile && (
+          {!isMobile && SHOW_LIST_VIEW && (
             <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
               <div style={{ display: "inline-flex", borderRadius: 999, background: "#f3f0ea", padding: 3 }}>
                 {[["split", "Split"], ["map", "Full map"]].map(([v, label]) => (
@@ -2881,7 +2884,7 @@ export default function MapView() {
       {/* Map / List toggle. A compact centred pill rather than a full-width
           bar: the bar sat across the bottom of the screen and read as the app's
           navigation, hiding the real one underneath it. */}
-      {isMobile && (
+      {isMobile && SHOW_LIST_VIEW && (
         <div
           style={{
             position: "fixed",
