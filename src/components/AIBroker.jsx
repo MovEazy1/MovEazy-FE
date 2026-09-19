@@ -19,10 +19,13 @@ import { geocodePlace, searchPlaces, reverseGeocode } from "../lib/geocode";
 import { useAuth } from "../context/AuthContext";
 import { saveUserRequirement, fetchUserRequirement, rowToPrefs } from "../lib/userRequirements";
 import { LOCALITIES, ALL_LOCALITIES, FLAT_TYPES, OFFICE_CHIPS } from "../data/preferenceOptions";
+import MovEazyLogo from "./branding/MovEAZYLogo";
 
+// MovEazy's own palette (ink + mint), the same pairing used on the nav/hero —
+// not a generic blue theme.
 const B = {
-  ink: "#0F172A", muted: "#64748B", line: "#E2E8F0",
-  blue: "#2563EB", blueDeep: "#1D4ED8", blueSoft: "#EFF6FF", blueBorder: "#BFDBFE",
+  ink: "#04211D", inkDeep: "#02140E", muted: "#64748B", line: "#E2E8F0",
+  mint: "#5EEAD4", mintWash: "#E9FBF6", mintBorder: "#BEEFE2",
   bg: "#FFFFFF", track: "#E2E8F0",
 };
 const EASE = [0.22, 1, 0.36, 1];
@@ -204,7 +207,7 @@ export default function AIBroker({ open, onClose }) {
             <button type="button" className="brk-close" onClick={onClose} aria-label="Close"><X size={18} /></button>
 
             <div className="brk-header">
-              <div className="brk-logo">Move<span>azy</span></div>
+              <MovEazyLogo variant="light" size="sm" />
               <div className="brk-tagline">Finding a home,<br />made easy.</div>
             </div>
 
@@ -368,7 +371,7 @@ function LocalityChips({ step, prefs, toggle }) {
 const BLR = { lat: 12.9716, lng: 77.5946 };
 const OFFICE_ICON = L.divIcon({
   className: "brk-lmarker",
-  html: `<svg width="30" height="40" viewBox="0 0 30 40" xmlns="http://www.w3.org/2000/svg"><path d="M15 1C7.8 1 2 6.8 2 14c0 9.2 13 25 13 25s13-15.8 13-25C28 6.8 22.2 1 15 1z" fill="#0F172A" stroke="#fff" stroke-width="2.5"/><circle cx="15" cy="14" r="4.6" fill="#fff"/></svg>`,
+  html: `<svg width="30" height="40" viewBox="0 0 30 40" xmlns="http://www.w3.org/2000/svg"><path d="M15 1C7.8 1 2 6.8 2 14c0 9.2 13 25 13 25s13-15.8 13-25C28 6.8 22.2 1 15 1z" fill="#04211D" stroke="#fff" stroke-width="2.5"/><circle cx="15" cy="14" r="4.6" fill="#fff"/></svg>`,
   iconSize: [30, 40],
   iconAnchor: [15, 39],
 });
@@ -649,7 +652,7 @@ function RankList({ items, onReorder }) {
   return (
     <Reorder.Group axis="y" values={items} onReorder={onReorder} className="brk-rank">
       {items.map((item, i) => (
-        <Reorder.Item key={item} value={item} className="brk-rank-item" whileDrag={{ scale: 1.02, boxShadow: "0 12px 26px rgba(15,23,42,0.16)" }}>
+        <Reorder.Item key={item} value={item} className="brk-rank-item" whileDrag={{ scale: 1.02, boxShadow: "0 12px 26px rgba(4,33,29,0.16)" }}>
           <span className="brk-rank-num">{i + 1}</span>
           <span className="brk-rank-label">{item}</span>
           <GripVertical size={16} className="brk-rank-grip" />
@@ -663,20 +666,18 @@ function RankList({ items, onReorder }) {
 function Styles() {
   return (
     <style>{`
-      .brk-overlay { position:fixed; inset:0; z-index:1500; background:rgba(15,23,42,0.5); backdrop-filter:blur(6px); display:flex; align-items:center; justify-content:center; padding:20px; font-family:'Inter', system-ui, sans-serif; }
-      .brk-shell { position:relative; width:min(460px,100%); height:min(760px,92vh); background:${B.bg}; border-radius:28px; overflow:hidden; display:flex; flex-direction:column; box-shadow:0 40px 100px rgba(15,23,42,0.35); }
+      .brk-overlay { position:fixed; inset:0; z-index:1500; background:rgba(4,33,29,0.5); backdrop-filter:blur(6px); display:flex; align-items:center; justify-content:center; padding:20px; font-family:'Inter', system-ui, sans-serif; }
+      .brk-shell { position:relative; width:min(460px,100%); height:min(760px,92vh); background:${B.bg}; border-radius:28px; overflow:hidden; display:flex; flex-direction:column; box-shadow:0 40px 100px rgba(4,33,29,0.35); }
       .brk-close { position:absolute; top:14px; right:14px; z-index:20; width:34px; height:34px; border-radius:50%; border:none; background:#F1F5F9; color:${B.ink}; display:flex; align-items:center; justify-content:center; cursor:pointer; }
       .brk-close:hover { background:#E2E8F0; }
 
       .brk-header { padding:22px 24px 0; display:flex; align-items:flex-start; justify-content:space-between; }
-      .brk-logo { font-weight:800; font-size:19px; color:${B.ink}; letter-spacing:-0.01em; }
-      .brk-logo span { color:${B.blue}; }
       .brk-tagline { font-size:11.5px; line-height:1.35; color:${B.muted}; text-align:right; padding-right:36px; }
 
       .brk-progress-row { display:flex; align-items:center; gap:10px; padding:14px 24px 0; }
       .brk-progress-track { flex:1; display:flex; gap:5px; }
       .brk-progress-seg { flex:1; height:4px; border-radius:999px; background:${B.track}; }
-      .brk-progress-seg.on { background:${B.blue}; }
+      .brk-progress-seg.on { background:${B.mint}; }
       .brk-progress-count { font-size:11.5px; font-weight:700; color:${B.muted}; white-space:nowrap; }
 
       .brk-scroll { flex:1; min-height:0; overflow-y:auto; padding:20px 24px 12px; }
@@ -686,24 +687,24 @@ function Styles() {
       .brk-content { margin-top:18px; display:flex; flex-direction:column; gap:14px; }
 
       .brk-footer { display:flex; align-items:center; justify-content:space-between; gap:14px; padding:14px 24px 20px; border-top:1px solid ${B.line}; }
-      .brk-link { display:inline-flex; align-items:center; gap:4px; background:none; border:none; color:${B.blue}; font-family:inherit; font-size:14px; font-weight:700; cursor:pointer; padding:8px 2px; }
-      .brk-next { display:inline-flex; align-items:center; gap:6px; border:none; border-radius:12px; background:${B.blue}; color:#fff; font-family:inherit; font-weight:700; font-size:14.5px; padding:12px 22px; cursor:pointer; transition:background .15s ease, transform .15s ease; margin-left:auto; }
-      .brk-next:hover:not(:disabled) { background:${B.blueDeep}; }
+      .brk-link { display:inline-flex; align-items:center; gap:4px; background:none; border:none; color:${B.ink}; font-family:inherit; font-size:14px; font-weight:700; cursor:pointer; padding:8px 2px; }
+      .brk-next { display:inline-flex; align-items:center; gap:6px; border:none; border-radius:12px; background:${B.ink}; color:#fff; font-family:inherit; font-weight:700; font-size:14.5px; padding:12px 22px; cursor:pointer; transition:background .15s ease, transform .15s ease; margin-left:auto; }
+      .brk-next:hover:not(:disabled) { background:${B.inkDeep}; }
       .brk-next:disabled { opacity:0.4; cursor:not-allowed; }
 
       /* card grid (commute / occupants / flat types) */
       .brk-cardgrid { display:grid; grid-template-columns:1fr 1fr; gap:12px; }
       .brk-card { position:relative; display:flex; flex-direction:column; align-items:flex-start; gap:6px; text-align:left; background:#fff; border:1.5px solid ${B.line}; border-radius:16px; padding:16px 14px; cursor:pointer; font-family:inherit; transition:border-color .15s ease, background .15s ease; }
-      .brk-card:hover { border-color:${B.blueBorder}; }
-      .brk-card.on { border-color:${B.blue}; background:${B.blueSoft}; }
+      .brk-card:hover { border-color:${B.mintBorder}; }
+      .brk-card.on { border-color:${B.ink}; background:${B.mintWash}; }
       .brk-card-checkbox { position:absolute; top:10px; right:10px; width:20px; height:20px; border-radius:50%; border:1.5px solid ${B.line}; background:#fff; display:flex; align-items:center; justify-content:center; color:#fff; }
-      .brk-card.on .brk-card-checkbox { background:${B.blue}; border-color:${B.blue}; }
-      .brk-card-icon { color:${B.blue}; }
+      .brk-card.on .brk-card-checkbox { background:${B.ink}; border-color:${B.ink}; }
+      .brk-card-icon { color:${B.ink}; }
       .brk-card-label { font-size:14.5px; font-weight:700; color:${B.ink}; }
       .brk-card-sub { font-size:12px; color:${B.muted}; }
-      .brk-card.on .brk-card-sub { color:${B.blueDeep}; font-weight:600; }
+      .brk-card.on .brk-card-sub { color:${B.ink}; font-weight:600; }
 
-      .brk-note-banner { display:flex; align-items:flex-start; gap:9px; background:${B.blueSoft}; border-radius:12px; padding:12px 14px; font-size:12.5px; line-height:1.45; color:${B.blueDeep}; }
+      .brk-note-banner { display:flex; align-items:flex-start; gap:9px; background:${B.mintWash}; border-radius:12px; padding:12px 14px; font-size:12.5px; line-height:1.45; color:${B.ink}; }
       .brk-note-banner svg { flex-shrink:0; margin-top:1px; }
 
       /* localities */
@@ -713,8 +714,8 @@ function Styles() {
       .brk-chips-label { font-size:12.5px; font-weight:700; color:${B.muted}; margin-top:2px; }
       .brk-chip-wrap { display:flex; flex-wrap:wrap; gap:9px; }
       .brk-pill { display:inline-flex; align-items:center; gap:6px; border:1.5px solid ${B.line}; background:#fff; color:${B.ink}; font-family:inherit; font-size:13.5px; font-weight:600; padding:9px 15px; border-radius:999px; cursor:pointer; transition:border-color .15s ease, color .15s ease; }
-      .brk-pill.on { border-color:${B.blue}; color:${B.blueDeep}; background:${B.blueSoft}; }
-      .brk-pill-check { width:15px; height:15px; border-radius:50%; background:${B.blue}; color:#fff; display:inline-flex; align-items:center; justify-content:center; flex-shrink:0; }
+      .brk-pill.on { border-color:${B.ink}; color:${B.ink}; background:${B.mintWash}; }
+      .brk-pill-check { width:15px; height:15px; border-radius:50%; background:${B.ink}; color:#fff; display:inline-flex; align-items:center; justify-content:center; flex-shrink:0; }
       .brk-empty-hint { font-size:13px; color:${B.muted}; }
 
       /* office */
@@ -722,20 +723,20 @@ function Styles() {
       .brk-mapbox { position:relative; height:260px; border-radius:16px; overflow:hidden; border:1px solid ${B.line}; background:#EEF2F6; }
       .brk-leaflet { position:absolute; inset:0; width:100%; height:100%; z-index:0; background:#EEF2F6; }
       .brk-lmarker { background:none; border:none; }
-      .brk-lmarker svg { filter:drop-shadow(0 4px 6px rgba(15,23,42,0.35)); }
+      .brk-lmarker svg { filter:drop-shadow(0 4px 6px rgba(4,33,29,0.35)); }
       .brk-map-tooltip.leaflet-tooltip { background:${B.ink}; color:#fff; border:none; font-size:11.5px; font-weight:700; padding:5px 10px; border-radius:999px; box-shadow:none; }
       .brk-map-tooltip.leaflet-tooltip::before { display:none; }
-      .brk-recenter { position:absolute; z-index:6; right:10px; bottom:10px; width:36px; height:36px; border-radius:50%; border:none; background:#fff; color:${B.ink}; display:flex; align-items:center; justify-content:center; cursor:pointer; box-shadow:0 6px 16px rgba(15,23,42,0.2); }
+      .brk-recenter { position:absolute; z-index:6; right:10px; bottom:10px; width:36px; height:36px; border-radius:50%; border:none; background:#fff; color:${B.ink}; display:flex; align-items:center; justify-content:center; cursor:pointer; box-shadow:0 6px 16px rgba(4,33,29,0.2); }
       .brk-map-hint { position:absolute; bottom:9px; left:10px; z-index:5; background:rgba(255,255,255,0.92); color:${B.muted}; font-size:11px; font-weight:600; padding:5px 10px; border-radius:8px; }
-      .brk-search-row { position:absolute; z-index:5; top:12px; left:12px; right:12px; display:flex; align-items:center; gap:9px; background:#fff; border-radius:12px; padding:6px 6px 6px 13px; box-shadow:0 8px 22px rgba(15,23,42,0.16); }
+      .brk-search-row { position:absolute; z-index:5; top:12px; left:12px; right:12px; display:flex; align-items:center; gap:9px; background:#fff; border-radius:12px; padding:6px 6px 6px 13px; box-shadow:0 8px 22px rgba(4,33,29,0.16); }
       .brk-search-input { flex:1; border:none; outline:none; font-family:inherit; font-size:14px; padding:8px 0; background:transparent; color:${B.ink}; }
-      .brk-spinner { width:15px; height:15px; border-radius:50%; border:2px solid ${B.line}; border-top-color:${B.blue}; animation:brk-spin 0.7s linear infinite; flex-shrink:0; margin-right:4px; }
+      .brk-spinner { width:15px; height:15px; border-radius:50%; border:2px solid ${B.line}; border-top-color:${B.ink}; animation:brk-spin 0.7s linear infinite; flex-shrink:0; margin-right:4px; }
       @keyframes brk-spin { to { transform:rotate(360deg); } }
-      .brk-suggest { position:absolute; top:56px; left:12px; right:12px; z-index:6; background:#fff; border-radius:12px; box-shadow:0 18px 40px rgba(15,23,42,0.2); overflow:hidden; max-height:200px; overflow-y:auto; }
+      .brk-suggest { position:absolute; top:56px; left:12px; right:12px; z-index:6; background:#fff; border-radius:12px; box-shadow:0 18px 40px rgba(4,33,29,0.2); overflow:hidden; max-height:200px; overflow-y:auto; }
       .brk-suggest-item { display:flex; align-items:center; gap:10px; width:100%; text-align:left; padding:11px 14px; background:none; border:none; border-bottom:1px solid #F1F5F9; cursor:pointer; font-family:inherit; }
       .brk-suggest-item:last-child { border-bottom:none; }
       .brk-suggest-item.active, .brk-suggest-item:hover { background:#F8FAFC; }
-      .brk-suggest-pin { flex-shrink:0; color:${B.blue}; }
+      .brk-suggest-pin { flex-shrink:0; color:${B.ink}; }
       .brk-suggest-txt { min-width:0; display:flex; flex-direction:column; }
       .brk-suggest-primary { font-size:13.5px; font-weight:700; color:${B.ink}; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
       .brk-suggest-secondary { font-size:11.5px; color:${B.muted}; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; margin-top:1px; }
@@ -747,20 +748,20 @@ function Styles() {
       .brk-budget-value span { font-weight:600; font-size:13px; color:${B.muted}; }
       .brk-range { position:relative; height:34px; margin-top:18px; }
       .brk-range-track { position:absolute; top:14px; left:0; right:0; height:5px; border-radius:999px; background:${B.track}; }
-      .brk-range-fill { position:absolute; top:14px; height:5px; border-radius:999px; background:${B.blue}; }
+      .brk-range-fill { position:absolute; top:14px; height:5px; border-radius:999px; background:${B.ink}; }
       .brk-range input[type=range] { position:absolute; top:0; left:0; width:100%; height:34px; margin:0; background:none; pointer-events:none; -webkit-appearance:none; appearance:none; }
-      .brk-range input[type=range]::-webkit-slider-thumb { -webkit-appearance:none; pointer-events:auto; width:22px; height:22px; border-radius:50%; background:#fff; border:3px solid ${B.blue}; box-shadow:0 3px 8px rgba(15,23,42,0.25); cursor:grab; }
-      .brk-range input[type=range]::-moz-range-thumb { pointer-events:auto; width:20px; height:20px; border-radius:50%; background:#fff; border:3px solid ${B.blue}; box-shadow:0 3px 8px rgba(15,23,42,0.25); cursor:grab; }
+      .brk-range input[type=range]::-webkit-slider-thumb { -webkit-appearance:none; pointer-events:auto; width:22px; height:22px; border-radius:50%; background:#fff; border:3px solid ${B.ink}; box-shadow:0 3px 8px rgba(4,33,29,0.25); cursor:grab; }
+      .brk-range input[type=range]::-moz-range-thumb { pointer-events:auto; width:20px; height:20px; border-radius:50%; background:#fff; border:3px solid ${B.ink}; box-shadow:0 3px 8px rgba(4,33,29,0.25); cursor:grab; }
       .brk-budget-scale { display:flex; justify-content:space-between; font-size:11.5px; color:${B.muted}; font-weight:600; margin-top:6px; }
       .brk-check { display:flex; align-items:flex-start; gap:10px; margin-top:6px; font-size:13.5px; line-height:1.4; font-weight:600; color:${B.ink}; cursor:pointer; }
       .brk-check input { display:none; }
       .brk-check-box { width:21px; height:21px; border-radius:6px; border:1.5px solid ${B.line}; display:inline-flex; align-items:center; justify-content:center; color:#fff; flex-shrink:0; margin-top:1px; transition:all .15s ease; }
-      .brk-check input:checked + .brk-check-box { background:${B.blue}; border-color:${B.blue}; }
+      .brk-check input:checked + .brk-check-box { background:${B.ink}; border-color:${B.ink}; }
 
       /* rank */
       .brk-rank { list-style:none; padding:0; margin:0; display:flex; flex-direction:column; gap:9px; }
       .brk-rank-item { display:flex; align-items:center; gap:12px; background:#fff; border:1.5px solid ${B.line}; border-radius:13px; padding:13px 14px; cursor:grab; }
-      .brk-rank-num { width:24px; height:24px; border-radius:8px; background:${B.blue}; color:#fff; font-weight:800; font-size:12px; display:flex; align-items:center; justify-content:center; flex-shrink:0; }
+      .brk-rank-num { width:24px; height:24px; border-radius:8px; background:${B.ink}; color:#fff; font-weight:800; font-size:12px; display:flex; align-items:center; justify-content:center; flex-shrink:0; }
       .brk-rank-label { flex:1; font-size:14px; font-weight:600; color:${B.ink}; }
       .brk-rank-grip { color:#CBD5E1; flex-shrink:0; }
 
