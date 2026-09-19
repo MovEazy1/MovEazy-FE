@@ -64,8 +64,8 @@ const STEPS = [
   { id: "commuteMinutes", type: "cards", single: true, q: "How much time to office works for you?", sub: "Select your comfortable commute time (one-way, by bike).", options: COMMUTE_OPTIONS, note: "We'll show you homes within this commute time from your office." },
   { id: "occupants", type: "cards", single: true, q: "Who'll be living there?", sub: "This helps us find the right kind of homes and landlords.", options: OCCUPANT_CARDS },
   { id: "flatTypes", type: "cards", single: false, q: "What type of home are you looking for?", sub: "Select all that work for you.", options: FLAT_TYPE_CARDS },
-  { id: "budget", type: "budget", q: "What's your monthly budget?", sub: "Select a range that works for you." },
-  { id: "priority", type: "rank", q: "Finally — rank these by what matters most.", sub: "Drag to reorder — top = most important." },
+  { id: "budget", type: "budget", q: "Enter the maximum budget", sub: "Drag to set the most you'd like to pay per month." },
+  { id: "priority", type: "rank", q: "One last thing — what matters most to you?", sub: "Drag to reorder, with your top priority at the top." },
 ];
 
 const emptyPrefs = () => ({
@@ -75,7 +75,7 @@ const emptyPrefs = () => ({
   occupants: ["Bachelor"],
   flatTypes: [...FLAT_TYPES],
   ...computeBudgetDefaults([...FLAT_TYPES]),
-  stretch: false,
+  stretch: true,
   mustHaves: [], lifestyle: [], dealBreakers: [],
   priority: ["Near to Office", "Good locality", "Budget fit", "Apartment over standalone", "Flat size", "Ventilation"],
   notes: {},
@@ -300,8 +300,8 @@ function StepBody({ step, prefs, set, toggle, selectCard }) {
   if (step.type === "budget") {
     return (
       <BudgetSlider
-        min={prefs.budgetMin} max={prefs.budgetMax} stretch={prefs.stretch}
-        onChange={(mn, mx) => set({ budgetMin: mn, budgetMax: mx })}
+        max={prefs.budgetMax} stretch={prefs.stretch}
+        onChange={(mx) => set({ budgetMax: mx })}
         onStretch={(v) => set({ stretch: v })}
       />
     );
@@ -616,25 +616,21 @@ function OfficeSearch({ value, onPick, chips }) {
   );
 }
 
-/* ── Dual-thumb budget slider ──────────────────────────────────────────────── */
-function BudgetSlider({ min, max, stretch, onChange, onStretch }) {
+/* ── Single-thumb max-budget slider ──────────────────────────────────────── */
+function BudgetSlider({ max, stretch, onChange, onStretch }) {
   const MIN = 15000, MAX = 200000, STEP = 1000;
   const pct = (v) => ((v - MIN) / (MAX - MIN)) * 100;
   return (
     <div className="brk-budget">
       <div className="brk-budget-value">
-        {fmtINR(min)} – {max >= MAX ? "₹2,00,000+" : fmtINR(max)} <span>/ month</span>
+        Up to {max >= MAX ? "₹2,00,000+" : fmtINR(max)} <span>/ month</span>
       </div>
       <div className="brk-range">
         <div className="brk-range-track" />
-        <div className="brk-range-fill" style={{ left: `${pct(min)}%`, right: `${100 - pct(max)}%` }} />
-        <input
-          type="range" min={MIN} max={MAX} step={STEP} value={min}
-          onChange={(e) => onChange(Math.min(Number(e.target.value), max - STEP), max)}
-        />
+        <div className="brk-range-fill" style={{ left: "0%", right: `${100 - pct(max)}%` }} />
         <input
           type="range" min={MIN} max={MAX} step={STEP} value={max}
-          onChange={(e) => onChange(min, Math.max(Number(e.target.value), min + STEP))}
+          onChange={(e) => onChange(Number(e.target.value))}
         />
       </div>
       <div className="brk-budget-scale"><span>₹15k</span><span>₹2L+</span></div>
