@@ -119,9 +119,6 @@ function LoginPopup({ onClose }) {
                     "forgot password" and the sign-up step were all removed: one
                     account per Google identity, nothing to reset, and no
                     half-finished signups to chase. */}
-                <p className="text-center mt-5 text-[13px] text-[#8B8578]">
-                  We&apos;ll never post anything or email you without asking.
-                </p>
               </motion.div>
             )}
 

@@ -111,10 +111,6 @@ export default function RequireSignInForListing() {
         >
           <GoogleIcon /> {busy ? "Redirecting…" : "Continue with Google"}
         </button>
-
-        <p style={{ color: "#8B8578", fontSize: 11.5, margin: "16px 0 0" }}>
-          We&apos;ll never post anything or email you without asking.
-        </p>
       </div>
     </div>
   );
