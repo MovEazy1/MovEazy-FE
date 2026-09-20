@@ -12,6 +12,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import MovEazyNav from "../components/layout/MovEazyNav";
+import PropertyModal from "../components/PropertyModal";
 import { useAuth } from "../context/AuthContext";
 import { useVisitCart } from "../context/VisitCartContext";
 import { fetchReactions, fetchOpenVisitsFor, fetchBookings, bookIndividual } from "../lib/visits";
@@ -34,6 +35,8 @@ export default function Shortlists() {
   const [chosen, setChosen] = useState({});        // { property_id: slot_at } — pending dropdown pick
   const [busy, setBusy] = useState("");
   const [loading, setLoading] = useState(true);
+  const [viewing, setViewing] = useState(null);     // full inventory row for the card currently open
+  const [viewingId, setViewingId] = useState("");   // property_id being fetched, so a slow tap doesn't look dead
 
   useEffect(() => {
     if (!user) { setLoading(false); return undefined; }
@@ -97,6 +100,20 @@ export default function Shortlists() {
     } finally { setBusy(""); }
   };
 
+  // Tapping a card opens the property, same as everywhere else in the app.
+  // A cart snapshot only carries a few fields (see VisitCartContext), so this
+  // always fetches the full inventory row rather than trusting whatever's
+  // already on the card.
+  const openProperty = async (propertyId) => {
+    setViewingId(propertyId);
+    try {
+      const rows = await fetchInventoryByIds([propertyId]);
+      if (rows?.[0]) setViewing(rows[0]);
+    } finally {
+      setViewingId((id) => (id === propertyId ? "" : id));
+    }
+  };
+
   const visitsList = combined.filter((it) => it.inVisitList);
   const likedList = combined.filter((it) => reactions[it.property_id] === "like");
   const shown = tab === "visits" ? visitsList : likedList;
@@ -115,9 +132,10 @@ export default function Shortlists() {
         .sl-segbtn.is-on .sl-segcount { background: #f0ebe1; color: #1c1a17; }
         .sl-segbtn:not(.is-on) .sl-segcount { background: rgba(255,255,255,.14); color: rgba(255,255,255,.8); }
         .sl-cards { display: flex; flex-direction: column; gap: 14px; margin-top: 20px; }
-        .sl-card { display: grid; grid-template-columns: 92px 1fr; gap: 14px; background: #fff; border: 1px solid #ece6da; border-radius: 18px; padding: 12px; }
-        .sl-thumb { aspect-ratio: 1/1; border-radius: 12px; overflow: hidden; background: linear-gradient(135deg,#f3ded9,#efe3c8); }
+        .sl-card { display: grid; grid-template-columns: 92px 1fr; gap: 14px; background: #fff; border: 1px solid #ece6da; border-radius: 18px; padding: 12px; cursor: pointer; }
+        .sl-thumb { position: relative; aspect-ratio: 1/1; border-radius: 12px; overflow: hidden; background: linear-gradient(135deg,#f3ded9,#efe3c8); }
         .sl-thumb img { width: 100%; height: 100%; object-fit: cover; display: block; }
+        .sl-thumb-loading { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; background: rgba(255,255,255,.75); font-size: 10.5px; font-weight: 700; color: #2a2621; text-align: center; padding: 4px; }
         .sl-name { font-size: 15.5px; font-weight: 800; }
         .sl-meta { font-size: 12.5px; color: #7a7267; margin-top: 1px; }
         .sl-rent { font-size: 15px; font-weight: 800; }
@@ -173,9 +191,17 @@ export default function Shortlists() {
               const b = bookingByPid[it.property_id];
               const options = slots[it.property_id] || [];
               return (
-                <div className="sl-card" key={it.property_id}>
+                <div
+                  className="sl-card"
+                  key={it.property_id}
+                  role="button"
+                  tabIndex={0}
+                  onClick={() => openProperty(it.property_id)}
+                  onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); openProperty(it.property_id); } }}
+                >
                   <div className="sl-thumb">
                     {it.cover && <img src={it.cover} alt="" loading="lazy" onError={(e) => { e.currentTarget.style.display = "none"; }} />}
+                    {viewingId === it.property_id && <div className="sl-thumb-loading">Opening…</div>}
                   </div>
                   <div>
                     <div className="sl-name">{it.title}</div>
@@ -194,7 +220,7 @@ export default function Shortlists() {
                       </div>
                     )}
                     {!b && (
-                      <div className="sl-row">
+                      <div className="sl-row" onClick={(e) => e.stopPropagation()}>
                         <select
                           className="sl-select"
                           value={chosen[it.property_id] || ""}
@@ -216,6 +242,8 @@ export default function Shortlists() {
           </div>
         )}
       </div>
+
+      {viewing && <PropertyModal property={viewing} onClose={() => setViewing(null)} />}
     </div>
   );
 }
