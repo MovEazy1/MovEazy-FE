@@ -233,6 +233,84 @@ export async function deleteClient(clientId) {
   if (error) throw error;
 }
 
+/**
+ * Bring in anyone who has signed up (and, if they got that far, saved
+ * preferences) but has no CRM row yet — the manual stand-in for a live sync,
+ * for an account on Supabase's free plan where a DB trigger or a polling job
+ * would just be more billed reads for the same result. A click costs exactly
+ * two reads (every seeker profile, every saved requirement) no matter how
+ * many thousands of accounts exist, and one write per client actually new —
+ * nothing is touched for someone already in the CRM, so it never clobbers an
+ * agent's own edits to a requirement override.
+ */
+export async function syncClientsFromSignups({ actorEmail = "" } = {}) {
+  requireDb();
+  const [{ data: profiles, error: profilesErr }, { data: reqs, error: reqsErr }, existing] = await Promise.all([
+    supabase.from("user_profiles").select("id,name,email,phone").in("role", ["customer", "tenant"]),
+    supabase.from("user_requirements").select("user_id,localities,budget_min,budget_max,flat_types,must_haves,deal_breakers,occupants"),
+    fetchClients(),
+  ]);
+  if (profilesErr) throw profilesErr;
+  if (reqsErr) throw reqsErr;
+
+  const knownUserIds = new Set(existing.filter((c) => c.user_id).map((c) => c.user_id));
+  const reqByUser = new Map((reqs || []).map((r) => [r.user_id, r]));
+  const toCreate = (profiles || []).filter((p) => p.id && !knownUserIds.has(p.id));
+
+  let created = 0;
+  const failures = [];
+  for (const p of toCreate) {
+    try {
+      const { data, error } = await supabase
+        .from("crm_clients")
+        .insert({
+          user_id: p.id,
+          name: p.name || (p.email ? p.email.split("@")[0] : "") || p.phone || "Unnamed",
+          phone: p.phone || "",
+          email: String(p.email || "").toLowerCase(),
+          source: "signup",
+          status: "fresh",
+          assigned_to: actorEmail,
+        })
+        .select("id")
+        .single();
+      if (error) throw error;
+
+      const req = reqByUser.get(p.id);
+      if (req) {
+        await supabase.from("crm_client_requirements").upsert(
+          {
+            client_id: data.id,
+            localities: req.localities ?? [],
+            budget_min: req.budget_min ?? null,
+            budget_max: req.budget_max ?? null,
+            flat_types: req.flat_types ?? [],
+            must_haves: req.must_haves ?? [],
+            deal_breakers: req.deal_breakers ?? [],
+            occupants: req.occupants ?? [],
+            min_score: 60,
+            updated_by: actorEmail,
+            updated_at: new Date().toISOString(),
+          },
+          { onConflict: "client_id" },
+        );
+      }
+
+      await supabase.from("crm_activities").insert({
+        client_id: data.id,
+        actor_email: actorEmail,
+        type: "system",
+        body: req ? "Synced from signup, with saved preferences" : "Synced from signup",
+      });
+      created += 1;
+    } catch (e) {
+      failures.push(`${p.email || p.phone || p.id}: ${e?.message || "could not be added"}`);
+    }
+  }
+
+  return { scanned: (profiles || []).length, created, failures };
+}
+
 /* ── Requirement override ─────────────────────────────────────────────────── */
 
 /**

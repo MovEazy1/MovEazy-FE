@@ -12,7 +12,7 @@ import ClientRecord from "./ClientRecord";
 import MatchesPane from "./MatchesPane";
 import {
   SORTS, STATUSES, TEMPERATURES, createClient, fetchShortlists,
-  saveClientRequirement, resetClientRequirement, statusLabel, tempColor,
+  saveClientRequirement, resetClientRequirement, statusLabel, tempColor, syncClientsFromSignups,
 } from "../../lib/crmClients";
 import { formatDuration } from "../../lib/sessionSync";
 import { SCOPES } from "../../lib/adminScopes";
@@ -180,6 +180,7 @@ export default function CrmClientsPage() {
   const [mineOnly, setMineOnly] = useState(false);
   const [adding, setAdding] = useState(false);
   const [importing, setImporting] = useState(false);
+  const [syncing, setSyncing] = useState(false);
   const [toast, setToast] = useState(null);
   const [mobileTab, setMobileTab] = useState("list");
   const [localShortlists, setLocalShortlists] = useState(shortlists);
@@ -326,6 +327,25 @@ export default function CrmClientsPage() {
     setLocalShortlists(await fetchShortlists());
   }, []);
 
+  // Manual stand-in for a live signup→CRM sync — see the doc comment on
+  // syncClientsFromSignups for why this is a button and not a trigger.
+  const handleSync = useCallback(async () => {
+    setSyncing(true);
+    try {
+      const { created, failures } = await syncClientsFromSignups({ actorEmail });
+      await crm.reload();
+      if (failures.length) {
+        showToast(`${created} added, ${failures.length} failed`, "error");
+      } else {
+        showToast(created ? `${created} new client${created === 1 ? "" : "s"} added` : "Already up to date");
+      }
+    } catch (e) {
+      showToast(e?.message || "Could not sync user data", "error");
+    } finally {
+      setSyncing(false);
+    }
+  }, [actorEmail, crm, showToast]);
+
   const select = (id) => {
     setParams({ client: id }, { replace: true });
     setMobileTab("record");
@@ -346,6 +366,9 @@ export default function CrmClientsPage() {
             </Btn>
             <Btn sm onClick={() => { setImporting((v) => !v); setAdding(false); }}>
               {importing ? "Close" : "Import"}
+            </Btn>
+            <Btn sm onClick={handleSync} disabled={syncing} title="Add any signed-up user (with saved preferences) not already in the CRM">
+              {syncing ? "Syncing…" : "Sync users"}
             </Btn>
           </div>
         )}
