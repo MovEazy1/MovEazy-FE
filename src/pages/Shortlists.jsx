@@ -103,14 +103,29 @@ export default function Shortlists() {
   // Tapping a card opens the property, same as everywhere else in the app.
   // A cart snapshot only carries a few fields (see VisitCartContext), so this
   // always fetches the full inventory row rather than trusting whatever's
-  // already on the card.
-  const openProperty = async (propertyId) => {
-    setViewingId(propertyId);
+  // already on the card. A listing with no photos yet is disproportionately
+  // likely to still be a draft the owner hasn't published — the read policy
+  // only allows published rows, so the fetch quietly comes back empty and the
+  // card looked "dead" on tap. Falling back to the card's own snapshot means
+  // it still opens; PropertyModal already shows a placeholder when there's no
+  // image at all.
+  const openProperty = async (it) => {
+    setViewingId(it.property_id);
     try {
-      const rows = await fetchInventoryByIds([propertyId]);
-      if (rows?.[0]) setViewing(rows[0]);
+      const rows = await fetchInventoryByIds([it.property_id]);
+      setViewing(
+        rows?.[0] || {
+          property_id: it.property_id,
+          title: it.title,
+          area: it.area,
+          flat_type: it.flat_type,
+          rent: it.rent,
+          cover_image_url: it.cover,
+          images: it.cover ? [it.cover] : [],
+        },
+      );
     } finally {
-      setViewingId((id) => (id === propertyId ? "" : id));
+      setViewingId((id) => (id === it.property_id ? "" : id));
     }
   };
 
@@ -196,8 +211,8 @@ export default function Shortlists() {
                   key={it.property_id}
                   role="button"
                   tabIndex={0}
-                  onClick={() => openProperty(it.property_id)}
-                  onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); openProperty(it.property_id); } }}
+                  onClick={() => openProperty(it)}
+                  onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); openProperty(it); } }}
                 >
                   <div className="sl-thumb">
                     {it.cover && <img src={it.cover} alt="" loading="lazy" onError={(e) => { e.currentTarget.style.display = "none"; }} />}
