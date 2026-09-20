@@ -117,19 +117,35 @@ export default function TopMatches() {
   const [advanceOn, setAdvanceOn] = useState(null);
   const [likedListings, setLikedListings] = useState([]);
   const visitToastTimer = useRef(null);
-  const shortlistDeadline = prefs?.notes?.shortlistDeadline || null;
+  // The deadline the countdown counts down to. Deliberately NOT derived from
+  // `prefs` — prefs can arrive as a snapshot handed over in router state
+  // (ForkHome passes the row it already had in hand), and that snapshot goes
+  // stale the moment a deadline gets written after it was captured. A plain
+  // reload then reuses that same stale snapshot (browsers keep history.state
+  // across a reload of the same entry) forever, so `prefs.notes` never picks
+  // up the real value and a fresh deadline gets minted on every visit. This
+  // fetches straight from the account on every "relax" render instead, which
+  // is the actual fix, not just a different cache to go stale.
+  const [shortlistDeadline, setShortlistDeadline] = useState(null);
   const countdownMs = useCountdownTo(shortlistDeadline);
 
-  // The 6-hour clock starts the first time the relax screen actually shows,
-  // and only then — it's an account-level timestamp (in the same notes blob
-  // as commuteMinutes), so it's the same clock on a refresh, a different
-  // device, or a visit next week, never a fresh 6 hours per browser.
   useEffect(() => {
-    if (phase !== "relax" || !prefs || !user?.uid || shortlistDeadline) return;
-    const deadline = Date.now() + SHORTLIST_WINDOW_MS;
-    setPrefs((p) => ({ ...p, notes: { ...(p.notes || {}), shortlistDeadline: deadline } }));
-    void persistShortlistDeadline(user.uid, prefs.notes, deadline);
-  }, [phase, prefs, user?.uid, shortlistDeadline]);
+    if (phase !== "relax" || !user?.uid) return;
+    let alive = true;
+    (async () => {
+      const row = await fetchUserRequirement(user.uid);
+      if (!alive) return;
+      const existing = row?.notes?.shortlistDeadline;
+      if (existing) {
+        setShortlistDeadline(existing);
+      } else {
+        const deadline = Date.now() + SHORTLIST_WINDOW_MS;
+        setShortlistDeadline(deadline);
+        void persistShortlistDeadline(user.uid, row?.notes, deadline);
+      }
+    })();
+    return () => { alive = false; };
+  }, [phase, user?.uid]);
 
   // Prefs handed over by the wizard win; otherwise load what's saved for this account.
   useEffect(() => {
