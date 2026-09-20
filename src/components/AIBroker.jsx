@@ -95,7 +95,7 @@ export default function AIBroker({ open, onClose }) {
   // would re-fire this effect — and wipe whatever the person just answered —
   // constantly instead of only on an actual sign-in/out. `uid` is stable.
   const uid = user?.uid || user?.id || null;
-  const [phase, setPhase] = useState("q"); // q | review
+  const [phase, setPhase] = useState("intro"); // intro | q | review
   const [stepIdx, setStepIdx] = useState(0);
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState(false);
@@ -107,7 +107,7 @@ export default function AIBroker({ open, onClose }) {
   useEffect(() => {
     if (!open) return;
     let alive = true;
-    setPhase("q");
+    setPhase("intro");
     setStepIdx(0);
     setSaving(false);
     setSaved(false);
@@ -159,6 +159,8 @@ export default function AIBroker({ open, onClose }) {
     if (step.type === "cards") return step.single ? true : (prefs[step.id] || []).length > 0;
     return true;
   };
+
+  const begin = () => setPhase("q");
 
   const advance = () => {
     // Leaving the flat-type step for the first time: seed the budget range
@@ -224,6 +226,15 @@ export default function AIBroker({ open, onClose }) {
 
             <div className="brk-scroll">
               <AnimatePresence mode="wait">
+                {phase === "intro" && (
+                  <motion.div key="intro" className="brk-panel" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}>
+                    <h2 className="brk-q">Saving your time is our priority</h2>
+                    <p className="brk-sub">
+                      Tell us your requirement in brief, and we'll create a personalised shortlist of flats made for you.
+                    </p>
+                  </motion.div>
+                )}
+
                 {phase === "q" && (
                   <motion.div key={step.id} className="brk-panel" initial={{ opacity: 0, x: 16 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: -16 }} transition={{ duration: 0.28, ease: EASE }}>
                     <h2 className="brk-q">{step.q}</h2>
@@ -252,7 +263,11 @@ export default function AIBroker({ open, onClose }) {
             </div>
 
             <div className="brk-footer">
-              {phase === "q" ? (
+              {phase === "intro" ? (
+                <button type="button" className="brk-next" style={{ marginLeft: "auto" }} onClick={begin}>
+                  Let's begin <ChevronRight size={16} />
+                </button>
+              ) : phase === "q" ? (
                 <>
                   {stepIdx === 0 ? (
                     <button type="button" className="brk-link" onClick={advance}>Skip for now</button>
