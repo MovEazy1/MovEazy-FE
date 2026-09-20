@@ -12,6 +12,7 @@ import { useCrmAccess } from "../../hooks/useCrmAccess";
 import { SCOPES } from "../../lib/adminScopes";
 import {
   fetchClients, fetchClientRequirements, fetchEngagement, fetchShortlists, fetchLastTouch,
+  fetchClientOwnAnswers,
 } from "../../lib/crmClients";
 import { fetchCrmSettings } from "../../lib/crmSettings";
 import { fetchShareChannels } from "../../lib/marketing";
@@ -156,14 +157,14 @@ export default function CrmShell() {
       // resolves to [] on a project without the marketing migration, and the
       // share menu then degrades to the plain per-platform link rather than
       // leaving an agent with no way to post at all.
-      const [clients, requirements, inventory, engagement, shortlists, touches, settings, marketingChannels] =
+      const [clients, requirements, inventory, engagement, shortlists, touches, settings, marketingChannels, ownAnswers] =
         await Promise.all([
           fetchClients(), fetchClientRequirements(), fetchInventory(),
           fetchEngagement(), fetchShortlists(), fetchLastTouch(), fetchCrmSettings(),
-          fetchShareChannels(),
+          fetchShareChannels(), fetchClientOwnAnswers(),
         ]);
       setData({
-        clients, requirements, inventory, engagement, shortlists, touches, settings, marketingChannels,
+        clients, requirements, inventory, engagement, shortlists, touches, settings, marketingChannels, ownAnswers,
       });
       setError("");
     } catch (e) {

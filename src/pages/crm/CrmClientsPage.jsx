@@ -168,7 +168,7 @@ function ImportPanel({ actorEmail, onDone, onCancel, onToast }) {
 
 export default function CrmClientsPage() {
   const crm = useCrm();
-  const { clients, requirements, inventory, engagement, shortlists, touches, settings, access, user } = crm;
+  const { clients, requirements, inventory, engagement, shortlists, touches, settings, access, user, ownAnswers } = crm;
 
   const [params, setParams] = useSearchParams();
   const selectedId = params.get("client") || "";
@@ -217,6 +217,14 @@ export default function CrmClientsPage() {
     for (const e of engagement) m.set(e.user_id, e);
     return m;
   }, [engagement]);
+
+  /** What the client told us themselves — office + commute time — keyed by
+   * user_id, the same lookup shape as engByUser above. */
+  const ownAnswersByUser = useMemo(() => {
+    const m = new Map();
+    for (const a of ownAnswers ?? []) m.set(a.user_id, a);
+    return m;
+  }, [ownAnswers]);
 
   /** Most recent activity per client — the "oldest untouched" sort. */
   const lastTouchByClient = useMemo(() => {
@@ -513,6 +521,7 @@ export default function CrmClientsPage() {
       requirement={requirement}
       isOverride={Boolean(storedReq)}
       engagement={engByUser.get(selected.user_id)}
+      ownAnswers={ownAnswersByUser.get(selected.user_id)}
       settings={settings}
       access={access}
       actorEmail={actorEmail}

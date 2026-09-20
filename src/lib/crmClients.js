@@ -79,6 +79,16 @@ export const fetchClientRequirements = () =>
 export const fetchEngagement = () =>
   safeSelect("user_engagement", "user_id,session_count,total_seconds,longest_seconds,last_seen_at");
 
+/**
+ * What the client typed themselves in the "Find My Flat" wizard — office
+ * location and commute time — read straight from public.user_requirements
+ * rather than the CRM's own requirement override, since those two answers
+ * are facts about the client, not something an agent edits. One bulk read
+ * for every account, same shape as fetchEngagement above.
+ */
+export const fetchClientOwnAnswers = () =>
+  safeSelect("user_requirements", "user_id,office,notes");
+
 export const fetchShortlists = () =>
   safeSelect(
     "crm_shortlists",

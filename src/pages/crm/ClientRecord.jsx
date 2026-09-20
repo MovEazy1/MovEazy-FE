@@ -140,17 +140,29 @@ function hasRequirement(req) {
   );
 }
 
+/** Matches the four commute-time cards on the wizard's own step — same
+ * minutes, same words, so a number here reads exactly as the client saw it. */
+function commuteLabel(minutes) {
+  if (!minutes) return "";
+  if (minutes >= 60) return "1 hr+";
+  return `${minutes} min`;
+}
+
 /**
- * The four facts that decide whether you pick this client up right now, sitting
+ * The six facts that decide whether you pick this client up right now, sitting
  * directly under the name. Everything else about the requirement is one click
  * away — this strip is what an agent scans, not the full option vocabulary.
+ * Office and commute time are what the client typed themselves in the wizard
+ * (ownAnswers, from public.user_requirements) — never edited from the CRM.
  */
-function HeaderFacts({ req }) {
+function HeaderFacts({ req, ownAnswers }) {
   const facts = [
     ["Move in", req?.move_in || ""],
     ["Budget", budgetLabel(req)],
     ["Flat type", (req?.flat_types ?? []).join(", ")],
     ["Area", (req?.localities ?? []).join(", ")],
+    ["Office", ownAnswers?.office?.display || ownAnswers?.office?.label || ""],
+    ["Time to office", commuteLabel(ownAnswers?.notes?.commuteMinutes)],
   ];
   return (
     <div
@@ -424,7 +436,7 @@ function ClosePrompt({ status, reasons, onCancel, onConfirm }) {
 
 export default function ClientRecord({
   client, requirement, isOverride, engagement, settings, access, actorEmail, agentName,
-  onPatch, onRequirementChange, onRequirementReset, onToast,
+  onPatch, onRequirementChange, onRequirementReset, onToast, ownAnswers,
 }) {
   const [activities, setActivities] = useState([]);
   const [pendingClose, setPendingClose] = useState(null);
@@ -550,7 +562,7 @@ export default function ClientRecord({
           </Btn>
         </div>
 
-        <HeaderFacts req={requirement} />
+        <HeaderFacts req={requirement} ownAnswers={ownAnswers} />
         {client.phone && (
           <span className="crm-mute crm-num" style={{ fontSize: 10.5, marginTop: -10 }}>
             {isTouch ? `tel:+${String(client.phone).replace(/\D/g, "")} · opens your phone's dialler`
