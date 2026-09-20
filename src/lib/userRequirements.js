@@ -115,6 +115,24 @@ export async function markMatchesSeen(uid) {
   }
 }
 
+/**
+ * Sets the account-level deadline for the "our team is curating your
+ * shortlist" countdown, but only the first time — it rides in the same
+ * notes jsonb blob as commuteMinutes, so it survives across devices and
+ * browsers (unlike a localStorage timer) and never gets pushed forward by
+ * a later visit. `currentNotes` is whatever the caller already has loaded,
+ * so this doesn't need its own read before the write.
+ */
+export async function persistShortlistDeadline(uid, currentNotes, deadline) {
+  if (!isSupabaseConfigured || !supabase || !uid) return;
+  try {
+    const notes = { ...(currentNotes && typeof currentNotes === "object" ? currentNotes : {}), shortlistDeadline: deadline };
+    await supabase.from("user_requirements").update({ notes }).eq("user_id", uid);
+  } catch {
+    // best-effort — see markMatchesSeen above
+  }
+}
+
 /** Every user's requirement (for the List my Flat "who does this match" step). */
 export async function fetchAllUserRequirements({ limit = 1000 } = {}) {
   if (!isSupabaseConfigured || !supabase) return [];

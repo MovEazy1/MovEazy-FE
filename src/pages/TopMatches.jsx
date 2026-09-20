@@ -15,7 +15,7 @@ import Toast from "../components/Toast";
 import { useAuth } from "../context/AuthContext";
 import { fetchAllListings } from "../lib/listingsFeed";
 import { matchRequirementToListings, normalizeRequirement } from "../lib/inventoryMatch";
-import { fetchUserRequirement, markMatchesSeen, rowToPrefs } from "../lib/userRequirements";
+import { fetchUserRequirement, markMatchesSeen, persistShortlistDeadline, rowToPrefs } from "../lib/userRequirements";
 import { toggleSavedListing } from "../lib/userActivity";
 import { logSavedListingChange } from "../lib/crmSync";
 import { setReaction } from "../lib/visits";
@@ -32,27 +32,19 @@ function formatCountdown(ms) {
   return `${h}:${m}:${s}`;
 }
 
-/** Counts down from a 6-hour deadline that's set the first time the relax
- * screen shows and then persisted, so a refresh (or coming back later)
- * doesn't hand the person a fresh 6 hours every time. */
-function useShortlistCountdown(active, storageKey) {
-  const [remaining, setRemaining] = useState(SHORTLIST_WINDOW_MS);
+/** Counts down to a fixed deadline (an account-level timestamp, not a
+ * per-browser one) — returns null until the deadline is known, so callers
+ * can tell "still figuring out the deadline" apart from "the deadline is
+ * now/past". */
+function useCountdownTo(deadline) {
+  const [remaining, setRemaining] = useState(() => (deadline ? Math.max(0, deadline - Date.now()) : null));
   useEffect(() => {
-    if (!active) return undefined;
-    let deadline = null;
-    try {
-      const stored = Number(localStorage.getItem(storageKey));
-      if (stored && stored > Date.now()) deadline = stored;
-    } catch { /* private mode / storage blocked — fall through to a fresh deadline */ }
-    if (!deadline) {
-      deadline = Date.now() + SHORTLIST_WINDOW_MS;
-      try { localStorage.setItem(storageKey, String(deadline)); } catch { /* best-effort */ }
-    }
+    if (!deadline) { setRemaining(null); return undefined; }
     const tick = () => setRemaining(Math.max(0, deadline - Date.now()));
     tick();
     const id = setInterval(tick, 1000);
     return () => clearInterval(id);
-  }, [active, storageKey]);
+  }, [deadline]);
   return remaining;
 }
 
@@ -125,7 +117,19 @@ export default function TopMatches() {
   const [advanceOn, setAdvanceOn] = useState(null);
   const [likedListings, setLikedListings] = useState([]);
   const visitToastTimer = useRef(null);
-  const countdownMs = useShortlistCountdown(phase === "relax", `moveazy_shortlist_deadline_${user?.uid || "anon"}`);
+  const shortlistDeadline = prefs?.notes?.shortlistDeadline || null;
+  const countdownMs = useCountdownTo(shortlistDeadline);
+
+  // The 6-hour clock starts the first time the relax screen actually shows,
+  // and only then — it's an account-level timestamp (in the same notes blob
+  // as commuteMinutes), so it's the same clock on a refresh, a different
+  // device, or a visit next week, never a fresh 6 hours per browser.
+  useEffect(() => {
+    if (phase !== "relax" || !prefs || !user?.uid || shortlistDeadline) return;
+    const deadline = Date.now() + SHORTLIST_WINDOW_MS;
+    setPrefs((p) => ({ ...p, notes: { ...(p.notes || {}), shortlistDeadline: deadline } }));
+    void persistShortlistDeadline(user.uid, prefs.notes, deadline);
+  }, [phase, prefs, user?.uid, shortlistDeadline]);
 
   // Prefs handed over by the wizard win; otherwise load what's saved for this account.
   useEffect(() => {
@@ -166,20 +170,37 @@ export default function TopMatches() {
 
   const recordSeen = (listing) => setSeenIds((ids) => (ids.includes(listing.id) ? ids : [...ids, listing.id]));
 
-  const goToPriorityWhatsapp = () => {
-    // `prefs` is either AIBroker's camelCase shape or a raw user_requirements
-    // row (ForkHome hands that over as-is for a returning visitor) — read
-    // both so the message doesn't come out blank depending on entry point.
+  // `prefs` is either AIBroker's camelCase shape or a raw user_requirements
+  // row (ForkHome hands that over as-is for a returning visitor) — read both
+  // so a WhatsApp message doesn't come out blank depending on entry point.
+  const describePrefs = () => {
     const rupee = (n) => `₹${Number(n || 0).toLocaleString("en-IN")}`;
     const flatTypes = prefs?.flatTypes?.length ? prefs.flatTypes : prefs?.flat_types;
     const flatType = flatTypes?.length ? flatTypes.join("/") : "flat";
     const budgetMin = prefs?.budgetMin ?? prefs?.budget_min;
     const budgetMax = prefs?.budgetMax ?? prefs?.budget_max;
     const budget = prefs ? `${rupee(budgetMin)} - ${rupee(budgetMax)}` : "";
-    const message =
-      "Priority Move In\n" +
-      `Hey Team, I'm looking to move-in ASAP in a ${flatType}. My budget is ${budget}.`;
+    return { flatType, budget };
+  };
+
+  const openWhatsapp = (message) => {
     window.open(`https://wa.me/919146969162?text=${encodeURIComponent(message)}`, "_blank", "noopener,noreferrer");
+  };
+
+  const goToPriorityWhatsapp = () => {
+    const { flatType, budget } = describePrefs();
+    openWhatsapp(
+      "Priority Move In\n" +
+      `Hey Team, I'm looking to move-in ASAP in a ${flatType}. My budget is ${budget}.`
+    );
+  };
+
+  const goToNudgeWhatsapp = () => {
+    const { flatType, budget } = describePrefs();
+    openWhatsapp(
+      "Shortlist Nudge\n" +
+      `Hey Team, it's been over 6 hours and I haven't received my curated shortlist yet. Could you please prioritize my ${flatType} search (budget ${budget})?`
+    );
   };
 
   const onVisitBooked = useCallback((message, listing) => {
@@ -253,14 +274,29 @@ export default function TopMatches() {
             <p style={{ color: T.teal, fontWeight: 800, fontSize: 17, margin: "0 0 20px" }}>
               Best flat for you.
             </p>
-            <div style={{ display: "inline-flex", flexDirection: "column", alignItems: "center", gap: 6, background: "#EAF6F2", border: `1px solid ${T.teal}33`, borderRadius: 16, padding: "14px 22px", margin: "0 0 32px" }}>
-              <p style={{ color: T.text, fontSize: 14, lineHeight: 1.5, margin: 0, maxWidth: 320 }}>
-                Our team will be sharing a curated shortlist of <strong>30 flats</strong> in
-              </p>
-              <span style={{ fontVariantNumeric: "tabular-nums", fontWeight: 800, fontSize: 24, letterSpacing: "0.02em", color: T.teal }}>
-                {formatCountdown(countdownMs)}
-              </span>
-            </div>
+            {countdownMs !== null && countdownMs <= 0 ? (
+              <div style={{ display: "inline-flex", flexDirection: "column", alignItems: "center", gap: 10, background: "#FCF3E8", border: "1px solid #E8A33D55", borderRadius: 16, padding: "16px 22px", margin: "0 0 32px", maxWidth: 340 }}>
+                <p style={{ color: T.text, fontSize: 14, lineHeight: 1.5, margin: 0 }}>
+                  Due to High Demand our 2 Member team is super occupied currently.
+                </p>
+                <button
+                  type="button"
+                  onClick={goToNudgeWhatsapp}
+                  style={{ padding: "10px 20px", borderRadius: 999, border: "none", background: T.gold, color: T.ink, fontWeight: 700, fontSize: 13.5, cursor: "pointer" }}
+                >
+                  Nudge us on WhatsApp to take this up on priority
+                </button>
+              </div>
+            ) : (
+              <div style={{ display: "inline-flex", flexDirection: "column", alignItems: "center", gap: 6, background: "#EAF6F2", border: `1px solid ${T.teal}33`, borderRadius: 16, padding: "14px 22px", margin: "0 0 32px" }}>
+                <p style={{ color: T.text, fontSize: 14, lineHeight: 1.5, margin: 0, maxWidth: 320 }}>
+                  Our team will be sharing a curated shortlist of <strong>30 flats</strong> in
+                </p>
+                <span style={{ fontVariantNumeric: "tabular-nums", fontWeight: 800, fontSize: 24, letterSpacing: "0.02em", color: T.teal }}>
+                  {countdownMs === null ? "--:--:--" : formatCountdown(countdownMs)}
+                </span>
+              </div>
+            )}
             <div style={{ display: "flex", justifyContent: "center", margin: "0 0 36px" }}>
               <RelaxCup />
             </div>
