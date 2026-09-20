@@ -114,7 +114,11 @@ export default function TopMatches() {
   const [prefsChecked, setPrefsChecked] = useState(!!location.state?.prefs);
   const [listings, setListings] = useState([]);
   const [listingsLoading, setListingsLoading] = useState(true);
-  const [phase, setPhase] = useState("swiping"); // swiping | relax
+  // A returning visitor whose account already has matches_seen (raw DB rows
+  // carry that column straight through from ForkHome) skips the swipe deck
+  // entirely and lands on the relax/timer screen — "Find My Flat" shouldn't
+  // hand them the same five cards, or the questionnaire, a second time.
+  const [phase, setPhase] = useState(location.state?.prefs?.matches_seen ? "relax" : "swiping"); // swiping | relax
   const [seenIds, setSeenIds] = useState([]);
   const [viewing, setViewing] = useState(null); // { listing, openVisitForm }
   const [visitToast, setVisitToast] = useState("");
@@ -129,7 +133,11 @@ export default function TopMatches() {
     if (!user?.uid) { setPrefsChecked(true); return; }
     let alive = true;
     fetchUserRequirement(user.uid)
-      .then((row) => { if (alive && row) setPrefs(rowToPrefs(row)); })
+      .then((row) => {
+        if (!alive || !row) return;
+        setPrefs(rowToPrefs(row));
+        if (row.matches_seen) setPhase("relax");
+      })
       .finally(() => { if (alive) setPrefsChecked(true); });
     return () => { alive = false; };
   }, [prefs, user?.uid, authLoading]);
@@ -159,9 +167,15 @@ export default function TopMatches() {
   const recordSeen = (listing) => setSeenIds((ids) => (ids.includes(listing.id) ? ids : [...ids, listing.id]));
 
   const goToPriorityWhatsapp = () => {
+    // `prefs` is either AIBroker's camelCase shape or a raw user_requirements
+    // row (ForkHome hands that over as-is for a returning visitor) — read
+    // both so the message doesn't come out blank depending on entry point.
     const rupee = (n) => `₹${Number(n || 0).toLocaleString("en-IN")}`;
-    const flatType = prefs?.flatTypes?.length ? prefs.flatTypes.join("/") : "flat";
-    const budget = prefs ? `${rupee(prefs.budgetMin)} - ${rupee(prefs.budgetMax)}` : "";
+    const flatTypes = prefs?.flatTypes?.length ? prefs.flatTypes : prefs?.flat_types;
+    const flatType = flatTypes?.length ? flatTypes.join("/") : "flat";
+    const budgetMin = prefs?.budgetMin ?? prefs?.budget_min;
+    const budgetMax = prefs?.budgetMax ?? prefs?.budget_max;
+    const budget = prefs ? `${rupee(budgetMin)} - ${rupee(budgetMax)}` : "";
     const message =
       "Priority Move In\n" +
       `Hey Team, I'm looking to move-in ASAP in a ${flatType}. My budget is ${budget}.`;
