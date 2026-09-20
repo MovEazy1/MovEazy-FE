@@ -157,7 +157,10 @@ function commuteLabel(minutes) {
  */
 function HeaderFacts({ req, ownAnswers }) {
   const facts = [
-    ["Move in", req?.move_in || ""],
+    // An agent's own override wins if set; otherwise fall back to what the
+    // client picked themselves in the wizard (also from ownAnswers, like
+    // office/commute — user_requirements has no move_in column of its own).
+    ["Move in", req?.move_in || ownAnswers?.notes?.moveInDate || ""],
     ["Budget", budgetLabel(req)],
     ["Flat type", (req?.flat_types ?? []).join(", ")],
     ["Area", (req?.localities ?? []).join(", ")],

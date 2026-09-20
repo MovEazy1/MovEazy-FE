@@ -38,6 +38,12 @@ const COMMUTE_OPTIONS = [
   { value: 45, label: "45 min", sub: "Fairly flexible" },
   { value: 60, label: "1 hr", sub: "Not an issue" },
 ];
+const MOVE_IN_OPTIONS = [
+  { value: "Immediately", label: "Immediately", sub: "Ready now" },
+  { value: "Within 15 days", label: "15 days", sub: "Within 2 weeks" },
+  { value: "Within 1 month", label: "1 month", sub: "Within 30 days" },
+  { value: "Flexible", label: "Flexible", sub: "No rush" },
+];
 const OCCUPANT_CARDS = [
   { value: "Bachelor", label: "Bachelor", sub: "Just me", Icon: User },
   { value: "With Roommates", label: "With Roommates", sub: "Boys / Girls", Icon: Users },
@@ -61,9 +67,10 @@ function computeBudgetDefaults(flatTypes = []) {
 const STEPS = [
   { id: "office", type: "location", q: "Where's your office located?", sub: "We'll find homes that keep you close to work." },
   { id: "localities", type: "chips", q: "Which localities do you prefer?", sub: "Select multiple areas. We'll show you homes in and around these locations.", options: LOCALITIES },
-  { id: "commuteMinutes", type: "cards", single: true, q: "How much time to office works for you?", sub: "Select your comfortable commute time (one-way, by bike).", options: COMMUTE_OPTIONS, note: "We'll show you homes within this commute time from your office." },
+  { id: "commuteMinutes", type: "cards", single: true, scalar: true, q: "How much time to office works for you?", sub: "Select your comfortable commute time (one-way, by bike).", options: COMMUTE_OPTIONS, note: "We'll show you homes within this commute time from your office." },
   { id: "occupants", type: "cards", single: true, q: "Who'll be living there?", sub: "This helps us find the right kind of homes and landlords.", options: OCCUPANT_CARDS },
   { id: "flatTypes", type: "cards", single: false, q: "What type of home are you looking for?", sub: "Select all that work for you.", options: FLAT_TYPE_CARDS },
+  { id: "moveInDate", type: "cards", single: true, scalar: true, q: "When are you looking to move in?", sub: "This helps us prioritize the right homes for you.", options: MOVE_IN_OPTIONS },
   { id: "budget", type: "budget", q: "Enter the maximum budget", sub: "Drag to set the most you'd like to pay per month." },
   { id: "priority", type: "rank", q: "One last thing — what matters most to you?", sub: "Drag to reorder, with your top priority at the top." },
 ];
@@ -74,6 +81,7 @@ const emptyPrefs = () => ({
   commuteMinutes: 30,
   occupants: ["Bachelor"],
   flatTypes: [...FLAT_TYPES],
+  moveInDate: "Immediately",
   ...computeBudgetDefaults([...FLAT_TYPES]),
   stretch: true,
   mustHaves: [], lifestyle: [], dealBreakers: [],
@@ -148,7 +156,10 @@ export default function AIBroker({ open, onClose }) {
       return { ...p, [key]: next };
     });
   const selectCard = (s, val) => {
-    if (s.id === "commuteMinutes") { set({ commuteMinutes: val }); return; }
+    // A "scalar" single-select stores the bare value (a number of minutes, a
+    // date-range label) rather than wrapping it in a one-item array the way
+    // occupants/flatTypes do, since nothing downstream treats it as a list.
+    if (s.scalar) { set({ [s.id]: val }); return; }
     if (s.single) { set({ [s.id]: [val] }); return; }
     toggle(s.id, val, s.max);
   };
@@ -334,7 +345,7 @@ function StepBody({ step, prefs, set, toggle, selectCard }) {
 
 /* ── Icon-grid cards (commute time / occupants / flat type) ────────────────── */
 function CardGrid({ step, prefs, onSelect }) {
-  const isOn = (val) => (step.id === "commuteMinutes" ? prefs.commuteMinutes === val : (prefs[step.id] || []).includes(val));
+  const isOn = (val) => (step.scalar ? prefs[step.id] === val : (prefs[step.id] || []).includes(val));
   return (
     <div className="brk-cardgrid">
       {step.options.map((o) => {
