@@ -134,13 +134,13 @@ export default function ForkHome() {
     try {
       const saved = await fetchUserRequirement(uid);
       if (saved) {
-        // Already shown the one-time top-5 swipe screen — straight to the map.
-        navigate(saved.matches_seen ? "/map" : "/matches", { state: { prefs: saved } });
+        // Their five best matches; the screen itself decides whether that is a
+        // fresh swipe or the "sit back and relax" hand-off.
+        navigate("/matches", { state: { prefs: saved } });
       } else {
         // First-timer, no saved requirement yet — straight into the AI agent
-        // chat instead of the map-vs-agent choice. The choice modal (below)
-        // is kept but no longer triggered from here; nothing else in the app
-        // opens it, so this is a behaviour change, not a removal.
+        // chat. The choice modal (below) is kept but no longer triggered from
+        // here; nothing else in the app opens it.
         setShowChatbot(true);
       }
     } finally {
