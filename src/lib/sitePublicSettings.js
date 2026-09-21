@@ -11,16 +11,6 @@ export const CONTACT_GRADIENTS = [
 
 export const DEFAULT_CONTACT_TEAM = [
   {
-    name: "Kuldeep Meena",
-    title: "IITK BS Physics",
-    role: "Sales",
-    phone: "+91 70559 54373",
-    phoneRaw: "917055954373",
-    whatsappUrl: "https://wa.me/917055954373",
-    avatar: "KM",
-    gradient: CONTACT_GRADIENTS[0],
-  },
-  {
     name: "Suresh Meena",
     title: "IITK Electrical",
     role: "Sales",
@@ -36,8 +26,8 @@ export const DEFAULT_SITE_PUBLIC = {
   contacts: DEFAULT_CONTACT_TEAM,
   supportEmail: "support@moveazy.co.in",
   privacyEmail: "privacy@moveazy.co.in",
-  legalPhoneDisplay: "+91 70559 54373",
-  legalPhoneTel: "tel:+917055954373",
+  legalPhoneDisplay: "+91 96089 86517",
+  legalPhoneTel: "tel:+919608986517",
 };
 
 const MAX_CONTACTS = 12;
@@ -116,7 +106,7 @@ function normalizeContactsArray(arr) {
   return out.filter((c) => c.name && c.phoneRaw.length >= 10);
 }
 
-/** Ensure Kuldeep / Suresh (and other defaults) stay on the public contact list. */
+/** Ensure Suresh (and other defaults) stay on the public contact list. */
 export function mergeDefaultContacts(contacts) {
   const list = Array.isArray(contacts) ? [...contacts] : [];
   const seen = new Set(list.map((c) => c.phoneRaw));

@@ -8,9 +8,6 @@ const DEFAULT_WA_GREETING =
 export const SALES_WA_GREETING =
   "Hi — I'd like to speak with MovEazy sales about flat search or guarantee plans. Please share next steps.";
 
-/** Kuldeep Meena — primary consultation WhatsApp. */
-export const KULDEEP_MEENA_WHATSAPP = "https://wa.me/917055954373";
-
 /** Build a WhatsApp deep link (E.164 digits without +). */
 export function buildWhatsAppUrl(phoneRaw, message = DEFAULT_WA_GREETING) {
   const digits = String(phoneRaw || "").replace(/\D/g, "");

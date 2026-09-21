@@ -29,7 +29,6 @@ import { toggleSavedListing } from "../lib/userActivity";
 import { logSavedListingChange } from "../lib/crmSync";
 import { setReaction } from "../lib/visits";
 import { persistRequestedMoreFlats } from "../lib/userRequirements";
-import { DEFAULT_CONTACT_TEAM } from "../lib/sitePublicSettings";
 
 const T = { ink: "#04211D", teal: "#0E7C68", gold: "#E8A33D", text: "#171412", textDim: "#5c554e", line: "#e9e3db" };
 
@@ -209,8 +208,11 @@ export default function CuratedProperties() {
   const firstName = String(share?.clientName || "").split(/\s+/)[0];
 
   const requestMoreUrl = useMemo(() => {
-    const contact = DEFAULT_CONTACT_TEAM[0];
-    const base = contact?.whatsappUrl || "https://wa.me/917055954373";
+    // The shared support line already public on the Contact page — never an
+    // individual consultant's personal number, so this can never end up
+    // paging one specific person's phone just because they happened to be
+    // first in a list somewhere.
+    const base = "https://wa.me/919608986517";
     const who = firstName ? ` for ${firstName}` : "";
     const text = liked.length
       ? `Hi MovEazy, please share some more flat options${who}.`
