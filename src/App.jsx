@@ -13,6 +13,7 @@ const Profile = lazy(() => import("./pages/Profile"));
 const SupabaseLogin = lazy(() => import("./pages/SupabaseLogin"));
 const BrokerDashboard = lazy(() => import("./pages/BrokerDashboard"));
 const MapPage = lazy(() => import("./pages/MapPage"));
+const CuratedProperties = lazy(() => import("./pages/CuratedProperties"));
 const TopMatches = lazy(() => import("./pages/TopMatches"));
 const HowItWorks = lazy(() => import("./pages/HowItWorks"));
 const About = lazy(() => import("./pages/About"));
@@ -103,6 +104,11 @@ function AppRoutes() {
         <Route path="/" element={<ForkHome />} />
         <Route path="/map" element={<MapPage />} />
         <Route path="/matches" element={<TopMatches />} />
+        {/* The shortlist our team curated for one person. With a token it is the
+            WhatsApp link and works signed out; without one it is the same set
+            for whoever is signed in. */}
+        <Route path="/curated" element={<CuratedProperties />} />
+        <Route path="/curated/:token" element={<CuratedProperties />} />
         <Route path="/how-it-works" element={<HowItWorks />} />
         <Route path="/about" element={<About />} />
         <Route

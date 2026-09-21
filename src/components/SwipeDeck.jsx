@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { X, Heart, BedDouble, Bath, Layers, ShieldCheck, MapPin, CalendarCheck, CheckCircle2 } from "lucide-react";
+import { X, Heart, BedDouble, Bath, Layers, ShieldCheck, MapPin, CalendarCheck, CheckCircle2, Images } from "lucide-react";
 import { coverMedia, isVideoUrl, orderListingMedia } from "../lib/listingMedia";
 import { formatPostedAgo } from "../lib/formatTime";
 
@@ -108,7 +108,17 @@ function SwipeCard({ listing, index, top, onSwiped, onOpenDetails, position }) {
             ) : (
               <img src={cover} alt={listing.title} loading="lazy" draggable={false} style={{ width: "100%", height: "100%", objectFit: "cover", pointerEvents: "none" }} />
             )
-          ) : null}
+          ) : (
+            /* A listing with no photos yet read as a card that failed to load —
+               half the surface blank, nothing to say why. Name the gap instead. */
+            <div style={{ width: "100%", height: "100%", display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", gap: 8, color: T.textMute }}>
+              <Images size={26} strokeWidth={1.7} />
+              <span style={{ fontSize: 12.5, fontWeight: 600 }}>Photos on the way</span>
+              <span style={{ fontSize: 11.5, maxWidth: 200, textAlign: "center", lineHeight: 1.4 }}>
+                Tap through for everything else about this home.
+              </span>
+            </div>
+          )}
 
           {top && (
             <>
@@ -183,20 +193,33 @@ export default function SwipeDeck({
   onOpenDetails,
   onScheduleVisit,
   onExhausted,
+  onIndexChange,
   emptyLabel = "No homes to show right now.",
   advanceOn,
+  startIndex = 0,
+  counterLabel,
 }) {
-  const [index, setIndex] = useState(0);
+  const [index, setIndex] = useState(startIndex);
   const [position, setPosition] = useState(1);
   const [toast, setToast] = useState(null); // { text, tone: 'like'|'skip' }
   const exhaustedFired = useRef(false);
   const toastTimer = useRef(null);
 
-  // A fresh listing set (new filters, new top-5 pull) should restart the deck.
+  // A fresh listing set (new filters, new top-5 pull) should restart the deck —
+  // at `startIndex`, which is how a shared shortlist someone abandoned halfway
+  // resumes on the next unanswered card instead of the first one again.
   useEffect(() => {
-    setIndex(0);
+    setIndex(startIndex);
     exhaustedFired.current = false;
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [listings]);
+
+  // Lets the page around the deck say where in the set the user is — the
+  // counter a curated shortlist carries into the property view.
+  useEffect(() => {
+    onIndexChange?.(index);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [index]);
 
   const done = index >= listings.length;
 
@@ -272,11 +295,15 @@ export default function SwipeDeck({
 
       <div style={{ display: "flex", alignItems: "center", gap: 10, width: "100%", maxWidth: 380, justifyContent: "center" }}>
         <span style={{ fontSize: 12, fontWeight: 700, color: T.textMute }}>
-          {index + 1} of {listings.length}
+          {counterLabel ? counterLabel(index + 1, listings.length) : `${index + 1} of ${listings.length}`}
         </span>
       </div>
 
-      <div style={{ position: "relative", width: "100%", maxWidth: 380, height: 460 }}>
+      {/* Height follows the viewport rather than sitting at a fixed 460px: on a
+          laptop and on a smaller phone that pushed the skip and shortlist
+          buttons below the fold, so the deck's two main actions needed a scroll
+          to reach. */}
+      <div style={{ position: "relative", width: "100%", maxWidth: 380, height: "clamp(330px, 54vh, 460px)" }}>
         <AnimatePresence>
           {stack.map((listing, i) => (
             <SwipeCard

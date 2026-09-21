@@ -12,8 +12,18 @@ import {
   buildTemplateVars, generateShareToken, propertyLink, renderTemplate, whatsappUrl,
 } from "../../lib/crmSettings";
 import { logActivity, recordClientReaction, upsertShortlist } from "../../lib/crmClients";
+import { CURATED_STATUS_LABEL, createCuratedShare } from "../../lib/curatedShares";
 import { SCOPES } from "../../lib/adminScopes";
 import { Btn, C, Chip, Empty, ScoreRing, inr, relTime } from "./crmUi";
+
+/** How the client's own answer reads, and in what colour. */
+const ANSWER_PILL = {
+  liked: { label: CURATED_STATUS_LABEL.liked, color: C.accent },
+  disliked: { label: CURATED_STATUS_LABEL.disliked, color: C.coral },
+  okay: { label: CURATED_STATUS_LABEL.okay, color: C.textDim },
+  visit_scheduled: { label: CURATED_STATUS_LABEL.visit_scheduled, color: C.accent },
+  visited: { label: CURATED_STATUS_LABEL.visited, color: C.accent },
+};
 
 const REACTIONS = [
   { id: "like", label: "Like", color: C.accent },
@@ -30,6 +40,7 @@ function MatchCard({ match, shortlist, canWrite, onSend, onShortlist, onReact, b
   const { listing, score, reasons, blockers } = match;
   const sent = shortlist?.shared_at;
   const cover = coverOf(listing);
+  const clientAnswer = ANSWER_PILL[shortlist?.status];
 
   return (
     <div
@@ -115,6 +126,24 @@ function MatchCard({ match, shortlist, canWrite, onSend, onShortlist, onReact, b
             {shortlist.open_count > 0
               ? `Opened ${shortlist.open_count}× · last ${relTime(shortlist.last_opened_at)}`
               : "Not opened yet"}
+          </span>
+        )}
+
+        {/* What the client themselves did, on the link we sent — a swipe or a
+            booking, not something an agent typed in. Shown apart from the
+            "Replied:" row below, which is the agent's own record of a phone
+            call, so the two can never be mistaken for each other. */}
+        {clientAnswer && (
+          <span
+            style={{
+              alignSelf: "flex-start", display: "inline-flex", alignItems: "center", gap: 5,
+              fontSize: 10.5, fontWeight: 700, padding: "3px 8px", borderRadius: 999,
+              background: `${clientAnswer.color}18`, color: clientAnswer.color,
+              border: `1px solid ${clientAnswer.color}44`,
+            }}
+          >
+            {clientAnswer.label}
+            {shortlist?.reacted_at ? ` · ${relTime(shortlist.reacted_at)}` : ""}
           </span>
         )}
 
@@ -248,42 +277,70 @@ export default function MatchesPane({
   };
 
   /**
-   * Send a set the agent chose, rather than whatever the top five happened to
-   * be. Every property still gets its own tracked link.
+   * Send a set the agent chose, as one curated link.
+   *
+   * This used to paste one tracked link per property into the message: twenty
+   * three properties meant twenty three links, which is a message nobody opens
+   * and a set the recipient can't feel the shape of. Now the set itself is the
+   * thing we send — they swipe it like the first five homes they saw, and every
+   * swipe comes back onto these rows, so "did not like" is something this pane
+   * shows rather than something an agent has to ring up and ask about.
+   *
+   * The row is written before the message is opened. A share the client can
+   * reach but the CRM has no record of would record their swipes against
+   * nothing, so the link must not exist until the batch does.
    */
   const handleSendSelected = async () => {
     if (!client.phone) return onToast("No phone number on this client", "error");
     const top = matches.filter((m) => picked.has(m.listing.property_id));
     if (top.length < 2) return onToast("Pick at least two properties", "error");
-    const template = (settings?.templates ?? []).find((t) => t.id === "share_matches");
-    const shareTokens = Object.fromEntries(
-      top.map((m) => [
-        m.listing.property_id,
-        byProperty.get(m.listing.property_id)?.share_token || generateShareToken(),
-      ]),
-    );
-    const vars = buildTemplateVars({ client, requirement, agentName, matches: top, shareTokens });
-    window.open(whatsappUrl(client.phone, renderTemplate(template?.body ?? "", vars)), "_blank", "noopener");
+
+    // Opened empty, now, in the click's own task. A browser only trusts a
+    // window.open that happens there, and the batch has to be written before
+    // the link exists — so by the time we have a URL, a popup blocker would
+    // already have swallowed the tab.
+    const waTab = window.open("about:blank", "_blank");
+    if (waTab) waTab.opener = null;
 
     setBusy(true);
     try {
+      const share = await createCuratedShare({
+        clientId: client.id,
+        propertyIds: top.map((m) => m.listing.property_id),
+        sharedBy: actorEmail,
+        agentName,
+      });
+
+      const template = (settings?.templates ?? []).find((t) => t.id === "share_curated")
+        ?? (settings?.templates ?? []).find((t) => t.id === "share_matches");
+      const vars = buildTemplateVars({
+        client, requirement, agentName, matches: top, curatedLink: share.link,
+      });
+      const waUrl = whatsappUrl(client.phone, renderTemplate(template?.body ?? "", vars));
+      if (waTab) waTab.location.replace(waUrl);
+      else window.open(waUrl, "_blank", "noopener");
+
       for (const m of top) {
         await upsertShortlist(client.id, m.listing.property_id, {
           status: "shared", score_at_share: m.score, shared_by: actorEmail,
           shared_at: new Date().toISOString(),
-          share_token: shareTokens[m.listing.property_id],
+          curated_share_id: share.id,
         });
       }
       await logActivity(client.id, {
         type: "whatsapp",
-        body: `Shared ${top.length} properties`,
-        meta: { property_ids: top.map((m) => m.listing.property_id) },
+        body: `Shared a curated shortlist of ${top.length} properties`,
+        meta: { property_ids: top.map((m) => m.listing.property_id), curated_share_id: share.id },
         actorEmail,
       });
       await onShortlistsChanged();
       cancelSelecting();
+      onToast(`Sent ${top.length} homes as one link`);
     } catch (e) {
-      onToast(e?.message || "Sent, but could not log it", "error");
+      // Nothing was sent, so don't leave a blank tab sitting there looking like
+      // a message that failed to open.
+      waTab?.close();
+      onToast(e?.message || "Could not create that shortlist link", "error");
     } finally {
       setBusy(false);
     }
@@ -303,14 +360,14 @@ export default function MatchesPane({
                 variant="wa"
                 onClick={handleSendSelected}
                 disabled={busy || picked.size < 2}
-                title={picked.size < 2 ? "Pick at least two" : `Send ${picked.size} properties`}
+                title={picked.size < 2 ? "Pick at least two" : `Send these ${picked.size} as one link`}
               >
                 Send {picked.size || ""}
               </Btn>
               <Btn sm onClick={cancelSelecting}>Cancel</Btn>
             </div>
           ) : (
-            <Btn sm onClick={() => setSelecting(true)}>Send multiple</Btn>
+            <Btn sm onClick={() => setSelecting(true)}>Send shortlist</Btn>
           )
         )}
       </div>
@@ -327,7 +384,7 @@ export default function MatchesPane({
         >
           {picked.size < 2
             ? "Tap the properties to include — at least two."
-            : `${picked.size} selected. They go in one message, each with its own tracked link.`}
+            : `${picked.size} selected. They go as one link they can swipe through — every like, skip and visit lands back here.`}
         </p>
       )}
 

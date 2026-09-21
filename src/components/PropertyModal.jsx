@@ -4,6 +4,7 @@ import { coverPhoto, isVideoUrl, orderListingMedia } from "../lib/listingMedia";
 import { formatPostedAgo } from "../lib/formatTime";
 import { propertyLink, shareVia } from "../lib/crmSettings";
 import { useAuth } from "../context/AuthContext";
+import { useBackClose } from "../hooks/useBackClose";
 import { getListingPrivateData, isListingPubliclyVisible } from "../lib/firestoreStore";
 import { canReadListingPrivatePhones } from "../lib/accessControl";
 import { isSupabaseConfigured } from "../lib/supabase";
@@ -181,7 +182,17 @@ function MediaElement({ src, alt, style, firstImage }) {
   );
 }
 
-export default function PropertyModal({ property, onClose, listings = [], onSelectListing, onSavedChange, onVisitBooked, onExploreMore }) {
+/**
+ * @param {boolean} initialShowVisitForm Opened by "Schedule a Visit" rather than
+ *   by tapping the card — land on the booking panel instead of the photos.
+ * @param {React.ReactNode} banner A strip above the photos, for context the
+ *   surface that opened this knows and the listing doesn't ("3 of 23 homes we
+ *   shortlisted for you").
+ */
+export default function PropertyModal({
+  property, onClose, listings = [], onSelectListing, onSavedChange, onVisitBooked, onExploreMore,
+  initialShowVisitForm = false, banner = null, manageHistory = true,
+}) {
   const { user } = useAuth();
   const { openLogin } = useLoginModal();
   const [visitForm, setVisitForm] = useState({ time: "", timeISO: "" });
@@ -279,6 +290,13 @@ export default function PropertyModal({ property, onClose, listings = [], onSele
     return () => window.removeEventListener("resize", onResize);
   }, []);
 
+  /** How much room the app's own bottom nav needs, if this page has one. */
+  const [bottomInset, setBottomInset] = useState(0);
+  useEffect(() => {
+    const bar = document.querySelector(".mzn-bottombar");
+    setBottomInset(bar ? Math.round(bar.getBoundingClientRect().height) : 0);
+  }, [isMobile]);
+
   const [isSaved, setIsSaved] = useState(false);
   const [shareText, setShareText] = useState("↗ Share");
   const [activeMediaIndex, setActiveMediaIndex] = useState(0);
@@ -354,8 +372,11 @@ export default function PropertyModal({ property, onClose, listings = [], onSele
   useEffect(() => {
     if (!property?.id) return;
     setActiveMediaIndex(0);
+    // Opened on the booking panel? Then this would scroll away from the very
+    // thing they asked for, and its smooth animation would win the race.
+    if (initialShowVisitForm) return;
     scrollRef.current?.scrollTo({ top: 0, behavior: "smooth" });
-  }, [property?.id]);
+  }, [property?.id, initialShowVisitForm]);
 
   useEffect(() => {
     if (!property?.id) return;
@@ -370,6 +391,42 @@ export default function PropertyModal({ property, onClose, listings = [], onSele
       { excludeId: property.id, limit: 4, maxKm: 35 }
     );
   }, [property?.id, property?.lat, property?.lng, listings]);
+
+  /**
+   * Opened by a "Schedule a Visit" button, not by tapping the card. Three call
+   * sites passed this prop and nothing here read it, so every one of them
+   * landed the renter on the photo gallery and left them to find the booking
+   * panel themselves. The frame's wait is for the panel to exist to scroll to.
+   */
+  useEffect(() => {
+    if (!initialShowVisitForm || !property?.id) return undefined;
+    // Twice, a beat apart: the photos above the panel load at their own pace and
+    // move it while they do, so the first scroll lands short on a slow
+    // connection and the second one corrects it. Instant, not smooth — the
+    // card's own entrance animation is still running, and it cancels a smooth
+    // scroll mid-flight, which left the renter on the photos after all.
+    const timers = [160, 520].map((ms) =>
+      setTimeout(() => {
+        document.getElementById("book")?.scrollIntoView({ block: "center" });
+      }, ms),
+    );
+    return () => timers.forEach(clearTimeout);
+  }, [initialShowVisitForm, property?.id]);
+
+  /**
+   * Back closes the property, not the page.
+   *
+   * This view is an overlay owned by whatever opened it — the swipe deck, the
+   * curated shortlist, a profile card — none of which are routes. Without a
+   * history entry of its own, pressing back (or swiping right on a phone) threw
+   * the whole page away: someone three cards into their matches who opened one
+   * and pressed back landed on the homepage with their place in the deck gone.
+   *
+   * A surface that already gives the property a route of its own — /property/:id,
+   * or the map's ?listingId= — passes manageHistory={false}: there, routing does
+   * this job and a second entry would only cost a wasted back press.
+   */
+  useBackClose(manageHistory, onClose, "property");
 
   const brokerCallLine = String(resolvedBrokerPhone || property?.contact || "").trim();
   const brokerWhatsAppUrl = useMemo(() => {
@@ -642,8 +699,13 @@ export default function PropertyModal({ property, onClose, listings = [], onSele
           position: "fixed", top: 0, left: 0, right: 0,
           // The app's own bottom bar is fixed at z-index 190; stopping short of
           // it keeps that nav visible and working rather than covering it and
-          // drawing a fake one.
-          bottom: isMobile ? "calc(62px + env(safe-area-inset-bottom, 0px))" : 0,
+          // drawing a fake one. Measured rather than assumed — the swipe deck,
+          // the curated shortlist and /property/:id have no bottom bar, and a
+          // fixed 62px gap there was a strip of the page behind showing through
+          // under the booking button.
+          bottom: bottomInset
+            ? `calc(${bottomInset}px + env(safe-area-inset-bottom, 0px))`
+            : 0,
           zIndex: 99999, background: "rgba(4, 33, 29, 0.94)",
           display: "flex", justifyContent: "center", alignItems: "center", padding: isMobile ? "8px" : "20px"
         }}
@@ -742,6 +804,8 @@ export default function PropertyModal({ property, onClose, listings = [], onSele
               </button>
             </div>
           </div>
+
+          {banner}
 
           {offMarket ? (
             <div

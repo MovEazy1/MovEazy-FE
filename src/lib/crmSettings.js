@@ -18,6 +18,17 @@ export const DEFAULT_TEMPLATES = [
       "Want me to book visits this weekend?",
   },
   {
+    id: "share_curated",
+    name: "Share the curated shortlist",
+    body:
+      "Hi {{client_name}}, this is {{agent_name}} from MovEazy \u{1F44B}\n\n" +
+      "I've gone through what's available in {{localities}} around {{budget}} and " +
+      "shortlisted {{match_count}} homes for you. They're all in one place here:\n\n" +
+      "{{curated_link}}\n\n" +
+      "Swipe through them \u2014 tap \u2665 on the ones you like, X on the ones you don't, " +
+      "and book a visit right there for any that look right. I'll see what you pick.",
+  },
+  {
     id: "send_property",
     name: "Send one property",
     body:
@@ -66,6 +77,7 @@ export const DEFAULT_CLOSED_OUTSIDE_REASONS = [
 
 export const TEMPLATE_VARIABLES = [
   "client_name", "agent_name", "localities", "budget", "match_count", "match_list",
+  "curated_link",
   "property_id", "property_title", "flat_type", "rent", "area", "link", "visit_time",
 ];
 
@@ -78,7 +90,9 @@ export const DEFAULT_CRM_SETTINGS = {
 /** Templates a feature sends by id — these have to exist or a button does
  *  nothing. Anything else in DEFAULT_TEMPLATES is a starting point the team is
  *  free to delete. */
-const REQUIRED_TEMPLATE_IDS = ["send_property", "visit_reminder", "visit_confirmation"];
+const REQUIRED_TEMPLATE_IDS = [
+  "share_curated", "send_property", "visit_reminder", "visit_confirmation",
+];
 
 function normalize(data) {
   const saved = Array.isArray(data?.templates) && data.templates.length
@@ -147,7 +161,7 @@ const inr = (n) =>
  *
  * Everything shared points at `/p/:id` — a tiny server-rendered page carrying
  * that property's own Open Graph tags, so WhatsApp previews the flat instead of
- * our logo. It forwards on to /map?listingId=…, token included, so the landing
+ * our logo. It forwards on to /property/:id, token included, so the landing
  * behaviour is unchanged.
  *
  * Every link is attributed, because a link that escapes without parameters is
@@ -183,7 +197,7 @@ export function propertyLink(propertyId, options = {}) {
 /**
  * Where a share came from. Named rather than spelled out at each call site, so
  * a new share button can't invent its own vocabulary — or forget to attribute
- * itself, which is how a bare /map?listingId= link reached a customer.
+ * itself, which is how a bare untracked link once reached a customer.
  */
 export const SHARE_SOURCES = {
   /** An agent sending a flat from a client's record. */
@@ -309,7 +323,7 @@ export function generateShareToken() {
  */
 export function buildTemplateVars({
   client, requirement, agentName, property, matches = [], visitTime = "",
-  shareToken = "", shareTokens = {},
+  shareToken = "", shareTokens = {}, curatedLink = "",
 } = {}) {
   const budget =
     requirement?.budget_min || requirement?.budget_max
@@ -331,6 +345,9 @@ export function buildTemplateVars({
         return id ? `${head}\n${propertyLink(id, shareTokens[id] || "")}` : head;
       })
       .join("\n\n"),
+    // The whole shortlist behind one link. Twenty-three links in one message is
+    // a message nobody opens; this is the same set as one place to go.
+    curated_link: curatedLink,
     property_id: property?.property_id ?? "",
     property_title: property?.title || property?.area || "",
     flat_type: property?.flat_type ?? "",
