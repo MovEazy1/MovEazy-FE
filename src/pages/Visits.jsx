@@ -3,12 +3,84 @@ import { useNavigate, useLocation } from "react-router-dom";
 import MovEazyNav from "../components/layout/MovEazyNav";
 import { useAuth } from "../context/AuthContext";
 import { useVisitCart } from "../context/VisitCartContext";
-import { fetchOpenVisitsFor, fetchBookings, bookIndividual, bookCombined, cancelBooking } from "../lib/visits";
+import {
+  fetchOpenVisitsFor, fetchBookings, bookIndividual, bookCombined, cancelBooking, requestNextAvailableVisit,
+} from "../lib/visits";
 
 const fmtINR = (n) => `₹${Number(n || 0).toLocaleString("en-IN")}`;
 const COMBINED_FEE = 1000;
 const fmtSlot = (iso) =>
   iso ? new Date(iso).toLocaleString("en-IN", { weekday: "short", day: "numeric", month: "short", hour: "numeric", minute: "2-digit", hour12: true }) : "";
+
+/** Viewing hours a lister would plausibly agree to. Same set PropertyModal offers. */
+const SUGGEST_HOURS = [9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19];
+const hourLabel = (h) => {
+  const period = h >= 12 ? "PM" : "AM";
+  const twelve = h % 12 === 0 ? 12 : h % 12;
+  return `${twelve}:00 ${period}`;
+};
+
+/**
+ * Pick a day, then a time on that day — for a home with no published slots
+ * to choose from. Same two-step shape as PropertyModal's own "Suggest Date &
+ * Time", kept as its own small copy here rather than shared: that one lives
+ * inside a full-screen form, this one inside a compact card row, and the
+ * two are unlikely to drift apart since both just report a day+hour upward.
+ */
+function ProposeTime({ onPick }) {
+  const [day, setDay] = useState(null);
+
+  const days = useMemo(() => {
+    const out = [];
+    const base = new Date();
+    for (let i = 0; i < 7; i++) {
+      const d = new Date(base);
+      d.setDate(base.getDate() + i);
+      d.setHours(0, 0, 0, 0);
+      out.push(d);
+    }
+    return out;
+  }, []);
+
+  const dayLabel = (d, i) => {
+    if (i === 0) return "Today";
+    if (i === 1) return "Tomorrow";
+    return d.toLocaleDateString("en-IN", { weekday: "short", day: "numeric", month: "short" });
+  };
+
+  const choose = (d, hour) => {
+    const picked = new Date(d);
+    picked.setHours(hour, 0, 0, 0);
+    onPick(picked.toISOString());
+  };
+
+  return (
+    <div className="vz-propose">
+      {!day ? (
+        <div className="vz-chiprow">
+          {days.map((d, i) => (
+            <button key={d.toISOString()} type="button" className="vz-chip" onClick={() => setDay(d)}>
+              {dayLabel(d, i)}
+            </button>
+          ))}
+        </div>
+      ) : (
+        <>
+          <div className="vz-chiprow">
+            {SUGGEST_HOURS.map((h) => (
+              <button key={h} type="button" className="vz-chip" onClick={() => choose(day, h)}>
+                {hourLabel(h)}
+              </button>
+            ))}
+          </div>
+          <button type="button" className="vz-link" style={{ marginTop: 4 }} onClick={() => setDay(null)}>
+            ← Back to days
+          </button>
+        </>
+      )}
+    </div>
+  );
+}
 
 export default function Visits() {
   const navigate = useNavigate();
@@ -28,6 +100,7 @@ export default function Visits() {
   const [combinedOpen, setCombinedOpen] = useState(false);
   const [combinedSlot, setCombinedSlot] = useState("");
   const [busy, setBusy] = useState("");
+  const [proposing, setProposing] = useState("");   // property_id whose "suggest a time" picker is open
 
   const propertyIds = useMemo(() => cart.items.map((i) => i.property_id), [cart.items]);
 
@@ -81,6 +154,25 @@ export default function Visits() {
     try { await bookIndividual(user.uid, pid, slot); await reload(); } finally { setBusy(""); }
   };
 
+  /**
+   * For a home with no published slots: register interest with no time
+   * attached. The lister is told someone wants to view and still needs to
+   * offer a time — same "preference" row requestSlot below writes with one.
+   */
+  const requestAnyTime = async (pid) => {
+    setBusy(pid);
+    try { await requestNextAvailableVisit(user.uid, pid); await reload(); } finally { setBusy(""); }
+  };
+
+  const requestSlot = async (pid, iso) => {
+    setBusy(pid);
+    try {
+      await requestNextAvailableVisit(user.uid, pid, iso);
+      setProposing("");
+      await reload();
+    } finally { setBusy(""); }
+  };
+
   const confirmCombined = async () => {
     if (!combinedSlot || !toSchedule.length) return;
     setBusy("combined");
@@ -116,6 +208,12 @@ export default function Visits() {
         .vz-btn:disabled { opacity: .5; cursor: default; }
         .vz-btn-ghost { background: #fff; color: #4a443d; border: 1px solid #e2dccf; }
         .vz-when { display: inline-flex; align-items: center; gap: 7px; font-size: 13.5px; font-weight: 700; color: #16a34a; margin-top: 8px; }
+        .vz-when.vz-pending { color: #b98d2f; }
+        .vz-noslots { font-size: 12px; color: #7a7267; margin: 8px 0 0; }
+        .vz-propose { margin-top: 8px; }
+        .vz-chiprow { display: flex; gap: 6px; flex-wrap: wrap; max-height: 110px; overflow-y: auto; }
+        .vz-chip { padding: 7px 11px; border-radius: 999px; font-size: 12px; font-weight: 700; cursor: pointer; white-space: nowrap; background: #fff; border: 1.5px solid #e2dccf; color: #4a443d; }
+        .vz-chip:hover { border-color: #1c1a17; }
         .vz-kind { font-size: 11px; font-weight: 800; text-transform: uppercase; letter-spacing: .04em; color: #b98d2f; }
         .vz-rent { font-size: 14px; font-weight: 800; }
         .vz-link { background: none; border: none; color: #b0392b; font: 600 12.5px 'Plus Jakarta Sans',sans-serif; cursor: pointer; padding: 4px; }
@@ -198,15 +296,32 @@ export default function Visits() {
                   <div>
                     <div className="vz-name">{it.title}</div>
                     <div className="vz-meta">{[it.flat_type, it.area].filter(Boolean).join(" · ")} · <span className="vz-rent">{fmtINR(it.rent)}/mo</span></div>
-                    <div className="vz-row">
-                      <select className="vz-select" value={chosen[it.property_id] || ""} onChange={(e) => setChosen((c) => ({ ...c, [it.property_id]: e.target.value }))}>
-                        <option value="">{options.length ? "Pick a visit slot…" : "No slots published yet"}</option>
-                        {options.map((s) => <option key={s.id} value={s.slot_at}>{fmtSlot(s.slot_at)}</option>)}
-                      </select>
-                      <button type="button" className="vz-btn" disabled={!chosen[it.property_id] || busy === it.property_id} onClick={() => confirmIndividual(it.property_id)}>
-                        {busy === it.property_id ? "Booking…" : "Book slot"}
-                      </button>
-                    </div>
+                    {options.length > 0 ? (
+                      <div className="vz-row">
+                        <select className="vz-select" value={chosen[it.property_id] || ""} onChange={(e) => setChosen((c) => ({ ...c, [it.property_id]: e.target.value }))}>
+                          <option value="">Pick a visit slot…</option>
+                          {options.map((s) => <option key={s.id} value={s.slot_at}>{fmtSlot(s.slot_at)}</option>)}
+                        </select>
+                        <button type="button" className="vz-btn" disabled={!chosen[it.property_id] || busy === it.property_id} onClick={() => confirmIndividual(it.property_id)}>
+                          {busy === it.property_id ? "Booking…" : "Book slot"}
+                        </button>
+                      </div>
+                    ) : (
+                      <>
+                        <p className="vz-noslots">No slots published yet — propose a time and we'll confirm it with them.</p>
+                        <div className="vz-row">
+                          <button type="button" className="vz-btn" disabled={busy === it.property_id} onClick={() => requestAnyTime(it.property_id)}>
+                            {busy === it.property_id ? "Sending…" : "Request a visit"}
+                          </button>
+                          <button type="button" className="vz-link" onClick={() => setProposing((p) => (p === it.property_id ? "" : it.property_id))}>
+                            {proposing === it.property_id ? "Cancel" : "Or suggest a time →"}
+                          </button>
+                        </div>
+                        {proposing === it.property_id && (
+                          <ProposeTime onPick={(iso) => requestSlot(it.property_id, iso)} />
+                        )}
+                      </>
+                    )}
                     <button type="button" className="vz-link" onClick={() => removeItem(it.property_id)}>Remove</button>
                   </div>
                 </div>
@@ -224,19 +339,33 @@ export default function Visits() {
             </div>
             {scheduled.map((it) => {
               const b = bookingByPid[it.property_id];
+              // A preference row has no confirmed slot — either no time was
+              // given ("request a visit") or one was suggested but the lister
+              // hasn't locked it in yet. Either way, it isn't "scheduled" and
+              // shouldn't read as if it were.
+              const pending = b.status === "preference";
               return (
                 <div className="vz-card" key={it.property_id}>
                   <div className="vz-thumb">{it.cover && <img src={it.cover} alt="" onError={(e) => (e.currentTarget.style.display = "none")} />}</div>
                   <div>
                     <div className="vz-name">{it.title}</div>
                     <div className="vz-meta">{[it.flat_type, it.area].filter(Boolean).join(" · ")} · <span className="vz-rent">{fmtINR(it.rent)}/mo</span></div>
-                    <div className="vz-when">
-                      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M20 6 9 17l-5-5"/></svg>
-                      Visit {fmtSlot(b.slot_at)}
-                      &nbsp;<span className="vz-kind">{b.kind === "combined" ? `· Combined tour (${fmtINR(COMBINED_FEE)})` : ""}</span>
-                    </div>
+                    {pending ? (
+                      <div className="vz-when vz-pending">
+                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 3"/></svg>
+                        {b.slot_at ? `Proposed ${fmtSlot(b.slot_at)} — waiting to be confirmed` : "Requested — waiting on a time from the lister"}
+                      </div>
+                    ) : (
+                      <div className="vz-when">
+                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M20 6 9 17l-5-5"/></svg>
+                        Visit {fmtSlot(b.slot_at)}
+                        &nbsp;<span className="vz-kind">{b.kind === "combined" ? `· Combined tour (${fmtINR(COMBINED_FEE)})` : ""}</span>
+                      </div>
+                    )}
                     <div className="vz-row">
-                      <button type="button" className="vz-btn vz-btn-ghost" onClick={() => unschedule(it.property_id)}>Reschedule</button>
+                      <button type="button" className="vz-btn vz-btn-ghost" onClick={() => unschedule(it.property_id)}>
+                        {pending ? "Cancel request" : "Reschedule"}
+                      </button>
                       <button type="button" className="vz-link" onClick={() => removeItem(it.property_id)}>Remove</button>
                     </div>
                   </div>
