@@ -207,23 +207,19 @@ export default function CuratedProperties() {
     : "Your shortlist";
   const firstName = String(share?.clientName || "").split(/\s+/)[0];
 
-  const requestMoreUrl = useMemo(() => {
-    // The shared support line already public on the Contact page — never an
-    // individual consultant's personal number, so this can never end up
-    // paging one specific person's phone just because they happened to be
-    // first in a list somewhere.
-    const base = "https://wa.me/919608986517";
-    const who = firstName ? ` for ${firstName}` : "";
-    const text = liked.length
-      ? `Hi MovEazy, please share some more flat options${who}.`
-      : `Hi MovEazy, I don't like the options you've shared${who} — please share some more crazy options.`;
-    return `${base}?text=${encodeURIComponent(text)}`;
-  }, [liked.length, firstName]);
-
+  /**
+   * Deliberately does NOT open WhatsApp right now. It used to send to a
+   * hardcoded number pulled from code without confirming whose phone it
+   * actually was — that turned out to be a real person's personal line once
+   * already. Until there's a verified, intended number for this, the request
+   * only reaches the CRM (persistRequestedMoreFlats below, surfaced on the
+   * client's record as "Asked for more homes"), which is exactly the "the
+   * CRM should be notified" requirement this button exists for.
+   */
   const handleRequestMore = useCallback(() => {
-    window.open(requestMoreUrl, "_blank", "noopener");
+    flash("We've let your agent know");
     if (user?.uid) void persistRequestedMoreFlats(user.uid);
-  }, [requestMoreUrl, user?.uid]);
+  }, [user?.uid, flash]);
 
   return (
     <div style={{ minHeight: "100dvh", background: "#fff" }}>
