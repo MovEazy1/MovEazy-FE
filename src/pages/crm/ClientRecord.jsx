@@ -17,7 +17,7 @@ import { buildTemplateVars, renderTemplate, whatsappUrl } from "../../lib/crmSet
 import { CURATED_STATUS_LABEL } from "../../lib/curatedShares";
 import { formatDuration } from "../../lib/sessionSync";
 import { SCOPES } from "../../lib/adminScopes";
-import { Btn, C, Chip, Empty, TempDot, inr, relTime } from "./crmUi";
+import { Btn, C, Chip, Empty, TempDot, deadlineLabel, inr, relTime } from "./crmUi";
 
 /* ── Small pieces ─────────────────────────────────────────────────────────── */
 
@@ -244,6 +244,14 @@ function WhatTheyToldUs({ ownAnswers }) {
           </li>
         ))}
       </ul>
+      {(() => {
+        const deadline = deadlineLabel(notes);
+        return deadline ? (
+          <p style={{ margin: 0, fontSize: 11.5, fontWeight: 700, color: deadline.startsWith("overdue") ? C.coral : C.gold, lineHeight: 1.5 }}>
+            Shortlist {deadline}
+          </p>
+        ) : null;
+      })()}
       {notes.requestedMoreFlatsAt && (
         <p style={{ margin: 0, fontSize: 11.5, fontWeight: 700, color: C.gold, lineHeight: 1.5 }}>
           Asked for more homes {relTime(notes.requestedMoreFlatsAt)}

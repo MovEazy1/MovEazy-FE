@@ -37,6 +37,7 @@ export const tempLabel = (id) => TEMPERATURES.find((t) => t.id === id)?.label ??
 
 export const SORTS = [
   { id: "move_in",   label: "Earliest move-in" },
+  { id: "deadline",  label: "Shortlist due soonest" },
   { id: "time",      label: "Most time on site" },
   { id: "opens",     label: "Most opens" },
   { id: "last_seen", label: "Last seen" },
@@ -103,7 +104,7 @@ export const fetchShortlists = () =>
   safeSelect(
     "crm_shortlists",
     "id,client_id,property_id,status,score_at_share,shared_by,shared_at,created_at,"
-      + "share_token,opened_at,last_opened_at,open_count",
+      + "share_token,opened_at,last_opened_at,open_count,curated_share_id,reacted_at",
     (q) => q.order("created_at", { ascending: false }).limit(6000),
   );
 

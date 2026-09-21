@@ -253,3 +253,29 @@ export const relTime = (d) => {
   if (days < 31) return `${days}d ago`;
   return shortDate(d);
 };
+
+/** The account-level "our team is curating your shortlist" countdown — set
+ *  the first time a client reaches the relax screen (TopMatches.jsx), never
+ *  after. Someone with no deadline yet sorts to the very end rather than
+ *  looking most urgent. */
+export function deadlineTs(notes) {
+  const v = notes?.shortlistDeadline;
+  if (!v) return Number.POSITIVE_INFINITY;
+  // new Date(...) (not Date.parse) so this reads both the ISO string every
+  // deadline is written as now, and the raw epoch-ms number a few accounts
+  // still carry from before that convention — Date.parse stringifies a
+  // number first and fails to parse the result.
+  const t = new Date(v).getTime();
+  return Number.isNaN(t) ? Number.POSITIVE_INFINITY : t;
+}
+
+/** How the countdown reads on the client list and record pane — soonest
+ *  first, overdue called out rather than just counting past zero. */
+export function deadlineLabel(notes) {
+  const ts = deadlineTs(notes);
+  if (!Number.isFinite(ts)) return "";
+  const ms = ts - Date.now();
+  const mins = Math.round(Math.abs(ms) / 60000);
+  const val = mins < 60 ? `${mins}m` : `${Math.round(mins / 60)}h`;
+  return ms <= 0 ? `overdue ${val}` : `due in ${val}`;
+}

@@ -18,7 +18,7 @@ import { formatDuration } from "../../lib/sessionSync";
 import { SCOPES } from "../../lib/adminScopes";
 import { fetchNotifications, markNotificationRead } from "../../lib/crmPayments";
 import { buildTemplateCsv, downloadCsv, parseCsv, planImport, runImport } from "../../lib/crmImport";
-import { Btn, C, Chip, Empty, TempDot, Toast, shortDate } from "./crmUi";
+import { Btn, C, Chip, Empty, TempDot, Toast, deadlineLabel, deadlineTs, shortDate } from "./crmUi";
 
 const EMPTY_REQ = {
   localities: [], budget_min: null, budget_max: null, flat_types: [], furnishing: "",
@@ -262,6 +262,8 @@ export default function CrmClientsPage() {
     const sorted = [...rows];
     sorted.sort((a, b) => {
       switch (sort) {
+        case "deadline":
+          return deadlineTs(ownAnswersByUser.get(a.user_id)?.notes) - deadlineTs(ownAnswersByUser.get(b.user_id)?.notes);
         case "time":
           return (eng(b)?.total_seconds ?? 0) - (eng(a)?.total_seconds ?? 0);
         case "opens":
@@ -279,7 +281,7 @@ export default function CrmClientsPage() {
       }
     });
     return sorted;
-  }, [clients, q, statusFilter, tempFilter, mineOnly, sort, reqByClient, engByUser, lastTouchByClient, actorEmail]);
+  }, [clients, q, statusFilter, tempFilter, mineOnly, sort, reqByClient, engByUser, lastTouchByClient, actorEmail, ownAnswersByUser]);
 
   const selected = useMemo(
     () => clients.find((c) => c.id === selectedId) ?? visible[0] ?? null,
@@ -445,6 +447,7 @@ export default function CrmClientsPage() {
         {visible.map((c) => {
           const e = engByUser.get(c.user_id);
           const req = reqByClient.get(c.id);
+          const deadline = deadlineLabel(ownAnswersByUser.get(c.user_id)?.notes);
           return (
             <button key={c.id} type="button" onClick={() => select(c.id)}
               className={c.id === selected?.id ? "crm-lead crm-lead--on" : "crm-lead"}>
@@ -469,6 +472,14 @@ export default function CrmClientsPage() {
                 {c.status === "dnp" && c.dnp_count > 0 ? ` ×${c.dnp_count}` : ""}
                 {e ? ` · ${e.session_count} opens · ${formatDuration(e.total_seconds)}` : ""}
               </span>
+              {deadline && (
+                <span
+                  className="crm-num"
+                  style={{ fontSize: 10.5, fontWeight: 700, color: deadline.startsWith("overdue") ? C.coral : C.gold }}
+                >
+                  Shortlist {deadline}
+                </span>
+              )}
             </button>
           );
         })}

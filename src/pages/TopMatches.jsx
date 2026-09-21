@@ -1,10 +1,16 @@
 /**
  * Step 2 + 3 of the find-a-flat flow: right after the preference wizard
  * (AIBroker) or for a returning user with saved prefs, show the 5
- * best-matched homes as single swipeable cards, then a "sit back and relax"
- * interstitial before handing off to the full map. A focused, full-screen
- * session rather than the usual site chrome — closer to the reference flow
- * than a marketing page with a nav bar bolted on top.
+ * best-matched homes as single swipeable cards, then "sit back and relax"
+ * with a live countdown to when the team's curated shortlist lands.
+ *
+ * That interstitial used to be a pause before handing off to the full map.
+ * There is no map now, and that is the point: the five homes are what we have
+ * on hand, and everything after them is our model searching every portal there
+ * is and our team sending back a shortlist. The countdown is the promise we
+ * made them made visible — and the moment a shortlist actually exists, this
+ * screen hands straight over to it rather than making them notice and tap
+ * through on their own.
  */
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
@@ -14,15 +20,20 @@ import SwipeDeck from "../components/SwipeDeck";
 import Toast from "../components/Toast";
 import { useAuth } from "../context/AuthContext";
 import { fetchAllListings } from "../lib/listingsFeed";
-import { matchRequirementToListings, normalizeRequirement } from "../lib/inventoryMatch";
+import { listingForScoring, normalizeRequirement, scoreMatch } from "../lib/inventoryMatch";
 import { fetchUserRequirement, markMatchesSeen, persistShortlistDeadline, rowToPrefs } from "../lib/userRequirements";
 import { toggleSavedListing } from "../lib/userActivity";
 import { logSavedListingChange } from "../lib/crmSync";
 import { setReaction } from "../lib/visits";
+import { fetchMyCuratedProperties } from "../lib/curatedShares";
 
 const TOP_N = 5;
 const T = { ink: "#04211D", teal: "#0E7C68", gold: "#E8A33D", text: "#171412", textDim: "#5c554e" };
 const SHORTLIST_WINDOW_MS = 6 * 60 * 60 * 1000;
+// While waiting with nothing sent yet, check back for a curated list without
+// asking someone to reload — infrequent enough that a whole afternoon left on
+// this tab costs a handful of reads, not a background job.
+const CURATED_POLL_MS = 45 * 1000;
 
 function formatCountdown(ms) {
   const total = Math.max(0, Math.floor(ms / 1000));
@@ -106,16 +117,15 @@ export default function TopMatches() {
   const [prefsChecked, setPrefsChecked] = useState(!!location.state?.prefs);
   const [listings, setListings] = useState([]);
   const [listingsLoading, setListingsLoading] = useState(true);
-  // A returning visitor whose account already has matches_seen (raw DB rows
-  // carry that column straight through from ForkHome) skips the swipe deck
-  // entirely and lands on the relax/timer screen — "Find My Flat" shouldn't
-  // hand them the same five cards, or the questionnaire, a second time.
-  const [phase, setPhase] = useState(location.state?.prefs?.matches_seen ? "relax" : "swiping"); // swiping | relax
-  const [seenIds, setSeenIds] = useState([]);
+  const [phase, setPhase] = useState("swiping"); // swiping | relax
   const [viewing, setViewing] = useState(null); // { listing, openVisitForm }
   const [visitToast, setVisitToast] = useState("");
   const [advanceOn, setAdvanceOn] = useState(null);
   const [likedListings, setLikedListings] = useState([]);
+  // A shortlist the team has already sent. The moment this is > 0 we hand
+  // straight over to /curated — the count itself is never shown, it only
+  // ever gates the redirect.
+  const [curatedCount, setCuratedCount] = useState(0);
   const visitToastTimer = useRef(null);
   // The deadline the countdown counts down to. Deliberately NOT derived from
   // `prefs` — prefs can arrive as a snapshot handed over in router state
@@ -137,11 +147,11 @@ export default function TopMatches() {
       if (!alive) return;
       const existing = row?.notes?.shortlistDeadline;
       if (existing) {
-        setShortlistDeadline(existing);
+        setShortlistDeadline(new Date(existing).getTime());
       } else {
         const deadline = Date.now() + SHORTLIST_WINDOW_MS;
         setShortlistDeadline(deadline);
-        void persistShortlistDeadline(user.uid, row?.notes, deadline);
+        void persistShortlistDeadline(user.uid, row?.notes, new Date(deadline).toISOString());
       }
     })();
     return () => { alive = false; };
@@ -156,6 +166,9 @@ export default function TopMatches() {
       .then((row) => {
         if (!alive || !row) return;
         setPrefs(rowToPrefs(row));
+        // They have swiped these five before. Showing them the same five again
+        // is a worse answer than the true one: we are still looking, and the
+        // shortlist lands when it lands.
         if (row.matches_seen) setPhase("relax");
       })
       .finally(() => { if (alive) setPrefsChecked(true); });
@@ -164,11 +177,33 @@ export default function TopMatches() {
 
   // This is the one-time screen — mark it seen as soon as it's actually
   // shown, so a returning visit (even one that never finishes swiping)
-  // lands on the map next time instead of back here.
+  // lands on the relax screen next time instead of back here.
   useEffect(() => {
     if (!prefs || !user?.uid) return;
     void markMatchesSeen(user.uid);
   }, [prefs, user?.uid]);
+
+  // Check for a curated shortlist once on mount, then keep checking on a slow
+  // poll for as long as we're sitting on the relax screen with nothing sent
+  // yet — an agent can send one at any moment while this tab is still open.
+  // The instant one shows up, hand over to it; nothing here ever renders the
+  // count itself.
+  useEffect(() => {
+    if (!user?.uid) { setCuratedCount(0); return undefined; }
+    let alive = true;
+    const check = () =>
+      fetchMyCuratedProperties()
+        .then((res) => { if (alive) setCuratedCount(res?.propertyIds?.length || 0); })
+        .catch(() => {});
+    check();
+    if (phase !== "relax") return () => { alive = false; };
+    const id = setInterval(check, CURATED_POLL_MS);
+    return () => { alive = false; clearInterval(id); };
+  }, [user?.uid, phase]);
+
+  useEffect(() => {
+    if (curatedCount > 0) navigate("/curated", { replace: true });
+  }, [curatedCount, navigate]);
 
   useEffect(() => {
     let alive = true;
@@ -178,17 +213,30 @@ export default function TopMatches() {
     return () => { alive = false; };
   }, []);
 
+  /**
+   * The five, actually ranked.
+   *
+   * fetchAllListings returns the display shape — location, monthlyRent, bhk —
+   * and scoreMatch reads the inventory column names — area, rent, flat_type.
+   * Handing it the display shape scored every home 0 on every axis, so "your
+   * top 5 matches" was really "five homes, in whatever order they came back",
+   * and a deal-breaker never blocked anything. listingForScoring is the bridge
+   * that exists for exactly this; the map has always used it.
+   */
   const topMatches = useMemo(() => {
     if (!prefs || !listings.length) return [];
-    const ranked = matchRequirementToListings(normalizeRequirement(prefs), listings, { min: 0 });
-    return ranked.slice(0, TOP_N).map((r) => ({ ...r.listing, matchScore: r.score, matchReasons: r.reasons }));
+    const req = normalizeRequirement(prefs);
+    return listings
+      .map((listing) => ({ listing, ...scoreMatch(listingForScoring(listing), req) }))
+      .filter((m) => m.blockers.length === 0)
+      .sort((a, b) => b.score - a.score)
+      .slice(0, TOP_N)
+      .map((r) => ({ ...r.listing, matchScore: r.score, matchReasons: r.reasons }));
   }, [prefs, listings]);
 
-  const recordSeen = (listing) => setSeenIds((ids) => (ids.includes(listing.id) ? ids : [...ids, listing.id]));
-
   // `prefs` is either AIBroker's camelCase shape or a raw user_requirements
-  // row (ForkHome hands that over as-is for a returning visitor) — read both
-  // so a WhatsApp message doesn't come out blank depending on entry point.
+  // row (a returning visitor's saved answers) — read both so a WhatsApp
+  // message doesn't come out blank depending on entry point.
   const describePrefs = () => {
     const rupee = (n) => `₹${Number(n || 0).toLocaleString("en-IN")}`;
     const flatTypes = prefs?.flatTypes?.length ? prefs.flatTypes : prefs?.flat_types;
@@ -222,7 +270,6 @@ export default function TopMatches() {
   const onVisitBooked = useCallback((message, listing) => {
     setVisitToast(message);
     setAdvanceOn({ id: listing.id, ts: Date.now() });
-    recordSeen(listing);
     setLikedListings((ls) => (ls.some((x) => x.id === listing.id) ? ls : [...ls, listing]));
     clearTimeout(visitToastTimer.current);
     visitToastTimer.current = setTimeout(() => setVisitToast(""), 2800);
@@ -264,12 +311,10 @@ export default function TopMatches() {
                 const now = toggleSavedListing(user, l.id, l.title);
                 void logSavedListingChange(user, l.id, now, l.title);
                 void setReaction(user?.uid, l.id, "like", null);
-                recordSeen(l);
                 setLikedListings((ls) => (ls.some((x) => x.id === l.id) ? ls : [...ls, l]));
               }}
               onSwipeLeft={(l) => {
                 void setReaction(user?.uid, l.id, "dislike", null);
-                recordSeen(l);
               }}
               onOpenDetails={(l) => setViewing({ listing: l, openVisitForm: false })}
               onScheduleVisit={(l) => setViewing({ listing: l, openVisitForm: true })}
@@ -279,8 +324,10 @@ export default function TopMatches() {
           </>
         ) : (
           // "Sit back and relax" — also the landing spot when no listing
-          // cleared the match bar at all, so the flow never dead-ends.
-          <div style={{ textAlign: "center", padding: "56px 16px 24px" }}>
+          // cleared the match bar at all, so the flow never dead-ends. If a
+          // curated shortlist already exists this is only ever on screen for
+          // the instant before the redirect effect above fires.
+          <div style={{ textAlign: "center", padding: "48px 16px 24px" }}>
             <h1 style={{ fontWeight: 800, fontSize: 32, lineHeight: 1.15, margin: "0 0 14px", color: T.text }}>
               Sit back and relax
             </h1>
@@ -288,12 +335,12 @@ export default function TopMatches() {
               while our team is figuring out the
             </p>
             <p style={{ color: T.teal, fontWeight: 800, fontSize: 17, margin: "0 0 20px" }}>
-              Best flat for you.
+              best flat for you.
             </p>
             {countdownMs !== null && countdownMs <= 0 ? (
               <div style={{ display: "inline-flex", flexDirection: "column", alignItems: "center", gap: 10, background: "#FCF3E8", border: "1px solid #E8A33D55", borderRadius: 16, padding: "16px 22px", margin: "0 0 32px", maxWidth: 340 }}>
                 <p style={{ color: T.text, fontSize: 14, lineHeight: 1.5, margin: 0 }}>
-                  Due to High Demand our 2 Member team is super occupied currently.
+                  Due to high demand our team is a little behind right now.
                 </p>
                 <button
                   type="button"
@@ -306,14 +353,14 @@ export default function TopMatches() {
             ) : (
               <div style={{ display: "inline-flex", flexDirection: "column", alignItems: "center", gap: 6, background: "#EAF6F2", border: `1px solid ${T.teal}33`, borderRadius: 16, padding: "14px 22px", margin: "0 0 32px" }}>
                 <p style={{ color: T.text, fontSize: 14, lineHeight: 1.5, margin: 0, maxWidth: 320 }}>
-                  Our team will be sharing a curated shortlist of <strong>30 flats</strong> in
+                  Our team will be sharing your curated shortlist in
                 </p>
                 <span style={{ fontVariantNumeric: "tabular-nums", fontWeight: 800, fontSize: 24, letterSpacing: "0.02em", color: T.teal }}>
                   {countdownMs === null ? "--:--:--" : formatCountdown(countdownMs)}
                 </span>
               </div>
             )}
-            <div style={{ display: "flex", justifyContent: "center", margin: "0 0 36px" }}>
+            <div style={{ display: "flex", justifyContent: "center", margin: "0 0 30px" }}>
               <RelaxCup />
             </div>
             {likedListings.length > 0 && (
@@ -330,7 +377,7 @@ export default function TopMatches() {
               onClick={goToPriorityWhatsapp}
               style={{ padding: "14px 28px", borderRadius: 999, border: "none", background: T.ink, color: "#fff", fontWeight: 700, fontSize: 14.5, cursor: "pointer" }}
             >
-              No, I&apos;m in hurry &amp; I can&apos;t Relax
+              No, I&apos;m in a hurry &amp; I can&apos;t relax
             </button>
           </div>
         )}
