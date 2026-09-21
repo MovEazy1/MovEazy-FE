@@ -80,14 +80,24 @@ export const fetchEngagement = () =>
   safeSelect("user_engagement", "user_id,session_count,total_seconds,longest_seconds,last_seen_at");
 
 /**
- * What the client typed themselves in the "Find My Flat" wizard — office
- * location and commute time — read straight from public.user_requirements
- * rather than the CRM's own requirement override, since those two answers
- * are facts about the client, not something an agent edits. One bulk read
- * for every account, same shape as fetchEngagement above.
+ * Every answer the client gave themselves in the "Find My Flat" wizard, read
+ * straight from public.user_requirements rather than the CRM's own
+ * requirement override, since these are facts about the client, not
+ * something an agent edits. One bulk read for every account, same shape as
+ * fetchEngagement above — the full row costs the same one read as a few
+ * columns did, so there's no reason to keep trimming it as more of the
+ * wizard's answers become worth showing.
  */
-export const fetchClientOwnAnswers = () =>
-  safeSelect("user_requirements", "user_id,office,notes");
+export const fetchClientOwnAnswers = () => safeSelect("user_requirements", "*");
+
+/**
+ * Every property a client has swiped on themselves — from the first five
+ * matches, a curated shortlist, or a WhatsApp link — read on demand for
+ * whichever client is open, the same way fetchActivities is scoped to one
+ * client rather than pulling every reaction on the platform.
+ */
+export const fetchClientListingReactions = (userId) =>
+  safeSelect("listing_reactions", "property_id,reaction,updated_at", (q) => q.eq("user_id", userId));
 
 export const fetchShortlists = () =>
   safeSelect(

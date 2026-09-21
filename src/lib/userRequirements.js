@@ -138,6 +138,28 @@ export async function persistShortlistDeadline(uid, currentNotes, deadline) {
   }
 }
 
+/**
+ * Flags, for the CRM, that this account asked for more homes after going
+ * through a shortlist — read into notes.requestedMoreFlatsAt so it shows up
+ * next to the rest of what the client told us without an agent having to
+ * dig through a WhatsApp thread for it. A rare, one-off tap rather than a hot
+ * path, so unlike persistShortlistDeadline this reads the row first instead
+ * of asking the caller to already have it loaded.
+ */
+export async function persistRequestedMoreFlats(uid) {
+  if (!isSupabaseConfigured || !supabase || !uid) return;
+  try {
+    const { data } = await supabase.from("user_requirements").select("notes").eq("user_id", uid).maybeSingle();
+    const notes = {
+      ...(data?.notes && typeof data.notes === "object" ? data.notes : {}),
+      requestedMoreFlatsAt: new Date().toISOString(),
+    };
+    await supabase.from("user_requirements").update({ notes }).eq("user_id", uid);
+  } catch {
+    // best-effort — see markMatchesSeen above
+  }
+}
+
 /** Every user's requirement (for the List my Flat "who does this match" step). */
 export async function fetchAllUserRequirements({ limit = 1000 } = {}) {
   if (!isSupabaseConfigured || !supabase) return [];

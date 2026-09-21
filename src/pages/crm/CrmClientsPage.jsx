@@ -522,6 +522,8 @@ export default function CrmClientsPage() {
       isOverride={Boolean(storedReq)}
       engagement={engByUser.get(selected.user_id)}
       ownAnswers={ownAnswersByUser.get(selected.user_id)}
+      shortlists={localShortlists}
+      inventory={inventory}
       settings={settings}
       access={access}
       actorEmail={actorEmail}

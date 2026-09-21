@@ -10,10 +10,11 @@ import {
   ALL_LOCALITIES, DEALBREAKERS, FLAT_TYPES, FURNISHINGS, MUST_HAVES, OCCUPANTS,
 } from "../../data/preferenceOptions";
 import {
-  STATUSES, TEMPERATURES, CLOSED_STATUSES, fetchActivities, logActivity,
+  STATUSES, TEMPERATURES, CLOSED_STATUSES, fetchActivities, fetchClientListingReactions, logActivity,
   setClientNote, setClientStatus, setClientTemperature,
 } from "../../lib/crmClients";
 import { buildTemplateVars, renderTemplate, whatsappUrl } from "../../lib/crmSettings";
+import { CURATED_STATUS_LABEL } from "../../lib/curatedShares";
 import { formatDuration } from "../../lib/sessionSync";
 import { SCOPES } from "../../lib/adminScopes";
 import { Btn, C, Chip, Empty, TempDot, inr, relTime } from "./crmUi";
@@ -195,6 +196,155 @@ function HeaderFacts({ req, ownAnswers }) {
         </div>
       ))}
     </div>
+  );
+}
+
+/**
+ * Every answer from the client's own wizard, unfiltered by whatever an agent
+ * has since overridden in the requirement above — so "she says ₹48k" and
+ * "will go to ₹52k" can both be read at once instead of one silently hiding
+ * the other. Only appears once they've actually answered something.
+ */
+function WhatTheyToldUs({ ownAnswers }) {
+  if (!ownAnswers) return null;
+  const notes = ownAnswers.notes && typeof ownAnswers.notes === "object" ? ownAnswers.notes : {};
+  const rows = [
+    ["Office", ownAnswers.office?.display || ownAnswers.office?.label || ""],
+    ["Time to office", commuteLabel(notes.commuteMinutes)],
+    ["Move in", notes.moveInDate || ""],
+    ["Age", ownAnswers.age || ""],
+    ["Areas", (ownAnswers.localities ?? []).join(", ")],
+    ["Budget", budgetLabel({ budget_min: ownAnswers.budget_min, budget_max: ownAnswers.budget_max })],
+    ["Willing to stretch", ownAnswers.stretch ? "Yes" : ""],
+    ["Flat type", (ownAnswers.flat_types ?? []).join(", ")],
+    ["Occupants", (ownAnswers.occupants ?? []).join(", ")],
+    ["Must haves", (ownAnswers.must_haves ?? []).join(", ")],
+    ["Lifestyle", (ownAnswers.lifestyle ?? []).join(", ")],
+    ["Deal breakers", (ownAnswers.deal_breakers ?? []).join(", ")],
+    ["Priority", (ownAnswers.priority ?? []).join(", ")],
+  ].filter(([, v]) => v);
+
+  if (!rows.length) return null;
+
+  return (
+    <div className="crm-card" style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 8 }}>
+        <span className="crm-label">What they told us · their own wizard answers</span>
+        {ownAnswers.updated_at && (
+          <span className="crm-mute" style={{ fontSize: 10 }}>updated {relTime(ownAnswers.updated_at)}</span>
+        )}
+      </div>
+      <ul style={{ margin: 0, padding: 0, listStyle: "none", display: "flex", flexDirection: "column", gap: 6 }}>
+        {rows.map(([label, value]) => (
+          <li key={label} style={{ display: "flex", gap: 10, alignItems: "baseline" }}>
+            <span className="crm-label" style={{ flex: "none", width: 110 }}>{label}</span>
+            <span style={{ fontSize: 12.5, color: label === "Deal breakers" ? C.coral : C.text, lineHeight: 1.5 }}>
+              {value}
+            </span>
+          </li>
+        ))}
+      </ul>
+      {notes.requestedMoreFlatsAt && (
+        <p style={{ margin: 0, fontSize: 11.5, fontWeight: 700, color: C.gold, lineHeight: 1.5 }}>
+          Asked for more homes {relTime(notes.requestedMoreFlatsAt)}
+        </p>
+      )}
+    </div>
+  );
+}
+
+/** First usable photo — same rule ListingCard/MatchesPane use, cover first. */
+function coverOf(listing) {
+  return listing?.cover_image_url || (listing?.images ?? [])[0] || "";
+}
+
+const REACTION_STATUS = { like: "liked", dislike: "disliked" };
+
+/**
+ * Every property this client has actually reacted to — the first five
+ * matches, a curated shortlist, or a link an agent sent — merged from
+ * listing_reactions (their own swipes) and crm_shortlists (what an agent
+ * sent and however they answered it) so one property never shows up twice
+ * with two different verdicts. Loaded only for whichever client is open,
+ * same as the activity timeline below.
+ */
+function PropertiesShown({ client, shortlists, inventory }) {
+  const [reactions, setReactions] = useState([]);
+
+  useEffect(() => {
+    let alive = true;
+    if (!client.user_id) { setReactions([]); return undefined; }
+    fetchClientListingReactions(client.user_id).then((rows) => alive && setReactions(rows));
+    return () => { alive = false; };
+  }, [client.id, client.user_id]);
+
+  const inventoryById = useMemo(() => {
+    const m = new Map();
+    for (const l of inventory ?? []) m.set(l.property_id, l);
+    return m;
+  }, [inventory]);
+
+  const rows = useMemo(() => {
+    const byProperty = new Map();
+    for (const r of reactions) {
+      byProperty.set(r.property_id, { propertyId: r.property_id, status: REACTION_STATUS[r.reaction] || "", at: r.updated_at });
+    }
+    for (const s of shortlists ?? []) {
+      if (s.client_id !== client.id) continue;
+      const prior = byProperty.get(s.property_id);
+      byProperty.set(s.property_id, {
+        propertyId: s.property_id,
+        status: s.status || prior?.status || "",
+        at: s.reacted_at || prior?.at || s.shared_at,
+      });
+    }
+    return [...byProperty.values()]
+      .map((r) => ({ ...r, listing: inventoryById.get(r.propertyId) }))
+      .sort((a, b) => new Date(b.at || 0) - new Date(a.at || 0));
+  }, [reactions, shortlists, client.id, inventoryById]);
+
+  if (!rows.length) return null;
+
+  return (
+    <Section label={`Properties shown · ${rows.length}`}>
+      <div className="crm-card" style={{ display: "flex", flexDirection: "column", gap: 0 }}>
+        {rows.map((r) => {
+          const cover = coverOf(r.listing);
+          const label = CURATED_STATUS_LABEL[r.status] || r.status || "Shown, no reply yet";
+          const color = ["liked", "visit_scheduled", "visited"].includes(r.status) ? C.accent
+            : r.status === "disliked" || r.status === "rejected" ? C.coral : C.textDim;
+          return (
+            <div key={r.propertyId} style={{ display: "flex", gap: 10, padding: "8px 0", borderBottom: `1px solid ${C.lineSoft}` }}>
+              <div style={{
+                flex: "none", width: 36, height: 36, borderRadius: 7, overflow: "hidden",
+                background: C.surfaceAlt, border: `1px solid ${C.line}`, display: "grid", placeItems: "center",
+              }}>
+                {cover ? (
+                  <img src={cover} alt="" loading="lazy" style={{ width: "100%", height: "100%", objectFit: "cover" }}
+                    onError={(e) => { e.currentTarget.style.display = "none"; }} />
+                ) : (
+                  <span className="crm-mute" style={{ fontSize: 7 }}>NO PIC</span>
+                )}
+              </div>
+              <div style={{ display: "flex", flexDirection: "column", gap: 2, minWidth: 0, flex: 1 }}>
+                <span style={{ fontSize: 12.5, fontWeight: 600, color: C.text, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                  {r.listing ? `${r.listing.flat_type || "Home"} · ${r.listing.area || "—"}` : r.propertyId}
+                </span>
+                <span className="crm-mute crm-num" style={{ fontSize: 10.5 }}>
+                  {r.listing ? `${inr(r.listing.rent)} · ${r.propertyId}` : "no longer in inventory"}
+                </span>
+              </div>
+              <span style={{
+                flex: "none", alignSelf: "center", fontSize: 10.5, fontWeight: 700, padding: "3px 8px", borderRadius: 999,
+                background: `${color}18`, color, border: `1px solid ${color}44`, whiteSpace: "nowrap",
+              }}>
+                {label}{r.at ? ` · ${relTime(r.at)}` : ""}
+              </span>
+            </div>
+          );
+        })}
+      </div>
+    </Section>
   );
 }
 
@@ -439,7 +589,7 @@ function ClosePrompt({ status, reasons, onCancel, onConfirm }) {
 
 export default function ClientRecord({
   client, requirement, isOverride, engagement, settings, access, actorEmail, agentName,
-  onPatch, onRequirementChange, onRequirementReset, onToast, ownAnswers,
+  onPatch, onRequirementChange, onRequirementReset, onToast, ownAnswers, shortlists, inventory,
 }) {
   const [activities, setActivities] = useState([]);
   const [pendingClose, setPendingClose] = useState(null);
@@ -630,6 +780,10 @@ export default function ClientRecord({
 
         <RequirementCard req={requirement} isOverride={isOverride} canEdit={canEditReq}
           onChange={onRequirementChange} onReset={onRequirementReset} />
+
+        <WhatTheyToldUs ownAnswers={ownAnswers} />
+
+        <PropertiesShown client={client} shortlists={shortlists} inventory={inventory} />
 
         {/* engagement */}
         <div className="crm-card">
