@@ -26,6 +26,7 @@ import { toggleSavedListing } from "../lib/userActivity";
 import { logSavedListingChange } from "../lib/crmSync";
 import { setReaction } from "../lib/visits";
 import { fetchMyCuratedProperties } from "../lib/curatedShares";
+import { MOVEAZY_TEAM_WHATSAPP } from "../config/contactChannels";
 
 const TOP_N = 5;
 const T = { ink: "#04211D", teal: "#0E7C68", gold: "#E8A33D", text: "#171412", textDim: "#5c554e" };
@@ -248,7 +249,7 @@ export default function TopMatches() {
   };
 
   const openWhatsapp = (message) => {
-    window.open(`https://wa.me/919146969162?text=${encodeURIComponent(message)}`, "_blank", "noopener,noreferrer");
+    window.open(`${MOVEAZY_TEAM_WHATSAPP}?text=${encodeURIComponent(message)}`, "_blank", "noopener,noreferrer");
   };
 
   const goToPriorityWhatsapp = () => {

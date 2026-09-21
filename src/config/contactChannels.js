@@ -2,6 +2,14 @@ import { DEFAULT_CONTACT_TEAM } from "../lib/sitePublicSettings";
 
 export { DEFAULT_CONTACT_TEAM };
 
+/**
+ * The one number every urgency/nudge WhatsApp send should go to — confirmed
+ * directly by the team, not inferred from whichever contact card or support
+ * line happened to be hardcoded somewhere. Nothing that pages someone on a
+ * client's behalf should use any other number.
+ */
+export const MOVEAZY_TEAM_WHATSAPP = "https://wa.me/919146969162";
+
 const DEFAULT_WA_GREETING =
   "Hi — I'd like to book a free consultation with MovEazy. Please share next steps.";
 

@@ -29,6 +29,7 @@ import { toggleSavedListing } from "../lib/userActivity";
 import { logSavedListingChange } from "../lib/crmSync";
 import { setReaction } from "../lib/visits";
 import { persistRequestedMoreFlats } from "../lib/userRequirements";
+import { MOVEAZY_TEAM_WHATSAPP } from "../config/contactChannels";
 
 const T = { ink: "#04211D", teal: "#0E7C68", gold: "#E8A33D", text: "#171412", textDim: "#5c554e", line: "#e9e3db" };
 
@@ -207,19 +208,18 @@ export default function CuratedProperties() {
     : "Your shortlist";
   const firstName = String(share?.clientName || "").split(/\s+/)[0];
 
-  /**
-   * Deliberately does NOT open WhatsApp right now. It used to send to a
-   * hardcoded number pulled from code without confirming whose phone it
-   * actually was — that turned out to be a real person's personal line once
-   * already. Until there's a verified, intended number for this, the request
-   * only reaches the CRM (persistRequestedMoreFlats below, surfaced on the
-   * client's record as "Asked for more homes"), which is exactly the "the
-   * CRM should be notified" requirement this button exists for.
-   */
+  const requestMoreUrl = useMemo(() => {
+    const who = firstName ? ` for ${firstName}` : "";
+    const text = liked.length
+      ? `Hi MovEazy, please share some more flat options${who}.`
+      : `Hi MovEazy, I don't like the options you've shared${who} — please share some more crazy options.`;
+    return `${MOVEAZY_TEAM_WHATSAPP}?text=${encodeURIComponent(text)}`;
+  }, [liked.length, firstName]);
+
   const handleRequestMore = useCallback(() => {
-    flash("We've let your agent know");
+    window.open(requestMoreUrl, "_blank", "noopener");
     if (user?.uid) void persistRequestedMoreFlats(user.uid);
-  }, [user?.uid, flash]);
+  }, [requestMoreUrl, user?.uid]);
 
   return (
     <div style={{ minHeight: "100dvh", background: "#fff" }}>
