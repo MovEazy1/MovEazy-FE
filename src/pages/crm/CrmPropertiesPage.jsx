@@ -15,6 +15,9 @@ import {
 } from "../../lib/crmSettings";
 import { groupByPlatform } from "../../lib/marketing";
 import { SCOPES } from "../../lib/adminScopes";
+import { splitMedia } from "../../lib/listingMedia";
+import { mapInventoryToListing } from "../../lib/inventory";
+import PropertyModal from "../../components/PropertyModal";
 import { Btn, C, Chip, Empty, ScoreRing, inr, shortDate } from "./crmUi";
 
 /** Platforms we show first, and what the button says. Anything else follows. */
@@ -102,6 +105,76 @@ function ChannelRow({ channel, listing, title, onPicked }) {
  * public feed outlives the share: the post stays up, and people keep arriving
  * at something they cannot rent.
  */
+/**
+ * Up to four photos of a flat, as a 2x2 the width of an id.
+ *
+ * The id column was a column of MZ- codes. Nobody recognises a flat from its
+ * code, so finding one meant opening rows until the right one appeared — the
+ * photos are what an agent actually recognises, and they cost one cell.
+ *
+ * Videos are dropped: a listing's media array holds both, and a <video> in a
+ * 54px tile is a black square. The id stays underneath, because it is what the
+ * search box matches and what every share link and WhatsApp message quotes.
+ */
+function PropertyThumbs({ listing, onOpen }) {
+  const { photos } = splitMedia([listing.cover_image_url, ...(listing.images ?? [])].filter(Boolean));
+  const shown = photos.slice(0, 4);
+
+  return (
+    <button
+      type="button"
+      onClick={onOpen}
+      title={`Open ${listing.property_id}`}
+      style={{
+        display: "flex", flexDirection: "column", gap: 4, padding: 0,
+        background: "none", border: "none", cursor: "pointer", textAlign: "left",
+      }}
+    >
+      {shown.length ? (
+        <span
+          style={{
+            display: "grid", width: 54, height: 54, borderRadius: 7, overflow: "hidden",
+            // One photo fills the tile; two, three or four share it, so a
+            // half-photographed listing never renders as gaps.
+            gridTemplateColumns: shown.length === 1 ? "1fr" : "1fr 1fr",
+            gridTemplateRows: shown.length <= 2 ? "1fr" : "1fr 1fr",
+            gap: 1, background: C.line, flex: "none",
+          }}
+        >
+          {shown.map((src, i) => (
+            <img
+              key={src}
+              src={src}
+              alt=""
+              loading="lazy"
+              style={{
+                width: "100%", height: "100%", objectFit: "cover", display: "block",
+                background: C.surfaceAlt,
+                // Three photos: the first takes the full left column, so the
+                // odd one out is the feature rather than a gap.
+                ...(shown.length === 3 && i === 0 ? { gridRow: "span 2" } : {}),
+              }}
+            />
+          ))}
+        </span>
+      ) : (
+        <span
+          className="crm-mute"
+          style={{
+            width: 54, height: 54, borderRadius: 7, background: C.surfaceAlt, flex: "none",
+            display: "flex", alignItems: "center", justifyContent: "center", fontSize: 9.5,
+          }}
+        >
+          no photo
+        </span>
+      )}
+      <span className="crm-num" style={{ color: C.accent, fontSize: 10.5, fontWeight: 600 }}>
+        {listing.property_id}
+      </span>
+    </button>
+  );
+}
+
 function SocialShare({ listing }) {
   const { marketingChannels } = useCrm();
   const [openPlatform, setOpenPlatform] = useState("");
@@ -224,6 +297,10 @@ export default function CrmPropertiesPage() {
   const [q, setQ] = useState("");
   const [status, setStatus] = useState("published");
   const [openId, setOpenId] = useState("");
+  // The full property card, opened from a thumbnail. Rendered here rather than
+  // sending the agent to a new tab: they are working down a list, and a tab
+  // switch loses their place in it.
+  const [previewId, setPreviewId] = useState("");
 
   const clientByReq = useMemo(() => {
     const byId = new Map(clients.map((c) => [c.id, c]));
@@ -239,6 +316,16 @@ export default function CrmPropertiesPage() {
         .join(" ").toLowerCase().includes(needle);
     });
   }, [inventory, q, status]);
+
+  // mapInventoryToListing is what PropertyPage feeds the modal too, so the
+  // card renders from the same shape in both places.
+  const previewListing = useMemo(
+    () => {
+      const row = inventory.find((l) => l.property_id === previewId);
+      return row ? mapInventoryToListing(row) : null;
+    },
+    [inventory, previewId],
+  );
 
   const openListing = useMemo(() => inventory.find((l) => l.property_id === openId), [inventory, openId]);
 
@@ -283,7 +370,9 @@ export default function CrmPropertiesPage() {
               <tbody>
                 {rows.map((l) => (
                   <tr key={l.property_id}>
-                    <td className="crm-num" style={{ color: C.accent }}>{l.property_id}</td>
+                    <td>
+                      <PropertyThumbs listing={l} onOpen={() => setPreviewId(l.property_id)} />
+                    </td>
                     <td>{l.flat_type || "—"}{l.furnishing ? ` · ${l.furnishing}` : ""}</td>
                     <td>{l.area || "—"}</td>
                     <td className="crm-num">{inr(l.rent)}</td>
@@ -354,6 +443,18 @@ export default function CrmPropertiesPage() {
             )}
           </div>
         </div>
+      )}
+
+      {previewListing && (
+        /* The same card the public site shows, so an agent checking a flat
+           sees exactly what a tenant sees. manageHistory={false}: the CRM
+           owns nothing in the URL here, and the modal's own history entry
+           would put a back press between the agent and their list. */
+        <PropertyModal
+          property={previewListing}
+          onClose={() => setPreviewId("")}
+          manageHistory={false}
+        />
       )}
     </div>
   );
