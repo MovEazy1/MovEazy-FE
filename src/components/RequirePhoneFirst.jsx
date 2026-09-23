@@ -23,7 +23,6 @@ import { formatForDisplay, normalizeIndianMobile } from "../lib/mobile";
 const INK     = "#1A2421";
 const WHITE   = "#FFFEFB";
 const LINE    = "#D9D3C4";
-const MUTED   = "#8B8578";
 const RUST    = "#C8500F";
 const RUST_BG = "#FBEAE0";
 
@@ -81,27 +80,25 @@ export default function RequirePhoneFirst({ open, onDone, onClose }) {
       }}
       role="dialog"
       aria-modal="true"
-      aria-labelledby="leadphone-title"
+      // No visible heading to point at, so the label lives here. A screen
+      // reader still announces what this is; nothing is drawn for it.
+      aria-label="Enter your mobile number"
       onClick={onClose}
     >
       <div
         className="w-full my-auto"
         style={{
-          maxWidth: 360, background: WHITE, border: `1px solid ${LINE}`,
+          maxWidth: 340, background: WHITE, border: `1px solid ${LINE}`,
           borderRadius: 16, padding: "22px 20px",
           boxShadow: "0 16px 44px rgba(26,36,33,0.14)",
           fontFamily: "Inter, sans-serif",
         }}
         onClick={(e) => e.stopPropagation()}
       >
-        <h2 id="leadphone-title" style={{ color: INK, fontSize: 17, fontWeight: 700, letterSpacing: "-0.01em", margin: 0 }}>
-          What's your mobile number?
-        </h2>
-        <p style={{ color: MUTED, fontSize: 13, lineHeight: 1.5, margin: "7px 0 0" }}>
-          So we can send you the homes we find and arrange your visits. No account needed yet.
-        </p>
-
-        <div style={{ marginTop: 16 }}>
+        {/* No heading and no explanatory copy: the field and its +91 prefix
+            say what this wants. Same shell as RequirePhoneModal, which this
+            now matches pixel for pixel apart from that modal's own title. */}
+        <div>
           <div
             style={{
               display: "flex", alignItems: "center", height: 44,
