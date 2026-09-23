@@ -98,7 +98,33 @@ describe("what we keep before someone signs up", () => {
   it("starts empty rather than undefined for a first-time visitor", () => {
     expect(lead.leadSnapshot()).toEqual({
       name: "", phone: "", prefs: null, step: 0, completed: false,
+      leadType: "", propertyId: "",
     });
+  });
+
+  it("marks someone who opened a shared property link as a direct lead", async () => {
+    // The bug this guards: leadType defaulted to "questionnaire", and the
+    // don't-demote rule keyed on that default — so a brand-new lead counted as
+    // a questionnaire one and could never be recorded as direct. Every share
+    // link would have landed in the CRM mislabelled.
+    await lead.saveLead({ phone: "9888877777", leadType: "direct_property", propertyId: "MZ-FQ5U48" });
+    expect(lead.leadSnapshot()).toMatchObject({
+      leadType: "direct_property", propertyId: "MZ-FQ5U48",
+    });
+  });
+
+  it("promotes that lead once they start answering questions", async () => {
+    await lead.saveLead({ phone: "9888877777", leadType: "direct_property", propertyId: "MZ-FQ5U48" });
+    await lead.saveLead({ prefs: { localities: ["HSR"] }, step: 2, leadType: "questionnaire" });
+    expect(lead.leadSnapshot().leadType).toBe("questionnaire");
+    // The flat that brought them in is still the flat that brought them in.
+    expect(lead.leadSnapshot().propertyId).toBe("MZ-FQ5U48");
+  });
+
+  it("never demotes a questionnaire lead who later opens a shared link", async () => {
+    await lead.saveLead({ prefs: { localities: ["HSR"] }, step: 3, leadType: "questionnaire" });
+    await lead.saveLead({ leadType: "direct_property", propertyId: "MZ-OTHER1" });
+    expect(lead.leadSnapshot().leadType).toBe("questionnaire");
   });
 
   it("does not throw when storage is unavailable", async () => {

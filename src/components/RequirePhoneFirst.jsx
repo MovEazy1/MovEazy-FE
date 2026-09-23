@@ -26,7 +26,7 @@ const LINE    = "#D9D3C4";
 const RUST    = "#C8500F";
 const RUST_BG = "#FBEAE0";
 
-export default function RequirePhoneFirst({ open, onDone, onClose }) {
+export default function RequirePhoneFirst({ open, onDone, onClose, dismissible = true, extra = null }) {
   const [value, setValue] = useState("");
   const [busy, setBusy] = useState(false);
   const [focused, setFocused] = useState(false);
@@ -43,14 +43,14 @@ export default function RequirePhoneFirst({ open, onDone, onClose }) {
     // A frame's delay, or the autofocus lands before the dialog is painted and
     // the mobile keyboard opens against a half-rendered sheet.
     const t = setTimeout(() => inputRef.current?.focus(), 60);
-    const onKey = (e) => e.key === "Escape" && onClose?.();
+    const onKey = (e) => { if (dismissible && e.key === "Escape") onClose?.(); };
     window.addEventListener("keydown", onKey);
     return () => {
       clearTimeout(t);
       window.removeEventListener("keydown", onKey);
       document.body.style.overflow = prev;
     };
-  }, [open, onClose]);
+  }, [open, onClose, dismissible]);
 
   if (!open) return null;
 
@@ -65,7 +65,7 @@ export default function RequirePhoneFirst({ open, onDone, onClose }) {
     // localStorage by the time saveLead resolves, and the next questionnaire
     // step sends it again — a failed round trip must not strand somebody on a
     // spinner before they have seen a single flat.
-    await saveLead({ phone: mobile });
+    await saveLead({ phone: mobile, ...(extra || {}) });
     setBusy(false);
     onDone?.(mobile);
   };
@@ -81,7 +81,7 @@ export default function RequirePhoneFirst({ open, onDone, onClose }) {
       role="dialog"
       aria-modal="true"
       aria-labelledby="leadphone-title"
-      onClick={onClose}
+      onClick={dismissible ? onClose : undefined}
     >
       <div
         className="w-full my-auto"

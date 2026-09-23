@@ -25,7 +25,13 @@ import { firstTouch } from "./attribution";
 const KEY_STORAGE = "moveazy_lead_key";
 const SNAPSHOT_STORAGE = "moveazy_lead";
 
-const empty = () => ({ name: "", phone: "", prefs: null, step: 0, completed: false });
+const empty = () => ({
+  name: "", phone: "", prefs: null, step: 0, completed: false,
+  // "questionnaire" or "direct_property" — someone who answered nine questions
+  // told us what they want; someone who opened a shared link told us only
+  // which flat caught their eye, which is what propertyId keeps.
+  leadType: "", propertyId: "",
+});
 
 function readLocal(key, fallback = null) {
   try {
@@ -94,9 +100,17 @@ export async function saveLead(patch = {}) {
   if (!key) return leadSnapshot();
 
   const next = { ...leadSnapshot() };
-  for (const field of ["name", "phone", "prefs", "step", "completed"]) {
+  for (const field of ["name", "phone", "prefs", "step", "completed", "leadType", "propertyId"]) {
     if (patch[field] !== undefined) next[field] = patch[field];
   }
+  // Someone who has started answering questions is a questionnaire lead, and
+  // opening a shared link later must not demote them — they have told us what
+  // they want, which is worth more than which flat they last tapped. Keyed on
+  // actual progress, not on the field's own default, or a brand-new lead would
+  // count as a questionnaire one and could never be marked direct.
+  const prev = leadSnapshot();
+  if (prev.step > 0 || prev.completed) next.leadType = "questionnaire";
+  if (prev.propertyId) next.propertyId = prev.propertyId;
   // completed latches: reopening the questionnaire to change an answer must
   // not un-complete a lead the CRM has already acted on.
   next.completed = leadSnapshot().completed || Boolean(next.completed);
@@ -117,6 +131,8 @@ export async function saveLead(patch = {}) {
       p_utm: touch
         ? { source: touch.source, medium: touch.medium, campaign: touch.campaign, content: touch.content }
         : null,
+      p_lead_type: patch.leadType ?? null,
+      p_property_id: patch.propertyId ?? null,
     });
   } catch {
     /* kept locally; the next step's save carries the same fields again */
@@ -141,8 +157,11 @@ export async function loadLead() {
     if (error || !row) return cached;
 
     const merged = {
+      ...cached,
       name: row.name || cached.name,
       phone: row.phone || cached.phone,
+      leadType: row.lead_type || cached.leadType,
+      propertyId: row.property_id || cached.propertyId,
       // The server's answers win: they are the ones the CRM is looking at.
       prefs: row.prefs && Object.keys(row.prefs).length ? row.prefs : cached.prefs,
       step: Math.max(Number(row.step) || 0, cached.step || 0),

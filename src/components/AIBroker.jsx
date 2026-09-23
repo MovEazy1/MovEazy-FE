@@ -202,7 +202,12 @@ function prefsComplete(prefs) {
     && prefs.localities.length > 0 && prefs.occupants.length > 0 && prefs.flatTypes.length > 0;
 }
 
-export default function AIBroker({ open, onClose }) {
+/**
+ * @param {boolean} startFresh Open on the intro at question one, ignoring any
+ *   half-finished lead. "Get personalised flats" means start the conversation,
+ *   not resume one the person may not remember having.
+ */
+export default function AIBroker({ open, onClose, startFresh = false }) {
   const navigate = useNavigate();
   const { user } = useAuth();
   const { openLogin } = useLoginModal();
@@ -257,10 +262,11 @@ export default function AIBroker({ open, onClose }) {
       if (!alive) return;
       if (lead.prefs) setPrefs((p) => ({ ...p, ...restore(lead.prefs) }));
       if (lead.name) setPrefs((p) => ({ ...p, name: lead.name }));
-      if (lead.step > 0 && !lead.completed) setStepIdx(Math.min(lead.step, stepsFor({ ...emptyPrefs(), ...(lead.prefs || {}) }).length - 1));
+      if (!startFresh && lead.step > 0 && !lead.completed) setStepIdx(Math.min(lead.step, stepsFor({ ...emptyPrefs(), ...(lead.prefs || {}) }).length - 1));
     })();
 
     return () => { alive = false; };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [open, uid]);
 
   // esc to close
@@ -336,6 +342,9 @@ export default function AIBroker({ open, onClose }) {
       prefs: nextPrefs,
       step: steps.length,
       completed: true,
+      // Promotes a lead that arrived on a property link: they have told us
+      // what they want now, which outranks which flat they first tapped.
+      leadType: "questionnaire",
     });
     onClose?.();
     openLogin({
@@ -363,6 +372,7 @@ export default function AIBroker({ open, onClose }) {
           name: String(seeded.name || "").trim(),
           prefs: seeded,
           step: idx + 1,
+          leadType: "questionnaire",
         });
       }
       setStepIdx(idx + 1);
@@ -956,7 +966,11 @@ function RankList({ items, onReorder }) {
 function Styles() {
   return (
     <style>{`
-      .brk-overlay { position:fixed; inset:0; z-index:1500; background:rgba(4,33,29,0.5); backdrop-filter:blur(6px); display:flex; align-items:center; justify-content:center; padding:20px; font-family:'Inter', system-ui, sans-serif; }
+      /* Above PropertyModal's 99999, because "Get personalised flats" opens
+         this over a flat and 1500 put it behind — the button looked dead.
+         Still below the two phone gates (999997/999998): those ask for the one
+         thing everything else depends on and must stay on top of this. */
+      .brk-overlay { position:fixed; inset:0; z-index:100500; background:rgba(4,33,29,0.5); backdrop-filter:blur(6px); display:flex; align-items:center; justify-content:center; padding:20px; font-family:'Inter', system-ui, sans-serif; }
       .brk-shell { position:relative; width:min(460px,100%); height:min(760px,92vh); background:${B.bg}; border-radius:28px; overflow:hidden; display:flex; flex-direction:column; box-shadow:0 40px 100px rgba(4,33,29,0.35); }
       .brk-close { position:absolute; top:14px; right:14px; z-index:20; width:34px; height:34px; border-radius:50%; border:none; background:#F1F5F9; color:${B.ink}; display:flex; align-items:center; justify-content:center; cursor:pointer; }
       .brk-close:hover { background:#E2E8F0; }

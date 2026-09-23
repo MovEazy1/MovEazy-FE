@@ -6,13 +6,30 @@ import { VisitCartProvider } from "./context/VisitCartContext";
 import ForkHome from "./pages/ForkHome";
 import ErrorBoundary from "./components/ErrorBoundary";
 import RequirePhoneModal from "./components/RequirePhoneModal";
-import RequireSignInForListing from "./components/RequireSignInForListing";
+import RequirePhoneForListing from "./components/RequirePhoneForListing";
 import { useSessionTracking } from "./hooks/useSessionTracking";
 
 const Profile = lazy(() => import("./pages/Profile"));
 const SupabaseLogin = lazy(() => import("./pages/SupabaseLogin"));
 const BrokerDashboard = lazy(() => import("./pages/BrokerDashboard"));
-const MapPage = lazy(() => import("./pages/MapPage"));
+/**
+ * Self-serve browsing is off for launch.
+ *
+ * The map and the list let someone page through the whole inventory on their
+ * own, which is the opposite of what we are selling: a seeker tells us what
+ * they want, sees the five best homes for it, and then our team goes and finds
+ * the rest across every portal there is. Leaving an "explore 400 flats" surface
+ * next to that turns a concierge into a search box.
+ *
+ * So the browse routes are switched off here rather than deleted — MapView.jsx,
+ * MapPage.jsx and Listings.jsx are untouched on disk, and turning them back on
+ * is uncommenting these two lines and the two routes below. Everything that
+ * used to link into them now lands on /matches (the five) or /property/:id (one
+ * specific home), so no link in the wild — or in a customer's WhatsApp — breaks.
+ *
+ * const MapPage = lazy(() => import("./pages/MapPage"));
+ */
+const PropertyPage = lazy(() => import("./pages/PropertyPage"));
 const CuratedProperties = lazy(() => import("./pages/CuratedProperties"));
 const TopMatches = lazy(() => import("./pages/TopMatches"));
 const HowItWorks = lazy(() => import("./pages/HowItWorks"));
@@ -27,6 +44,7 @@ const BrokerRegister = lazy(() => import("./pages/BrokerRegister"));
 const MyProperties = lazy(() => import("./pages/MyProperties"));
 const SuperAdminPanel = lazy(() => import("./pages/SuperAdminPanel"));
 const AnalyticsDashboard = lazy(() => import("./pages/AnalyticsDashboard"));
+const OpsDashboard = lazy(() => import("./pages/OpsDashboard"));
 const MarketingShell = lazy(() => import("./pages/marketing/MarketingShell"));
 const MarketingIndex = lazy(() =>
   import("./pages/marketing/MarketingShell").then((m) => ({ default: m.MarketingIndex })),
@@ -59,10 +77,29 @@ function PageLoader() {
   );
 }
 
-/** Keeps every existing link and bookmark to /recommendations working. */
-function RecommendationsRedirect() {
-  const { state } = useLocation();
-  return <Navigate to="/map" replace state={state} />;
+/**
+ * Everything that used to open the map still opens something.
+ *
+ * Two shapes arrive here. `/map?listingId=MZ-123` is one specific home — every
+ * share link we have ever sent forwards to it — and that becomes /property/:id,
+ * carrying its UTM parameters and `mz_s` token across so the open still
+ * attributes. A bare `/map` was "let me browse", and that becomes the five
+ * matches, which is the answer we now give to that question.
+ */
+function MapRedirect() {
+  const location = useLocation();
+  const params = new URLSearchParams(location.search);
+  const listingId = String(params.get("listingId") || "").trim();
+  if (!listingId) return <Navigate to="/matches" replace state={location.state} />;
+  params.delete("listingId");
+  const qs = params.toString();
+  return (
+    <Navigate
+      to={`/property/${encodeURIComponent(listingId)}${qs ? `?${qs}` : ""}`}
+      replace
+      state={location.state}
+    />
+  );
 }
 
 function ProfileRoute({ children }) {
@@ -88,7 +125,7 @@ function SessionTrackerComponent() {
       {/* A signed-out visitor whose session opened directly on a property
           (a shared /p/:id link) must sign in before seeing it. If they do,
           the phone gate below picks up next for an account with none on file. */}
-      <RequireSignInForListing />
+      <RequirePhoneForListing />
       {/* Sits above every route: a signed-in account with no mobile number
           saved is asked for one before it can use the app. */}
       <RequirePhoneModal />
@@ -102,8 +139,12 @@ function AppRoutes() {
     <Suspense fallback={<PageLoader />}>
       <Routes>
         <Route path="/" element={<ForkHome />} />
-        <Route path="/map" element={<MapPage />} />
+        {/* Browsing is off — see the note by the imports.
+            <Route path="/map" element={<MapPage />} /> */}
+        <Route path="/map" element={<MapRedirect />} />
         <Route path="/matches" element={<TopMatches />} />
+        {/* One home, at its own address: where every shared link lands. */}
+        <Route path="/property/:propertyId" element={<PropertyPage />} />
         {/* The shortlist our team curated for one person. With a token it is the
             WhatsApp link and works signed out; without one it is the same set
             for whoever is signed in. */}
@@ -120,15 +161,17 @@ function AppRoutes() {
           }
         />
         <Route path="/admin" element={<AdminDatabase />} />
-        {/* One browsing surface. /recommendations had a second map and a second
-            listing detail view of its own, so every improvement reached only one
-            of the two paths a seeker could arrive by. Ranking now lives in the
-            map; the old URL keeps working and carries its preferences over. */}
-        <Route path="/recommendations" element={<RecommendationsRedirect />} />
+        {/* An old bookmark. It used to be a second browsing surface; it is now
+            the same redirect the map is. */}
+        <Route path="/recommendations" element={<MapRedirect />} />
         <Route path="/register-broker" element={<BrokerRegister />} />
         <Route path="/my-properties" element={<MyProperties />} />
         <Route path="/superadmin" element={<SuperAdminPanel />} />
         <Route path="/analytics" element={<AnalyticsDashboard />} />
+        {/* Day-on-day operating numbers. Gated per-email in Postgres
+            (can_view_ops_dashboard) and granted from /superadmin — the people who
+            open this are not staff, so it deliberately shows counts and no rows. */}
+        <Route path="/dashboard" element={<OpsDashboard />} />
         {/* Marketing channel dashboards. Access is per-email and per-channel,
             gated inside MarketingShell and again in Postgres — the people who
             open these are channel owners, not staff. ":slug" is deliberate:
