@@ -20,7 +20,7 @@ import { useAuth } from "../context/AuthContext";
 import { saveUserRequirement, fetchUserRequirement, rowToPrefs } from "../lib/userRequirements";
 import { leadSnapshot, loadLead, saveLead } from "../lib/leadIntake";
 import { useLoginModal } from "../context/LoginModalContext";
-import { LOCALITIES, ALL_LOCALITIES, FLAT_TYPES, OFFICE_CHIPS } from "../data/preferenceOptions";
+import { LOCALITIES, ALL_LOCALITIES, FLAT_TYPES, OFFICE_CHIPS, PRIORITIES, reconcilePriority } from "../data/preferenceOptions";
 import MovEazyLogo from "./branding/MovEAZYLogo";
 
 // MovEazy's own palette (ink + mint), the same pairing used on the nav/hero —
@@ -145,7 +145,8 @@ const STEPS = [
   { id: "flatTypes", type: "cards", single: false, q: "What type of home are you looking for?", sub: "Select all that work for you.", options: FLAT_TYPE_CARDS },
   { id: "moveInDate", type: "cards", single: true, scalar: true, q: "When are you looking to move in?", sub: "This helps us prioritize the right homes for you.", options: MOVE_IN_OPTIONS },
   { id: "budget", type: "budget", q: "Enter the maximum budget", sub: "Drag to set the most you'd like to pay per month." },
-  { id: "priority", type: "rank", q: "One last thing — what matters most to you?", sub: "Drag to reorder, with your top priority at the top." },
+  { id: "priority", type: "rank", q: "Stack your priority",
+    sub: "The most important question for our ML model to figure out the right flat. Drag to reorder, with your top priority at the top." },
 ];
 
 /**
@@ -157,6 +158,20 @@ const STEPS = [
  */
 function stepsFor(prefs) {
   return STEPS.filter((s) => !s.when || s.when(prefs));
+}
+
+/**
+ * Answers coming back from a half-finished lead.
+ *
+ * rowToPrefs does this for a signed-in account; a lead is the same answers in
+ * the same shape, stored somewhere else, and needs the same treatment. Without
+ * it, anyone who was midway through the questionnaire when the priority
+ * options were renamed would carry the old labels for the rest of the flow and
+ * save them straight back.
+ */
+function restore(prefs) {
+  const p = prefs && typeof prefs === "object" ? prefs : {};
+  return { ...p, priority: reconcilePriority(p.priority) };
 }
 
 const emptyPrefs = () => ({
@@ -176,7 +191,7 @@ const emptyPrefs = () => ({
   ...computeBudgetDefaults([...FLAT_TYPES]),
   stretch: true,
   mustHaves: [], lifestyle: [], dealBreakers: [],
-  priority: ["Near to Office", "Good locality", "Budget fit", "I want a flat quickly", "Apartment over standalone", "Flat size", "Ventilation"],
+  priority: [...PRIORITIES],
   notes: {},
 });
 
@@ -235,12 +250,12 @@ export default function AIBroker({ open, onClose }) {
       // correct them — a visitor should never watch a spinner to see what they
       // themselves typed.
       const cached = leadSnapshot();
-      if (alive && cached.prefs) setPrefs((p) => ({ ...p, ...cached.prefs }));
+      if (alive && cached.prefs) setPrefs((p) => ({ ...p, ...restore(cached.prefs) }));
       if (alive && cached.name) setPrefs((p) => ({ ...p, name: cached.name }));
 
       const lead = await loadLead();
       if (!alive) return;
-      if (lead.prefs) setPrefs((p) => ({ ...p, ...lead.prefs }));
+      if (lead.prefs) setPrefs((p) => ({ ...p, ...restore(lead.prefs) }));
       if (lead.name) setPrefs((p) => ({ ...p, name: lead.name }));
       if (lead.step > 0 && !lead.completed) setStepIdx(Math.min(lead.step, stepsFor({ ...emptyPrefs(), ...(lead.prefs || {}) }).length - 1));
     })();
@@ -584,9 +599,12 @@ function StepBody({ step, prefs, set, toggle, selectCard }) {
   }
   if (step.type === "rank") {
     return (
+      // "Budget Deals" shows the number they actually set, so the row reads as
+      // their budget rather than an abstraction. The label is swapped back on
+      // reorder, because the stored string is what gets scored against.
       <RankList
-        items={prefs.priority.map((p) => (p === "Budget fit" ? `Budget under ${fmtINR(prefs.budgetMax)}` : p))}
-        onReorder={(labels) => set({ priority: labels.map((l) => (l.startsWith("Budget under") ? "Budget fit" : l)) })}
+        items={prefs.priority.map((p) => (p === "Budget Deals" ? `Budget Deals — under ${fmtINR(prefs.budgetMax)}` : p))}
+        onReorder={(labels) => set({ priority: labels.map((l) => (l.startsWith("Budget Deals") ? "Budget Deals" : l)) })}
       />
     );
   }
@@ -949,7 +967,9 @@ function Styles() {
       .brk-progress-row { display:flex; align-items:center; gap:10px; padding:14px 24px 0; }
       .brk-progress-track { flex:1; display:flex; gap:5px; }
       .brk-progress-seg { flex:1; height:4px; border-radius:999px; background:${B.track}; }
-      .brk-progress-seg.on { background:${B.mint}; }
+      /* The brand mint is a 1.5:1 tint — as a 4px bar on white it barely
+         registers. The logo green reads as progress at a glance. */
+      .brk-progress-seg.on { background:${B.accent}; }
       .brk-progress-count { font-size:11.5px; font-weight:700; color:${B.muted}; white-space:nowrap; }
 
       .brk-scroll { flex:1; min-height:0; overflow-y:auto; padding:20px 24px 12px; }

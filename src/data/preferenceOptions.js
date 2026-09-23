@@ -52,6 +52,63 @@ export const MUST_HAVES = ["Balcony", "Gym", "Swimming Pool", "Lift", "Covered P
 export const LIFESTYLE = ["Walkable cafes", "Nightlife", "Parks", "Running Track", "Office Commute", "Schools", "Hospitals", "Grocery Nearby", "Peaceful Area", "Young Crowd", "Community Living"];
 export const DEALBREAKERS = ["No Sunlight", "Ground Floor", "Too Far From Metro", "Bachelor Restrictions", "Old Buildings", "Small Kitchen", "Traffic Heavy Roads", "Water Problems", "Poor Mobile Network"];
 export const OFFICE_CHIPS = ["HSR Layout", "Koramangala", "Manyata Tech Park", "Embassy Tech Village", "Bagmane Tech Park", "Electronic City", "RMZ Ecoworld", "Prestige Tech Park"];
+
+/**
+ * What someone is optimising for, in the order it is presented.
+ *
+ * The order is the answer: this list is dragged into the person's own ranking
+ * and scored against, so the strings are stored verbatim and are the join key
+ * between a requirement and the model reading it.
+ */
+export const PRIORITIES = [
+  "Minimum Hassle should be there",
+  "Budget Deals",
+  "I want a Flat Quickly",
+  "Ventilation",
+  "Walking Distance to Office",
+  "Size of Flat",
+  "Apartment over Standalone",
+  "Good Neighborhood",
+];
+
+/**
+ * Earlier wording, kept so a saved ranking survives the rename.
+ *
+ * Someone who ranked these last month has their order stored as the old
+ * strings. Without this map their saved answer would render as a list of
+ * labels that no longer exist, and reconcile below would discard the lot and
+ * hand back the default — silently throwing away the one answer they were
+ * asked to think hardest about.
+ */
+const PRIORITY_RENAMES = {
+  "Near to Office": "Walking Distance to Office",
+  "Good locality": "Good Neighborhood",
+  "Budget fit": "Budget Deals",
+  "I want a flat quickly": "I want a Flat Quickly",
+  "Apartment over standalone": "Apartment over Standalone",
+  "Flat size": "Size of Flat",
+};
+
+/**
+ * A saved ranking, brought up to date: renamed entries translated, anything
+ * no longer offered dropped, and anything newly added appended at the end.
+ *
+ * Appended rather than slotted into its default position on purpose — the
+ * order is theirs, and a new option has no claim to a rank they didn't give it.
+ */
+export function reconcilePriority(saved) {
+  const list = Array.isArray(saved) ? saved : [];
+  const seen = new Set();
+  const out = [];
+  for (const raw of list) {
+    const name = PRIORITY_RENAMES[raw] || raw;
+    if (!PRIORITIES.includes(name) || seen.has(name)) continue;
+    seen.add(name);
+    out.push(name);
+  }
+  for (const name of PRIORITIES) if (!seen.has(name)) out.push(name);
+  return out;
+}
 export const AGES = ["18–24", "25–30", "31–35", "36–45", "46+"];
 export const FURNISHINGS = ["Fully Furnished", "Semi Furnished", "Unfurnished"];
 

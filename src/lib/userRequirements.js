@@ -1,4 +1,5 @@
 import { supabase, isSupabaseConfigured } from "./supabase";
+import { reconcilePriority } from "../data/preferenceOptions";
 
 /**
  * Per-user requirement profile — the demand side, one row per user_id in the
@@ -83,7 +84,9 @@ export function rowToPrefs(row) {
     mustHaves: arr(row.must_haves),
     lifestyle: arr(row.lifestyle),
     dealBreakers: arr(row.deal_breakers),
-    priority: arr(row.priority),
+    // Translated and topped up, so a ranking saved under the old wording
+    // comes back as the person left it instead of being reset to the default.
+    priority: reconcilePriority(arr(row.priority)),
     commuteMinutes: num(row.notes?.commuteMinutes) ?? 30,
     moveInDate: row.notes?.moveInDate || "",
     notes: row.notes && typeof row.notes === "object" ? row.notes : {},
