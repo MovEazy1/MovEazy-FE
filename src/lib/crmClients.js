@@ -36,6 +36,9 @@ export const tempColor = (id) => TEMPERATURES.find((t) => t.id === id)?.color ??
 export const tempLabel = (id) => TEMPERATURES.find((t) => t.id === id)?.label ?? "Unset";
 
 export const SORTS = [
+  // First in the list because it is the one with a clock on it: somebody who
+  // left a number today is worth a call today.
+  { id: "fresh",     label: "Fresh leads" },
   { id: "move_in",   label: "Earliest move-in" },
   { id: "deadline",  label: "Shortlist due soonest" },
   { id: "time",      label: "Most time on site" },

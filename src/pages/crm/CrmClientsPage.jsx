@@ -252,10 +252,30 @@ export default function CrmClientsPage() {
     }
     if (mineOnly) rows = rows.filter((c) => (c.assigned_to || "").toLowerCase() === actorEmail.toLowerCase());
 
+    // "Fresh leads" is a filter as much as an order: a lead is somebody we can
+    // actually ring, so anyone without a number is not one.
+    if (sort === "fresh") rows = rows.filter((c) => String(c.phone || "").trim());
+
     const eng = (c) => engByUser.get(c.user_id);
+
+    /**
+     * When we last saw them, whoever they are.
+     *
+     * user_engagement keys on user_id, and a phone-first lead has no account
+     * yet — so for exactly the people this sort exists to surface, last_seen_at
+     * is always missing. updated_at covers them: save_lead_intake bumps it on
+     * every step of the questionnaire, which is the same signal.
+     */
+    const lastSeen = (c) => Math.max(
+      new Date(eng(c)?.last_seen_at ?? 0).getTime() || 0,
+      new Date(c.updated_at ?? 0).getTime() || 0,
+      new Date(c.created_at ?? 0).getTime() || 0,
+    );
     const sorted = [...rows];
     sorted.sort((a, b) => {
       switch (sort) {
+        case "fresh":
+          return lastSeen(b) - lastSeen(a);
         case "deadline":
           return deadlineTs(ownAnswersByUser.get(a.user_id)?.notes) - deadlineTs(ownAnswersByUser.get(b.user_id)?.notes);
         case "time":
