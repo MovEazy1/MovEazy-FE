@@ -1,96 +1,105 @@
 /**
- * Mandatory mobile-number capture, shown after sign-in to any account whose
- * profile has no number saved.
+ * The first thing we ask for, in place of the Google wall.
  *
- * Signup collects a phone (see pages/SupabaseLogin.jsx), but two groups still
- * arrive without one: Google OAuth users, who never see that form, and every
- * account created before the field existed. This gate closes that hole without
- * touching the login flows themselves — it watches the signed-in user and only
- * appears when `phone` is genuinely empty, so anyone who already has one saved
- * never sees it.
+ * The funnel used to open with an OAuth popup on the first meaningful click.
+ * Everyone not ready to hand over an account left, and left nothing behind. A
+ * mobile number is a far smaller thing to ask for, and it is the one field the
+ * team actually needs: an agent calls it to arrange visits.
  *
- * Deliberately not dismissible: no close button, no backdrop click, no Escape.
- * The number is what a ground agent calls to arrange visits, so an account
- * without one can't actually be served.
+ * So this is not RequirePhoneModal. That one runs after sign-in, against an
+ * account, and writes to user_profiles. This runs before there is an account at
+ * all, and writes to lead_intake keyed by the browser. The two share their
+ * palette and their idea of a valid number (lib/mobile.js), nothing else.
  *
- * Styled on the same light palette as the /auth page (SupabaseLogin.jsx) so the
- * two account screens read as one system rather than two products.
+ * Dismissible, unlike its sibling. This gate stands between a visitor and the
+ * thing they just clicked, on their first visit, before they owe us anything —
+ * a modal with no way out at that moment is how you lose the visit as well as
+ * the number.
  */
 import { useEffect, useRef, useState } from "react";
-import { useLocation } from "react-router-dom";
-import { useAuth } from "../context/AuthContext";
-// Shared with RequirePhoneFirst, the gate that now runs before signup, so the
-// two screens cannot disagree about what a valid number is.
+import { hasLeadPhone, saveLead } from "../lib/leadIntake";
 import { formatForDisplay, normalizeIndianMobile } from "../lib/mobile";
 
 const INK     = "#1A2421";
 const WHITE   = "#FFFEFB";
 const LINE    = "#D9D3C4";
+const MUTED   = "#8B8578";
 const RUST    = "#C8500F";
 const RUST_BG = "#FBEAE0";
 
-export default function RequirePhoneModal() {
-  const { user, loading, updateUserProfile } = useAuth();
-  const { pathname } = useLocation();
+export default function RequirePhoneFirst({ open, onDone, onClose }) {
   const [value, setValue] = useState("");
   const [busy, setBusy] = useState(false);
   const [focused, setFocused] = useState(false);
   const [err, setErr] = useState("");
   const inputRef = useRef(null);
 
-  const needsPhone =
-    !loading && !!user?.uid && !String(user.phone || "").trim() && !pathname.startsWith("/auth");
-
-  // The modal owns the scroll lock while it's up, so the page behind can't be
-  // scrolled past a gate the visitor can't dismiss.
   useEffect(() => {
-    if (!needsPhone) return undefined;
+    if (!open) return undefined;
+    setValue("");
+    setErr("");
+    setBusy(false);
     const prev = document.body.style.overflow;
     document.body.style.overflow = "hidden";
-    inputRef.current?.focus();
-    return () => { document.body.style.overflow = prev; };
-  }, [needsPhone]);
+    // A frame's delay, or the autofocus lands before the dialog is painted and
+    // the mobile keyboard opens against a half-rendered sheet.
+    const t = setTimeout(() => inputRef.current?.focus(), 60);
+    const onKey = (e) => e.key === "Escape" && onClose?.();
+    window.addEventListener("keydown", onKey);
+    return () => {
+      clearTimeout(t);
+      window.removeEventListener("keydown", onKey);
+      document.body.style.overflow = prev;
+    };
+  }, [open, onClose]);
 
-  if (!needsPhone) return null;
+  if (!open) return null;
 
-  const ready = !!normalizeIndianMobile(value);
+  const ready = Boolean(normalizeIndianMobile(value));
 
-  const save = async () => {
+  const submit = async () => {
     const mobile = normalizeIndianMobile(value);
     if (!mobile) { setErr("Enter a valid 10-digit mobile number."); return; }
     setBusy(true);
     setErr("");
-    // Pass the existing name through — updateUserProfile writes name and phone
-    // together, so omitting it would blank the name out.
-    const res = await updateUserProfile(user.name || "", mobile);
-    if (res?.success) return; // user.phone updates, needsPhone flips false, gate unmounts
-    setErr(res?.error || "Could not save your number. Please try again.");
+    // Never block the journey on this write. The number is already in
+    // localStorage by the time saveLead resolves, and the next questionnaire
+    // step sends it again — a failed round trip must not strand somebody on a
+    // spinner before they have seen a single flat.
+    await saveLead({ phone: mobile });
     setBusy(false);
+    onDone?.(mobile);
   };
 
   return (
     <div
       className="fixed inset-0 flex items-center justify-center p-4 overflow-y-auto"
-      // Above PropertyModal's own z-index (99999) — a signed-in, phoneless
-      // account opening a property from a share link should still hit this
-      // gate, not have the property render over it.
-      style={{ background: "rgba(26,36,33,0.45)", backdropFilter: "blur(4px)", WebkitBackdropFilter: "blur(4px)", zIndex: 999998 }}
+      style={{
+        background: "rgba(26,36,33,0.45)",
+        backdropFilter: "blur(4px)", WebkitBackdropFilter: "blur(4px)",
+        zIndex: 999997,
+      }}
       role="dialog"
       aria-modal="true"
-      aria-labelledby="reqphone-title"
+      aria-labelledby="leadphone-title"
+      onClick={onClose}
     >
       <div
         className="w-full my-auto"
         style={{
-          maxWidth: 340, background: WHITE, border: `1px solid ${LINE}`,
+          maxWidth: 360, background: WHITE, border: `1px solid ${LINE}`,
           borderRadius: 16, padding: "22px 20px",
           boxShadow: "0 16px 44px rgba(26,36,33,0.14)",
           fontFamily: "Inter, sans-serif",
         }}
+        onClick={(e) => e.stopPropagation()}
       >
-        <h2 id="reqphone-title" style={{ color: INK, fontSize: 17, fontWeight: 700, letterSpacing: "-0.01em", margin: 0 }}>
-          Verify your Mobile No.
+        <h2 id="leadphone-title" style={{ color: INK, fontSize: 17, fontWeight: 700, letterSpacing: "-0.01em", margin: 0 }}>
+          What's your mobile number?
         </h2>
+        <p style={{ color: MUTED, fontSize: 13, lineHeight: 1.5, margin: "7px 0 0" }}>
+          So we can send you the homes we find and arrange your visits. No account needed yet.
+        </p>
 
         <div style={{ marginTop: 16 }}>
           <div
@@ -114,7 +123,6 @@ export default function RequirePhoneModal() {
               +91
             </span>
             <input
-              id="reqphone-input"
               ref={inputRef}
               type="tel"
               inputMode="numeric"
@@ -123,7 +131,7 @@ export default function RequirePhoneModal() {
               onChange={(e) => { setValue(formatForDisplay(e.target.value)); if (err) setErr(""); }}
               onFocus={() => setFocused(true)}
               onBlur={() => setFocused(false)}
-              onKeyDown={(e) => { if (e.key === "Enter" && ready && !busy) save(); }}
+              onKeyDown={(e) => { if (e.key === "Enter" && ready && !busy) submit(); }}
               placeholder="98765 43210"
               style={{
                 flex: 1, minWidth: 0, height: "100%", padding: "0 14px",
@@ -139,7 +147,7 @@ export default function RequirePhoneModal() {
 
         <button
           type="button"
-          onClick={save}
+          onClick={submit}
           disabled={busy || !ready}
           style={{
             width: "100%", height: 44, marginTop: 14, borderRadius: 10,
@@ -156,3 +164,7 @@ export default function RequirePhoneModal() {
     </div>
   );
 }
+
+/** Whether this browser still owes us a number. Re-exported so a caller can
+ *  decide whether to open the gate without reaching into the lead store. */
+export { hasLeadPhone };

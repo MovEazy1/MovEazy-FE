@@ -15,8 +15,10 @@ import { useAuth } from "../context/AuthContext";
 import MovEazyLogo from "../components/branding/MovEAZYLogo";
 import { useLoginModal } from "../context/LoginModalContext";
 import AIBroker from "../components/AIBroker";
+import RequirePhoneFirst from "../components/RequirePhoneFirst";
 import MovEazyNav from "../components/layout/MovEazyNav";
 import { fetchUserRequirement } from "../lib/userRequirements";
+import { hasLeadPhone } from "../lib/leadIntake";
 import livingRoomImg from "../assets/images/Cozy_modern_living_room.png";
 import keysImg from "../assets/images/guarentee-keyhandover.jpg";
 import sofaImg from "../assets/images/services/image1-sofa.png";
@@ -104,6 +106,7 @@ export default function ForkHome() {
   const { openLogin } = useLoginModal();
   const navigate = useNavigate();
   const [showChatbot, setShowChatbot] = useState(false);
+  const [showPhoneGate, setShowPhoneGate] = useState(false);
   const [showChoice, setShowChoice] = useState(false);
   const [checkingPrefs, setCheckingPrefs] = useState(false);
   const [pendingMatchCheck, setPendingMatchCheck] = useState(false);
@@ -120,8 +123,10 @@ export default function ForkHome() {
   useEffect(() => {
     if (searchParams.get("find") !== "1" || authLoading) return;
     setSearchParams({}, { replace: true });
-    if (user) setShowChatbot(true);
-    else openLogin(() => setShowChatbot(true));
+    // Same rule as startFlatSearch: the agent opens for anyone, signed in or
+    // not; only the number is asked for first.
+    if (user || hasLeadPhone()) setShowChatbot(true);
+    else setShowPhoneGate(true);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [searchParams, user, authLoading]);
 
@@ -158,12 +163,23 @@ export default function ForkHome() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [pendingMatchCheck, user]);
 
+  /**
+   * "Show me flats" — the click that used to raise a Google popup.
+   *
+   * It no longer asks anyone to sign up. A signed-out visitor gives a mobile
+   * number, answers the questionnaire, and only then meets the gate. Everything
+   * they say in between is kept against the browser (lib/leadIntake.js), so a
+   * refusal at the gate still leaves the team a named lead with a number and a
+   * full brief — which is exactly what the Google wall was throwing away.
+   */
   const startFlatSearch = () => {
     if (checkingPrefs || authLoading) return;
     if (user) {
       goToMatches(user.uid);
+    } else if (hasLeadPhone()) {
+      setShowChatbot(true);
     } else {
-      openLogin(() => setPendingMatchCheck(true));
+      setShowPhoneGate(true);
     }
   };
 
@@ -181,9 +197,12 @@ export default function ForkHome() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [searchParams, user, authLoading]);
 
+  // Kept for the choice modal below, which nothing currently opens. It used to
+  // send people browsing; there is nothing to browse, so it sends them to their
+  // matches like every other entry point.
   const chooseMap = () => {
     setShowChoice(false);
-    navigate("/map");
+    navigate("/matches");
   };
 
   const chooseAgent = () => {
@@ -924,9 +943,9 @@ export default function ForkHome() {
               <div className="mzn-choice-grid">
                 <button type="button" className="mzn-choice-opt mzn-choice-opt-plain" onClick={chooseMap}>
                   <span className="mzn-choice-icon"><MapPinIcon /></span>
-                  <span className="mzn-choice-opt-title">Explore map-based listings</span>
-                  <span className="mzn-choice-opt-body">Browse verified flats on a live map and filter by area yourself.</span>
-                  <span className="mzn-choice-opt-cta">Open map <ArrowIcon /></span>
+                  <span className="mzn-choice-opt-title">See my best matches</span>
+                  <span className="mzn-choice-opt-body">Jump straight to the homes we have ranked against what you told us.</span>
+                  <span className="mzn-choice-opt-cta">Show me <ArrowIcon /></span>
                 </button>
 
                 <button type="button" className="mzn-choice-opt mzn-choice-opt-hero" onClick={chooseAgent}>
@@ -943,6 +962,11 @@ export default function ForkHome() {
       </AnimatePresence>
 
       {/* ── AI Broker consultant ── */}
+      <RequirePhoneFirst
+        open={showPhoneGate}
+        onClose={() => setShowPhoneGate(false)}
+        onDone={() => { setShowPhoneGate(false); setShowChatbot(true); }}
+      />
       <AIBroker open={showChatbot} onClose={() => setShowChatbot(false)} />
     </div>
   );

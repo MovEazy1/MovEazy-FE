@@ -15,6 +15,8 @@ import {
 } from "../lib/profileService";
 import { saveCustomerSearchProfile } from "../lib/customerSearchProfile";
 import { attributionToken } from "../lib/attribution";
+import { claimLead, leadSnapshot } from "../lib/leadIntake";
+import { fetchUserRequirement, saveUserRequirement } from "../lib/userRequirements";
 import { isEmailAdminAllowed, getEnvAdminEmails } from "../lib/adminAccess";
 import { supabase, isSupabaseConfigured, normalizeSupabaseError, getSupabaseAuthSettings } from "../lib/supabase";
 
@@ -107,6 +109,40 @@ function saveE2EVerifiedAccounts(value) {
   localStorage.setItem("moveasy_e2e_verified", JSON.stringify(value));
 }
 
+/**
+ * Move a pre-signup lead onto the account that just appeared.
+ *
+ * Split between client and server on purpose. The preferences are written here
+ * through saveUserRequirement, which already owns the prefs-to-columns mapping
+ * and is covered by its own tests; duplicating it in PL/pgSQL would be a second
+ * copy to keep in step. claim_lead_intake() does only the parts the browser
+ * cannot: marking the lead claimed, pointing its CRM row at the new account so
+ * the lead and the customer stop being two rows in the pipeline, and copying
+ * the phone onto the profile.
+ *
+ * Safe to run on every sign-in — the server claims a lead once, and the
+ * requirement write is skipped for anyone who already has one, so a returning
+ * user's saved preferences are never overwritten by a stale browser snapshot.
+ */
+async function adoptLeadIntake(sbUser) {
+  const lead = leadSnapshot();
+  if (!lead?.prefs || !lead.completed) {
+    // Nothing worth carrying over, but still tell the server: the phone and the
+    // CRM link are worth claiming even from an abandoned questionnaire.
+    await claimLead();
+    return;
+  }
+
+  const existing = await fetchUserRequirement(sbUser.id).catch(() => null);
+  if (!existing) {
+    await saveUserRequirement(
+      { uid: sbUser.id, email: sbUser.email, name: lead.name || "" },
+      lead.prefs,
+    );
+  }
+  await claimLead();
+}
+
 function buildUserFromProfile(sbUser, profile) {
   return {
     email: profile.email,
@@ -156,6 +192,18 @@ export function AuthProvider({ children }) {
       // (Already self-protecting internally — wrapped again here too, so a
       // change to that function can't reopen the bug above.)
       await recordSignupAttribution(sbUser);
+    } catch { /* best-effort */ }
+
+    try {
+      // Everything they told us before signing up now belongs to this account.
+      // It happens here rather than in the login modal because Google sign-in
+      // redirects the browser away: by the time they are back, anything
+      // holding a callback is long gone, and this handler is the only thing
+      // that survives the trip.
+      //
+      // Wrapped like its neighbours — an unclaimed lead is a nuisance, being
+      // dropped into the phone-less fallback is a bug the visitor sees.
+      await adoptLeadIntake(sbUser);
     } catch { /* best-effort */ }
 
     try {

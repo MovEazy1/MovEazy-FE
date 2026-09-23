@@ -25,7 +25,7 @@ export function GoogleIcon() {
   );
 }
 
-function LoginPopup({ onClose }) {
+function LoginPopup({ onClose, title, subtitle }) {
   const { loginWithGoogle } = useAuth();
 
   // Lock body scroll
@@ -104,9 +104,18 @@ function LoginPopup({ onClose }) {
               <motion.div key="login" custom={dir}
                 initial={{ opacity: 0, x: dir > 0 ? 18 : -18 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: dir > 0 ? -18 : 18 }}
                 transition={{ duration: 0.2, ease: EASE }}>
-                <h2 className="text-center text-[#1A2421] text-[26px] leading-tight mb-7" style={{ fontFamily: "'Fredoka','Sora',sans-serif", fontWeight: 600 }}>
-                  Login to your Account
+                <h2 className={"text-center text-[#1A2421] text-[26px] leading-tight " + (subtitle ? "mb-2" : "mb-7")} style={{ fontFamily: "'Fredoka','Sora',sans-serif", fontWeight: 600 }}>
+                  {title || "Login to your Account"}
                 </h2>
+
+                {/* Set when the gate follows the questionnaire: it is the
+                    difference between "log in" and "your homes are ready",
+                    which is the entire reason the gate moved to the end. */}
+                {subtitle && (
+                  <p className="text-center text-[13.5px] leading-relaxed mb-6" style={{ color: MUTED }}>
+                    {subtitle}
+                  </p>
+                )}
 
                 {alertBox}
 
@@ -134,6 +143,7 @@ function LoginPopup({ onClose }) {
 
 export function LoginModalProvider({ children }) {
   const [open, setOpen] = useState(false);
+  const [copy, setCopy] = useState({});
 
   /**
    * Callers still pass a "do this once they're in" callback, and it is still
@@ -144,13 +154,28 @@ export function LoginModalProvider({ children }) {
    * Anything that must happen after sign-in belongs in AuthContext's session
    * handler, which runs on return.
    */
-  const openLogin = useCallback(() => setOpen(true), []);
+  /**
+   * Also accepts `{ title, subtitle }` now, so the gate that follows the
+   * preference questionnaire can say what is waiting on the other side of it
+   * rather than the generic "Login to your Account". Existing callers pass a
+   * function, which is ignored exactly as before.
+   */
+  const openLogin = useCallback((arg) => {
+    setCopy(arg && typeof arg === "object" ? arg : {});
+    setOpen(true);
+  }, []);
 
   return (
     <Ctx.Provider value={{ openLogin }}>
       {children}
       <AnimatePresence>
-        {open && <LoginPopup onClose={() => setOpen(false)} />}
+        {open && (
+          <LoginPopup
+            onClose={() => setOpen(false)}
+            title={copy.title}
+            subtitle={copy.subtitle}
+          />
+        )}
       </AnimatePresence>
     </Ctx.Provider>
   );

@@ -18,6 +18,8 @@ import {
 import { geocodePlace, searchPlaces, reverseGeocode } from "../lib/geocode";
 import { useAuth } from "../context/AuthContext";
 import { saveUserRequirement, fetchUserRequirement, rowToPrefs } from "../lib/userRequirements";
+import { leadSnapshot, loadLead, saveLead } from "../lib/leadIntake";
+import { useLoginModal } from "../context/LoginModalContext";
 import { LOCALITIES, ALL_LOCALITIES, FLAT_TYPES, OFFICE_CHIPS } from "../data/preferenceOptions";
 import MovEazyLogo from "./branding/MovEAZYLogo";
 
@@ -65,6 +67,10 @@ function computeBudgetDefaults(flatTypes = []) {
 
 /* ── Question data ─────────────────────────────────────────────────────────── */
 const STEPS = [
+  // First, because it is the one answer that makes everything after it read as
+  // a conversation rather than a form — and because a lead in the CRM with a
+  // number but no name is a cold call.
+  { id: "name", type: "text", q: "First up — what should we call you?", sub: "So our team knows who they're helping.", placeholder: "Your name", max: 60 },
   { id: "office", type: "location", q: "Where's your office located?", sub: "We'll find homes that keep you close to work." },
   { id: "localities", type: "chips", q: "Which localities do you prefer?", sub: "Select multiple areas. We'll show you homes in and around these locations.", options: LOCALITIES },
   { id: "commuteMinutes", type: "cards", single: true, scalar: true, q: "How much time to office works for you?", sub: "Select your comfortable commute time (one-way, by bike).", options: COMMUTE_OPTIONS, note: "We'll show you homes within this commute time from your office." },
@@ -76,6 +82,7 @@ const STEPS = [
 ];
 
 const emptyPrefs = () => ({
+  name: "",
   office: null,
   localities: [],
   commuteMinutes: 30,
@@ -92,12 +99,14 @@ const emptyPrefs = () => ({
 /** The mandatory answers — same set gating "Continue" step-by-step, checked
  * all at once for the single-page review's "Save preferences" button. */
 function prefsComplete(prefs) {
-  return prefs.localities.length > 0 && prefs.occupants.length > 0 && prefs.flatTypes.length > 0;
+  return String(prefs.name || "").trim().length > 0
+    && prefs.localities.length > 0 && prefs.occupants.length > 0 && prefs.flatTypes.length > 0;
 }
 
 export default function AIBroker({ open, onClose }) {
   const navigate = useNavigate();
   const { user } = useAuth();
+  const { openLogin } = useLoginModal();
   // AuthContext hands back a new `user` object on practically every render
   // (its provider value isn't memoized), so depending on `user` itself here
   // would re-fire this effect — and wipe whatever the person just answered —
@@ -109,9 +118,15 @@ export default function AIBroker({ open, onClose }) {
   const [saved, setSaved] = useState(false);
   const [prefs, setPrefs] = useState(emptyPrefs);
 
-  // Reset when reopened. If this user already has a saved requirement, skip
-  // the questionnaire entirely and open straight into the single-page "Modify
-  // my Preferences" review, pre-filled with what they told us last time.
+  // Reset when reopened. A signed-in user with a saved requirement skips the
+  // questionnaire and opens straight into the single-page "Modify my
+  // Preferences" review, pre-filled with what they told us last time.
+  //
+  // A signed-out visitor now has somewhere to resume from too: answers are
+  // written to lead_intake as they go, keyed by the browser, so closing the tab
+  // three questions in and coming back tomorrow picks up at question four
+  // rather than question one. That is the point of asking before signup — the
+  // work survives the visit that produced it.
   useEffect(() => {
     if (!open) return;
     let alive = true;
@@ -120,16 +135,32 @@ export default function AIBroker({ open, onClose }) {
     setSaving(false);
     setSaved(false);
     setPrefs(emptyPrefs());
-    if (uid) {
-      (async () => {
+
+    (async () => {
+      if (uid) {
         const row = await fetchUserRequirement(uid);
         const savedPrefs = rowToPrefs(row);
         if (alive && savedPrefs) {
           setPrefs((p) => ({ ...p, ...savedPrefs }));
           setPhase("review");
         }
-      })();
-    }
+        return;
+      }
+
+      // Show the cached answers immediately, then let the server's copy
+      // correct them — a visitor should never watch a spinner to see what they
+      // themselves typed.
+      const cached = leadSnapshot();
+      if (alive && cached.prefs) setPrefs((p) => ({ ...p, ...cached.prefs }));
+      if (alive && cached.name) setPrefs((p) => ({ ...p, name: cached.name }));
+
+      const lead = await loadLead();
+      if (!alive) return;
+      if (lead.prefs) setPrefs((p) => ({ ...p, ...lead.prefs }));
+      if (lead.name) setPrefs((p) => ({ ...p, name: lead.name }));
+      if (lead.step > 0 && !lead.completed) setStepIdx(Math.min(lead.step, STEPS.length - 1));
+    })();
+
     return () => { alive = false; };
   }, [open, uid]);
 
@@ -165,6 +196,7 @@ export default function AIBroker({ open, onClose }) {
   };
 
   const canContinue = () => {
+    if (step.type === "text") return String(prefs[step.id] || "").trim().length > 0;
     if (step.type === "location") return !!prefs.office;
     if (step.type === "chips") return (prefs[step.id] || []).length > 0;
     if (step.type === "cards") return step.single ? true : (prefs[step.id] || []).length > 0;
@@ -173,18 +205,58 @@ export default function AIBroker({ open, onClose }) {
 
   const begin = () => setPhase("q");
 
+  /**
+   * Hand the finished answers to whoever can hold them.
+   *
+   * Signed in, this is what it always was: write user_requirements and go to
+   * the matches. Signed out, the answers go to the lead instead and the Google
+   * gate comes up — the one place in the flow it now appears. Asking here
+   * rather than on the first click is the whole restructure: by this point we
+   * have a name, a number and a full brief, so a refusal still leaves the team
+   * a lead to call, and the person being asked has something waiting for them
+   * on the other side of it.
+   */
+  const finish = async (nextPrefs) => {
+    if (user) {
+      await saveUserRequirement(user, nextPrefs);
+      onClose?.();
+      navigate("/matches", { state: { prefs: nextPrefs, justSubmitted: true } });
+      return;
+    }
+    await saveLead({
+      name: String(nextPrefs.name || "").trim(),
+      prefs: nextPrefs,
+      step: STEPS.length,
+      completed: true,
+    });
+    onClose?.();
+    openLogin({
+      title: "Sign up to see your shortlisted flats",
+      subtitle: "We've matched your preferences against everything available. Your homes are ready.",
+    });
+  };
+
   const advance = () => {
     // Leaving the flat-type step for the first time: seed the budget range
     // from whatever's still selected there, biggest type wins.
-    if (step.id === "flatTypes") setPrefs((p) => ({ ...p, ...computeBudgetDefaults(p.flatTypes) }));
+    const seeded = step.id === "flatTypes"
+      ? { ...prefs, ...computeBudgetDefaults(prefs.flatTypes) }
+      : prefs;
+    if (step.id === "flatTypes") setPrefs(seeded);
+
     if (stepIdx + 1 >= STEPS.length) {
-      // Questionnaire complete — persist the requirement (best-effort) and take
-      // the user to their top 5 swipeable matches.
-      saveUserRequirement(user, prefs).then(() => {
-        navigate("/matches", { state: { prefs, justSubmitted: true } });
-      });
-      onClose?.();
+      finish(seeded);
     } else {
+      // Save on the way past every step, not only at the end. Someone who
+      // abandons the questionnaire halfway is exactly who this restructure is
+      // meant to catch, and their half-answers are worth more than nothing.
+      if (!user) {
+        saveLead({
+          name: String(seeded.name || "").trim(),
+          prefs: seeded,
+          step: stepIdx + 1,
+        });
+      }
       setStepIdx((i) => i + 1);
     }
   };
@@ -195,6 +267,9 @@ export default function AIBroker({ open, onClose }) {
   const saveReview = async () => {
     if (!prefsComplete(prefs) || saving) return;
     setSaving(true);
+    // Signed out, finish() puts up the signup gate instead of navigating, so
+    // there is no "Saved ✓" beat to sit through before it.
+    if (!user) { await finish(prefs); setSaving(false); return; }
     await saveUserRequirement(user, prefs);
     setSaving(false);
     setSaved(true);
@@ -309,6 +384,23 @@ export default function AIBroker({ open, onClose }) {
  * the "Modify my preferences" review both render this, so an edit made in
  * either place behaves identically. */
 function StepBody({ step, prefs, set, toggle, selectCard }) {
+  if (step.type === "text") {
+    return (
+      <input
+        className="brk-text-input"
+        type="text"
+        autoComplete="given-name"
+        maxLength={step.max || 80}
+        value={prefs[step.id] || ""}
+        onChange={(e) => set({ [step.id]: e.target.value })}
+        placeholder={step.placeholder || ""}
+        // The first question of the questionnaire, so the caret belongs here;
+        // every other step is a tap target and would only raise a keyboard
+        // over the options.
+        autoFocus
+      />
+    );
+  }
   if (step.type === "location") {
     return <OfficeSearch value={prefs.office} onPick={(o) => set({ office: o })} chips={OFFICE_CHIPS} />;
   }
@@ -728,6 +820,12 @@ function Styles() {
 
       .brk-note-banner { display:flex; align-items:flex-start; gap:9px; background:${B.mintWash}; border-radius:12px; padding:12px 14px; font-size:12.5px; line-height:1.45; color:${B.ink}; }
       .brk-note-banner svg { flex-shrink:0; margin-top:1px; }
+
+      /* free text — the name step, and anything else that is a plain answer */
+      .brk-text-input { width:100%; border:1.5px solid ${B.line}; border-radius:12px; padding:13px 15px; background:#fff;
+        font-family:inherit; font-size:15px; color:${B.ink}; outline:none; transition:border-color .15s ease, box-shadow .15s ease; }
+      .brk-text-input::placeholder { color:${B.muted}; }
+      .brk-text-input:focus { border-color:${B.ink}; box-shadow:0 0 0 3px ${B.mintWash}; }
 
       /* localities */
       .brk-search-box { display:flex; align-items:center; gap:9px; border:1.5px solid ${B.line}; border-radius:12px; padding:11px 14px; background:#fff; }

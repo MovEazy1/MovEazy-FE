@@ -37,11 +37,15 @@ export function prefsToRow(prefs, user, extra = {}) {
     priority: arr(p.priority),
     // commuteMinutes/moveInDate have no columns of their own — they ride
     // inside the same notes jsonb blob the per-step "anything else?" text
-    // already uses, so neither preference needs its own migration.
+    // already uses, so neither preference needs its own migration. The name
+    // the questionnaire now opens with rides along the same way: its real home
+    // is user_profiles.name, and this copy exists only so "Modify my
+    // preferences" can show back what they typed.
     notes: {
       ...(p.notes && typeof p.notes === "object" ? p.notes : {}),
       commuteMinutes: num(p.commuteMinutes) ?? 30,
       moveInDate: p.moveInDate || "",
+      ...(String(p.name || "").trim() ? { name: String(p.name).trim().slice(0, 60) } : {}),
     },
     updated_at: new Date().toISOString(),
     ...extra,
@@ -55,6 +59,7 @@ export function prefsToRow(prefs, user, extra = {}) {
 export function rowToPrefs(row) {
   if (!row) return null;
   return {
+    name: row.notes?.name || "",
     office: row.office || null,
     age: row.age || "",
     localities: arr(row.localities),
