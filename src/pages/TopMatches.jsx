@@ -22,7 +22,8 @@ import { listingForScoring, normalizeRequirement, scoreMatch } from "../lib/inve
 import { fetchUserRequirement, markMatchesSeen, rowToPrefs } from "../lib/userRequirements";
 import { toggleSavedListing } from "../lib/userActivity";
 import { logSavedListingChange } from "../lib/crmSync";
-import { setReaction } from "../lib/visits";
+import { fetchBookings, fetchReactions, setReaction } from "../lib/visits";
+import { MOVEAZY_TEAM_WHATSAPP } from "../config/contactChannels";
 import { fetchMyCuratedProperties } from "../lib/curatedShares";
 
 const TOP_N = 5;
@@ -95,6 +96,33 @@ export default function TopMatches() {
   const [curatedCount, setCuratedCount] = useState(0);
   const visitToastTimer = useRef(null);
 
+  /**
+   * Homes this person has already answered for.
+   *
+   * A like, a skip or a booked visit is an answer, and re-dealing the same
+   * card asks the question again — which is what the deck has been doing on
+   * every visit. Each of those answers lives somewhere they can go back to:
+   * likes on /shortlists, visits on /visits, skips deliberately nowhere.
+   *
+   * Loaded once per account rather than watched: the deck removes a card as it
+   * is swiped, so this only has to cover coming *back*.
+   */
+  const [decided, setDecided] = useState(null);
+  useEffect(() => {
+    if (!user?.uid) { setDecided(new Set()); return undefined; }
+    let alive = true;
+    Promise.all([fetchReactions(user.uid), fetchBookings(user.uid)])
+      .then(([reactions, bookings]) => {
+        if (!alive) return;
+        setDecided(new Set([
+          ...Object.keys(reactions || {}),
+          ...(bookings || []).map((b) => b.property_id),
+        ]));
+      })
+      .catch(() => { if (alive) setDecided(new Set()); });
+    return () => { alive = false; };
+  }, [user?.uid]);
+
   // Prefs handed over by the wizard win; otherwise load what's saved for this account.
   useEffect(() => {
     if (prefs || authLoading) return;
@@ -149,15 +177,34 @@ export default function TopMatches() {
    * that exists for exactly this; the map has always used it.
    */
   const topMatches = useMemo(() => {
-    if (!prefs || !listings.length) return [];
+    // Wait for the answered set before dealing anything: showing five cards and
+    // then pulling three of them out as it arrives is worse than a beat of
+    // loading.
+    if (!prefs || !listings.length || decided === null) return [];
     const req = normalizeRequirement(prefs);
     return listings
+      .filter((l) => !decided.has(l.id))
       .map((listing) => ({ listing, ...scoreMatch(listingForScoring(listing), req) }))
       .filter((m) => m.blockers.length === 0)
       .sort((a, b) => b.score - a.score)
       .slice(0, TOP_N)
       .map((r) => ({ ...r.listing, matchScore: r.score, matchReasons: r.reasons }));
-  }, [prefs, listings]);
+  }, [prefs, listings, decided]);
+
+  /**
+   * What the nudge says. Carries their own answers, so the team opens a
+   * message that already knows what they are looking for.
+   */
+  const nudgeHref = useMemo(() => {
+    const where = (prefs?.localities ?? []).slice(0, 3).join(", ");
+    const text = [
+      "Hi MovEazy — I'm looking for a flat and I'd rather not wait.",
+      where ? `Areas: ${where}` : "",
+      prefs?.budgetMax ? `Budget: up to ₹${Number(prefs.budgetMax).toLocaleString("en-IN")}/mo` : "",
+      prefs?.flatTypes?.length ? `Type: ${prefs.flatTypes.join(", ")}` : "",
+    ].filter(Boolean).join("\n");
+    return `${MOVEAZY_TEAM_WHATSAPP}?text=${encodeURIComponent(text)}`;
+  }, [prefs]);
 
 
 
@@ -261,6 +308,26 @@ export default function TopMatches() {
                 </button>
               </>
             )}
+
+            {/* Waiting is the honest answer, but it should not be the only
+                thing on offer. The number is the team's own, from
+                contactChannels — never one inferred from elsewhere. */}
+            <p style={{ color: T.textDim, fontSize: 13, margin: "22px 0 10px" }}>
+              In a hurry?
+            </p>
+            <a
+              href={nudgeHref}
+              target="_blank"
+              rel="noopener noreferrer"
+              style={{
+                display: "inline-flex", alignItems: "center", gap: 8,
+                padding: "13px 26px", borderRadius: 999, textDecoration: "none",
+                border: `1.5px solid ${T.teal}`, color: T.teal,
+                fontWeight: 700, fontSize: 14.5,
+              }}
+            >
+              Nudge us on WhatsApp
+            </a>
           </div>
         )}
       </div>
