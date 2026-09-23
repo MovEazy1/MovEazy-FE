@@ -1,8 +1,9 @@
 import { useEffect, useRef, useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { X, Heart, BedDouble, Bath, Layers, ShieldCheck, MapPin, CalendarCheck, CheckCircle2, Images } from "lucide-react";
+import { X, Heart, BedDouble, Bath, Layers, ShieldCheck, MapPin, CalendarCheck, CheckCircle2, Images, Clock } from "lucide-react";
 import { coverMedia, isVideoUrl, orderListingMedia } from "../lib/listingMedia";
 import { formatPostedAgo } from "../lib/formatTime";
+import { commuteMinutes, formatCommute } from "../lib/commute";
 
 /**
  * One-card-at-a-time swipeable browsing surface. Right swipe = shortlist,
@@ -54,12 +55,16 @@ function Stat({ icon: Icon, value }) {
   );
 }
 
-function SwipeCard({ listing, index, top, onSwiped, onOpenDetails, position }) {
+function SwipeCard({ listing, index, top, onSwiped, onOpenDetails, position, office }) {
   const cover = cardCover(listing);
   const coverIsVideo = isVideoUrl(cover);
   const postedAgo = formatPostedAgo(listing.postedAt);
   const bedrooms = listing.bedrooms || (typeof listing.bhk === "string" ? listing.bhk.match(/\d+/)?.[0] : null);
   const highlights = highlightsFor(listing);
+  // The questionnaire asks how long a commute they will accept; until now the
+  // card never said what this one actually is. Estimated from distance, so it
+  // costs nothing and is ready the moment the card mounts.
+  const commute = commuteMinutes(listing, office);
 
   // Plain state, not a bound MotionValue — a MotionValue wired into style.x
   // fights framer-motion's own exit animation on that same property, which
@@ -158,6 +163,9 @@ function SwipeCard({ listing, index, top, onSwiped, onOpenDetails, position }) {
             <Stat icon={BedDouble} value={bedrooms ? `${bedrooms} Bed` : null} />
             <Stat icon={Bath} value={listing.bathrooms ? `${listing.bathrooms} Bath` : null} />
             <Stat icon={Layers} value={listing.floorNumber ? `Floor ${listing.floorNumber}` : null} />
+            {/* Tilde, not a bare number: this is estimated from distance, not
+                a routed journey, and the card shouldn't pretend otherwise. */}
+            <Stat icon={Clock} value={commute ? `~${formatCommute(commute)} to office` : null} />
           </div>
 
           {highlights.length ? (
@@ -194,6 +202,8 @@ export default function SwipeDeck({
   onScheduleVisit,
   onExhausted,
   onIndexChange,
+  /** Their office from the questionnaire, for the commute estimate. */
+  office = null,
   emptyLabel = "No homes to show right now.",
   advanceOn,
   startIndex = 0,
@@ -314,6 +324,7 @@ export default function SwipeDeck({
               position={position}
               onOpenDetails={onOpenDetails}
               onSwiped={advance}
+              office={office}
             />
           ))}
         </AnimatePresence>
