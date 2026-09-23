@@ -3,7 +3,7 @@
  * see every client it fits, ranked. That's how a new listing turns into four
  * WhatsApp messages in a minute.
  */
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { useCrm } from "./CrmShell";
 import { matchListingToRequirements } from "../../lib/inventoryMatch";
@@ -15,6 +15,11 @@ import {
 } from "../../lib/crmSettings";
 import { groupByPlatform } from "../../lib/marketing";
 import { SCOPES } from "../../lib/adminScopes";
+import { COLUMNS, matchesFilters, optionsFor } from "./propertyColumns";
+
+// One stable empty set, so an unfiltered column does not hand ColumnFilter a
+// brand-new Set on every render and re-run its effects for nothing.
+const EMPTY = new Set();
 import { splitMedia } from "../../lib/listingMedia";
 import { mapInventoryToListing } from "../../lib/inventory";
 import PropertyModal from "../../components/PropertyModal";
@@ -116,6 +121,107 @@ function ChannelRow({ channel, listing, title, onPicked }) {
  * 54px tile is a black square. The id stays underneath, because it is what the
  * search box matches and what every share link and WhatsApp message quotes.
  */
+/**
+ * A tick-list of every value this column actually holds.
+ *
+ * Options come from the rows the search box and status chips already left, not
+ * from the whole table — a filter offering areas that cannot appear is one that
+ * returns nothing and says nothing about why. They deliberately do not narrow
+ * as sibling columns are ticked: options vanishing underneath somebody while
+ * they are still choosing is worse than an occasional empty result.
+ */
+function ColumnFilter({ column, values, picked, onChange }) {
+  const [open, setOpen] = useState(false);
+  const [needle, setNeedle] = useState("");
+  const box = useRef(null);
+
+  useEffect(() => {
+    if (!open) return undefined;
+    const away = (e) => { if (box.current && !box.current.contains(e.target)) setOpen(false); };
+    const esc = (e) => { if (e.key === "Escape") setOpen(false); };
+    document.addEventListener("mousedown", away);
+    window.addEventListener("keydown", esc);
+    return () => {
+      document.removeEventListener("mousedown", away);
+      window.removeEventListener("keydown", esc);
+    };
+  }, [open]);
+
+  const shown = needle
+    ? values.filter((v) => v.toLowerCase().includes(needle.trim().toLowerCase()))
+    : values;
+
+  const toggle = (v) => {
+    const next = new Set(picked);
+    if (next.has(v)) next.delete(v); else next.add(v);
+    onChange(next);
+  };
+
+  const on = picked.size > 0;
+
+  return (
+    <span ref={box} style={{ position: "relative", display: "inline-block" }}>
+      <button
+        type="button"
+        onClick={() => setOpen((o) => !o)}
+        className="crm-btn crm-btn--sm"
+        style={{
+          fontWeight: 600, padding: "2px 7px", gap: 4,
+          borderColor: on ? C.accent : undefined, color: on ? C.accent : undefined,
+        }}
+        title={`Filter by ${column.label}`}
+      >
+        {on ? `${picked.size} picked` : "All"}
+        <span aria-hidden="true" style={{ fontSize: 9 }}>▾</span>
+      </button>
+
+      {open && (
+        <span
+          style={{
+            position: "absolute", top: "calc(100% + 4px)", left: 0, zIndex: 60,
+            width: 218, maxHeight: 280, overflow: "auto", padding: 8,
+            background: C.bg, border: `1px solid ${C.line}`, borderRadius: 10,
+            boxShadow: "0 12px 30px rgba(4,33,29,0.14)",
+            display: "flex", flexDirection: "column", gap: 6,
+          }}
+        >
+          {values.length > 8 && (
+            <input
+              className="crm-input"
+              style={{ fontSize: 11.5, padding: "5px 8px" }}
+              placeholder={`Search ${column.label.toLowerCase()}…`}
+              value={needle}
+              onChange={(e) => setNeedle(e.target.value)}
+              autoFocus
+            />
+          )}
+
+          <span style={{ display: "flex", gap: 6 }}>
+            <Btn sm onClick={() => onChange(new Set(shown))}>All shown</Btn>
+            <Btn sm onClick={() => onChange(new Set())} disabled={!on}>Clear</Btn>
+          </span>
+
+          {shown.length === 0 ? (
+            <span className="crm-mute" style={{ fontSize: 11 }}>Nothing matches.</span>
+          ) : (
+            shown.map((v) => (
+              <label
+                key={v}
+                style={{ display: "flex", alignItems: "center", gap: 7, fontSize: 11.5, cursor: "pointer" }}
+              >
+                <input type="checkbox" checked={picked.has(v)} onChange={() => toggle(v)} />
+                <span style={{ minWidth: 0, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                  {v}
+                </span>
+              </label>
+            ))
+          )}
+        </span>
+      )}
+    </span>
+  );
+}
+
 function PropertyThumbs({ listing, onOpen }) {
   const { photos } = splitMedia([listing.cover_image_url, ...(listing.images ?? [])].filter(Boolean));
   const shown = photos.slice(0, 4);
@@ -301,13 +407,17 @@ export default function CrmPropertiesPage() {
   // sending the agent to a new tab: they are working down a list, and a tab
   // switch loses their place in it.
   const [previewId, setPreviewId] = useState("");
+  /** Ticked values per column; an absent or empty set means "no filter". */
+  const [filters, setFilters] = useState({});
 
   const clientByReq = useMemo(() => {
     const byId = new Map(clients.map((c) => [c.id, c]));
     return (req) => byId.get(req.client_id);
   }, [clients]);
 
-  const rows = useMemo(() => {
+  // What the search box and the status chips leave. The column tick-lists are
+  // built from this, so they only ever offer values that can actually appear.
+  const base = useMemo(() => {
     const needle = q.trim().toLowerCase();
     return inventory.filter((l) => {
       if (status && l.status !== status) return false;
@@ -316,6 +426,20 @@ export default function CrmPropertiesPage() {
         .join(" ").toLowerCase().includes(needle);
     });
   }, [inventory, q, status]);
+
+  const options = useMemo(() => optionsFor(base), [base]);
+
+  const anyFilter = useMemo(
+    () => Object.values(filters).some((s) => s && s.size > 0),
+    [filters],
+  );
+
+  // Any ticked value within a column, every ticked column at once — which is
+  // how somebody reads them: "2 or 3 BHK, in HSR".
+  const rows = useMemo(
+    () => base.filter((l) => matchesFilters(l, filters)),
+    [base, filters],
+  );
 
   // mapInventoryToListing is what PropertyPage feeds the modal too, so the
   // card renders from the same shape in both places.
@@ -363,8 +487,26 @@ export default function CrmPropertiesPage() {
             <table className="crm-table">
               <thead>
                 <tr>
-                  <th>Id</th><th>Home</th><th>Area</th><th>Rent</th><th>Owner</th>
-                  <th>Source</th><th>Added</th><th />
+                  {COLUMNS.map((col) => <th key={col.key}>{col.label}</th>)}
+                  <th />
+                </tr>
+                {/* A second header row rather than a panel above the table: a
+                    filter belongs under the heading it filters, where the
+                    column it applies to cannot be mistaken. */}
+                <tr>
+                  {COLUMNS.map((col) => (
+                    <th key={col.key} style={{ paddingTop: 0, fontWeight: 400 }}>
+                      <ColumnFilter
+                        column={col}
+                        values={options[col.key] || []}
+                        picked={filters[col.key] || EMPTY}
+                        onChange={(next) => setFilters((f) => ({ ...f, [col.key]: next }))}
+                      />
+                    </th>
+                  ))}
+                  <th style={{ paddingTop: 0 }}>
+                    {anyFilter && <Btn sm onClick={() => setFilters({})}>Reset</Btn>}
+                  </th>
                 </tr>
               </thead>
               <tbody>
