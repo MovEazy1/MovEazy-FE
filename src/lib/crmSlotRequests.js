@@ -1,27 +1,36 @@
 /**
  * Tenants waiting on a visit time.
  *
- * When somebody asks to see a flat that has no slots on it, that ask lands in
- * visit_requests and nothing happens to it. The CRM showed a four-line amber
- * strip on the Clients tab with the notification text and a "Done" button —
- * which cleared the alert without arranging anything, and never said which flat
- * it was about or let anyone answer the person waiting.
+ * A booking with no slot_at is somebody who asked for "the next available
+ * slot" on a flat whose lister has published no times — see the comment in
+ * crm_visit_sync.sql, which is what raises the alert. They are the ones
+ * needing a human to arrange a time rather than just to turn up.
  *
- * This is the same queue as data worth acting on: grouped by property, with the
- * people waiting attached, so a screen can show the flat, everyone waiting on
- * it, and the two things that actually resolve it — put times up, or take the
- * flat down.
+ * That queue used to be a four-line amber strip on the Clients tab: the
+ * notification text, and a "Done" button that cleared the alert without
+ * arranging anything. It never said which flat, never showed it, and gave
+ * nobody a way to answer the person waiting.
+ *
+ * This is the same queue as data worth acting on: grouped by property, with
+ * the people waiting attached, so a screen can show the flat, everyone waiting
+ * on it, and the two things that resolve it — put times up, or take the flat
+ * down.
+ *
+ * Reads visit_bookings, which CRM staff already have rights to
+ * (crm_visits_access.sql). There is no visit_requests table in this database;
+ * customer_schema.sql declares one, but it was never applied.
  */
 import { supabase, isSupabaseConfigured } from "./supabase";
 
-/** Pending asks, newest first. Readable by CRM staff (crm_slot_requests.sql). */
+/** Not cancelled, and never given a time. Newest first. */
 export async function fetchPendingSlotRequests({ limit = 500 } = {}) {
   if (!isSupabaseConfigured || !supabase) return [];
   try {
     const { data, error } = await supabase
-      .from("visit_requests")
-      .select("id,customer_id,customer_email,customer_phone,listing_id,listing_title,visit_time,notes,status,created_at")
-      .eq("status", "pending")
+      .from("visit_bookings")
+      .select("id,user_id,property_id,slot_at,kind,status,created_at")
+      .is("slot_at", null)
+      .not("status", "in", "(cancelled,done)")
       .order("created_at", { ascending: false })
       .limit(limit);
     if (error) return [];
@@ -61,10 +70,10 @@ export async function fetchSlotsFor(propertyIds = []) {
  * Marked rather than deleted: the ask is a real thing that happened, and the
  * Visits screen and the client's own timeline still read it.
  */
-export async function resolveSlotRequest(id, status = "scheduled") {
+export async function resolveSlotRequest(id, status = "cancelled") {
   if (!isSupabaseConfigured || !supabase || !id) return false;
   try {
-    const { error } = await supabase.from("visit_requests").update({ status }).eq("id", id);
+    const { error } = await supabase.from("visit_bookings").update({ status }).eq("id", id);
     return !error;
   } catch {
     return false;
@@ -78,11 +87,11 @@ export async function resolveSlotRequest(id, status = "scheduled") {
  * on it once, not once per person waiting, and seeing four people against one
  * address is the argument for doing it now.
  */
-export function groupRequestsByProperty(requests = [], listings = new Map(), slots = new Map()) {
+export function groupRequestsByProperty(requests = [], listings = new Map(), slots = new Map(), profiles = new Map()) {
   const byProperty = new Map();
 
   for (const r of requests) {
-    const id = r.listing_id;
+    const id = r.property_id;
     if (!id) continue;
     if (!byProperty.has(id)) {
       byProperty.set(id, {
@@ -90,7 +99,7 @@ export function groupRequestsByProperty(requests = [], listings = new Map(), slo
         listing: listings.get(id) || null,
         // Falls back to whatever the request recorded at the time, so a flat
         // since removed from inventory still shows something readable.
-        title: listings.get(id)?.title || r.listing_title || id,
+        title: listings.get(id)?.title || id,
         slots: slots.get(id) || [],
         waiting: [],
       });
@@ -99,21 +108,24 @@ export function groupRequestsByProperty(requests = [], listings = new Map(), slo
     // One row per person, not per ask: somebody who asked three times is one
     // person to call back, and three identical rows is three chances to
     // message them three times.
-    const key = (r.customer_phone || r.customer_email || r.customer_id || r.id).toString().toLowerCase();
+    // The booking carries only a user_id; the name and number come from the
+    // profile, which is what an agent needs to open a message.
+    const who = profiles.get(r.user_id) || {};
+    const key = (who.phone || who.email || r.user_id || r.id).toString().toLowerCase();
     const seen = group.waiting.find((w) => w.key === key);
     if (seen) {
       seen.asks += 1;
-      if (r.notes && !seen.notes) seen.notes = r.notes;
       continue;
     }
     group.waiting.push({
       key,
       id: r.id,
-      userId: r.customer_id || null,
-      email: r.customer_email || "",
-      phone: r.customer_phone || "",
-      preferred: r.visit_time || "",
-      notes: r.notes || "",
+      userId: r.user_id || null,
+      name: who.name || "",
+      email: who.email || "",
+      phone: who.phone || "",
+      preferred: "",
+      notes: "",
       askedAt: r.created_at,
       asks: 1,
     });

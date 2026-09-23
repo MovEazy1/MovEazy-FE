@@ -22,6 +22,7 @@ import {
   askPreferredTimeMessage, fetchPendingSlotRequests, fetchSlotsFor, formatSlot,
   groupRequestsByProperty, resolveSlotRequest, slotsAvailableMessage,
 } from "../../lib/crmSlotRequests";
+import { fetchProfilesFor } from "../../lib/crmVisits";
 
 /** A tenant with no number can't be messaged, only called back by email. */
 function WaitingRow({ person, group, nameFor, onMessaged }) {
@@ -103,7 +104,9 @@ function PropertyCard({ group, nameFor, canWrite, onChanged }) {
       await setInventoryStatus(group.propertyId, "rented");
       // The asks are closed too: the flat is gone, so nobody is still waiting
       // on a time for it.
-      await Promise.all(group.waiting.map((w) => resolveSlotRequest(w.id, "closed")));
+      // "cancelled", not "closed": the fetch excludes cancelled and done, and
+      // a status outside that pair would leave every row right where it was.
+      await Promise.all(group.waiting.map((w) => resolveSlotRequest(w.id, "cancelled")));
       onChanged();
     } catch {
       setBusy(false);
@@ -187,13 +190,21 @@ export default function CrmNotificationsPage() {
 
   const [requests, setRequests] = useState([]);
   const [slots, setSlots] = useState(new Map());
+  const [profiles, setProfiles] = useState(new Map());
   const [loading, setLoading] = useState(true);
 
   const load = useCallback(async () => {
     setLoading(true);
     const rows = await fetchPendingSlotRequests();
     setRequests(rows);
-    setSlots(await fetchSlotsFor(rows.map((r) => r.listing_id)));
+    // A booking carries a user_id and nothing else about the person, so the
+    // name and number an agent needs come from the profile.
+    const [slotRows, profileRows] = await Promise.all([
+      fetchSlotsFor(rows.map((r) => r.property_id)),
+      fetchProfilesFor(rows.map((r) => r.user_id)),
+    ]);
+    setSlots(slotRows);
+    setProfiles(new Map((profileRows ?? []).map((p) => [p.id, p])));
     setLoading(false);
   }, []);
 
@@ -205,8 +216,8 @@ export default function CrmNotificationsPage() {
   );
 
   const groups = useMemo(
-    () => groupRequestsByProperty(requests, listingsById, slots),
-    [requests, listingsById, slots],
+    () => groupRequestsByProperty(requests, listingsById, slots, profiles),
+    [requests, listingsById, slots, profiles],
   );
 
   /**
@@ -222,6 +233,8 @@ export default function CrmNotificationsPage() {
       if (c.email) byEmail.set(String(c.email).toLowerCase(), c.name);
     }
     return (person) => {
+      // Their profile name first — it is the one they gave us themselves.
+      if (person.name) return person.name;
       const viaPhone = person.phone ? byPhone.get(String(person.phone).replace(/\D/g, "").slice(-10)) : "";
       const viaEmail = person.email ? byEmail.get(person.email.toLowerCase()) : "";
       return viaPhone || viaEmail || (person.email ? person.email.split("@")[0] : "Tenant");
