@@ -45,10 +45,20 @@ export default function PropertyPage() {
    * stops and back means the homepage, because a page that will not let go is
    * worse than the drop-off it is trying to prevent.
    *
-   * Only for a deep-link entry: location.key is "default" only for the entry a
-   * tab opened on, so browsing in from the map or the deck keeps a normal back.
+   * Only for a deep-link entry, and the test for that is the history index
+   * rather than location.key.
+   *
+   * A shared link does not land here directly: /p/:id redirects to
+   * /map?listingId=, which the router then <Navigate replace>s to this route.
+   * That replace mints a new location.key, so keying on it meant the guard
+   * never armed for the one journey it exists for — it only ever worked when
+   * the address was typed straight in. React Router's idx counts entries and a
+   * replace does not advance it, so it is still 0 however many redirects
+   * happened on the way in, and still non-zero for somebody who browsed here.
    */
-  const [deepLinkEntry] = useState(() => !location.key || location.key === "default");
+  const [deepLinkEntry] = useState(
+    () => (window.history.state?.idx ?? 0) === 0 || !location.key || location.key === "default",
+  );
   const backsLeft = useRef(2);
 
   useEffect(() => {
