@@ -24,6 +24,9 @@ export const useCrm = () => useContext(CrmContext);
 
 const RAIL = [
   { to: "/crm/clients",    code: "CL", label: "Clients" },
+  // Before Pipeline: it is the tab with work waiting on somebody, and a queue
+  // nobody walks past is a queue nobody clears.
+  { to: "/crm/notifications", code: "NF", label: "Notifications" },
   { to: "/crm/pipeline",   code: "PI", label: "Pipeline" },
   { to: "/crm/properties", code: "PR", label: "Properties" },
   { to: "/crm/visits",     code: "VS", label: "Visits" },
