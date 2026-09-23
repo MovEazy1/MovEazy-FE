@@ -171,8 +171,13 @@ export function LoginModalProvider({ children }) {
     setOpen(true);
   }, []);
 
+  // Callers that own the back button need to be able to take this down
+   // themselves — a page intercepting back to keep somebody on the site cannot
+   // leave a sign-in sheet sitting on top of whatever it shows them instead.
+  const closeLogin = useCallback(() => setOpen(false), []);
+
   return (
-    <Ctx.Provider value={{ openLogin }}>
+    <Ctx.Provider value={{ openLogin, closeLogin }}>
       {children}
       <AnimatePresence>
         {open && (

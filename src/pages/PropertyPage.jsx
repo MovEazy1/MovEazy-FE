@@ -10,12 +10,12 @@
  * `?visit=1` opens straight on the booking panel — that is what "Schedule a
  * visit" sends when it has to leave the page it was on.
  */
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useLocation, useNavigate, useParams } from "react-router-dom";
 import PropertyModal from "../components/PropertyModal";
 import AIBroker from "../components/AIBroker";
 import Toast from "../components/Toast";
-import useBackClose from "../hooks/useBackClose";
+import { useLoginModal } from "../context/LoginModalContext";
 import { fetchInventoryByIds, mapInventoryToListing } from "../lib/inventory";
 
 const T = { ink: "#04211D", text: "#171412", textDim: "#5c554e" };
@@ -30,7 +30,61 @@ export default function PropertyPage() {
   // useBackClose makes that a real history entry, so back closes the wizard
   // and returns here instead of leaving the site the link came from.
   const [showBroker, setShowBroker] = useState(false);
-  useBackClose(showBroker, () => setShowBroker(false), "broker-from-property");
+  const { closeLogin } = useLoginModal();
+
+  /**
+   * Back, on a flat somebody was sent, goes nowhere useful.
+   *
+   * They arrived on this page — it is the first entry in the tab — so back is
+   * the app they came from: WhatsApp, a feed, a subreddit. One press and the
+   * visit is over, whatever they were in the middle of.
+   *
+   * So the first couple of presses open the questionnaire instead. It is the
+   * one thing on the site that is worth more to them than the flat they were
+   * sent, and it is where a lead actually starts. After that the intercepting
+   * stops and back means the homepage, because a page that will not let go is
+   * worse than the drop-off it is trying to prevent.
+   *
+   * Only for a deep-link entry: location.key is "default" only for the entry a
+   * tab opened on, so browsing in from the map or the deck keeps a normal back.
+   */
+  const [deepLinkEntry] = useState(() => !location.key || location.key === "default");
+  const backsLeft = useRef(2);
+
+  useEffect(() => {
+    if (!deepLinkEntry) return undefined;
+
+    let armed = true;
+    // Same URL, one extra entry: back now has somewhere to land that is not
+    // the app they came from.
+    const arm = () =>
+      window.history.pushState({ ...window.history.state, mzExitGuard: true }, "", window.location.href);
+
+    arm();
+
+    const onPop = () => {
+      if (!armed) return;
+      if (backsLeft.current > 0) {
+        backsLeft.current -= 1;
+        // A sign-in sheet would otherwise sit on top of the questionnaire we
+        // are about to show, and it is above it in the stacking order.
+        closeLogin();
+        setShowBroker(true);
+        arm();
+        return;
+      }
+      // Out of chances. The homepage, not the site they came from.
+      armed = false;
+      navigate("/", { replace: true });
+    };
+
+    window.addEventListener("popstate", onPop);
+    return () => {
+      armed = false;
+      window.removeEventListener("popstate", onPop);
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [deepLinkEntry]);
 
   const [listing, setListing] = useState(null);
   const [loading, setLoading] = useState(true);
