@@ -83,10 +83,19 @@ const OCCUPANT_CARDS = [
  * now an agent learned which was which on the call.
  */
 const PROFILE_SETTLED = "In Bengaluru 3+ months";
+/**
+ * Ordered newest-arrival first, so the list runs along one axis — just out of
+ * college, just arrived, settled — instead of jumping about.
+ *
+ * The follow-up question hangs off PROFILE_SETTLED, the stored tag, not this
+ * list's order. Moving an option up or down cannot detach it; only changing
+ * that tag could, which is why the labels are free to be rewritten and the
+ * values are not.
+ */
 const PROFILE_OPTIONS = [
+  { value: "First job after college", label: "Fresh graduate" },
+  { value: "New to Bengaluru", label: "Moved to Bangalore recently" },
   { value: PROFILE_SETTLED, label: "Been in Bangalore for more than 3 months" },
-  { value: "New to Bengaluru", label: "Just moved to Bangalore recently" },
-  { value: "First job after college", label: "I'm here for my first job after college" },
 ];
 
 /**
