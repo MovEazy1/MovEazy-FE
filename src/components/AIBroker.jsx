@@ -169,7 +169,10 @@ const emptyPrefs = () => ({
   commuteMinutes: 30,
   occupants: ["Bachelor"],
   flatTypes: [...FLAT_TYPES],
-  moveInDate: "Immediately",
+  // A month out, not "Immediately": that was the truthful answer for almost
+  // nobody, and a default nobody means is worse than no default — it lands in
+  // the CRM as urgency the person never claimed.
+  moveInDate: "Within 1 month",
   ...computeBudgetDefaults([...FLAT_TYPES]),
   stretch: true,
   mustHaves: [], lifestyle: [], dealBreakers: [],
