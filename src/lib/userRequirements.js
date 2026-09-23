@@ -45,6 +45,13 @@ export function prefsToRow(prefs, user, extra = {}) {
       ...(p.notes && typeof p.notes === "object" ? p.notes : {}),
       commuteMinutes: num(p.commuteMinutes) ?? 30,
       moveInDate: p.moveInDate || "",
+      // Whether the commute figure above is a wall or a preference. Without it
+      // a great flat six minutes past the line is silently thrown away.
+      commuteFlexible: p.commuteFlexible !== false,
+      // Who they are and why they're moving. Both are short canonical tags, so
+      // the CRM can group on them; neither has a column of its own.
+      profile: p.profile || "",
+      moveReason: p.moveReason || "",
       ...(String(p.name || "").trim() ? { name: String(p.name).trim().slice(0, 60) } : {}),
     },
     updated_at: new Date().toISOString(),
@@ -60,6 +67,11 @@ export function rowToPrefs(row) {
   if (!row) return null;
   return {
     name: row.notes?.name || "",
+    profile: row.notes?.profile || "",
+    moveReason: row.notes?.moveReason || "",
+    // Defaults to true for rows saved before the question existed, matching
+    // the checkbox's own default rather than silently narrowing their search.
+    commuteFlexible: row.notes?.commuteFlexible !== false,
     office: row.office || null,
     age: row.age || "",
     localities: arr(row.localities),

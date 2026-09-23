@@ -5,7 +5,7 @@
  * progress bar, and a sticky Back/Next footer. Renders its own full-screen
  * overlay. Mount as <AIBroker open onClose/>.
  */
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { motion, AnimatePresence, Reorder } from "framer-motion";
 import { MapContainer, TileLayer, Marker, Tooltip, useMap, useMapEvents, ZoomControl } from "react-leaflet";
@@ -73,6 +73,34 @@ const OCCUPANT_CARDS = [
   { value: "Family", label: "Family", sub: "Spouse / Kids", Icon: Home },
   { value: "Others", label: "Others", sub: "Let us know", Icon: MoreHorizontal },
 ];
+/**
+ * Who we're talking to, and — for the one group where it isn't obvious — why
+ * they're moving.
+ *
+ * The stored `value` is a short canonical tag, because this is read in the CRM
+ * and sorted on; the long sentence is only the label. Someone new to the city
+ * needs different handling from someone whose lease is running out, and until
+ * now an agent learned which was which on the call.
+ */
+const PROFILE_SETTLED = "In Bengaluru 3+ months";
+const PROFILE_OPTIONS = [
+  { value: PROFILE_SETTLED, label: "Been in Bangalore for more than 3 months" },
+  { value: "New to Bengaluru", label: "Just moved to Bangalore recently" },
+  { value: "First job after college", label: "I'm here for my first job after college" },
+];
+
+/**
+ * Only asked of someone already living here. Somebody who has just arrived, or
+ * is starting their first job, has already given the reason in the previous
+ * answer — asking again would be making them say it twice.
+ */
+const MOVE_REASON_OPTIONS = [
+  { value: "Lease expiring", label: "My current lease agreement is going to expire, so I want to move out" },
+  { value: "Wants a change", label: "I want a change, so I'm looking for a new flat" },
+  { value: "Switched company", label: "I've switched company, so I'm looking for a new flat" },
+  { value: "Commute too long", label: "My travel time is too long, so I'm moving to a new flat" },
+];
+
 const FLAT_TYPE_ICONS = { "1 RK": Home, "1 BHK": Home, "2 BHK": Building2, "3 BHK": Building2, "Villa": TreePine, "Room in Preoccupied flat": BedDouble };
 const FLAT_TYPE_SHORT_LABEL = { "Room in Preoccupied flat": "Room" };
 const FLAT_TYPE_CARDS = FLAT_TYPES.map((t) => ({ value: t, label: FLAT_TYPE_SHORT_LABEL[t] || t, Icon: FLAT_TYPE_ICONS[t] || Home }));
@@ -92,9 +120,18 @@ const STEPS = [
   // a conversation rather than a form — and because a lead in the CRM with a
   // number but no name is a cold call.
   { id: "name", type: "text", q: "First up — what should we call you?", sub: "So our team knows who they're helping.", placeholder: "Your name", max: 60 },
+  { id: "profile", type: "choice", scalar: true, required: true, options: PROFILE_OPTIONS,
+    q: "What best describes you?", sub: "It changes what we look for, and how quickly." },
+  // `when` is what makes this one conditional; see stepsFor() below.
+  { id: "moveReason", type: "choice", scalar: true, required: true, options: MOVE_REASON_OPTIONS,
+    when: (p) => p.profile === PROFILE_SETTLED,
+    q: "The reason I'm looking for a flat is", sub: "So we know what you're working around." },
   { id: "office", type: "location", q: "Where's your office located?", sub: "We'll find homes that keep you close to work." },
   { id: "localities", type: "chips", q: "Which localities do you prefer?", sub: "Select multiple areas. We'll show you homes in and around these locations.", options: LOCALITIES },
-  { id: "commuteMinutes", type: "cards", single: true, scalar: true, q: "How much time to office works for you?", sub: "Select your comfortable commute time (one-way, by bike).", options: COMMUTE_OPTIONS, note: "We'll show you homes within this commute time from your office." },
+  { id: "commuteMinutes", type: "cards", single: true, scalar: true, q: "How much time to office works for you?", sub: "Select your comfortable commute time (one-way, by bike).", options: COMMUTE_OPTIONS, note: "We'll show you homes within this commute time from your office.",
+    // Ticked, a good flat just outside the radius is still worth sending. It
+    // stops a hard cut-off throwing away the best home by five minutes.
+    checkbox: { id: "commuteFlexible", label: "I'm comfortable going a little beyond this for great properties" } },
   { id: "occupants", type: "cards", single: true, q: "Who'll be living there?", sub: "This helps us find the right kind of homes and landlords.", options: OCCUPANT_CARDS },
   { id: "flatTypes", type: "cards", single: false, q: "What type of home are you looking for?", sub: "Select all that work for you.", options: FLAT_TYPE_CARDS },
   { id: "moveInDate", type: "cards", single: true, scalar: true, q: "When are you looking to move in?", sub: "This helps us prioritize the right homes for you.", options: MOVE_IN_OPTIONS },
@@ -102,8 +139,22 @@ const STEPS = [
   { id: "priority", type: "rank", q: "One last thing — what matters most to you?", sub: "Drag to reorder, with your top priority at the top." },
 ];
 
+/**
+ * The questions this person actually gets.
+ *
+ * Every step is declared in STEPS; one of them carries a `when` and only
+ * appears for the answer it follows from. Derived rather than stored, so the
+ * list corrects itself the moment someone goes back and changes that answer.
+ */
+function stepsFor(prefs) {
+  return STEPS.filter((s) => !s.when || s.when(prefs));
+}
+
 const emptyPrefs = () => ({
   name: "",
+  profile: "",
+  moveReason: "",
+  commuteFlexible: true,
   office: null,
   localities: [],
   commuteMinutes: 30,
@@ -113,7 +164,7 @@ const emptyPrefs = () => ({
   ...computeBudgetDefaults([...FLAT_TYPES]),
   stretch: true,
   mustHaves: [], lifestyle: [], dealBreakers: [],
-  priority: ["Near to Office", "Good locality", "Budget fit", "Apartment over standalone", "Flat size", "Ventilation"],
+  priority: ["Near to Office", "Good locality", "Budget fit", "I want a flat quickly", "Apartment over standalone", "Flat size", "Ventilation"],
   notes: {},
 });
 
@@ -179,7 +230,7 @@ export default function AIBroker({ open, onClose }) {
       if (!alive) return;
       if (lead.prefs) setPrefs((p) => ({ ...p, ...lead.prefs }));
       if (lead.name) setPrefs((p) => ({ ...p, name: lead.name }));
-      if (lead.step > 0 && !lead.completed) setStepIdx(Math.min(lead.step, STEPS.length - 1));
+      if (lead.step > 0 && !lead.completed) setStepIdx(Math.min(lead.step, stepsFor({ ...emptyPrefs(), ...(lead.prefs || {}) }).length - 1));
     })();
 
     return () => { alive = false; };
@@ -197,7 +248,13 @@ export default function AIBroker({ open, onClose }) {
     };
   }, [open, onClose]);
 
-  const step = STEPS[stepIdx];
+  // The questions this person gets, which depends on what they have answered.
+  const steps = useMemo(() => stepsFor(prefs), [prefs]);
+  // Clamped rather than corrected in an effect: going back and changing the
+  // answer that opened the follow-up removes a step underneath the cursor, and
+  // an out-of-range index would render nothing at all for a frame.
+  const idx = Math.min(stepIdx, steps.length - 1);
+  const step = steps[idx];
   const set = (patch) => setPrefs((p) => ({ ...p, ...patch }));
   const toggle = (key, val, max) =>
     setPrefs((p) => {
@@ -220,6 +277,9 @@ export default function AIBroker({ open, onClose }) {
     if (step.type === "text") return String(prefs[step.id] || "").trim().length > 0;
     if (step.type === "location") return !!prefs.office;
     if (step.type === "chips") return (prefs[step.id] || []).length > 0;
+    // A single-select with a sensible default is always satisfied; one marked
+    // `required` has none, so it has to be answered rather than walked past.
+    if (step.type === "choice") return !step.required || !!prefs[step.id];
     if (step.type === "cards") return step.single ? true : (prefs[step.id] || []).length > 0;
     return true;
   };
@@ -247,7 +307,7 @@ export default function AIBroker({ open, onClose }) {
     await saveLead({
       name: String(nextPrefs.name || "").trim(),
       prefs: nextPrefs,
-      step: STEPS.length,
+      step: steps.length,
       completed: true,
     });
     onClose?.();
@@ -265,7 +325,7 @@ export default function AIBroker({ open, onClose }) {
       : prefs;
     if (step.id === "flatTypes") setPrefs(seeded);
 
-    if (stepIdx + 1 >= STEPS.length) {
+    if (idx + 1 >= steps.length) {
       finish(seeded);
     } else {
       // Save on the way past every step, not only at the end. Someone who
@@ -275,10 +335,10 @@ export default function AIBroker({ open, onClose }) {
         saveLead({
           name: String(seeded.name || "").trim(),
           prefs: seeded,
-          step: stepIdx + 1,
+          step: idx + 1,
         });
       }
-      setStepIdx((i) => i + 1);
+      setStepIdx(idx + 1);
     }
   };
 
@@ -323,11 +383,11 @@ export default function AIBroker({ open, onClose }) {
             {phase === "q" && (
               <div className="brk-progress-row">
                 <div className="brk-progress-track">
-                  {STEPS.map((s, i) => (
-                    <span key={s.id} className={`brk-progress-seg ${i <= stepIdx ? "on" : ""}`} />
+                  {steps.map((s, i) => (
+                    <span key={s.id} className={`brk-progress-seg ${i <= idx ? "on" : ""}`} />
                   ))}
                 </div>
-                <span className="brk-progress-count">{stepIdx + 1} of {STEPS.length}</span>
+                <span className="brk-progress-count">{idx + 1} of {steps.length}</span>
               </div>
             )}
 
@@ -385,7 +445,7 @@ export default function AIBroker({ open, onClose }) {
                     <h2 className="brk-q">Modify my preferences</h2>
                     <p className="brk-sub">Everything I know about your search — change anything, then save.</p>
                     <div className="brk-review-list">
-                      {STEPS.map((s) => (
+                      {steps.map((s) => (
                         <div key={s.id} className="brk-review-block">
                           <h3 className="brk-review-q">{s.q}</h3>
                           <StepBody step={s} prefs={prefs} set={set} toggle={toggle} selectCard={selectCard} />
@@ -404,13 +464,13 @@ export default function AIBroker({ open, onClose }) {
                 </button>
               ) : phase === "q" ? (
                 <>
-                  {stepIdx === 0 ? (
+                  {idx === 0 ? (
                     <button type="button" className="brk-link" onClick={advance}>Skip for now</button>
                   ) : (
-                    <button type="button" className="brk-link" onClick={() => setStepIdx((i) => Math.max(0, i - 1))}><ChevronLeft size={16} /> Back</button>
+                    <button type="button" className="brk-link" onClick={() => setStepIdx(Math.max(0, idx - 1))}><ChevronLeft size={16} /> Back</button>
                   )}
                   <button type="button" className="brk-next" disabled={!canContinue()} onClick={advance}>
-                    {stepIdx + 1 >= STEPS.length ? "Find my homes" : "Next"} <ChevronRight size={16} />
+                    {idx + 1 >= steps.length ? "Find my homes" : "Next"} <ChevronRight size={16} />
                   </button>
                 </>
               ) : (
@@ -456,11 +516,48 @@ function StepBody({ step, prefs, set, toggle, selectCard }) {
   if (step.type === "chips") {
     return <LocalityChips step={step} prefs={prefs} toggle={toggle} />;
   }
+  if (step.type === "choice") {
+    // Full-width rows rather than the two-up card grid: these answers are
+    // sentences, and a sentence in a 50%-width tile wraps to four lines.
+    return (
+      <div className="brk-choices" role="radiogroup" aria-label={step.q}>
+        {step.options.map((o) => {
+          const on = prefs[step.id] === o.value;
+          return (
+            <button
+              key={o.value}
+              type="button"
+              role="radio"
+              aria-checked={on}
+              className={`brk-choice ${on ? "on" : ""}`}
+              onClick={() => set({ [step.id]: o.value })}
+            >
+              <span className="brk-choice-dot" aria-hidden="true">{on && <Check size={12} strokeWidth={3} />}</span>
+              <span className="brk-choice-label">{o.label}</span>
+            </button>
+          );
+        })}
+      </div>
+    );
+  }
   if (step.type === "cards") {
     return (
       <>
         <CardGrid step={step} prefs={prefs} onSelect={(v) => selectCard(step, v)} />
         {step.note && <div className="brk-note-banner"><Info size={16} />{step.note}</div>}
+        {step.checkbox && (
+          <label className="brk-check">
+            <input
+              type="checkbox"
+              checked={!!prefs[step.checkbox.id]}
+              onChange={(e) => set({ [step.checkbox.id]: e.target.checked })}
+            />
+            <span className="brk-check-box" aria-hidden="true">
+              {prefs[step.checkbox.id] && <Check size={12} strokeWidth={3} />}
+            </span>
+            <span className="brk-check-label">{step.checkbox.label}</span>
+          </label>
+        )}
       </>
     );
   }
@@ -908,6 +1005,32 @@ function Styles() {
         font-family:inherit; font-size:15px; color:${B.ink}; outline:none; transition:border-color .15s ease, box-shadow .15s ease; }
       .brk-text-input::placeholder { color:${B.muted}; }
       .brk-text-input:focus { border-color:${B.ink}; box-shadow:0 0 0 3px ${B.mintWash}; }
+
+      /* single-choice rows — for answers that are sentences, not labels */
+      .brk-choices { display:flex; flex-direction:column; gap:9px; }
+      .brk-choice { display:flex; align-items:flex-start; gap:11px; width:100%; text-align:left;
+        border:1.5px solid ${B.line}; border-radius:13px; background:#fff; padding:14px 15px;
+        font-family:inherit; font-size:14px; line-height:1.45; color:${B.ink}; cursor:pointer;
+        transition:border-color .15s ease, background .15s ease; }
+      @media (hover:hover) { .brk-choice:hover { border-color:${B.mintBorder}; } }
+      .brk-choice.on { border-color:${B.accent}; background:${B.mintWash}; }
+      .brk-choice:focus-visible { outline:2px solid ${B.accent}; outline-offset:2px; }
+      .brk-choice-dot { flex:none; width:19px; height:19px; margin-top:1px; border-radius:50%;
+        border:1.5px solid ${B.line}; background:#fff; display:flex; align-items:center; justify-content:center; color:#fff; }
+      .brk-choice.on .brk-choice-dot { background:${B.accent}; border-color:${B.accent}; }
+      .brk-choice-label { flex:1; min-width:0; font-weight:600; }
+
+      /* an optional qualifier under a question, not an answer of its own */
+      .brk-check { display:flex; align-items:flex-start; gap:10px; margin-top:14px; cursor:pointer;
+        padding:12px 13px; border-radius:12px; background:${B.mintWash}; border:1px solid transparent;
+        transition:border-color .15s ease; }
+      @media (hover:hover) { .brk-check:hover { border-color:${B.mintBorder}; } }
+      .brk-check input { position:absolute; opacity:0; width:0; height:0; }
+      .brk-check-box { flex:none; width:19px; height:19px; border-radius:6px; border:1.5px solid ${B.line};
+        background:#fff; display:flex; align-items:center; justify-content:center; color:#fff; margin-top:1px; }
+      .brk-check input:checked ~ .brk-check-box { background:${B.accent}; border-color:${B.accent}; }
+      .brk-check input:focus-visible ~ .brk-check-box { outline:2px solid ${B.accent}; outline-offset:2px; }
+      .brk-check-label { font-size:13.5px; line-height:1.45; color:${B.ink}; font-weight:600; }
 
       /* localities */
       .brk-search-box { display:flex; align-items:center; gap:9px; border:1.5px solid ${B.line}; border-radius:12px; padding:11px 14px; background:#fff; }
