@@ -9,8 +9,20 @@
  * Add or rename an option here once and both flows stay in lockstep.
  */
 
-export const LOCALITIES = ["HSR", "Koramangala", "Indiranagar", "Bellandur", "Whitefield", "Electronic City", "Sarjapur", "BTM", "JP Nagar", "Marathahalli"];
-export const LOCALITIES_MORE = ["HSR Extension", "Kudlu Gate", "Harlur Road", "Silver County Road", "ITI Layout", "Jayanagar", "Hebbal", "Mahadevpura", "Bannerghatta Rd", "Yelahanka", "Rajajinagar"];
+/**
+ * The chips shown under "Popular nearby".
+ *
+ * The south-east cluster — HSR Extension and the roads inside it — was only
+ * reachable by typing into the search box, which nobody does when there is a
+ * row of chips underneath it. Most of our inventory sits there, so the areas
+ * we can actually fill are now the ones on offer.
+ */
+export const LOCALITIES = [
+  "HSR", "HSR Extension", "Koramangala", "Indiranagar", "Bellandur",
+  "Kudlu Gate", "Kudlu Road", "Harlur Road", "Silver County Road",
+  "Whitefield", "Electronic City", "Sarjapur", "BTM", "JP Nagar", "Marathahalli",
+];
+export const LOCALITIES_MORE = ["ITI Layout", "Jayanagar", "Hebbal", "Mahadevpura", "Bannerghatta Rd", "Yelahanka", "Rajajinagar"];
 export const OCCUPANTS = ["Bachelor", "Family", "Couple", "Working Professionals", "Students", "Pet Owner"];
 
 /**
@@ -60,7 +72,10 @@ export const ALL_LOCALITIES = [...LOCALITIES, ...LOCALITIES_MORE];
  *    keeps the precise name so a renter still reads "Kudlu Gate".
  */
 export const AREA_GROUPS = {
-  "HSR Extension": ["Kudlu Gate", "Harlur Road", "Silver County Road", "ITI Layout"],
+  // Kudlu Road sits alongside Kudlu Gate inside HSR Extension, so asking for
+  // the parent has to reach it too — otherwise a flat listed on Kudlu Road is
+  // invisible to everyone who searched the area it is in.
+  "HSR Extension": ["Kudlu Gate", "Kudlu Road", "Harlur Road", "Silver County Road", "ITI Layout"],
 };
 
 const norm = (a) => String(a || "").trim().toLowerCase();

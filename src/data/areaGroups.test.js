@@ -8,18 +8,18 @@ import {
   ALL_LOCALITIES, expandArea, expandAreas, parentAreaOf, withParentArea,
 } from "./preferenceOptions";
 
-describe("the five new areas exist for both sides to pick", () => {
+describe("the south-east areas exist for both sides to pick", () => {
   it("is offered wherever localities are listed", () => {
-    for (const a of ["HSR Extension", "Kudlu Gate", "Harlur Road", "Silver County Road", "ITI Layout"]) {
+    for (const a of ["HSR Extension", "Kudlu Gate", "Kudlu Road", "Harlur Road", "Silver County Road", "ITI Layout"]) {
       expect(ALL_LOCALITIES, a).toContain(a);
     }
   });
 });
 
 describe("asking for the parent takes any of its children", () => {
-  it("opens HSR Extension up into all five", () => {
+  it("opens HSR Extension up into every road inside it", () => {
     expect(expandArea("HSR Extension")).toEqual([
-      "HSR Extension", "Kudlu Gate", "Harlur Road", "Silver County Road", "ITI Layout",
+      "HSR Extension", "Kudlu Gate", "Kudlu Road", "Harlur Road", "Silver County Road", "ITI Layout",
     ]);
   });
 
@@ -39,7 +39,7 @@ describe("asking for the parent takes any of its children", () => {
   });
 
   it("ignores case and stray spacing", () => {
-    expect(expandArea("  hsr extension ")).toHaveLength(5);
+    expect(expandArea("  hsr extension ")).toHaveLength(6);
   });
 });
 
