@@ -10,7 +10,7 @@ import { canReadListingPrivatePhones } from "../lib/accessControl";
 import { isSupabaseConfigured } from "../lib/supabase";
 import {
   ArrowLeft, Share2, Heart, BedDouble, Users, Home as HomeIcon, CalendarDays,
-  MapPin, ChevronRight, CalendarCheck, Images, Compass,
+  MapPin, ChevronRight, CalendarCheck, Images,
 } from "lucide-react";
 import logoMint from "../assets/logo/moveazy-logo-mint-dark.png";
 import { useLoginModal } from "../context/LoginModalContext";
@@ -190,7 +190,7 @@ function MediaElement({ src, alt, style, firstImage }) {
  *   shortlisted for you").
  */
 export default function PropertyModal({
-  property, onClose, listings = [], onSelectListing, onSavedChange, onVisitBooked, onExploreMore,
+  property, onClose, listings = [], onSelectListing, onSavedChange, onVisitBooked,
   initialShowVisitForm = false, banner = null, manageHistory = true,
 }) {
   const { user } = useAuth();
@@ -610,7 +610,13 @@ export default function PropertyModal({
   const confirmSlot = async () => {
     if (!chosenSlot || offMarket) return;
     // Signing in mid-flow shouldn't lose the slot they picked.
-    if (!user) { openLogin?.(() => confirmSlot()); return; }
+    // Named, because this arrives mid-booking: a bare "Login to your Account"
+    // after tapping "Confirm visit" reads as an interruption rather than the
+    // next step of the thing they just asked for.
+    if (!user) { openLogin?.({
+      title: "Sign in to confirm your visit",
+      subtitle: "We'll hold this slot and send you the address and directions.",
+    }); return; }
     setBooking(true);
     try {
       await bookIndividual(user.uid, property.id, chosenSlot);
@@ -631,7 +637,10 @@ export default function PropertyModal({
    */
   const bookNextAvailable = async () => {
     if (offMarket) return;
-    if (!user) { openLogin?.(() => bookNextAvailable()); return; }
+    if (!user) { openLogin?.({
+      title: "Sign in to confirm your visit",
+      subtitle: "We'll hold this slot and send you the address and directions.",
+    }); return; }
     setBooking(true);
     try {
       await requestNextAvailableVisit(user.uid, property.id);
@@ -650,7 +659,10 @@ export default function PropertyModal({
       return;
     }
     // Signing in mid-flow shouldn't lose the time they suggested.
-    if (!user) { openLogin?.(() => submitVisit(e)); return; }
+    if (!user) { openLogin?.({
+      title: "Sign in to confirm your visit",
+      subtitle: "We'll hold this slot and send you the address and directions.",
+    }); return; }
     setBooking(true);
     try {
       await requestNextAvailableVisit(user.uid, property.id, visitForm.timeISO || null);
@@ -1501,27 +1513,6 @@ export default function PropertyModal({
                   <CalendarCheck size={19} strokeWidth={2.1} />
                   {offMarket ? "Off market" : myBooking ? myBookingShortLabel : "Schedule Visit"}
                 </button>
-                {/* Only passed by the first-open-of-a-shared-link surface —
-                    someone who has just signed up off a WhatsApp/Instagram
-                    link has seen exactly one home. This is the way out of
-                    that single card into "tell us what you want" instead of a
-                    dead end. */}
-                {onExploreMore && (
-                  <button
-                    type="button"
-                    onClick={onExploreMore}
-                    style={{
-                      flex: 1, padding: "15px", borderRadius: "12px", border: `1.5px solid ${T.line}`,
-                      display: "flex", alignItems: "center", justifyContent: "center", gap: "10px",
-                      background: "#fff", color: T.ink,
-                      fontSize: "16px", fontWeight: 700,
-                      cursor: "pointer",
-                    }}
-                  >
-                    <Compass size={19} strokeWidth={2.1} />
-                    Explore more flats
-                  </button>
-                )}
               </div>
             )}
           </div>

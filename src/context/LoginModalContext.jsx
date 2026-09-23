@@ -66,7 +66,13 @@ function LoginPopup({ onClose, title, subtitle }) {
     <motion.div
       initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
       transition={{ duration: 0.2 }}
-      className="fixed inset-0 z-[9000] flex items-center justify-center p-4 overflow-y-auto"
+      /* Above everything it can be opened from, or it mounts behind and the
+         button that called it looks dead. It was z-9000 against
+         PropertyModal's 99999, which is exactly what happened to "Confirm
+         visit" on a shared property link. The ladder: PropertyModal 99999,
+         the questionnaire 100500 (its last step opens this), this 100600,
+         and the two phone gates above all of it at 999997/999998. */
+      className="fixed inset-0 z-[100600] flex items-center justify-center p-4 overflow-y-auto"
       style={{ background: "rgba(26,36,33,0.45)", backdropFilter: "blur(4px)", WebkitBackdropFilter: "blur(4px)" }}
       onClick={onClose}
     >
