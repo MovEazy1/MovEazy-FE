@@ -12,7 +12,7 @@ import { MapContainer, TileLayer, Marker, Tooltip, useMap, useMapEvents, ZoomCon
 import L from "leaflet";
 import "leaflet/dist/leaflet.css";
 import {
-  X, ChevronLeft, ChevronRight, Search, Check, Info, Locate,
+  X, ChevronLeft, ChevronRight, Search, Check, Info, Locate, Clock, Star,
   User, Users, Home, Building2, TreePine, BedDouble, MoreHorizontal, GripVertical,
 } from "lucide-react";
 import { geocodePlace, searchPlaces, reverseGeocode } from "../lib/geocode";
@@ -28,10 +28,31 @@ import MovEazyLogo from "./branding/MovEAZYLogo";
 const B = {
   ink: "#04211D", inkDeep: "#02140E", muted: "#64748B", line: "#E2E8F0",
   mint: "#5EEAD4", mintWash: "#E9FBF6", mintBorder: "#BEEFE2",
+  // Readable green for text and icons. The brand mint is 1.5:1 on white and
+  // unusable for anything you have to read; this is the same accent the CRM
+  // settled on, at 5.1:1 on white and 4.8:1 on the mint wash the cards use.
+  accent: "#0E7C68",
   bg: "#FFFFFF", track: "#E2E8F0",
 };
 const EASE = [0.22, 1, 0.36, 1];
 const fmtINR = (n) => `₹${Number(n).toLocaleString("en-IN")}`;
+
+/**
+ * What the opening screen is for.
+ *
+ * It used to be a heading, one line of copy, and half a page of white space
+ * above "Let's begin" — which asks somebody to answer nine questions without
+ * saying what they get for it. Each of these is a reason to start, in the order
+ * they matter: the work we take off you, what comes back, and how it ends.
+ */
+const INTRO_BENEFITS = [
+  { id: "time", Icon: Clock, title: "Save hours of searching",
+    body: "We do the calls, coordinate with brokers and shortlist the best options." },
+  { id: "fit", Icon: Home, title: "Personalised for you",
+    body: "Get handpicked flats that match your needs, budget and location." },
+  { id: "speed", Icon: Star, title: "Move in faster",
+    body: "Fewer visits, better options, a smoother move-in experience." },
+];
 
 /* ── Question-specific option data ─────────────────────────────────────────── */
 const COMMUTE_OPTIONS = [
@@ -314,10 +335,38 @@ export default function AIBroker({ open, onClose }) {
               <AnimatePresence mode="wait">
                 {phase === "intro" && (
                   <motion.div key="intro" className="brk-panel" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}>
-                    <h2 className="brk-q">Saving your time is our priority</h2>
-                    <p className="brk-sub">
+                    {/* Two-tone, so the promise lands on "our priority" rather
+                        than reading as one flat line of marketing. */}
+                    <h2 className="brk-hero">
+                      Saving your time <span>is our priority</span>
+                    </h2>
+                    <p className="brk-hero-sub">
                       Tell us your requirement in brief, and we'll create a personalised shortlist of flats made for you.
                     </p>
+
+                    {/* The screen used to be a heading over an empty half-page.
+                        These answer the question somebody actually has before
+                        giving us nine answers: what do I get for this? */}
+                    <ul className="brk-benefits">
+                      {INTRO_BENEFITS.map(({ id, Icon, title, body }, i) => (
+                        <motion.li
+                          key={id}
+                          className="brk-benefit"
+                          initial={{ opacity: 0, y: 10 }}
+                          animate={{ opacity: 1, y: 0 }}
+                          // Staggered so the list assembles rather than
+                          // appearing as one block the eye has to re-scan.
+                          transition={{ duration: 0.34, ease: EASE, delay: 0.06 + i * 0.07 }}
+                        >
+                          <span className="brk-benefit-icon" aria-hidden="true"><Icon size={19} /></span>
+                          <span className="brk-benefit-text">
+                            <span className="brk-benefit-title">{title}</span>
+                            <span className="brk-benefit-body">{body}</span>
+                          </span>
+                          <ChevronRight className="brk-benefit-chev" size={17} aria-hidden="true" />
+                        </motion.li>
+                      ))}
+                    </ul>
                   </motion.div>
                 )}
 
@@ -348,9 +397,9 @@ export default function AIBroker({ open, onClose }) {
               </AnimatePresence>
             </div>
 
-            <div className="brk-footer">
+            <div className={`brk-footer${phase === "intro" ? " brk-footer--intro" : ""}`}>
               {phase === "intro" ? (
-                <button type="button" className="brk-next" style={{ marginLeft: "auto" }} onClick={begin}>
+                <button type="button" className="brk-next" onClick={begin}>
                   Let's begin <ChevronRight size={16} />
                 </button>
               ) : phase === "q" ? (
@@ -798,6 +847,39 @@ function Styles() {
       .brk-panel { display:flex; flex-direction:column; }
       .brk-q { font-weight:800; font-size:21px; line-height:1.28; letter-spacing:-0.01em; color:${B.ink}; margin:0; }
       .brk-sub { font-size:13.5px; line-height:1.5; color:${B.muted}; margin:7px 0 0; }
+
+      /* intro — bigger than a question, because it is the pitch and not a step */
+      .brk-hero { font-weight:800; font-size:30px; line-height:1.16; letter-spacing:-0.022em; color:${B.ink}; margin:2px 0 0; }
+      /* The second clause carries the promise, so it carries the colour — and
+         its own line, so the colour change lands on the wrap instead of
+         starting mid-line and running over the break. */
+      .brk-hero span { display:block; color:${B.accent}; }
+      .brk-hero-sub { font-size:14.5px; line-height:1.55; color:${B.muted}; margin:12px 0 0; }
+
+      .brk-benefits { list-style:none; margin:22px 0 0; padding:0; display:flex; flex-direction:column; gap:10px; }
+      .brk-benefit { display:flex; align-items:flex-start; gap:13px; padding:15px 14px; border-radius:15px;
+        background:${B.mintWash}; border:1px solid transparent; transition:border-color .18s ease, transform .18s ease; }
+      /* A lift on hover, no colour change: these are statements, not controls,
+         and anything stronger would promise a tap that does nothing. */
+      @media (hover:hover) { .brk-benefit:hover { border-color:${B.mintBorder}; transform:translateY(-1px); } }
+      .brk-benefit-icon { flex:none; width:38px; height:38px; border-radius:11px; background:#fff;
+        display:flex; align-items:center; justify-content:center; color:${B.accent};
+        box-shadow:0 1px 2px rgba(4,33,29,.06); }
+      .brk-benefit-text { display:flex; flex-direction:column; gap:3px; min-width:0; flex:1; }
+      .brk-benefit-title { font-size:14.5px; font-weight:700; color:${B.ink}; letter-spacing:-0.005em; }
+      .brk-benefit-body { font-size:13px; line-height:1.48; color:${B.muted}; }
+      .brk-benefit-chev { flex:none; color:${B.muted}; opacity:.5; margin-top:9px; }
+
+      /* One full-width action, the way the rest of the flow's primary step
+         reads on a phone — the intro has no "back" to sit beside. */
+      .brk-footer--intro { justify-content:stretch; }
+      .brk-footer--intro .brk-next { width:100%; justify-content:center; margin-left:0; padding:15px 22px; font-size:15px; border-radius:14px; }
+
+      @media (max-width:420px) {
+        .brk-hero { font-size:26px; }
+        .brk-benefit { padding:13px 12px; gap:11px; }
+        .brk-benefit-icon { width:34px; height:34px; border-radius:10px; }
+      }
       .brk-content { margin-top:18px; display:flex; flex-direction:column; gap:14px; }
 
       .brk-footer { display:flex; align-items:center; justify-content:space-between; gap:14px; padding:14px 24px 20px; border-top:1px solid ${B.line}; }
