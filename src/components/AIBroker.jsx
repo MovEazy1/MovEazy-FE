@@ -95,10 +95,10 @@ const PROFILE_OPTIONS = [
  * answer — asking again would be making them say it twice.
  */
 const MOVE_REASON_OPTIONS = [
-  { value: "Lease expiring", label: "My current lease agreement is going to expire, so I want to move out" },
-  { value: "Wants a change", label: "I want a change, so I'm looking for a new flat" },
-  { value: "Switched company", label: "I've switched company, so I'm looking for a new flat" },
-  { value: "Commute too long", label: "My travel time is too long, so I'm moving to a new flat" },
+  { value: "Lease expiring", label: "Current lease agreement expiry" },
+  { value: "Wants a change", label: "I want a change" },
+  { value: "Switched company", label: "I have switched the company" },
+  { value: "Commute too long", label: "Longer travel time from current flat" },
 ];
 
 const FLAT_TYPE_ICONS = { "1 RK": Home, "1 BHK": Home, "2 BHK": Building2, "3 BHK": Building2, "Villa": TreePine, "Room in Preoccupied flat": BedDouble };
