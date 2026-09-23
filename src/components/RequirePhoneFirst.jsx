@@ -80,9 +80,7 @@ export default function RequirePhoneFirst({ open, onDone, onClose }) {
       }}
       role="dialog"
       aria-modal="true"
-      // No visible heading to point at, so the label lives here. A screen
-      // reader still announces what this is; nothing is drawn for it.
-      aria-label="Enter your mobile number"
+      aria-labelledby="leadphone-title"
       onClick={onClose}
     >
       <div
@@ -95,10 +93,19 @@ export default function RequirePhoneFirst({ open, onDone, onClose }) {
         }}
         onClick={(e) => e.stopPropagation()}
       >
-        {/* No heading and no explanatory copy: the field and its +91 prefix
-            say what this wants. Same shell as RequirePhoneModal, which this
-            now matches pixel for pixel apart from that modal's own title. */}
-        <div>
+        {/* The same heading RequirePhoneModal carries, so the gate before
+            signup and the one after it read as one screen asked twice rather
+            than two different products. No explanatory copy under it: the
+            +91 prefix and the placeholder already say what is wanted. */}
+        <h2 id="leadphone-title" style={{ color: INK, fontSize: 17, fontWeight: 700, letterSpacing: "-0.01em", margin: 0 }}>
+          Verify your Mobile No{" "}
+          {/* The conventional required marker, in the accent rather than the
+              ink so it reads as one and not as a footnote. */}
+          <span aria-hidden="true" style={{ color: RUST }}>*</span>
+          <span className="sr-only"> (required)</span>
+        </h2>
+
+        <div style={{ marginTop: 16 }}>
           <div
             style={{
               display: "flex", alignItems: "center", height: 44,
