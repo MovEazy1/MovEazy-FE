@@ -12,6 +12,8 @@ import { commuteMinutes, formatCommute } from "../lib/commute";
  * a button buried at the bottom of a long listing page.
  */
 const EASE = [0.22, 1, 0.36, 1];
+/** How far a pointer may wander and still count as a tap rather than a swipe. */
+const TAP_SLOP_PX = 8;
 const T = {
   ink: "#04211D",
   teal: "#0E7C68",
@@ -70,6 +72,18 @@ function SwipeCard({ listing, index, top, onSwiped, onOpenDetails, position, off
   // fights framer-motion's own exit animation on that same property, which
   // left the outgoing card stuck on-screen instead of unmounting.
   const [dragX, setDragX] = useState(0);
+  /**
+   * Did this gesture travel, or was it a tap?
+   *
+   * framer-motion's onTap fires on pointer-up inside the element however far
+   * the pointer moved — the distance check is onTapCancel's job, and that only
+   * fires when the pointer leaves. A card that snaps back from a half-swipe
+   * never leaves, so every swipe was also opening the property.
+   *
+   * A ref, not state: it is read in the same gesture that sets it, and a
+   * re-render between the two would be a re-render per pointermove.
+   */
+  const travelled = useRef(false);
   const likeOpacity = Math.max(0, Math.min(1, (dragX - 20) / 100));
   const skipOpacity = Math.max(0, Math.min(1, (-dragX - 20) / 100));
 
@@ -79,15 +93,21 @@ function SwipeCard({ listing, index, top, onSwiped, onOpenDetails, position, off
       style={{ position: "absolute", inset: 0, cursor: top ? "pointer" : "default", zIndex: 10 - index, isolation: "isolate" }}
       dragConstraints={{ left: 0, right: 0 }}
       dragElastic={0.7}
-      onDrag={top ? (_e, info) => setDragX(info.offset.x) : undefined}
+      // Reset on the way down, so the flag describes this gesture and not the
+      // last one.
+      onPointerDown={() => { travelled.current = false; }}
+      onDrag={top ? (_e, info) => {
+        // A few pixels of slop: a finger on glass never holds perfectly still,
+        // and treating 2px of jitter as a swipe would break tapping entirely.
+        if (Math.abs(info.offset.x) > TAP_SLOP_PX) travelled.current = true;
+        setDragX(info.offset.x);
+      } : undefined}
       onDragEnd={(_e, info) => {
         setDragX(0);
         if (info.offset.x > 120) onSwiped(1, listing);
         else if (info.offset.x < -120) onSwiped(-1, listing);
       }}
-      // A real tap, not a drag — framer-motion only fires this when the
-      // pointer barely moved, so a swipe never also opens the card.
-      onTap={top ? () => onOpenDetails?.(listing) : undefined}
+      onTap={top ? () => { if (!travelled.current) onOpenDetails?.(listing); } : undefined}
       initial={{ scale: 0.94, y: 20, opacity: 0 }}
       animate={{ scale: 1 - index * 0.04, y: index * 14, opacity: 1 }}
       exit={{ x: position * 420, y: -60, rotate: position * 14, opacity: 0, transition: { duration: 0.4, ease: EASE } }}
