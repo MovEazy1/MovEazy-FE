@@ -1,6 +1,10 @@
 import { useEffect, useMemo, useState } from "react";
-import { fetchSlotsForProperty, addVisitSlot, deleteVisitSlot } from "../lib/visits";
+import { fetchSlotsForProperty, deleteVisitSlot } from "../lib/visits";
 import { markInventorySold } from "../lib/inventory";
+import {
+  CUSTOM_PICKER_DAYS, DATE_WINDOW_DAYS, VISIT_CAPACITY, applyVisitRule, buildTimes,
+  datesForMode, localYMD, readVisitRule, rememberVisitRule, upcomingDays,
+} from "../lib/visitSchedule";
 
 const fmtSlot = (iso) =>
   iso
@@ -10,76 +14,6 @@ const fmtDateChip = (ymd) =>
   ymd ? new Date(`${ymd}T00:00`).toLocaleDateString("en-IN", { weekday: "short", day: "numeric", month: "short" }) : "";
 const fmtTimeOnly = (iso) =>
   iso ? new Date(iso).toLocaleTimeString("en-IN", { hour: "numeric", minute: "2-digit", hour12: true }) : "";
-/** Local-calendar YYYY-MM-DD — deliberately not toISOString(), which converts
- * through UTC and silently shifts the date backward for any timezone ahead of
- * UTC (e.g. IST, UTC+5:30): local midnight becomes the previous UTC day. */
-const localYMD = (d) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
-
-const toMin = (hhmm) => {
-  // Number("") is 0, so an empty <input type="time"> would otherwise read as
-  // midnight and silently generate a full day of slots — demand real HH:MM.
-  const m = /^(\d{1,2}):(\d{2})$/.exec(String(hhmm ?? "").trim());
-  if (!m) return NaN;
-  const h = Number(m[1]), min = Number(m[2]);
-  return h > 23 || min > 59 ? NaN : h * 60 + min;
-};
-const toHHMM = (mins) => `${String(Math.floor(mins / 60)).padStart(2, "0")}:${String(mins % 60).padStart(2, "0")}`;
-
-// Fixed, not owner-configurable: one bookable time every hour within the
-// window, up to 10 visitors each. Keeps the form to just "when" — the
-// property_visit_slots table still stores one timestamp per bookable time
-// (no end column), so the from–to window is saved as the individual hourly
-// start times inside it.
-const STEP_MIN = 60;
-const DEFAULT_CAPACITY = 10;
-function buildTimes(from, to) {
-  const a = toMin(from), b = toMin(to);
-  if (!Number.isFinite(a) || !Number.isFinite(b) || b <= a) return [];
-  const out = [];
-  for (let t = a; t + STEP_MIN <= b; t += STEP_MIN) out.push(toHHMM(t));
-  return out;
-}
-
-// Everyday/Weekday/Weekend is a rolling window, not a one-time batch — a
-// renter should always see up to a week out, and the owner shouldn't have to
-// keep re-adding it. DATE_WINDOW_DAYS bounds how far a *recurring* mode
-// reaches; custom dates (a deliberate one-off pick) can go further, up to
-// CUSTOM_PICKER_DAYS, via the date grid below.
-const DATE_WINDOW_DAYS = 7;
-const CUSTOM_PICKER_DAYS = 45;
-
-/** YYYY-MM-DD dates for a recurring mode, within the next DATE_WINDOW_DAYS. */
-function datesForMode(mode) {
-  const out = [];
-  const start = new Date();
-  start.setHours(0, 0, 0, 0);
-  for (let i = 0; i < DATE_WINDOW_DAYS; i++) {
-    const d = new Date(start);
-    d.setDate(d.getDate() + i);
-    const dow = d.getDay(); // 0 = Sun … 6 = Sat
-    const isWeekend = dow === 0 || dow === 6;
-    if (mode === "everyday" || (mode === "weekday" && !isWeekend) || (mode === "weekend" && isWeekend)) {
-      out.push(localYMD(d));
-    }
-  }
-  return out;
-}
-
-/** The next CUSTOM_PICKER_DAYS calendar days, for the tappable date grid. */
-function upcomingDays() {
-  const out = [];
-  const start = new Date();
-  start.setHours(0, 0, 0, 0);
-  for (let i = 0; i < CUSTOM_PICKER_DAYS; i++) {
-    const d = new Date(start);
-    d.setDate(d.getDate() + i);
-    out.push(d);
-  }
-  return out;
-}
-
-const RECURRING_MODE_KEY = (propertyId) => `moveazy_visit_recur_${propertyId}`;
-
 function Label({ children }) {
   return <label className="block text-[11px] font-bold text-gray-500 uppercase tracking-wide mb-1">{children}</label>;
 }
@@ -136,7 +70,7 @@ function DateGrid({ selected, onToggle }) {
  * after each add so another time window can be layered on top, endlessly.
  *
  * A recurring rule is remembered per property (this browser only — see
- * RECURRING_MODE_KEY) so reopening this panel silently tops up any of the
+ * lib/visitSchedule.js) so reopening this panel silently tops up any of the
  * rolling 7 days that have fallen off since the poster was last here, instead
  * of requiring them to reselect "Everyday" every week.
  *
@@ -166,21 +100,14 @@ export default function PropertyVisitSlots({ propertyId, brandRed = "#e11d48", o
   // Silently top up a remembered recurring rule so the rolling 7-day window
   // stays full without the poster having to come back and reselect it.
   const renewRecurring = async (existingSlots) => {
-    let mode;
-    try { mode = localStorage.getItem(RECURRING_MODE_KEY(propertyId)); } catch { return; }
-    if (!mode) return;
-    const parsed = JSON.parse(mode); // { mode, fromT, toT }
-    const times = buildTimes(parsed.fromT, parsed.toT);
-    if (!times.length) return;
-    const have = new Set((existingSlots || []).map((s) => localYMD(new Date(s.slot_at))));
-    const need = datesForMode(parsed.mode).filter((d) => !have.has(d));
-    if (!need.length) return;
-    for (const d of need) {
-      for (const t of times) {
-        try { await addVisitSlot(propertyId, new Date(`${d}T${t}`).toISOString(), DEFAULT_CAPACITY); } catch { /* best-effort renewal */ }
-      }
-    }
-    await load();
+    const rule = readVisitRule(propertyId); // { mode, fromT, toT }
+    if (!rule) return;
+    // Only the dates that have fallen off the front of the window: the rest
+    // are already there, and re-inserting them would just bounce off the
+    // unique index.
+    const have = (existingSlots || []).map((r) => localYMD(new Date(r.slot_at)));
+    const { added } = await applyVisitRule(propertyId, rule, { skipDates: have });
+    if (added) await load();
   };
 
   useEffect(() => {
@@ -212,28 +139,15 @@ export default function PropertyVisitSlots({ propertyId, brandRed = "#e11d48", o
     if (!times.length) { setMsg({ type: "err", text: "Set an end time later than the start time." }); return; }
     if (!dates.length) { setMsg({ type: "err", text: dateMode === "custom" ? "Select at least one date, then press OK." : "Choose which dates this applies to." }); return; }
     setBusy(true);
-    let added = 0, skipped = 0;
     try {
-      for (const d of dates) {
-        for (const t of times) {
-          try {
-            await addVisitSlot(propertyId, new Date(`${d}T${t}`).toISOString(), DEFAULT_CAPACITY);
-            added += 1;
-          } catch (e) {
-            // (property_id, slot_at) is unique — a time that already exists is
-            // not a failure, just nothing to do.
-            const m = String(e?.message || "").toLowerCase();
-            if (m.includes("duplicate") || m.includes("unique")) skipped += 1;
-            else throw e;
-          }
-        }
-      }
+      const { added, skipped, failed, lastError } = await applyVisitRule(
+        propertyId,
+        { mode: dateMode, fromT, toT, dates },
+      );
+      if (failed) throw lastError;
       // Remember a recurring choice so it renews on its own next time this
       // panel opens; a custom pick is a one-off and isn't remembered.
-      try {
-        if (dateMode === "custom") localStorage.removeItem(RECURRING_MODE_KEY(propertyId));
-        else localStorage.setItem(RECURRING_MODE_KEY(propertyId), JSON.stringify({ mode: dateMode, fromT, toT }));
-      } catch { /* localStorage unavailable — renewal just won't be remembered */ }
+      rememberVisitRule(propertyId, dateMode === "custom" ? null : { mode: dateMode, fromT, toT });
       await load();
       setDateMode("");
       setCustomDates([]);
@@ -259,7 +173,7 @@ export default function PropertyVisitSlots({ propertyId, brandRed = "#e11d48", o
     try {
       await markInventorySold(propertyId);
       setSold(true);
-      try { localStorage.removeItem(RECURRING_MODE_KEY(propertyId)); } catch { /* not critical */ }
+      rememberVisitRule(propertyId, null);
       onSold?.();
     } catch (e) {
       setMsg({ type: "err", text: e?.message || "Could not update the listing." });

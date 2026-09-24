@@ -15,6 +15,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import { useCrm } from "./CrmShell";
 import PropertyVisitSlots from "../../components/PropertyVisitSlots";
+import { InternalDetails, VisitWindow } from "./CrmPropertyInternalFields";
 import {
   ALL_LOCALITIES, DEFAULT_POSTING_AMENITIES, FLAT_TYPES, FURNISHINGS, LIFESTYLE, MUST_HAVES, OCCUPANT_OPTIONS,
   parentAreaOf, withParentArea,
@@ -31,6 +32,8 @@ import {
 import { matchListingToRequirements } from "../../lib/inventoryMatch";
 import { supabase, isSupabaseConfigured } from "../../lib/supabase";
 import { SCOPES } from "../../lib/adminScopes";
+import { BLANK_INTERNAL, fetchInternal, saveInternal } from "../../lib/crmPropertyInternal";
+import { DEFAULT_VISIT_RULE, applyVisitRule, rememberVisitRule } from "../../lib/visitSchedule";
 import { Btn, C, Chip, Empty, Toast, inr } from "./crmUi";
 
 const BLANK = {
@@ -144,6 +147,20 @@ export default function CrmPropertyForm() {
   const [saving, setSaving] = useState(false);
   const [toast, setToast] = useState(null);
   const [published, setPublished] = useState(null);
+  /**
+   * Internal details, kept apart from `f` on purpose.
+   *
+   * They are a different row in a different table with a different audience,
+   * and the draft autosave writes `f` to localStorage — a POC's number has no
+   * business sitting in browser storage after the upload is done.
+   */
+  const [internal, setInternal] = useState({ ...BLANK_INTERNAL });
+  /**
+   * What a new listing is published with. Every day, 8am to 8pm, unless the
+   * agent narrows it: a flat with no bookable time offers a tenant only "next
+   * available slot", which is a message for somebody to answer by hand.
+   */
+  const [visitRule, setVisitRule] = useState({ ...DEFAULT_VISIT_RULE });
   const dropRef = useRef(null);
 
   const canWrite = access.has(SCOPES.PROPERTIES_WRITE);
@@ -167,6 +184,31 @@ export default function CrmPropertyForm() {
       localStorage.setItem(DRAFT_KEY, JSON.stringify(f));
     } catch { /* private mode */ }
   }, [f, isEdit]);
+
+  /**
+   * The internal row, when editing.
+   *
+   * A separate fetch rather than part of the listing load: it is a separate
+   * table, and a listing uploaded before this existed simply has no row — which
+   * is the blank form, not an error.
+   */
+  useEffect(() => {
+    if (!editId) return;
+    let cancelled = false;
+    (async () => {
+      const row = await fetchInternal(editId);
+      if (cancelled || !row) return;
+      setInternal({
+        source: row.source || "owner",
+        broker_id: row.broker_id || "",
+        poc_name: row.poc_name || "",
+        poc_phone: row.poc_phone || "",
+        poc_email: row.poc_email || "",
+        poc_note: row.poc_note || "",
+      });
+    })();
+    return () => { cancelled = true; };
+  }, [editId]);
 
   /* ── Load the listing being edited ─────────────────────────────────────── */
 
@@ -279,6 +321,23 @@ export default function CrmPropertyForm() {
     return need;
   }, [f]);
 
+  /**
+   * Write the internal row for a listing that now exists.
+   *
+   * Never fails the upload. A listing that saved and whose POC did not is a
+   * listing to correct; throwing here would lose the whole upload over a
+   * second table.
+   */
+  const writeInternal = useCallback(async (propertyId) => {
+    const res = await saveInternal(propertyId, internal, user?.email || "");
+    if (!res.ok) {
+      showToast(res.missingTable
+        ? "Saved, but the internal details table isn't there yet — run crm_property_internal.sql"
+        : "Saved, but the internal details didn't", "error");
+    }
+    return res.ok;
+  }, [internal, user]);
+
   const publish = useCallback(async () => {
     if (!canWrite) return;
     if (missingRequired.length) return showToast(`Still needed: ${missingRequired.join(", ")}`, "error");
@@ -390,6 +449,7 @@ export default function CrmPropertyForm() {
         if (error) throw error;
         setKeptImages(Array.isArray(data.images) ? data.images : []);
         setPhotos([]);
+        await writeInternal(editId);
         reload();
         showToast(`${editId} saved`);
         return;
@@ -397,6 +457,19 @@ export default function CrmPropertyForm() {
 
       const { data, error } = await supabase.from("inventory").insert(row).select().single();
       if (error) throw error;
+
+      // Both of these key on a property_id that did not exist a moment ago,
+      // which is why they run here and not with the rest of the form.
+      await writeInternal(propertyId);
+      if (visitRule.mode !== "none") {
+        const { added, failed } = await applyVisitRule(propertyId, visitRule);
+        // Remembered so the rolling window keeps topping itself up, exactly as
+        // it would if an agent had set it from the property's own panel.
+        rememberVisitRule(propertyId, visitRule);
+        if (failed && !added) {
+          showToast("Listing published, but the visit times didn't save — add them from the listing", "error");
+        }
+      }
 
       // Who was waiting for exactly this? The same engine, run the other way.
       const matches = matchListingToRequirements(data, requirements, { min: 60 });
@@ -409,7 +482,8 @@ export default function CrmPropertyForm() {
     } finally {
       setSaving(false);
     }
-  }, [canWrite, missingRequired, f, photos, keptImages, user, requirements, reload, isEdit, editId]);
+  }, [canWrite, missingRequired, f, photos, keptImages, user, requirements, reload, isEdit, editId,
+      writeInternal, visitRule]);
 
   useEffect(() => {
     const onKey = (e) => {
@@ -821,6 +895,20 @@ export default function CrmPropertyForm() {
                 onChange={(e) => set({ description: e.target.value })}
                 placeholder="What the post said, tidied up." />
             </Field>
+
+            {/* Only on a new listing. Editing gets the full slots panel
+                below, which shows what is already bookable — offering a
+                "publish with" window there would be a second, contradictory
+                answer to the same question. */}
+            {!isEdit && (
+              <Field title="Visit times">
+                <VisitWindow value={visitRule} onChange={setVisitRule} />
+              </Field>
+            )}
+
+            <div style={{ marginTop: 4 }}>
+              <InternalDetails value={internal} onChange={setInternal} actorEmail={user?.email || ""} />
+            </div>
 
             <div style={{ display: "flex", gap: 7 }}>
               <Btn variant="primary" onClick={publish} disabled={saving}>

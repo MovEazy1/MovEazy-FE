@@ -23,6 +23,9 @@ const EMPTY = new Set();
 import { splitMedia } from "../../lib/listingMedia";
 import { mapInventoryToListing } from "../../lib/inventory";
 import PropertyModal from "../../components/PropertyModal";
+import { fetchInternalMap, pocMessage, sourceLabel } from "../../lib/crmPropertyInternal";
+import { whatsappUrl } from "../../lib/crmSettings";
+import { formatForDisplay } from "../../lib/mobile";
 import { Btn, C, Chip, Empty, ScoreRing, inr, shortDate } from "./crmUi";
 
 /** Platforms we show first, and what the button says. Anything else follows. */
@@ -281,6 +284,69 @@ function PropertyThumbs({ listing, onOpen }) {
   );
 }
 
+/**
+ * Message whoever holds the keys.
+ *
+ * The number comes from inventory_private, which no signed-out visitor and no
+ * tenant account can read — see lib/crmPropertyInternal.js. It is never put in
+ * the listing row, so it cannot travel with a share link or a property card.
+ *
+ * Styled apart from the tenant-facing WhatsApp buttons elsewhere in the CRM, on
+ * purpose: on a screen with both, which side of the deal a button messages is
+ * the one thing worth being unable to get wrong.
+ */
+function PocMessage({ listing, internal, canEdit }) {
+  if (!internal) {
+    // No row at all — the listing predates these fields, or nobody filled them
+    // in. Say so where the answer is, rather than showing nothing.
+    return canEdit ? (
+      <Link
+        to={`/crm/properties/${listing.property_id}/edit`}
+        className="crm-btn crm-btn--sm"
+        style={{ textDecoration: "none", borderStyle: "dashed" }}
+        title="No internal contact recorded for this listing"
+      >
+        + POC
+      </Link>
+    ) : null;
+  }
+
+  const href = whatsappUrl(
+    internal.poc_phone,
+    pocMessage({
+      pocName: internal.poc_name,
+      propertyId: listing.property_id,
+      title: listing.title,
+      area: listing.area,
+    }),
+  );
+  const who = [internal.poc_name || sourceLabel(internal.source),
+               internal.poc_phone ? formatForDisplay(internal.poc_phone) : ""]
+    .filter(Boolean).join(" · ");
+
+  if (!href) {
+    return (
+      <span className="crm-chip" style={{ pointerEvents: "none", fontSize: 10, borderColor: C.gold, color: C.gold }}
+            title={`Via ${sourceLabel(internal.source)} — no POC number recorded`}>
+        no POC no.
+      </span>
+    );
+  }
+
+  return (
+    <a
+      className="crm-btn crm-btn--sm crm-btn--wa"
+      href={href}
+      target="_blank"
+      rel="noopener noreferrer"
+      style={{ textDecoration: "none" }}
+      title={`Internal — message the POC for ${listing.property_id}: ${who} (via ${sourceLabel(internal.source)})`}
+    >
+      POC
+    </a>
+  );
+}
+
 function SocialShare({ listing }) {
   const { marketingChannels } = useCrm();
   const [openPlatform, setOpenPlatform] = useState("");
@@ -409,6 +475,26 @@ export default function CrmPropertiesPage() {
   const [previewId, setPreviewId] = useState("");
   /** Ticked values per column; an absent or empty set means "no filter". */
   const [filters, setFilters] = useState({});
+  /**
+   * property_id → internal row, for the POC button.
+   *
+   * Fetched here rather than per row: one request for the table beats one per
+   * listing. Empty is the honest answer when the migration has not been run or
+   * the caller is not staff — RLS returns no rows rather than an error, and a
+   * POC button that simply is not there is the correct outcome either way.
+   */
+  const [internalMap, setInternalMap] = useState({});
+
+  useEffect(() => {
+    const ids = inventory.map((l) => l.property_id);
+    if (!ids.length) return;
+    let cancelled = false;
+    (async () => {
+      const map = await fetchInternalMap(ids);
+      if (!cancelled) setInternalMap(map);
+    })();
+    return () => { cancelled = true; };
+  }, [inventory]);
 
   const clientByReq = useMemo(() => {
     const byId = new Map(clients.map((c) => [c.id, c]));
@@ -533,6 +619,11 @@ export default function CrmPropertiesPage() {
                         )}
                         <a className="crm-btn crm-btn--sm" href={propertyLink(l.property_id)}
                            target="_blank" rel="noopener noreferrer" style={{ textDecoration: "none" }}>Open</a>
+                        <PocMessage
+                          listing={l}
+                          internal={internalMap[l.property_id]}
+                          canEdit={canEdit}
+                        />
                         <SocialShare listing={l} />
                       </div>
                     </td>
