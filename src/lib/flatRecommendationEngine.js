@@ -6,6 +6,7 @@ export const POPULAR_AREAS = [
   "Koramangala",
   "Bellandur",
   "Whitefield",
+  "Hoodi",
   "Mahadevpura",
   "Jayanagar",
   "Hebbal",

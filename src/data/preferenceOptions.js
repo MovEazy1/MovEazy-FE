@@ -20,7 +20,7 @@
 export const LOCALITIES = [
   "HSR", "HSR Extension", "Koramangala", "Indiranagar", "Bellandur",
   "Kudlu Gate", "Kudlu Road", "Harlur Road", "Silver County Road",
-  "Whitefield", "Electronic City", "Sarjapur", "BTM", "JP Nagar", "Marathahalli",
+  "Whitefield", "Hoodi", "Electronic City", "Sarjapur", "BTM", "JP Nagar", "Marathahalli",
 ];
 export const LOCALITIES_MORE = ["ITI Layout", "Jayanagar", "Hebbal", "Mahadevpura", "Bannerghatta Rd", "Yelahanka", "Rajajinagar"];
 export const OCCUPANTS = ["Bachelor", "Family", "Couple", "Working Professionals", "Students", "Pet Owner"];

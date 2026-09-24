@@ -64,8 +64,24 @@ const propertyTypes = ["Apartment", "Gated Societies", "Independent House/Villa"
 const furnishing = ["Semi", "Full", "None"];
 const availability = ["Immediate", "Within 15 days", "Within 30 days", "After 30 days"];
 
+/**
+ * Areas the map can filter on that have no seed listing.
+ *
+ * `localities` above is demo data: every row in it also generates a synthetic
+ * listing, which store.js seeds into localStorage and the map and home page
+ * then show. So an area cannot be added there just to make it filterable —
+ * that would invent a flat in it.
+ *
+ * A real area with no demo listing belongs here instead: it appears in the
+ * filter chips and a ?locality= link resolves to it, and nothing is fabricated.
+ */
+const AREAS_WITHOUT_SEED_LISTINGS = ["Hoodi"];
+
 /** Locality names for map filter chips (Bangalore only). */
-export const AREA_NAMES_SORTED = [...new Set(localities.filter(row => row[1] === "Bangalore").map((row) => row[0]))].sort((a, b) => a.localeCompare(b));
+export const AREA_NAMES_SORTED = [...new Set([
+  ...localities.filter(row => row[1] === "Bangalore").map((row) => row[0]),
+  ...AREAS_WITHOUT_SEED_LISTINGS,
+])].sort((a, b) => a.localeCompare(b));
 
 const listingsData = localities.map(([locality, city, lat, lng, baseRent], index) => {
   const bhk = bhks[index % bhks.length];
