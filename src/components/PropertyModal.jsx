@@ -189,12 +189,41 @@ function MediaElement({ src, alt, style, firstImage }) {
  *   surface that opened this knows and the listing doesn't ("3 of 23 homes we
  *   shortlisted for you").
  */
+/**
+ * Something a person can act on, never the database's own words.
+ *
+ * A booking that failed a not-null constraint reached a customer as
+ * 'null value in column "property_id" of relation "visit_bookings" violates
+ * not-null constraint' — our schema, in an alert, to somebody trying to see a
+ * flat. Postgres errors carry a code; anything with one is ours to read in the
+ * console and not theirs to read on screen.
+ */
+function bookingErrorMessage(err, fallback) {
+  const raw = String(err?.message || "");
+  const isDatabase = Boolean(err?.code) || /relation|constraint|column |violates|duplicate key/i.test(raw);
+  if (raw && !isDatabase) return raw;
+  return fallback;
+}
+
 export default function PropertyModal({
   property, onClose, listings = [], onSelectListing, onSavedChange, onVisitBooked,
   initialShowVisitForm = false, banner = null, manageHistory = true,
 }) {
   const { user } = useAuth();
   const { openLogin } = useLoginModal();
+
+  /**
+   * This home's id, whatever the caller called it.
+   *
+   * Most surfaces pass a mapped listing, where it is `id`. A saved-listing
+   * snapshot keeps the id in a sibling field and the object itself may only
+   * carry a title, so `property.id` was undefined and every booking from
+   * there failed at the database. Read once, here, rather than at each of the
+   * three call sites that book.
+   */
+  const propertyId = String(
+    property?.id ?? property?.property_id ?? property?.listingId ?? "",
+  ).trim();
   const [visitForm, setVisitForm] = useState({ time: "", timeISO: "" });
   const [visitSuccess, setVisitSuccess] = useState("");
   // The times the lister has actually published. Only these are offered — the
@@ -619,12 +648,13 @@ export default function PropertyModal({
     }); return; }
     setBooking(true);
     try {
-      await bookIndividual(user.uid, property.id, chosenSlot);
+      await bookIndividual(user.uid, propertyId, chosenSlot);
       const { day, time } = slotLabel(chosenSlot);
       finishVisitSuccess(`Visit booked for ${day} at ${time}`);
     } catch (err) {
       setVisitSuccess("");
-      alert(err?.message || "Could not book that slot — please try another.");
+      console.error("[visit] book slot", err);
+      alert(bookingErrorMessage(err, "Could not book that slot — please try another."));
     } finally {
       setBooking(false);
     }
@@ -643,10 +673,11 @@ export default function PropertyModal({
     }); return; }
     setBooking(true);
     try {
-      await requestNextAvailableVisit(user.uid, property.id);
+      await requestNextAvailableVisit(user.uid, propertyId);
       finishVisitSuccess("Visit requested — the lister will confirm a time shortly");
     } catch (err) {
-      alert(err?.message || "Could not send that request — please try again.");
+      console.error("[visit] request next available", err);
+      alert(bookingErrorMessage(err, "Could not send that request — please try again."));
     } finally {
       setBooking(false);
     }
@@ -665,10 +696,11 @@ export default function PropertyModal({
     }); return; }
     setBooking(true);
     try {
-      await requestNextAvailableVisit(user.uid, property.id, visitForm.timeISO || null);
+      await requestNextAvailableVisit(user.uid, propertyId, visitForm.timeISO || null);
       finishVisitSuccess(`Visit requested for ${visitForm.time}`);
     } catch (err) {
-      alert(err?.message || "Could not submit your request — please try again.");
+      console.error("[visit] submit visit", err);
+      alert(bookingErrorMessage(err, "Could not submit your request — please try again."));
     } finally {
       setBooking(false);
     }

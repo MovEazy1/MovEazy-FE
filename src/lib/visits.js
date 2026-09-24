@@ -142,8 +142,24 @@ export async function fetchBookingForProperty(uid, propertyId) {
 }
 
 /** Schedule (or reschedule) a single-property visit at a chosen slot. */
+/**
+ * A booking with no property is not a booking.
+ *
+ * Without this the insert reached the database and came back as
+ * 'null value in column "property_id" ... violates not-null constraint',
+ * which PropertyModal then showed to the customer verbatim. A caller that has
+ * lost the id is a bug on our side, and the person trying to book a flat
+ * should be told something they can act on.
+ */
+function requirePropertyId(propertyId) {
+  const id = String(propertyId ?? "").trim();
+  if (!id) throw new Error("We couldn't tell which home that was. Please reopen it and try again.");
+  return id;
+}
+
 export async function bookIndividual(uid, propertyId, slotAt) {
   if (!isSupabaseConfigured || !supabase || !uid) throw new Error("Not signed in");
+  propertyId = requirePropertyId(propertyId);
   const { error } = await supabase.from("visit_bookings").upsert(
     { user_id: uid, property_id: propertyId, slot_at: slotAt, kind: "individual", group_id: null, amount: 0, status: "scheduled" },
     { onConflict: "user_id,property_id" }
@@ -163,6 +179,7 @@ export async function bookIndividual(uid, propertyId, slotAt) {
  */
 export async function requestNextAvailableVisit(uid, propertyId, preferredSlotAt = null) {
   if (!isSupabaseConfigured || !supabase || !uid) throw new Error("Not signed in");
+  propertyId = requirePropertyId(propertyId);
   const { error } = await supabase.from("visit_bookings").upsert(
     { user_id: uid, property_id: propertyId, slot_at: preferredSlotAt, kind: "individual", group_id: null, amount: 0, status: "preference" },
     { onConflict: "user_id,property_id" }

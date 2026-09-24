@@ -537,7 +537,10 @@ export default function Profile() {
                         {listing ? (
                           <button
                             type="button"
-                            onClick={() => setViewingListing(listing)}
+                            // The snapshot may be nothing but a title, and the
+                            // id lives beside it rather than in it — without
+                            // this the modal had no home to book against.
+                            onClick={() => setViewingListing({ ...listing, id: listing.id || listingId })}
                             style={{
                               marginTop: 10, width: "100%", padding: "10px 12px", borderRadius: 8,
                               border: "none", background: INK, fontSize: 13, fontWeight: 700,
