@@ -123,31 +123,50 @@ export default function TopMatches() {
     return () => { alive = false; };
   }, [user?.uid]);
 
-  // Prefs handed over by the wizard win; otherwise load what's saved for this account.
+  /**
+   * What this account already told us, and whether it has already finished.
+   *
+   * Runs whether or not the wizard handed prefs over, which is the bug it
+   * replaces: the old version returned early when prefs were already set, so
+   * anybody arriving straight from the questionnaire never had matches_seen
+   * read at all and was dealt the same five again, however many times they had
+   * answered them.
+   *
+   * Wizard prefs still win — they are what the person just typed — but the
+   * row is read either way for the one flag that decides which screen this is.
+   */
   useEffect(() => {
-    if (prefs || authLoading) return;
-    if (!user?.uid) { setPrefsChecked(true); return; }
+    if (authLoading) return undefined;
+    if (!user?.uid) { setPrefsChecked(true); return undefined; }
     let alive = true;
     fetchUserRequirement(user.uid)
       .then((row) => {
         if (!alive || !row) return;
-        setPrefs(rowToPrefs(row));
-        // They have swiped these five before. Showing them the same five again
-        // is a worse answer than the true one: we are still looking, and the
+        if (!prefs) setPrefs(rowToPrefs(row));
+        // They have been through the five already. Dealing them again is a
+        // worse answer than the true one: we are still looking, and the
         // shortlist lands when it lands.
         if (row.matches_seen) setPhase("relax");
       })
       .finally(() => { if (alive) setPrefsChecked(true); });
     return () => { alive = false; };
-  }, [prefs, user?.uid, authLoading]);
+    // prefs deliberately absent: this reads the row once per account, and
+    // depending on it would re-run the moment it sets prefs itself.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [user?.uid, authLoading]);
 
-  // This is the one-time screen — mark it seen as soon as it's actually
-  // shown, so a returning visit (even one that never finishes swiping)
-  // lands on the map next time instead of back here.
+  /**
+   * Mark it finished when they actually reach the end, not when they arrive.
+   *
+   * It used to fire as soon as prefs existed — so opening the deck and
+   * swiping one card of five counted as having seen all five, and the next
+   * visit skipped the other four. Landing on this screen is the thing that
+   * means finished, so that is what records it.
+   */
   useEffect(() => {
-    if (!prefs || !user?.uid) return;
+    if (phase !== "relax" || !user?.uid) return;
     void markMatchesSeen(user.uid);
-  }, [prefs, user?.uid]);
+  }, [phase, user?.uid]);
 
   useEffect(() => {
     if (!user?.uid) { setCuratedCount(0); return undefined; }
