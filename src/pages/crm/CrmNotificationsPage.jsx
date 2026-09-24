@@ -15,7 +15,7 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import { Link } from "react-router-dom";
 import { useCrm } from "./CrmShell";
 import { SCOPES } from "../../lib/adminScopes";
-import { Btn, C, Empty, inr, shortDate } from "./crmUi";
+import { Btn, C, Chip, Empty, inr, shortDate } from "./crmUi";
 import { setInventoryStatus } from "../../lib/inventory";
 import { propertyLink, whatsappUrl } from "../../lib/crmSettings";
 import {
@@ -23,6 +23,7 @@ import {
   groupRequestsByProperty, resolveSlotRequest, slotsAvailableMessage,
 } from "../../lib/crmSlotRequests";
 import { fetchProfilesFor } from "../../lib/crmVisits";
+import CrmDailyTasks from "./CrmDailyTasks";
 
 /** A tenant with no number can't be messaged, only called back by email. */
 function WaitingRow({ person, group, nameFor, onMessaged }) {
@@ -184,9 +185,19 @@ function PropertyCard({ group, nameFor, canWrite, onChanged }) {
   );
 }
 
+/** The two queues this tab holds, in the order they get worked. */
+const SECTIONS = [
+  { id: "tasks", label: "Daily tasks" },
+  { id: "slots", label: "Flat slots required" },
+];
+
 export default function CrmNotificationsPage() {
   const { inventory, clients, access } = useCrm();
   const canWrite = access.has(SCOPES.PROPERTIES_WRITE);
+
+  // Daily tasks first: it is the one with somebody waiting on a reply, and a
+  // queue nobody opens is a queue nobody clears.
+  const [section, setSection] = useState("tasks");
 
   const [requests, setRequests] = useState([]);
   const [slots, setSlots] = useState(new Map());
@@ -246,6 +257,22 @@ export default function CrmNotificationsPage() {
   return (
     <div style={{ display: "flex", flex: 1, minHeight: 0 }}>
       <div className="crm-col" style={{ flex: 1 }}>
+        <div
+          className="crm-colhead"
+          style={{ gap: 6, justifyContent: "flex-start" }}
+        >
+          {SECTIONS.map((s) => (
+            <Chip key={s.id} on={section === s.id} onClick={() => setSection(s.id)}>
+              {s.label}
+              {s.id === "slots" && groups.length > 0 ? ` · ${groups.length}` : ""}
+            </Chip>
+          ))}
+        </div>
+
+        {section === "tasks" ? (
+          <CrmDailyTasks />
+        ) : (
+        <>
         <div className="crm-colhead">
           <span className="crm-label">
             Slot required · {groups.length} {groups.length === 1 ? "flat" : "flats"}
@@ -276,6 +303,8 @@ export default function CrmNotificationsPage() {
             </div>
           )}
         </div>
+        </>
+        )}
       </div>
     </div>
   );
