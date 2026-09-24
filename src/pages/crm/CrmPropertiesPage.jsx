@@ -473,7 +473,10 @@ export default function CrmPropertiesPage() {
         <div style={{ padding: "9px 12px", display: "flex", gap: 7, alignItems: "center", flexWrap: "wrap", flex: "none" }}>
           <input className="crm-input" style={{ maxWidth: 280 }} placeholder="Search id, area, title, owner…"
             value={q} onChange={(e) => setQ(e.target.value)} />
-          {["published", "paused", "rented", ""].map((s) => (
+          {/* dormant is written by the Prop follow-up queue. Without a chip
+              for it those listings would be reachable only under "All", which
+              is where a flat goes to be forgotten a second time. */}
+          {["published", "paused", "rented", "dormant", ""].map((s) => (
             <Chip key={s || "all"} on={status === s} onClick={() => setStatus(s)}>
               {s || "All"}
             </Chip>

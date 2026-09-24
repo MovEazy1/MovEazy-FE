@@ -24,6 +24,7 @@ import {
 } from "../../lib/crmSlotRequests";
 import { fetchProfilesFor } from "../../lib/crmVisits";
 import CrmDailyTasks from "./CrmDailyTasks";
+import CrmPropertyFollowUp from "./CrmPropertyFollowUp";
 
 /** A tenant with no number can't be messaged, only called back by email. */
 function WaitingRow({ person, group, nameFor, onMessaged }) {
@@ -189,6 +190,7 @@ function PropertyCard({ group, nameFor, canWrite, onChanged }) {
 const SECTIONS = [
   { id: "tasks", label: "Daily tasks" },
   { id: "slots", label: "Flat slots required" },
+  { id: "props", label: "Prop follow-up" },
 ];
 
 export default function CrmNotificationsPage() {
@@ -271,6 +273,8 @@ export default function CrmNotificationsPage() {
 
         {section === "tasks" ? (
           <CrmDailyTasks />
+        ) : section === "props" ? (
+          <CrmPropertyFollowUp />
         ) : (
         <>
         <div className="crm-colhead">
