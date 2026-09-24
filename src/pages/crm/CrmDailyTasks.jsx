@@ -11,6 +11,7 @@
  * follow-up: message them, or park it for a few hours.
  */
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useNavigate } from "react-router-dom";
 import { useCrm } from "./CrmShell";
 import { Btn, C, Empty } from "./crmUi";
 import { whatsappUrl } from "../../lib/crmSettings";
@@ -53,7 +54,7 @@ function SnoozeControl({ onSnooze, busy }) {
   );
 }
 
-function TaskRow({ task, onSnooze, onUnsnooze, busy }) {
+function TaskRow({ task, onSnooze, onUnsnooze, onOpen, busy }) {
   const message = followUpMessage({ name: task.name, action: task.latest });
   const href = whatsappUrl(task.phone, message);
 
@@ -62,9 +63,23 @@ function TaskRow({ task, onSnooze, onUnsnooze, busy }) {
       display: "flex", alignItems: "flex-start", gap: 10,
       padding: "10px 12px", borderBottom: `1px solid ${C.lineSoft}`,
     }}>
-      <span style={{ minWidth: 0, flex: 1 }}>
+      <button
+        type="button"
+        onClick={() => onOpen(task.clientId)}
+        title={`Open ${task.name}`}
+        // The row tells you somebody did something; their record tells you
+        // what they have done all along, which is the next question every
+        // time. Deliberately not the whole row: the buttons alongside would
+        // then navigate as well as act.
+        style={{
+          minWidth: 0, flex: 1, textAlign: "left", padding: 0,
+          background: "none", border: "none", cursor: "pointer", font: "inherit",
+        }}
+      >
         <span style={{ display: "flex", alignItems: "baseline", gap: 7, flexWrap: "wrap" }}>
-          <span style={{ fontSize: 13, fontWeight: 700, color: C.text }}>{task.name}</span>
+          <span className="crm-task-name" style={{ fontSize: 13, fontWeight: 700, color: C.text }}>
+            {task.name}
+          </span>
           <span className="crm-mute crm-num" style={{ fontSize: 11 }}>
             {task.phone || task.email || "no contact"}
           </span>
@@ -83,7 +98,7 @@ function TaskRow({ task, onSnooze, onUnsnooze, busy }) {
           {describeAction(task.latest)}
         </span>
         <span className="crm-mute" style={{ fontSize: 11 }}>{timeAgo(task.latest.created_at)}</span>
-      </span>
+      </button>
 
       <span style={{ display: "flex", alignItems: "center", gap: 5, flexWrap: "wrap", justifyContent: "flex-end" }}>
         {href ? (
@@ -108,7 +123,15 @@ function TaskRow({ task, onSnooze, onUnsnooze, busy }) {
 
 export default function CrmDailyTasks() {
   const { clients, user } = useCrm();
+  const navigate = useNavigate();
   const actorEmail = user?.email || "";
+
+  // The same address the pipeline and payments screens use to open somebody,
+  // so a client opened from here lands exactly where it would from there.
+  const openClient = useCallback(
+    (clientId) => navigate(`/crm/clients?client=${clientId}`),
+    [navigate],
+  );
   const [actions, setActions] = useState([]);
   const [snoozes, setSnoozes] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -206,6 +229,7 @@ export default function CrmDailyTasks() {
               busy={busy === t.clientId}
               onSnooze={onSnooze}
               onUnsnooze={onUnsnooze}
+              onOpen={openClient}
             />
           ))
         )}

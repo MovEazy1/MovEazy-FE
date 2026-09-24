@@ -86,6 +86,11 @@ textarea.crm-input { resize:vertical; line-height:1.55; }
 .crm .crm-btn--fb:hover:not(:disabled) { background:#EAF1FC; border-color:${C.fb}; color:${C.fb}; }
 .crm .crm-btn--reddit { border-color:${C.reddit}; color:${C.reddit}; }
 .crm .crm-btn--reddit:hover:not(:disabled) { background:#FDEEE8; border-color:${C.reddit}; color:${C.reddit}; }
+/* The clickable name in a daily task. Underlined only on hover: a queue of
+   forty underlined names reads as a wall of links. */
+.crm .crm-task-name { transition:color .12s ease; }
+.crm button:hover .crm-task-name { color:${C.accent}; text-decoration:underline; text-underline-offset:2px; }
+.crm button:focus-visible .crm-task-name { color:${C.accent}; }
 .crm .crm-btn--call { background:${C.bg}; border-color:${C.accent}; color:${C.accent}; }
 .crm .crm-btn--call:hover:not(:disabled) { background:${C.accentSoft}; border-color:${C.accent}; color:${C.accent}; }
 .crm .crm-btn--danger { border-color:#E8C4BC; color:${C.coral}; }
