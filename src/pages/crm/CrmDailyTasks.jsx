@@ -113,6 +113,7 @@ export default function CrmDailyTasks() {
   const [snoozes, setSnoozes] = useState([]);
   const [loading, setLoading] = useState(true);
   const [busy, setBusy] = useState("");
+  const [lastLoadedAt, setLastLoadedAt] = useState("");
   /**
    * Re-rendered on a timer as well as on new data, because a snooze expiring
    * is a change nobody wrote: the row has to reappear when its hour passes,
@@ -122,28 +123,35 @@ export default function CrmDailyTasks() {
   const alive = useRef(true);
 
   const load = useCallback(async () => {
+    setLoading(true);
     const [a, s] = await Promise.all([fetchClientActions(), fetchSnoozes()]);
     if (!alive.current) return;
     setActions(a);
     setSnoozes(s);
+    setLastLoadedAt(new Date().toISOString());
     setLoading(false);
   }, []);
 
+  /**
+   * Fetched once, then only when asked.
+   *
+   * This polled every thirty seconds, which is four requests a minute for
+   * every tab left open on this screen — near three thousand a day per agent,
+   * almost all of them returning the rows that were already on screen. A
+   * follow-up queue does not change faster than the person working it, and
+   * they are sitting in front of a Refresh button.
+   *
+   * The minute timer stays, and costs nothing: it only re-renders what has
+   * already been fetched, which is what lets a snooze that has run out come
+   * back on its own without asking the database anything.
+   */
   useEffect(() => {
     alive.current = true;
     load();
-    // Polled rather than subscribed: this is a queue somebody works through,
-    // not a chat, and half a minute late is not late. A realtime channel would
-    // be one more thing to keep alive for no visible gain.
-    const poll = setInterval(load, 30000);
-    const onFocus = () => load();
-    window.addEventListener("focus", onFocus);
     const clock = setInterval(() => setTick((t) => t + 1), 60000);
     return () => {
       alive.current = false;
-      clearInterval(poll);
       clearInterval(clock);
-      window.removeEventListener("focus", onFocus);
     };
   }, [load]);
 
@@ -172,7 +180,16 @@ export default function CrmDailyTasks() {
   return (
     <>
       <div className="crm-colhead">
-        <span className="crm-label">Daily tasks · {tasks.length}</span>
+        <span className="crm-label">
+          Daily tasks · {tasks.length}
+          {lastLoadedAt && (
+            <span className="crm-mute" style={{ fontWeight: 600 }}>
+              {" "}· updated {timeAgo(lastLoadedAt)}
+            </span>
+          )}
+        </span>
+        {/* The list is only as current as the last press, so it says when
+            that was rather than letting an empty queue pass for a quiet one. */}
         <Btn sm onClick={load} disabled={loading}>{loading ? "Loading…" : "Refresh"}</Btn>
       </div>
 
