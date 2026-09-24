@@ -93,7 +93,7 @@ function RelaxCup() {
  * covers to decorate a screen whose entire job is to be tapped through would
  * trade the moment for a spinner, and the shortlist itself is one tap away.
  */
-function CuratedReady({ count, onOpen }) {
+function CuratedReady({ count, onOpen, onClose }) {
   const reduce = useReducedMotion();
   const rise = (delay) =>
     reduce
@@ -108,16 +108,32 @@ function CuratedReady({ count, onOpen }) {
     <div
       style={{
         position: "relative", overflow: "hidden",
-        // Cancels the page wrapper's own padding on all four sides. It was
-        // only cancelled horizontally, so the panel asked for most of the
-        // viewport and then had 12px and 60px added back around it — enough to
-        // overflow and leave a pale strip under the dark screen.
-        margin: "-12px -16px -60px", padding: "56px 24px 48px",
+        // The whole viewport, and nothing around it. This used to render inside
+        // the page's 480px column, under a white top bar, and then ask for a
+        // full viewport on top of that bar's height — so the page always
+        // scrolled, the white wrapper showed through underneath, and a pale
+        // bar with dark icons sat on top of a dark screen.
+        width: "100%", minHeight: "100dvh", boxSizing: "border-box",
+        padding: "72px 24px 48px",
         background: T.ink, color: "#fff", textAlign: "center",
-        minHeight: "100dvh", boxSizing: "border-box",
         display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center",
       }}
     >
+      {/* The page's own close button went with the top bar, and a screen with
+          no way off it is a trap however good it looks. */}
+      <button
+        type="button"
+        aria-label="Close"
+        onClick={onClose}
+        style={{
+          position: "absolute", top: 18, left: 16, zIndex: 2,
+          width: 38, height: 38, borderRadius: "50%", border: "none",
+          background: "rgba(255,255,255,0.08)", color: "rgba(255,255,255,0.8)",
+          display: "flex", alignItems: "center", justifyContent: "center", cursor: "pointer",
+        }}
+      >
+        <X size={20} />
+      </button>
       {/* A single soft light behind the cards. One source, off-centre — the
           cheapest way to make a flat colour look lit rather than filled. */}
       <div
@@ -391,6 +407,20 @@ export default function TopMatches() {
   const loading = authLoading || listingsLoading || !prefsChecked;
   const total = topMatches.length;
 
+  // The team has picked, so that is the answer to "find my flat" — whether or
+  // not the five were ever swiped through. Returned before the page shell
+  // rather than inside it: this screen is the whole viewport, and the shell's
+  // white top bar and 480px column are exactly what it must not sit in.
+  if (!loading && prefs && curatedCount > 0) {
+    return (
+      <CuratedReady
+        count={curatedCount}
+        onOpen={() => navigate("/curated")}
+        onClose={() => navigate("/")}
+      />
+    );
+  }
+
   return (
     <div style={{ minHeight: "100vh", background: "#fff" }}>
       {!loading && prefs && <TopBar center={phase === "relax" ? `${total} of ${total || TOP_N}` : ""} />}
@@ -409,10 +439,6 @@ export default function TopMatches() {
               Tell us what you're looking for
             </button>
           </div>
-        ) : curatedCount > 0 ? (
-          // The team has picked. That is the answer to "find my flat" now,
-          // whether or not the five were ever swiped through.
-          <CuratedReady count={curatedCount} onOpen={() => navigate("/curated")} />
         ) : phase === "swiping" && total > 0 ? (
           <>
             <h1 style={{ fontWeight: 800, fontSize: 24, textAlign: "center", margin: "8px 0 4px", color: T.text }}>
