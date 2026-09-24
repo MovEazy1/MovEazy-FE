@@ -12,6 +12,7 @@
  */
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
+import { motion, useReducedMotion } from "framer-motion";
 import { X, Heart } from "lucide-react";
 import PropertyModal from "../components/PropertyModal";
 import SwipeDeck from "../components/SwipeDeck";
@@ -28,6 +29,8 @@ import { fetchMyCuratedProperties } from "../lib/curatedShares";
 
 const TOP_N = 5;
 const T = { ink: "#04211D", teal: "#0E7C68", gold: "#E8A33D", text: "#171412", textDim: "#5c554e" };
+/** The app's standard ease, matching the swipe deck and the questionnaire. */
+const EASE = [0.22, 1, 0.36, 1];
 
 function TopBar({ center }) {
   const navigate = useNavigate();
@@ -75,6 +78,150 @@ function RelaxCup() {
       <circle cx="57" cy="98" r="4" fill={`${T.gold}55`} />
       <circle cx="93" cy="98" r="4" fill={`${T.gold}55`} />
     </svg>
+  );
+}
+
+/**
+ * Your shortlist is ready.
+ *
+ * The one screen in this flow that is an arrival rather than a wait, so it is
+ * the one that gets to be loud. Everything else here is pale and patient; this
+ * is ink, and the only dark screen in the journey — which is what makes it
+ * read as an event rather than another step.
+ *
+ * The three tilted cards are not photographs of their homes. Loading three
+ * covers to decorate a screen whose entire job is to be tapped through would
+ * trade the moment for a spinner, and the shortlist itself is one tap away.
+ */
+function CuratedReady({ count, onOpen }) {
+  const reduce = useReducedMotion();
+  const rise = (delay) =>
+    reduce
+      ? { initial: { opacity: 0 }, animate: { opacity: 1 }, transition: { duration: 0.3, delay } }
+      : {
+          initial: { opacity: 0, y: 18 },
+          animate: { opacity: 1, y: 0 },
+          transition: { duration: 0.6, ease: EASE, delay },
+        };
+
+  return (
+    <div
+      style={{
+        position: "relative", overflow: "hidden",
+        margin: "4px -16px 0", padding: "44px 24px 40px",
+        background: T.ink, color: "#fff", textAlign: "center",
+        minHeight: "calc(100dvh - 76px)",
+        display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center",
+      }}
+    >
+      {/* A single soft light behind the cards. One source, off-centre — the
+          cheapest way to make a flat colour look lit rather than filled. */}
+      <div
+        aria-hidden
+        style={{
+          position: "absolute", top: "12%", left: "50%", width: 520, height: 520,
+          transform: "translateX(-50%)", pointerEvents: "none",
+          background: `radial-gradient(circle, ${T.teal}55 0%, transparent 62%)`,
+          filter: "blur(18px)",
+        }}
+      />
+
+      <motion.div style={{ position: "relative" }} {...rise(0)}>
+        <span
+          style={{
+            display: "inline-flex", alignItems: "center", gap: 7,
+            padding: "6px 14px", borderRadius: 999, marginBottom: 26,
+            background: "rgba(94,234,212,0.12)", border: "1px solid rgba(94,234,212,0.32)",
+            color: "#5EEAD4", fontSize: 12, fontWeight: 700, letterSpacing: "0.06em",
+            textTransform: "uppercase",
+          }}
+        >
+          <span
+            aria-hidden
+            style={{ width: 6, height: 6, borderRadius: "50%", background: "#5EEAD4" }}
+          />
+          Hand-picked for you
+        </span>
+      </motion.div>
+
+      {/* Three cards fanned out: the shortlist as an object, before it is a
+          list. Tilts are fixed, not random — a layout that reshuffles itself
+          on every render reads as a glitch. */}
+      <motion.div
+        aria-hidden
+        style={{ position: "relative", width: 230, height: 138, marginBottom: 34 }}
+        {...rise(0.08)}
+      >
+        {[
+          // Far enough apart to read as three cards. At a tighter spread the
+          // outer two vanish behind the middle one and the fan looks like a
+          // smudge rather than a stack.
+          { x: -62, rot: -14, o: 0.4, z: 1 },
+          { x: 62, rot: 14, o: 0.4, z: 1 },
+          { x: 0, rot: 0, o: 1, z: 2 },
+        ].map((c) => (
+          <span
+            key={`${c.x}-${c.rot}`}
+            style={{
+              position: "absolute", inset: 0, margin: "auto",
+              width: 116, height: 132, borderRadius: 16, zIndex: c.z,
+              transform: `translateX(${c.x}px) rotate(${c.rot}deg)`,
+              background: c.o === 1
+                ? "linear-gradient(160deg, #10473C 0%, #071F1A 100%)"
+                : "rgba(255,255,255,0.07)",
+              border: `1px solid rgba(94,234,212,${c.o === 1 ? 0.38 : 0.22})`,
+              boxShadow: c.o === 1 ? "0 18px 40px rgba(0,0,0,0.45)" : "none",
+              display: "flex", alignItems: "center", justifyContent: "center",
+            }}
+          >
+            {c.o === 1 && (
+              <span style={{ fontSize: 34, fontWeight: 800, color: "#5EEAD4", letterSpacing: "-0.03em" }}>
+                {count}
+              </span>
+            )}
+          </span>
+        ))}
+      </motion.div>
+
+      <motion.h1
+        style={{
+          position: "relative", fontWeight: 800, fontSize: 34, lineHeight: 1.1,
+          letterSpacing: "-0.03em", margin: "0 0 14px", maxWidth: 340,
+        }}
+        {...rise(0.16)}
+      >
+        Your curated list
+        <br />
+        <span style={{ color: "#5EEAD4" }}>is ready</span>
+      </motion.h1>
+
+      <motion.p
+        style={{
+          position: "relative", color: "rgba(255,255,255,0.72)", fontSize: 15.5,
+          lineHeight: 1.55, margin: "0 0 32px", maxWidth: 320,
+        }}
+        {...rise(0.22)}
+      >
+        {count} {count === 1 ? "home" : "homes"}, picked by our team from everything we could
+        find. Your perfect home is a few taps away.
+      </motion.p>
+
+      <motion.button
+        type="button"
+        onClick={onOpen}
+        style={{
+          position: "relative", width: "100%", maxWidth: 320, padding: "17px 28px",
+          borderRadius: 999, border: "none", cursor: "pointer",
+          background: "#5EEAD4", color: T.ink,
+          fontWeight: 800, fontSize: 16, letterSpacing: "-0.01em",
+          boxShadow: "0 14px 34px rgba(94,234,212,0.28)",
+        }}
+        whileTap={reduce ? undefined : { scale: 0.97 }}
+        {...rise(0.28)}
+      >
+        Show me what you&apos;ve got
+      </motion.button>
+    </div>
   );
 }
 
@@ -256,6 +403,10 @@ export default function TopMatches() {
               Tell us what you're looking for
             </button>
           </div>
+        ) : curatedCount > 0 ? (
+          // The team has picked. That is the answer to "find my flat" now,
+          // whether or not the five were ever swiped through.
+          <CuratedReady count={curatedCount} onOpen={() => navigate("/curated")} />
         ) : phase === "swiping" && total > 0 ? (
           <>
             <h1 style={{ fontWeight: 800, fontSize: 24, textAlign: "center", margin: "8px 0 4px", color: T.text }}>
