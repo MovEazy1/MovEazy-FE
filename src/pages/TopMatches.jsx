@@ -108,9 +108,13 @@ function CuratedReady({ count, onOpen }) {
     <div
       style={{
         position: "relative", overflow: "hidden",
-        margin: "4px -16px 0", padding: "44px 24px 40px",
+        // Cancels the page wrapper's own padding on all four sides. It was
+        // only cancelled horizontally, so the panel asked for most of the
+        // viewport and then had 12px and 60px added back around it — enough to
+        // overflow and leave a pale strip under the dark screen.
+        margin: "-12px -16px -60px", padding: "56px 24px 48px",
         background: T.ink, color: "#fff", textAlign: "center",
-        minHeight: "calc(100dvh - 76px)",
+        minHeight: "100dvh", boxSizing: "border-box",
         display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center",
       }}
     >
@@ -210,16 +214,18 @@ function CuratedReady({ count, onOpen }) {
         type="button"
         onClick={onOpen}
         style={{
-          position: "relative", width: "100%", maxWidth: 320, padding: "17px 28px",
-          borderRadius: 999, border: "none", cursor: "pointer",
-          background: "#5EEAD4", color: T.ink,
-          fontWeight: 800, fontSize: 16, letterSpacing: "-0.01em",
+          position: "relative", width: "100%", maxWidth: 340,
+          padding: "16px 24px", borderRadius: 22, border: "none", cursor: "pointer",
+          background: "#5EEAD4", color: T.ink, fontFamily: "inherit",
+          // Wraps to two lines on a phone, so it is a rounded rectangle rather
+          // than a pill: a two-line pill reads as a mistake.
+          fontWeight: 800, fontSize: 15, lineHeight: 1.35, letterSpacing: "-0.01em",
           boxShadow: "0 14px 34px rgba(94,234,212,0.28)",
         }}
         whileTap={reduce ? undefined : { scale: 0.97 }}
         {...rise(0.28)}
       >
-        Show me what you&apos;ve got
+        Show me what Shit have you guys pulled out in 6 Hours
       </motion.button>
     </div>
   );
