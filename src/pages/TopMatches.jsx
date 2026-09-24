@@ -207,12 +207,15 @@ function CuratedReady({ count, onOpen, onClose }) {
         style={{
           position: "relative", fontWeight: 800, fontSize: 34, lineHeight: 1.1,
           letterSpacing: "-0.03em", margin: "0 0 14px", maxWidth: 340,
+          // Stated rather than inherited, so the headline stays white if the
+          // panel's own colour ever changes.
+          color: "#fff",
         }}
         {...rise(0.16)}
       >
         Your curated list
         <br />
-        <span style={{ color: "#5EEAD4" }}>is ready</span>
+        is ready
       </motion.h1>
 
       <motion.p
