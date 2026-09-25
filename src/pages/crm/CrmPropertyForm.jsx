@@ -32,7 +32,9 @@ import {
 import { matchListingToRequirements } from "../../lib/inventoryMatch";
 import { supabase, isSupabaseConfigured } from "../../lib/supabase";
 import { SCOPES } from "../../lib/adminScopes";
-import { BLANK_INTERNAL, fetchInternal, saveInternal } from "../../lib/crmPropertyInternal";
+import {
+  BLANK_INTERNAL, fetchInternal, hasInternalDetail, probeInternalTables, saveInternal,
+} from "../../lib/crmPropertyInternal";
 import { DEFAULT_VISIT_RULE, applyVisitRule, rememberVisitRule } from "../../lib/visitSchedule";
 import { Btn, C, Chip, Empty, Toast, inr } from "./crmUi";
 
@@ -161,7 +163,18 @@ export default function CrmPropertyForm() {
    * available slot", which is a message for somebody to answer by hand.
    */
   const [visitRule, setVisitRule] = useState({ ...DEFAULT_VISIT_RULE });
+  /** "checking" | "ok" | "missing" | "denied" — whether the panel can save at all. */
+  const [internalAvailability, setInternalAvailability] = useState("checking");
   const dropRef = useRef(null);
+
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      const status = await probeInternalTables();
+      if (!cancelled) setInternalAvailability(status);
+    })();
+    return () => { cancelled = true; };
+  }, []);
 
   const canWrite = access.has(SCOPES.PROPERTIES_WRITE);
   const showToast = (message, tone = "ok") => {
@@ -328,14 +341,15 @@ export default function CrmPropertyForm() {
    * listing to correct; throwing here would lose the whole upload over a
    * second table.
    */
-  const writeInternal = useCallback(async (propertyId) => {
+  const writeInternal = useCallback(async (propertyId, { toast = true } = {}) => {
     const res = await saveInternal(propertyId, internal, user?.email || "");
-    if (!res.ok) {
+    if (!res.ok && toast) {
       showToast(res.missingTable
-        ? "Saved, but the internal details table isn't there yet — run crm_property_internal.sql"
-        : "Saved, but the internal details didn't", "error");
+        ? "Listing saved, but NOT the internal details — run crm_property_internal.sql"
+        : `Listing saved, but NOT the internal details: ${res.error?.message || "unknown error"}`, "error");
     }
-    return res.ok;
+    if (res.missingTable) setInternalAvailability("missing");
+    return res;
   }, [internal, user]);
 
   const publish = useCallback(async () => {
@@ -460,7 +474,11 @@ export default function CrmPropertyForm() {
 
       // Both of these key on a property_id that did not exist a moment ago,
       // which is why they run here and not with the rest of the form.
-      await writeInternal(propertyId);
+      // Skipped when nothing was entered, so a listing with no POC doesn't get
+      // an empty row — and doesn't report a failure nobody cares about.
+      const internalResult = hasInternalDetail(internal) || internal.source !== "owner"
+        ? await writeInternal(propertyId, { toast: false })
+        : null;
       if (visitRule.mode !== "none") {
         const { added, failed } = await applyVisitRule(propertyId, visitRule);
         // Remembered so the rolling window keeps topping itself up, exactly as
@@ -473,7 +491,7 @@ export default function CrmPropertyForm() {
 
       // Who was waiting for exactly this? The same engine, run the other way.
       const matches = matchListingToRequirements(data, requirements, { min: 60 });
-      setPublished({ listing: data, matches });
+      setPublished({ listing: data, matches, internalResult });
       try { localStorage.removeItem(DRAFT_KEY); } catch { /* ignore */ }
       setPhotos([]);
       reload();
@@ -483,7 +501,7 @@ export default function CrmPropertyForm() {
       setSaving(false);
     }
   }, [canWrite, missingRequired, f, photos, keptImages, user, requirements, reload, isEdit, editId,
-      writeInternal, visitRule]);
+      writeInternal, visitRule, internal]);
 
   useEffect(() => {
     const onKey = (e) => {
@@ -513,6 +531,36 @@ export default function CrmPropertyForm() {
         <h1 style={{ fontSize: 22, fontWeight: 800, margin: 0 }}>
           {published.listing.property_id} is live
         </h1>
+        {/* Stays on screen until it is dealt with. This screen replaces the
+            form, so a toast here was never seen — a failed POC save looked
+            identical to a good one. The typed details are still in state, so
+            Retry writes exactly what was entered. */}
+        {published.internalResult && !published.internalResult.ok && (
+          <div role="alert" style={{
+            padding: "10px 12px", borderRadius: 10, border: `1px solid ${C.coral}`,
+            background: "#FDF1EE", display: "flex", flexDirection: "column", gap: 8,
+          }}>
+            <span style={{ fontSize: 13, fontWeight: 700, color: C.coral }}>
+              The internal details (property via / POC) were not saved.
+            </span>
+            <span style={{ fontSize: 12, color: C.textDim, lineHeight: 1.5 }}>
+              {published.internalResult.missingTable
+                ? "The table for them doesn't exist yet — run crm_property_internal.sql in Supabase, then press Retry. Don't leave this screen first or what you typed is gone."
+                : published.internalResult.error?.message || "The save was refused."}
+            </span>
+            <div>
+              <Btn sm variant="primary" onClick={async () => {
+                const res = await writeInternal(published.listing.property_id, { toast: false });
+                setPublished((cur) => (cur ? { ...cur, internalResult: res } : cur));
+              }}>
+                Retry saving POC
+              </Btn>
+            </div>
+          </div>
+        )}
+        {published.internalResult?.ok && (
+          <span className="crm-mute" style={{ fontSize: 12 }}>Internal details saved.</span>
+        )}
         <p style={{ color: C.textDim, fontSize: 14, margin: 0 }}>
           {published.matches.length === 0
             ? "No clients clear 60% on it yet — it'll surface as requirements change."
@@ -536,7 +584,12 @@ export default function CrmPropertyForm() {
           </div>
         )}
         <div style={{ display: "flex", gap: 7 }}>
-          <Btn variant="primary" onClick={() => { setPublished(null); setF(BLANK); setImportInfo(null); setPasteText(""); }}>
+          <Btn variant="primary" onClick={() => {
+            setPublished(null); setF(BLANK); setImportInfo(null); setPasteText("");
+            // Otherwise the last flat's POC is saved against the next one.
+            setInternal({ ...BLANK_INTERNAL });
+            setVisitRule({ ...DEFAULT_VISIT_RULE });
+          }}>
             Add another
           </Btn>
           <Btn onClick={() => navigate("/crm/properties")}>Back to properties</Btn>
@@ -907,7 +960,12 @@ export default function CrmPropertyForm() {
             )}
 
             <div style={{ marginTop: 4 }}>
-              <InternalDetails value={internal} onChange={setInternal} actorEmail={user?.email || ""} />
+              <InternalDetails
+                value={internal}
+                onChange={setInternal}
+                actorEmail={user?.email || ""}
+                availability={internalAvailability}
+              />
             </div>
 
             <div style={{ display: "flex", gap: 7 }}>
@@ -917,7 +975,10 @@ export default function CrmPropertyForm() {
               {isEdit ? (
                 <Btn onClick={() => navigate("/crm/properties")}>Cancel</Btn>
               ) : (
-                <Btn onClick={() => { setF(BLANK); setPhotos([]); setPasteText(""); setImportInfo(null); }}>
+                <Btn onClick={() => {
+                  setF(BLANK); setPhotos([]); setPasteText(""); setImportInfo(null);
+                  setInternal({ ...BLANK_INTERNAL }); setVisitRule({ ...DEFAULT_VISIT_RULE });
+                }}>
                   Clear
                 </Btn>
               )}

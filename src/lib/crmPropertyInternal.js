@@ -51,6 +51,32 @@ export const isMissingInternalTable = (error) =>
 
 const clean = (v) => String(v ?? "").trim();
 
+/**
+ * Can this session save internal details at all?
+ *
+ * Asked once when the form opens, so the panel can say so before anyone types
+ * a POC into it. Without this the only signal was a toast after publishing —
+ * and a new listing's success screen replaced the form before the toast could
+ * be seen, so a failed save looked exactly like a good one.
+ *
+ * "missing" is the migration not having been run; "denied" is a signed-in
+ * account without CRM access. Both mean nothing typed here will be kept.
+ */
+export async function probeInternalTables() {
+  if (!isSupabaseConfigured || !supabase) return "unconfigured";
+  try {
+    const { error } = await supabase
+      .from("inventory_private")
+      .select("property_id", { head: true, count: "exact" })
+      .limit(1);
+    if (!error) return "ok";
+    if (isMissingInternalTable(error)) return "missing";
+    return "denied";
+  } catch {
+    return "denied";
+  }
+}
+
 /* ── Broker directory ─────────────────────────────────────────────────────── */
 
 /** The dropdown: most recently used first, then alphabetical. */

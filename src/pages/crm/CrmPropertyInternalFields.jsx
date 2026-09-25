@@ -59,7 +59,7 @@ function InternalFrame({ children }) {
  * the state and this only edits it — the row is written alongside the listing,
  * after there is a property_id to key it on.
  */
-export function InternalDetails({ value, onChange, actorEmail = "" }) {
+export function InternalDetails({ value, onChange, actorEmail = "", availability = "ok" }) {
   const [brokers, setBrokers] = useState([]);
   const [loadingBrokers, setLoadingBrokers] = useState(false);
   const [adding, setAdding] = useState(false);
@@ -127,6 +127,20 @@ export function InternalDetails({ value, onChange, actorEmail = "" }) {
 
   return (
     <InternalFrame>
+      {/* Said before anyone types, not after they publish. The first version
+          only reported this in a toast that the success screen then covered,
+          so a failed save read as a good one. */}
+      {(availability === "missing" || availability === "denied") && (
+        <div role="alert" style={{
+          margin: "0 0 12px", padding: "8px 10px", borderRadius: 8,
+          border: `1px solid ${C.coral}`, background: "#FDF1EE", color: C.coral,
+          fontSize: 11.5, lineHeight: 1.5, fontWeight: 600,
+        }}>
+          {availability === "missing"
+            ? "Not saving yet: the internal details table doesn't exist. Run crm_property_internal.sql in Supabase — anything typed here until then is lost on publish."
+            : "Not saving: this account can't write internal details. It needs CRM access with “Add and edit listings”."}
+        </div>
+      )}
       <Row title="Property via" hint="How this flat reached us — not the same thing as who the listing is posted as.">
         <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
           {PROPERTY_SOURCES.map((s) => (
