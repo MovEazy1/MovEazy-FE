@@ -17,6 +17,7 @@ import { buildTemplateVars, renderTemplate, whatsappUrl } from "../../lib/crmSet
 import { CURATED_STATUS_LABEL } from "../../lib/curatedShares";
 import { formatDuration } from "../../lib/sessionSync";
 import { SCOPES } from "../../lib/adminScopes";
+import { SIGNAL_LABEL, basisLabel, effectiveFacts, rentSeenLabel } from "../../lib/crmPropertyInterest";
 import { Btn, C, Chip, Empty, TempDot, deadlineLabel, inr, relTime } from "./crmUi";
 
 /* ── Small pieces ─────────────────────────────────────────────────────────── */
@@ -156,15 +157,25 @@ function commuteLabel(minutes) {
  * Office and commute time are what the client typed themselves in the wizard
  * (ownAnswers, from public.user_requirements) — never edited from the CRM.
  */
-function HeaderFacts({ req, ownAnswers }) {
+function HeaderFacts({ req, ownAnswers, inferred }) {
+  // Budget, flat type and area each come from the best source that has them:
+  // the agent's requirement, then the client's own wizard answers, then — for
+  // someone who never finished it — what the flats they opened imply. The
+  // last is marked on the tile, so a guess never reads as an answer.
+  const eff = effectiveFacts(req, ownAnswers, inferred);
+  const basis = basisLabel(inferred);
   const facts = [
     // An agent's own override wins if set; otherwise fall back to what the
     // client picked themselves in the wizard (also from ownAnswers, like
     // office/commute — user_requirements has no move_in column of its own).
     ["Move in", req?.move_in || ownAnswers?.notes?.moveInDate || ""],
-    ["Budget", budgetLabel(req)],
-    ["Flat type", (req?.flat_types ?? []).join(", ")],
-    ["Area", (req?.localities ?? []).join(", ")],
+    ["Budget",
+      eff.budget.inferred
+        ? rentSeenLabel({ min: eff.budget.min, max: eff.budget.max })
+        : budgetLabel({ budget_min: eff.budget.min, budget_max: eff.budget.max }),
+      eff.budget.inferred],
+    ["Flat type", eff.flat_types.value.join(", "), eff.flat_types.inferred],
+    ["Area", eff.localities.value.join(", "), eff.localities.inferred],
     ["Office", ownAnswers?.office?.display || ownAnswers?.office?.label || ""],
     ["Time to office", commuteLabel(ownAnswers?.notes?.commuteMinutes)],
   ];
@@ -176,7 +187,7 @@ function HeaderFacts({ req, ownAnswers }) {
         borderRadius: 9, background: C.surface, overflow: "hidden",
       }}
     >
-      {facts.map(([label, value], i) => (
+      {facts.map(([label, value, isInferred], i) => (
         <div
           key={label}
           style={{ padding: "8px 12px", borderLeft: i ? `1px solid ${C.line}` : "none", minWidth: 0 }}
@@ -186,13 +197,28 @@ function HeaderFacts({ req, ownAnswers }) {
             className="crm-num"
             style={{
               fontSize: 13, fontWeight: 700, marginTop: 2,
-              color: value ? C.text : C.textMute,
+              color: !value ? C.textMute : isInferred ? C.gold : C.text,
               overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap",
             }}
-            title={value || "not set"}
+            title={
+              !value ? "not set"
+                : isInferred ? `${value} — going by the flat they opened (${basis}), not something they told us`
+                  : value
+            }
           >
-            {value || "not set"}
+            {value ? `${isInferred ? "~" : ""}${value}` : "not set"}
           </div>
+          {value && isInferred && (
+            <div
+              className="crm-num"
+              style={{
+                fontSize: 9.5, color: C.gold, marginTop: 1,
+                whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis",
+              }}
+            >
+              from {basis}
+            </div>
+          )}
         </div>
       ))}
     </div>
@@ -397,7 +423,7 @@ function RequirementSummary({ req }) {
  * for changing a requirement and the wrong one for reading it, so reading is now
  * the default and editing is a click.
  */
-function RequirementCard({ req, isOverride, canEdit, onChange, onReset }) {
+function RequirementCard({ req, isOverride, canEdit, onChange, onReset, inferred }) {
   const [editing, setEditing] = useState(false);
   const known = hasRequirement(req);
 
@@ -426,11 +452,52 @@ function RequirementCard({ req, isOverride, canEdit, onChange, onReset }) {
 
       {!editing && known && <RequirementSummary req={req} />}
 
-      {!editing && !known && (
+      {!editing && !known && !inferred && (
         <p className="crm-mute" style={{ fontSize: 12.5, margin: 0, lineHeight: 1.55 }}>
           Nothing captured yet — they never finished Find My Flat. Add what you know and matches appear
           straight away.
         </p>
+      )}
+
+      {/* Not a requirement: nothing here is saved. It is what the flats they
+          opened imply, standing in until they, or an agent, say otherwise. */}
+      {!editing && !known && inferred && (
+        <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+          <p className="crm-mute" style={{ fontSize: 12.5, margin: 0, lineHeight: 1.55 }}>
+            Nothing stated yet — they never finished Find My Flat. Going by what they opened:
+          </p>
+          <div style={{
+            padding: "8px 10px", borderRadius: 8, border: `1px solid ${C.gold}55`, background: `${C.gold}10`,
+            fontSize: 12.5, color: C.text, lineHeight: 1.6,
+          }}>
+            <div>
+              {[
+                (inferred.flat_types ?? []).join(" / "),
+                (inferred.localities ?? []).length ? `in ${inferred.localities.join(", ")}` : "",
+                inferred.rentSeen ? `around ${rentSeenLabel(inferred.rentSeen)}` : "",
+              ].filter(Boolean).join(" ") || "—"}
+            </div>
+            <div className="crm-mute crm-num" style={{ fontSize: 11 }}>
+              {(inferred.basis ?? []).slice(0, 4)
+                .map((b) => `${SIGNAL_LABEL[b.signal] || "opened"} ${b.propertyId}`).join(" · ")}
+            </div>
+          </div>
+          {canEdit && (
+            <div>
+              {/* Adopting it is deliberate: it becomes their saved requirement,
+                  with a little either side of the rent they looked at. */}
+              <Btn sm onClick={() => onChange({
+                ...req,
+                localities: inferred.localities,
+                flat_types: inferred.flat_types,
+                budget_min: inferred.budget_min,
+                budget_max: inferred.budget_max,
+              })}>
+                Save as their requirement
+              </Btn>
+            </div>
+          )}
+        </div>
       )}
 
       {editing && (
@@ -598,6 +665,7 @@ function ClosePrompt({ status, reasons, onCancel, onConfirm }) {
 export default function ClientRecord({
   client, requirement, isOverride, engagement, settings, access, actorEmail, agentName,
   onPatch, onRequirementChange, onRequirementReset, onToast, ownAnswers, shortlists, inventory,
+  inferred = null,
 }) {
   const [activities, setActivities] = useState([]);
   const [pendingClose, setPendingClose] = useState(null);
@@ -723,7 +791,7 @@ export default function ClientRecord({
           </Btn>
         </div>
 
-        <HeaderFacts req={requirement} ownAnswers={ownAnswers} />
+        <HeaderFacts req={requirement} ownAnswers={ownAnswers} inferred={inferred} />
         {client.phone && (
           <span className="crm-mute crm-num" style={{ fontSize: 10.5, marginTop: -10 }}>
             {isTouch ? `tel:+${String(client.phone).replace(/\D/g, "")} · opens your phone's dialler`
@@ -787,7 +855,7 @@ export default function ClientRecord({
         </div>
 
         <RequirementCard req={requirement} isOverride={isOverride} canEdit={canEditReq}
-          onChange={onRequirementChange} onReset={onRequirementReset} />
+          onChange={onRequirementChange} onReset={onRequirementReset} inferred={inferred} />
 
         <WhatTheyToldUs ownAnswers={ownAnswers} />
 

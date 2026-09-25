@@ -171,7 +171,7 @@ function MatchCard({ match, shortlist, canWrite, onSend, onShortlist, onReact, b
 
 export default function MatchesPane({
   client, requirement, inventory, shortlists, settings, access, actorEmail, agentName,
-  onShortlistsChanged, onToast,
+  onShortlistsChanged, onToast, inferredBasis = "",
 }) {
   const [availableOnly, setAvailableOnly] = useState(true);
   const [busy, setBusy] = useState(false);
@@ -372,6 +372,16 @@ export default function MatchesPane({
         )}
       </div>
 
+      {/* No stated requirement, so these are ranked against what the flats
+          they opened imply. Said here so the list isn't read as their brief. */}
+      {inferredBasis && (
+        <div style={{
+          margin: "8px 12px 0", padding: "6px 9px", borderRadius: 8, fontSize: 11, lineHeight: 1.45,
+          border: `1px solid ${C.gold}55`, background: `${C.gold}10`, color: C.gold, flex: "none",
+        }}>
+          Nothing stated yet — matching on the flat they opened ({inferredBasis}).
+        </div>
+      )}
       <div style={{ padding: "8px 12px", display: "flex", gap: 6, flexWrap: "wrap", flex: "none" }}>
         <span className="crm-chip" style={{ pointerEvents: "none" }}>≥ {minScore}%</span>
         <Chip on={availableOnly} onClick={() => setAvailableOnly((v) => !v)}>Available now</Chip>

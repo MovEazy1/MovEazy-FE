@@ -15,6 +15,7 @@ import {
   fetchClientOwnAnswers,
 } from "../../lib/crmClients";
 import { fetchCrmSettings } from "../../lib/crmSettings";
+import { fetchPropertyInterest } from "../../lib/crmPropertyInterest";
 import { fetchShareChannels } from "../../lib/marketing";
 import { supabase, isSupabaseConfigured } from "../../lib/supabase";
 import { C, CrmStyles, Empty, Loading } from "./crmUi";
@@ -160,14 +161,18 @@ export default function CrmShell() {
       // resolves to [] on a project without the marketing migration, and the
       // share menu then degrades to the plain per-platform link rather than
       // leaving an agent with no way to post at all.
-      const [clients, requirements, inventory, engagement, shortlists, touches, settings, marketingChannels, ownAnswers] =
+      // interest is the other: [] until crm_client_property_interest.sql is
+      // run, which leaves clients reading exactly as they did before.
+      const [clients, requirements, inventory, engagement, shortlists, touches, settings, marketingChannels, ownAnswers,
+        interest] =
         await Promise.all([
           fetchClients(), fetchClientRequirements(), fetchInventory(),
           fetchEngagement(), fetchShortlists(), fetchLastTouch(), fetchCrmSettings(),
-          fetchShareChannels(), fetchClientOwnAnswers(),
+          fetchShareChannels(), fetchClientOwnAnswers(), fetchPropertyInterest(),
         ]);
       setData({
         clients, requirements, inventory, engagement, shortlists, touches, settings, marketingChannels, ownAnswers,
+        interest,
       });
       setError("");
     } catch (e) {

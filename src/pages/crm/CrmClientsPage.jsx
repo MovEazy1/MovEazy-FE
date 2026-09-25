@@ -15,6 +15,9 @@ import {
   saveClientRequirement, resetClientRequirement, statusLabel, tempColor, syncClientsFromSignups,
 } from "../../lib/crmClients";
 import { formatDuration } from "../../lib/sessionSync";
+import {
+  basisLabel, effectiveFacts, groupInterestByClient, inferRequirement, requirementForMatching,
+} from "../../lib/crmPropertyInterest";
 import { SCOPES } from "../../lib/adminScopes";
 import { buildTemplateCsv, downloadCsv, parseCsv, planImport, runImport } from "../../lib/crmImport";
 import { Btn, C, Chip, Empty, TempDot, Toast, deadlineLabel, deadlineTs, shortDate } from "./crmUi";
@@ -165,9 +168,40 @@ function ImportPanel({ actorEmail, onDone, onCancel, onToast }) {
   );
 }
 
+/**
+ * "JP Nagar · ₹27k · 2 BHK" under a client's name.
+ *
+ * Anything read from the flats they opened rather than stated is prefixed "~"
+ * and tinted, so a guess never passes for an answer at a glance.
+ */
+function ClientFactsLine({ facts, basis }) {
+  const parts = [];
+  const areas = facts.localities.value.slice(0, 2).join(", ");
+  parts.push({ text: areas || "no area", inferred: facts.localities.inferred });
+  const b = facts.budget;
+  if (b.max || b.min) {
+    const k = (n) => `₹${Math.round(n / 1000)}k`;
+    const text = b.inferred && b.min && b.max && b.min !== b.max ? `${k(b.min)}–${k(b.max)}` : k(b.max || b.min);
+    parts.push({ text, inferred: b.inferred });
+  }
+  if (facts.flat_types.value[0]) parts.push({ text: facts.flat_types.value[0], inferred: facts.flat_types.inferred });
+  const anyInferred = parts.some((p) => p.inferred);
+
+  return (
+    <span className="crm-mute crm-num" style={{ fontSize: 11 }}
+      title={anyInferred ? `~ = going by the flat they opened (${basis}), not something they told us` : undefined}>
+      {parts.map((p, i) => (
+        <span key={i} style={p.inferred ? { color: C.gold } : undefined}>
+          {i ? " · " : ""}{p.inferred ? "~" : ""}{p.text}
+        </span>
+      ))}
+    </span>
+  );
+}
+
 export default function CrmClientsPage() {
   const crm = useCrm();
-  const { clients, requirements, inventory, engagement, shortlists, touches, settings, access, user, ownAnswers } = crm;
+  const { clients, requirements, inventory, engagement, shortlists, touches, settings, access, user, ownAnswers, interest } = crm;
 
   const [params, setParams] = useSearchParams();
   const selectedId = params.get("client") || "";
@@ -206,6 +240,21 @@ export default function CrmClientsPage() {
     return m;
   }, [requirements]);
 
+  /**
+   * What each client's opened flats say they want — a stand-in for anyone who
+   * never finished Find My Flat. Never saved; only fills fields that are
+   * otherwise empty, so real answers win the moment they exist.
+   */
+  const inferredByClient = useMemo(() => {
+    const byId = new Map(inventory.map((l) => [l.property_id, l]));
+    const m = new Map();
+    for (const [clientId, signals] of groupInterestByClient(interest ?? [])) {
+      const inferred = inferRequirement(signals, byId);
+      if (inferred) m.set(clientId, inferred);
+    }
+    return m;
+  }, [interest, inventory]);
+
   const engByUser = useMemo(() => {
     const m = new Map();
     for (const e of engagement) m.set(e.user_id, e);
@@ -239,6 +288,7 @@ export default function CrmClientsPage() {
         const hay = [
           c.name, c.phone, c.email, c.note,
           ...(req?.localities ?? []),
+          ...(inferredByClient.get(c.id)?.localities ?? []),
           ...(c.tags ?? []),
         ].join(" ").toLowerCase();
         return hay.includes(needle);
@@ -295,7 +345,8 @@ export default function CrmClientsPage() {
       }
     });
     return sorted;
-  }, [clients, q, statusFilter, tempFilter, mineOnly, sort, reqByClient, engByUser, lastTouchByClient, actorEmail, ownAnswersByUser]);
+  }, [clients, q, statusFilter, tempFilter, mineOnly, sort, reqByClient, engByUser, lastTouchByClient, actorEmail,
+    ownAnswersByUser, inferredByClient]);
 
   const selected = useMemo(
     () => clients.find((c) => c.id === selectedId) ?? visible[0] ?? null,
@@ -476,11 +527,10 @@ export default function CrmClientsPage() {
                   {req?.move_in ? shortDate(req.move_in) === "—" ? req.move_in : shortDate(req.move_in) : "—"}
                 </span>
               </span>
-              <span className="crm-mute crm-num" style={{ fontSize: 11 }}>
-                {(req?.localities ?? []).slice(0, 2).join(", ") || "no area"}
-                {req?.budget_max ? ` · ₹${Math.round(req.budget_max / 1000)}k` : ""}
-                {(req?.flat_types ?? [])[0] ? ` · ${req.flat_types[0]}` : ""}
-              </span>
+              <ClientFactsLine
+                facts={effectiveFacts(req, ownAnswersByUser.get(c.user_id), inferredByClient.get(c.id))}
+                basis={basisLabel(inferredByClient.get(c.id))}
+              />
               <span className="crm-mute crm-num" style={{ fontSize: 11 }}>
                 {statusLabel(c.status)}
                 {c.status === "dnp" && c.dnp_count > 0 ? ` ×${c.dnp_count}` : ""}
@@ -522,6 +572,7 @@ export default function CrmClientsPage() {
       isOverride={Boolean(storedReq)}
       engagement={engByUser.get(selected.user_id)}
       ownAnswers={ownAnswersByUser.get(selected.user_id)}
+      inferred={inferredByClient.get(selected.id)}
       shortlists={localShortlists}
       inventory={inventory}
       settings={settings}
@@ -535,10 +586,16 @@ export default function CrmClientsPage() {
     />
   );
 
+  // With nothing stated, match on what their opened flats imply rather than
+  // show an empty pane — the pane says so, so it isn't mistaken for a brief.
+  const selectedInferred = selected ? inferredByClient.get(selected.id) : null;
+  const matchRequirement = requirementForMatching(requirement, selectedInferred);
+
   const matchesPane = (
     <MatchesPane
       client={selected}
-      requirement={requirement}
+      requirement={matchRequirement}
+      inferredBasis={matchRequirement !== requirement ? basisLabel(selectedInferred) : ""}
       inventory={inventory}
       shortlists={localShortlists}
       settings={settings}
