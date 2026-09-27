@@ -30,6 +30,7 @@ const RAIL = [
   { to: "/crm/notifications", code: "NF", label: "Notifications" },
   { to: "/crm/pipeline",   code: "PI", label: "Pipeline" },
   { to: "/crm/properties", code: "PR", label: "Properties" },
+  { to: "/crm/brokers",    code: "BR", label: "Brokers" },
   { to: "/crm/visits",     code: "VS", label: "Visits" },
   { to: "/crm/payments",   code: "PY", label: "Payments" },
   { to: "/crm/team",       code: "TM", label: "Team", scope: SCOPES.ROLES_WRITE },
