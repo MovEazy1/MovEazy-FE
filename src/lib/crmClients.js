@@ -6,6 +6,7 @@
  * whole workspace. Writes are not: if a write fails the caller must know.
  */
 import { supabase, isSupabaseConfigured } from "./supabase";
+import { normalizeIndianMobile } from "./mobile";
 
 /* ── Vocabulary ───────────────────────────────────────────────────────────── */
 
@@ -34,18 +35,6 @@ export const TEMPERATURES = [
 ];
 export const tempColor = (id) => TEMPERATURES.find((t) => t.id === id)?.color ?? "#3C5A54";
 export const tempLabel = (id) => TEMPERATURES.find((t) => t.id === id)?.label ?? "Unset";
-
-export const SORTS = [
-  // First in the list because it is the one with a clock on it: somebody who
-  // left a number today is worth a call today.
-  { id: "fresh",     label: "Fresh leads" },
-  { id: "move_in",   label: "Earliest move-in" },
-  { id: "deadline",  label: "Shortlist due soonest" },
-  { id: "time",      label: "Most time on site" },
-  { id: "opens",     label: "Most opens" },
-  { id: "last_seen", label: "Last seen" },
-  { id: "untouched", label: "Oldest untouched" },
-];
 
 /* ── Reads ────────────────────────────────────────────────────────────────── */
 
@@ -116,11 +105,31 @@ export const fetchActivities = (clientId) =>
     q.eq("client_id", clientId).order("created_at", { ascending: false }).limit(200),
   );
 
-/** Latest activity per client — powers the "oldest untouched" sort. */
+/**
+ * Recent activity across every client, newest first.
+ *
+ * actor_email and type are what split it in two: an empty actor is the client
+ * doing something on the site, a staff email with a contact type is us
+ * reaching out. The Fresh / Contacted tabs are built from exactly that split.
+ */
 export const fetchLastTouch = () =>
-  safeSelect("crm_activities", "client_id,created_at", (q) =>
+  safeSelect("crm_activities", "client_id,actor_email,type,created_at", (q) =>
     q.order("created_at", { ascending: false }).limit(8000),
   );
+
+/**
+ * Phone-first leads' own progress — the only record of what someone who has
+ * not signed up did on the site. Through the staff view, which runs as the
+ * caller so lead_intake's staff-only policy still applies.
+ */
+export const fetchLeadActivity = () =>
+  safeSelect("crm_lead_intake", "crm_client_id,step,completed,prefs,created_at,updated_at", (q) =>
+    q.not("crm_client_id", "is", null).order("updated_at", { ascending: false }).limit(6000),
+  );
+
+/** "Mark as contacted": a staff activity, so it records who and when. */
+export const markContacted = (clientId, { actorEmail = "" } = {}) =>
+  logActivity(clientId, { type: "contacted", body: "Marked as contacted", actorEmail });
 
 /* ── Writes ───────────────────────────────────────────────────────────────── */
 
@@ -279,7 +288,12 @@ export async function syncClientsFromSignups({ actorEmail = "" } = {}) {
 
   const knownUserIds = new Set(existing.filter((c) => c.user_id).map((c) => c.user_id));
   const reqByUser = new Map((reqs || []).map((r) => [r.user_id, r]));
-  const toCreate = (profiles || []).filter((p) => p.id && !knownUserIds.has(p.id));
+  // A number makes a lead; a sign-in alone does not. Accounts without a
+  // valid mobile stay out of the CRM until they add one — at which point the
+  // crm_lead_from_profile_phone trigger brings them in by itself.
+  const toCreate = (profiles || []).filter(
+    (p) => p.id && !knownUserIds.has(p.id) && normalizeIndianMobile(p.phone),
+  );
 
   let created = 0;
   const failures = [];
@@ -290,7 +304,7 @@ export async function syncClientsFromSignups({ actorEmail = "" } = {}) {
         .insert({
           user_id: p.id,
           name: p.name || (p.email ? p.email.split("@")[0] : "") || p.phone || "Unnamed",
-          phone: p.phone || "",
+          phone: normalizeIndianMobile(p.phone),
           email: String(p.email || "").toLowerCase(),
           source: "signup",
           status: "fresh",

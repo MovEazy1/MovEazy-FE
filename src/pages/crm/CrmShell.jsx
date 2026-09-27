@@ -11,7 +11,7 @@ import { useAuth } from "../../context/AuthContext";
 import { useCrmAccess } from "../../hooks/useCrmAccess";
 import { SCOPES } from "../../lib/adminScopes";
 import {
-  fetchClients, fetchClientRequirements, fetchEngagement, fetchShortlists, fetchLastTouch,
+  fetchClients, fetchClientRequirements, fetchEngagement, fetchShortlists, fetchLastTouch, fetchLeadActivity,
   fetchClientOwnAnswers,
 } from "../../lib/crmClients";
 import { fetchCrmSettings } from "../../lib/crmSettings";
@@ -164,15 +164,15 @@ export default function CrmShell() {
       // interest is the other: [] until crm_client_property_interest.sql is
       // run, which leaves clients reading exactly as they did before.
       const [clients, requirements, inventory, engagement, shortlists, touches, settings, marketingChannels, ownAnswers,
-        interest] =
+        interest, leads] =
         await Promise.all([
           fetchClients(), fetchClientRequirements(), fetchInventory(),
           fetchEngagement(), fetchShortlists(), fetchLastTouch(), fetchCrmSettings(),
-          fetchShareChannels(), fetchClientOwnAnswers(), fetchPropertyInterest(),
+          fetchShareChannels(), fetchClientOwnAnswers(), fetchPropertyInterest(), fetchLeadActivity(),
         ]);
       setData({
         clients, requirements, inventory, engagement, shortlists, touches, settings, marketingChannels, ownAnswers,
-        interest,
+        interest, leads,
       });
       setError("");
     } catch (e) {

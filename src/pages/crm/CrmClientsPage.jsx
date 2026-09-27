@@ -11,29 +11,25 @@ import { useCrm } from "./CrmShell";
 import ClientRecord from "./ClientRecord";
 import MatchesPane from "./MatchesPane";
 import {
-  SORTS, STATUSES, TEMPERATURES, createClient, fetchShortlists,
+  TEMPERATURES, createClient, fetchShortlists, markContacted,
   saveClientRequirement, resetClientRequirement, statusLabel, tempColor, syncClientsFromSignups,
 } from "../../lib/crmClients";
 import { formatDuration } from "../../lib/sessionSync";
+import {
+  CONTACTED_SORTS, FRESH_SORTS, LEAD_STAGES, QUIET_AFTER_DAYS, agoLabel, bucketOf, moveInTs,
+  shortlistDueTs, sortClients, summariseClients,
+} from "../../lib/crmLeadBuckets";
 import {
   basisLabel, effectiveFacts, groupInterestByClient, inferRequirement, requirementForMatching,
 } from "../../lib/crmPropertyInterest";
 import { SCOPES } from "../../lib/adminScopes";
 import { buildTemplateCsv, downloadCsv, parseCsv, planImport, runImport } from "../../lib/crmImport";
-import { Btn, C, Chip, Empty, TempDot, Toast, deadlineLabel, deadlineTs, shortDate } from "./crmUi";
+import { Btn, C, Chip, Empty, TempDot, Toast, deadlineLabel, shortDate } from "./crmUi";
 
 const EMPTY_REQ = {
   localities: [], budget_min: null, budget_max: null, flat_types: [], furnishing: "",
   must_haves: [], deal_breakers: [], occupants: [], move_in: "", min_score: 60,
 };
-
-/** "15 Oct 2026" and "ASAP" both mean something; only the first can be sorted. */
-function moveInTs(raw) {
-  const v = String(raw || "").trim();
-  if (!v) return Number.POSITIVE_INFINITY;
-  const t = Date.parse(v);
-  return Number.isNaN(t) ? Number.MAX_SAFE_INTEGER - 1 : t;
-}
 
 function NewClientForm({ actorEmail, onCreated, onCancel, onToast }) {
   const [f, setF] = useState({ name: "", phone: "", email: "" });
@@ -201,16 +197,36 @@ function ClientFactsLine({ facts, basis }) {
 
 export default function CrmClientsPage() {
   const crm = useCrm();
-  const { clients, requirements, inventory, engagement, shortlists, touches, settings, access, user, ownAnswers, interest } = crm;
+  const {
+    clients, requirements, inventory, engagement, shortlists, touches, settings, access, user, ownAnswers, interest, leads,
+  } = crm;
 
   const [params, setParams] = useSearchParams();
   const selectedId = params.get("client") || "";
 
   const [q, setQ] = useState("");
-  const [sort, setSort] = useState("move_in");
-  const [statusFilter, setStatusFilter] = useState("");
+  /**
+   * Fresh leads | Contacted | No number.
+   *
+   * Fresh is anyone who gave us a number and has not heard from us; Contacted
+   * is everyone we have reached out to. The third holds sign-ins with no
+   * number — not leads, but kept visible rather than silently dropped, which
+   * is what the old "Fresh leads" sort did and why the count shrank.
+   */
+  const [tab, setTab] = useState("fresh");
+  const [freshSort, setFreshSort] = useState("site");
+  const [contactedSort, setContactedSort] = useState("site");
+  const [stageFilter, setStageFilter] = useState("");
   const [tempFilter, setTempFilter] = useState("");
-  const [mineOnly, setMineOnly] = useState(false);
+  /** Extra filters on Contacted: quiet, dnp, mine, closed. Closed is hidden unless asked for. */
+  const [extras, setExtras] = useState(() => new Set());
+  const toggleExtra = (id) =>
+    setExtras((cur) => {
+      const next = new Set(cur);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
   const [adding, setAdding] = useState(false);
   const [importing, setImporting] = useState(false);
   const [syncing, setSyncing] = useState(false);
@@ -269,18 +285,41 @@ export default function CrmClientsPage() {
     return m;
   }, [ownAnswers]);
 
-  /** Most recent activity per client — the "oldest untouched" sort. */
-  const lastTouchByClient = useMemo(() => {
-    const m = new Map();
-    for (const t of touches) if (!m.has(t.client_id)) m.set(t.client_id, t.created_at);
-    return m;
-  }, [touches]);
+  /**
+   * Per client: have we contacted them, when did they last do something on
+   * the site, and how far along are they. Derived, never stored — see
+   * lib/crmLeadBuckets.js. localShortlists rather than the shell's copy, so a
+   * flat sent from the Matches pane moves the lead out of Fresh at once.
+   */
+  const summaries = useMemo(
+    () => summariseClients(clients, {
+      activities: touches, shortlists: localShortlists, engagement, ownAnswers, leads, requirements, interest,
+    }),
+    [clients, touches, localShortlists, engagement, ownAnswers, leads, requirements, interest],
+  );
+
+  const bucketCounts = useMemo(() => {
+    const n = { fresh: 0, contacted: 0, no_number: 0 };
+    for (const c of clients) n[bucketOf(summaries.get(c.id))] += 1;
+    return n;
+  }, [clients, summaries]);
+
+  const stageCounts = useMemo(() => {
+    const n = Object.fromEntries(LEAD_STAGES.map((s) => [s.id, 0]));
+    for (const c of clients) {
+      const s = summaries.get(c.id);
+      if (bucketOf(s) === "contacted" && !s.closed) n[s.stage] += 1;
+    }
+    return n;
+  }, [clients, summaries]);
 
   /* ── The list ──────────────────────────────────────────────────────────── */
 
   const visible = useMemo(() => {
     const needle = q.trim().toLowerCase();
-    let rows = clients;
+    // A search spans every tab: someone typing a phone number wants that
+    // person wherever they are, not only if they happen to be under this tab.
+    let rows = needle ? clients : clients.filter((c) => bucketOf(summaries.get(c.id)) === tab);
 
     if (needle) {
       rows = rows.filter((c) => {
@@ -294,58 +333,28 @@ export default function CrmClientsPage() {
         return hay.includes(needle);
       });
     }
-    if (statusFilter) rows = rows.filter((c) => c.status === statusFilter);
-    if (tempFilter) {
-      rows = tempFilter === "unset"
-        ? rows.filter((c) => !c.temperature)
-        : rows.filter((c) => c.temperature === tempFilter);
-    }
-    if (mineOnly) rows = rows.filter((c) => (c.assigned_to || "").toLowerCase() === actorEmail.toLowerCase());
-
-    // "Fresh leads" is a filter as much as an order: a lead is somebody we can
-    // actually ring, so anyone without a number is not one.
-    if (sort === "fresh") rows = rows.filter((c) => String(c.phone || "").trim());
-
-    const eng = (c) => engByUser.get(c.user_id);
-
-    /**
-     * When we last saw them, whoever they are.
-     *
-     * user_engagement keys on user_id, and a phone-first lead has no account
-     * yet — so for exactly the people this sort exists to surface, last_seen_at
-     * is always missing. updated_at covers them: save_lead_intake bumps it on
-     * every step of the questionnaire, which is the same signal.
-     */
-    const lastSeen = (c) => Math.max(
-      new Date(eng(c)?.last_seen_at ?? 0).getTime() || 0,
-      new Date(c.updated_at ?? 0).getTime() || 0,
-      new Date(c.created_at ?? 0).getTime() || 0,
-    );
-    const sorted = [...rows];
-    sorted.sort((a, b) => {
-      switch (sort) {
-        case "fresh":
-          return lastSeen(b) - lastSeen(a);
-        case "deadline":
-          return deadlineTs(ownAnswersByUser.get(a.user_id)?.notes) - deadlineTs(ownAnswersByUser.get(b.user_id)?.notes);
-        case "time":
-          return (eng(b)?.total_seconds ?? 0) - (eng(a)?.total_seconds ?? 0);
-        case "opens":
-          return (eng(b)?.session_count ?? 0) - (eng(a)?.session_count ?? 0);
-        case "last_seen":
-          return new Date(eng(b)?.last_seen_at ?? 0) - new Date(eng(a)?.last_seen_at ?? 0);
-        case "untouched": {
-          const at = lastTouchByClient.get(a.id) ?? a.created_at;
-          const bt = lastTouchByClient.get(b.id) ?? b.created_at;
-          return new Date(at) - new Date(bt);
-        }
-        case "move_in":
-        default:
-          return moveInTs(reqByClient.get(a.id)?.move_in) - moveInTs(reqByClient.get(b.id)?.move_in);
+    if (tab === "contacted" && !needle) {
+      // A closed lead needs no follow-up, so it stays out of the working list
+      // unless asked for — otherwise every deal we ever closed sits in the way.
+      rows = extras.has("closed")
+        ? rows.filter((c) => summaries.get(c.id)?.closed)
+        : rows.filter((c) => !summaries.get(c.id)?.closed);
+      if (stageFilter) rows = rows.filter((c) => summaries.get(c.id)?.stage === stageFilter);
+      if (tempFilter) {
+        rows = tempFilter === "unset"
+          ? rows.filter((c) => !c.temperature)
+          : rows.filter((c) => c.temperature === tempFilter);
       }
+      if (extras.has("quiet")) rows = rows.filter((c) => summaries.get(c.id)?.quiet);
+      if (extras.has("dnp")) rows = rows.filter((c) => c.status === "dnp");
+      if (extras.has("mine")) rows = rows.filter((c) => (c.assigned_to || "").toLowerCase() === actorEmail.toLowerCase());
+    }
+
+    return sortClients(rows, tab === "contacted" ? contactedSort : freshSort, summaries, {
+      moveIn: (c) => moveInTs(reqByClient.get(c.id)?.move_in || ownAnswersByUser.get(c.user_id)?.notes?.moveInDate),
+      due: (c) => shortlistDueTs(ownAnswersByUser.get(c.user_id)?.notes),
     });
-    return sorted;
-  }, [clients, q, statusFilter, tempFilter, mineOnly, sort, reqByClient, engByUser, lastTouchByClient, actorEmail,
+  }, [clients, q, tab, freshSort, contactedSort, stageFilter, tempFilter, extras, summaries, reqByClient, actorEmail,
     ownAnswersByUser, inferredByClient]);
 
   const selected = useMemo(
@@ -421,6 +430,30 @@ export default function CrmClientsPage() {
     }
   }, [actorEmail, crm, showToast]);
 
+  /**
+   * A contact just logged from this screen, folded into the loaded activity so
+   * the lead re-buckets now. Without it a lead messaged from its record stayed
+   * under Fresh until the next reload — the list most likely to be worked
+   * straight down, showing someone already handled.
+   */
+  const recordContact = useCallback((clientId, type) => {
+    crm.setData((d) => ({
+      ...d,
+      touches: [{ client_id: clientId, actor_email: actorEmail, type, created_at: new Date().toISOString() },
+        ...(d.touches ?? [])],
+    }));
+  }, [crm, actorEmail]);
+
+  const handleMarkContacted = useCallback(async (clientId) => {
+    try {
+      await markContacted(clientId, { actorEmail });
+      recordContact(clientId, "contacted");
+      showToast("Moved to Contacted");
+    } catch (e) {
+      showToast(e?.message || "Could not mark as contacted", "error");
+    }
+  }, [actorEmail, recordContact, showToast]);
+
   const select = (id) => {
     setParams({ client: id }, { replace: true });
     setMobileTab("record");
@@ -433,7 +466,7 @@ export default function CrmClientsPage() {
   const listPane = (
     <div className="crm-col" style={{ width: isNarrow ? "100%" : 248, flex: isNarrow ? 1 : "none" }}>
       <div className="crm-colhead">
-        <span className="crm-label">Clients · {visible.length}</span>
+        <span className="crm-label">Clients · {clients.length}</span>
         {access.has(SCOPES.CLIENTS_WRITE) && (
           <div style={{ display: "flex", gap: 5 }}>
             <Btn sm onClick={() => { setAdding((v) => !v); setImporting(false); }}>
@@ -442,7 +475,7 @@ export default function CrmClientsPage() {
             <Btn sm onClick={() => { setImporting((v) => !v); setAdding(false); }}>
               {importing ? "Close" : "Import"}
             </Btn>
-            <Btn sm onClick={handleSync} disabled={syncing} title="Add any signed-up user (with saved preferences) not already in the CRM">
+            <Btn sm onClick={handleSync} disabled={syncing} title="Add any signed-up user with a mobile number who is not already in the CRM">
               {syncing ? "Syncing…" : "Sync users"}
             </Btn>
           </div>
@@ -473,44 +506,125 @@ export default function CrmClientsPage() {
       )}
 
       <div style={{ padding: "9px 12px 6px", display: "flex", flexDirection: "column", gap: 7, flex: "none" }}>
-        <input className="crm-input" placeholder="Search name, phone, area, note…" value={q}
+        <input className="crm-input" placeholder="Search every tab: name, phone, area…" value={q}
           onChange={(e) => setQ(e.target.value)} />
-        <label style={{ display: "flex", alignItems: "center", gap: 6 }}>
-          <span className="crm-label" style={{ flex: "none" }}>Sort</span>
-          <select className="crm-input" value={sort} onChange={(e) => setSort(e.target.value)}>
-            {SORTS.map((s) => <option key={s.id} value={s.id}>{s.label}</option>)}
-          </select>
-        </label>
+
+        {/* The three buckets. Counts are always the whole bucket, so a filter
+            below never makes it look as if leads have gone missing. */}
+        <div role="tablist" style={{ display: "flex", border: `1px solid ${C.line}`, borderRadius: 8, overflow: "hidden" }}>
+          {[
+            ["fresh", "Fresh", "A number, and nobody from MovEazy has contacted them"],
+            ["contacted", "Contacted", "Everyone we have reached out to"],
+            ["no_number", "No no.", "Signed in, never gave a number — not a lead"],
+          ].map(([id, label, hint]) => {
+            const on = tab === id;
+            return (
+              <button
+                key={id} type="button" role="tab" aria-selected={on} title={hint}
+                onClick={() => setTab(id)}
+                style={{
+                  flex: id === "no_number" ? "0 0 auto" : 1, padding: "6px 6px", border: "none", cursor: "pointer",
+                  font: "inherit", fontSize: 11.5, fontWeight: 700,
+                  background: on ? C.accent : C.surface, color: on ? "#fff" : id === "no_number" ? C.textMute : C.text,
+                  borderLeft: id === "fresh" ? "none" : `1px solid ${C.line}`,
+                }}
+              >
+                {label} <span style={{ opacity: 0.8, fontWeight: 600 }}>{bucketCounts[id]}</span>
+              </button>
+            );
+          })}
+        </div>
+
+        {!q.trim() && tab !== "no_number" && (
+          <label style={{ display: "flex", alignItems: "center", gap: 6 }}>
+            <span className="crm-label" style={{ flex: "none" }}>Sort</span>
+            {tab === "fresh" ? (
+              <select className="crm-input" value={freshSort} onChange={(e) => setFreshSort(e.target.value)}>
+                {FRESH_SORTS.map((s) => <option key={s.id} value={s.id}>{s.label}</option>)}
+              </select>
+            ) : (
+              <select className="crm-input" value={contactedSort} onChange={(e) => setContactedSort(e.target.value)}>
+                {CONTACTED_SORTS.map((s) => <option key={s.id} value={s.id}>{s.label}</option>)}
+              </select>
+            )}
+          </label>
+        )}
       </div>
 
-      <div style={{ padding: "0 12px 6px", display: "flex", gap: 5, flexWrap: "wrap", flex: "none" }}>
-        <Chip on={mineOnly} onClick={() => setMineOnly((v) => !v)}>Mine</Chip>
-        {STATUSES.map((s) => (
-          <Chip key={s.id} on={statusFilter === s.id} title={s.hint}
-            onClick={() => setStatusFilter(statusFilter === s.id ? "" : s.id)}>
-            {s.label}
-          </Chip>
-        ))}
-      </div>
+      {q.trim() && (
+        <div className="crm-mute" style={{ padding: "0 12px 8px", fontSize: 11 }}>
+          Searching all tabs · {visible.length} found
+        </div>
+      )}
 
-      <div style={{ padding: "0 12px 9px", display: "flex", gap: 5, flexWrap: "wrap", flex: "none" }}>
-        {TEMPERATURES.map((t) => (
-          <Chip key={t.id} on={tempFilter === t.id} title={t.hint}
-            onClick={() => setTempFilter(tempFilter === t.id ? "" : t.id)}
-            style={tempFilter === t.id ? { borderColor: t.color, color: t.color, background: `${t.color}18` } : undefined}>
-            <TempDot color={t.color} />
-            {t.label}
-          </Chip>
-        ))}
-        <Chip on={tempFilter === "unset"} onClick={() => setTempFilter(tempFilter === "unset" ? "" : "unset")}>
-          Unset
-        </Chip>
-      </div>
+      {!q.trim() && tab === "fresh" && (
+        <div className="crm-mute" style={{ padding: "0 12px 8px", fontSize: 11, lineHeight: 1.45 }}>
+          Gave us a number, not contacted yet. Messaging, calling or sending a flat moves them to Contacted.
+        </div>
+      )}
+
+      {!q.trim() && tab === "no_number" && (
+        <div className="crm-mute" style={{ padding: "0 12px 8px", fontSize: 11, lineHeight: 1.45 }}>
+          Signed in without a mobile number. Not leads — they move to Fresh the moment they add one.
+        </div>
+      )}
+
+      {!q.trim() && tab === "contacted" && (
+        <>
+          {/* Where they have got to. Exclusive: each lead sits at the furthest
+              stage reached, so these add up to the tab. */}
+          <div style={{ padding: "0 12px 6px", display: "flex", gap: 5, flexWrap: "wrap", flex: "none" }}>
+            {LEAD_STAGES.map((s) => (
+              <Chip key={s.id} on={stageFilter === s.id} title={s.hint}
+                onClick={() => setStageFilter(stageFilter === s.id ? "" : s.id)}>
+                {s.label} <span style={{ opacity: 0.7 }}>{stageCounts[s.id]}</span>
+              </Chip>
+            ))}
+          </div>
+
+          <div style={{ padding: "0 12px 6px", display: "flex", gap: 5, flexWrap: "wrap", flex: "none" }}>
+            {TEMPERATURES.map((t) => (
+              <Chip key={t.id} on={tempFilter === t.id} title={t.hint}
+                onClick={() => setTempFilter(tempFilter === t.id ? "" : t.id)}
+                style={tempFilter === t.id ? { borderColor: t.color, color: t.color, background: `${t.color}18` } : undefined}>
+                <TempDot color={t.color} />
+                {t.label}
+              </Chip>
+            ))}
+            <Chip on={tempFilter === "unset"} onClick={() => setTempFilter(tempFilter === "unset" ? "" : "unset")}>
+              Unset
+            </Chip>
+          </div>
+
+          <div style={{ padding: "0 12px 9px", display: "flex", gap: 5, flexWrap: "wrap", flex: "none" }}>
+            <Chip on={extras.has("quiet")} onClick={() => toggleExtra("quiet")}
+              title={`Nothing from us in ${QUIET_AFTER_DAYS}+ days`}>
+              Going quiet
+            </Chip>
+            <Chip on={extras.has("dnp")} onClick={() => toggleExtra("dnp")} title="Did not pick">DNP</Chip>
+            <Chip on={extras.has("mine")} onClick={() => toggleExtra("mine")}>Mine</Chip>
+            <Chip on={extras.has("closed")} onClick={() => toggleExtra("closed")} title="Closed by us or outside — hidden otherwise">
+              Closed
+            </Chip>
+            {(stageFilter || tempFilter || extras.size > 0) && (
+              <Chip onClick={() => { setStageFilter(""); setTempFilter(""); setExtras(new Set()); }}>Clear</Chip>
+            )}
+          </div>
+        </>
+      )}
 
       <div className="crm-scroll" style={{ flex: 1 }}>
-        {visible.length === 0 && <Empty>Nobody matches those filters.</Empty>}
+        {visible.length === 0 && (
+          <Empty>
+            {q.trim() ? "Nobody matches that."
+              : tab === "fresh" ? "No fresh leads — everyone who left a number has been contacted."
+                : "Nobody matches those filters."}
+          </Empty>
+        )}
         {visible.map((c) => {
           const e = engByUser.get(c.user_id);
+          const sm = summaries.get(c.id);
+          const bucket = bucketOf(sm);
           const req = reqByClient.get(c.id);
           const deadline = deadlineLabel(ownAnswersByUser.get(c.user_id)?.notes);
           return (
@@ -532,9 +646,22 @@ export default function CrmClientsPage() {
                 basis={basisLabel(inferredByClient.get(c.id))}
               />
               <span className="crm-mute crm-num" style={{ fontSize: 11 }}>
-                {statusLabel(c.status)}
-                {c.status === "dnp" && c.dnp_count > 0 ? ` ×${c.dnp_count}` : ""}
+                {/* The two clocks a follow-up runs on: when they were last on
+                    the site, and when we last reached out. */}
+                {sm?.lastSiteActionAt ? `on site ${agoLabel(sm.lastSiteActionAt)}` : "never on site"}
+                {bucket === "contacted" && sm?.lastContactAt ? ` · us ${agoLabel(sm.lastContactAt)}` : ""}
+              </span>
+              <span className="crm-mute crm-num" style={{ fontSize: 11 }}>
+                {bucket === "contacted"
+                  ? LEAD_STAGES.find((st) => st.id === sm?.stage)?.label
+                  : statusLabel(c.status)}
+                {c.status === "dnp" && c.dnp_count > 0 ? ` · DNP ×${c.dnp_count}` : ""}
                 {e ? ` · ${e.session_count} opens · ${formatDuration(e.total_seconds)}` : ""}
+                {q.trim() && (
+                  <span style={{ color: C.accent, fontWeight: 700 }}>
+                    {" "}· {bucket === "fresh" ? "Fresh" : bucket === "contacted" ? "Contacted" : "No number"}
+                  </span>
+                )}
               </span>
               {deadline && (
                 <span
@@ -573,6 +700,9 @@ export default function CrmClientsPage() {
       engagement={engByUser.get(selected.user_id)}
       ownAnswers={ownAnswersByUser.get(selected.user_id)}
       inferred={inferredByClient.get(selected.id)}
+      isFreshLead={bucketOf(summaries.get(selected.id)) === "fresh"}
+      onContactLogged={recordContact}
+      onMarkContacted={handleMarkContacted}
       shortlists={localShortlists}
       inventory={inventory}
       settings={settings}

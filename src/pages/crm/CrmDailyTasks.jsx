@@ -15,6 +15,7 @@ import { useNavigate } from "react-router-dom";
 import { useCrm } from "./CrmShell";
 import { Btn, C, Empty } from "./crmUi";
 import { whatsappUrl } from "../../lib/crmSettings";
+import { logActivity } from "../../lib/crmClients";
 import {
   SNOOZE_PRESETS, buildDailyTasks, clearSnooze, describeAction, fetchClientActions,
   fetchSnoozes, followUpMessage, snoozeTask, timeAgo,
@@ -54,7 +55,7 @@ function SnoozeControl({ onSnooze, busy }) {
   );
 }
 
-function TaskRow({ task, onSnooze, onUnsnooze, onOpen, busy }) {
+function TaskRow({ task, onSnooze, onUnsnooze, onOpen, onMessaged, busy }) {
   const message = followUpMessage({ name: task.name, action: task.latest });
   const href = whatsappUrl(task.phone, message);
 
@@ -108,6 +109,10 @@ function TaskRow({ task, onSnooze, onUnsnooze, onOpen, busy }) {
             target="_blank"
             rel="noopener noreferrer"
             style={{ textDecoration: "none" }}
+            // Recorded, so the lead counts as contacted. A message sent from
+            // here used to leave no trace, and the person stayed under Fresh
+            // leads looking as if nobody had reached them.
+            onClick={() => onMessaged(task.clientId)}
           >
             WhatsApp
           </a>
@@ -122,9 +127,21 @@ function TaskRow({ task, onSnooze, onUnsnooze, onOpen, busy }) {
 }
 
 export default function CrmDailyTasks() {
-  const { clients, user } = useCrm();
+  const { clients, user, setData } = useCrm();
   const navigate = useNavigate();
   const actorEmail = user?.email || "";
+
+  const onMessaged = useCallback((clientId) => {
+    // Fire and forget: the link has already opened WhatsApp, and a failed log
+    // must not get in the way of the message itself.
+    logActivity(clientId, { type: "whatsapp", body: "Opened WhatsApp from Daily tasks", actorEmail })
+      .then(() => setData?.((d) => ({
+        ...d,
+        touches: [{ client_id: clientId, actor_email: actorEmail, type: "whatsapp", created_at: new Date().toISOString() },
+          ...(d.touches ?? [])],
+      })))
+      .catch(() => {});
+  }, [actorEmail, setData]);
 
   // The same address the pipeline and payments screens use to open somebody,
   // so a client opened from here lands exactly where it would from there.
@@ -230,6 +247,7 @@ export default function CrmDailyTasks() {
               onSnooze={onSnooze}
               onUnsnooze={onUnsnooze}
               onOpen={openClient}
+              onMessaged={onMessaged}
             />
           ))
         )}

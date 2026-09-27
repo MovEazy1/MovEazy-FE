@@ -665,7 +665,7 @@ function ClosePrompt({ status, reasons, onCancel, onConfirm }) {
 export default function ClientRecord({
   client, requirement, isOverride, engagement, settings, access, actorEmail, agentName,
   onPatch, onRequirementChange, onRequirementReset, onToast, ownAnswers, shortlists, inventory,
-  inferred = null,
+  inferred = null, isFreshLead = false, onContactLogged = () => {}, onMarkContacted = null,
 }) {
   const [activities, setActivities] = useState([]);
   const [pendingClose, setPendingClose] = useState(null);
@@ -706,6 +706,7 @@ export default function ClientRecord({
         body: `Opened WhatsApp · ${outreachTemplate?.name ?? "template"}`,
         actorEmail,
       });
+      onContactLogged(client.id, "whatsapp");
       refreshActivities();
     }
   };
@@ -725,6 +726,7 @@ export default function ClientRecord({
     }
     if (canWrite) {
       await logActivity(client.id, { type: "call", body: "Called", actorEmail });
+      onContactLogged(client.id, "call");
       refreshActivities();
     }
   };
@@ -785,6 +787,14 @@ export default function ClientRecord({
               {client.assigned_to ? ` · ${client.assigned_to}` : ""}
             </div>
           </div>
+          {/* For contact made outside the CRM — a call from a personal phone,
+              a WhatsApp from the team number — which nothing here could see. */}
+          {isFreshLead && onMarkContacted && canWrite && (
+            <Btn onClick={async () => { await onMarkContacted(client.id); refreshActivities(); }}
+              title="Already spoke to them outside the CRM? Move them to Contacted">
+              Mark contacted
+            </Btn>
+          )}
           <Btn variant="wa" onClick={handleWhatsApp} disabled={!client.phone}>WhatsApp</Btn>
           <Btn variant="call" onClick={handleCall} disabled={!client.phone}>
             {copied ? "Copied" : "Call"}
