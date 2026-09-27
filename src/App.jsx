@@ -11,7 +11,6 @@ import { useSessionTracking } from "./hooks/useSessionTracking";
 
 const Profile = lazy(() => import("./pages/Profile"));
 const SupabaseLogin = lazy(() => import("./pages/SupabaseLogin"));
-const BrokerDashboard = lazy(() => import("./pages/BrokerDashboard"));
 /**
  * Self-serve browsing is off for launch.
  *
@@ -40,7 +39,6 @@ const Visits = lazy(() => import("./pages/Visits"));
 const Shortlists = lazy(() => import("./pages/Shortlists"));
 const TenantManagement = lazy(() => import("./pages/TenantManagement"));
 const RentManagement = lazy(() => import("./pages/RentManagement"));
-const BrokerRegister = lazy(() => import("./pages/BrokerRegister"));
 const MyProperties = lazy(() => import("./pages/MyProperties"));
 const SuperAdminPanel = lazy(() => import("./pages/SuperAdminPanel"));
 const AnalyticsDashboard = lazy(() => import("./pages/AnalyticsDashboard"));
@@ -61,6 +59,10 @@ const CrmNotificationsPage = lazy(() => import("./pages/crm/CrmNotificationsPage
 const CrmTeamPage = lazy(() => import("./pages/crm/CrmTeamPage"));
 const CrmPaymentsPage = lazy(() => import("./pages/crm/CrmPaymentsPage"));
 const CrmSettingsPage = lazy(() => import("./pages/crm/CrmSettingsPage"));
+// The broker app. Its own route tree: at /partners here, and at the root of
+// partners.moveazy.co.in (same deployment, same bundle — see lib/partners.js).
+const PartnerApp = lazy(() => import("./pages/partners/PartnerApp"));
+const IS_PARTNER_HOST = typeof window !== "undefined" && /^partners\./i.test(window.location.hostname);
 
 function PageLoader() {
   return (
@@ -111,15 +113,6 @@ function ProfileRoute({ children }) {
   return children;
 }
 
-function BrokerRoute({ children }) {
-  const { user, loading } = useAuth();
-  if (loading) return <PageLoader />;
-  if (!user) return <Navigate to="/auth?next=/broker" replace />;
-  // Broker CRM is for broker accounts only — everyone else is sent to register.
-  if (user.role !== "broker") return <Navigate to="/register-broker" replace />;
-  return children;
-}
-
 function SessionTrackerComponent() {
   useSessionTracking();
   return (
@@ -137,10 +130,20 @@ function SessionTrackerComponent() {
 }
 
 function AppRoutes() {
+  if (IS_PARTNER_HOST) {
+    return (
+      <Suspense fallback={<PageLoader />}>
+        <Routes>
+          <Route path="/*" element={<PartnerApp />} />
+        </Routes>
+      </Suspense>
+    );
+  }
   return (
     <Suspense fallback={<PageLoader />}>
       <Routes>
         <Route path="/" element={<ForkHome />} />
+        <Route path="/partners/*" element={<PartnerApp />} />
         {/* Browsing is off — see the note by the imports.
             <Route path="/map" element={<MapPage />} /> */}
         <Route path="/map" element={<MapRedirect />} />
@@ -166,7 +169,9 @@ function AppRoutes() {
         {/* An old bookmark. It used to be a second browsing surface; it is now
             the same redirect the map is. */}
         <Route path="/recommendations" element={<MapRedirect />} />
-        <Route path="/register-broker" element={<BrokerRegister />} />
+        {/* Broker sign-up and the old broker CRM now live in the partner app. The
+            pages stay in the tree for now; every link to them lands there. */}
+        <Route path="/register-broker" element={<Navigate to="/partners" replace />} />
         <Route path="/my-properties" element={<MyProperties />} />
         <Route path="/superadmin" element={<SuperAdminPanel />} />
         <Route path="/analytics" element={<AnalyticsDashboard />} />
@@ -242,14 +247,7 @@ function AppRoutes() {
             </ProfileRoute>
           }
         />
-        <Route
-          path="/broker"
-          element={
-            <BrokerRoute>
-              <BrokerDashboard />
-            </BrokerRoute>
-          }
-        />
+        <Route path="/broker" element={<Navigate to="/partners" replace />} />
         {/* Legacy routes → home or profile for now */}
         <Route path="/customer" element={<Navigate to="/profile" replace />} />
         <Route path="*" element={<Navigate to="/" replace />} />

@@ -16,6 +16,8 @@ import { useNavigate, useParams } from "react-router-dom";
 import { useCrm } from "./CrmShell";
 import PropertyVisitSlots from "../../components/PropertyVisitSlots";
 import { InternalDetails, VisitWindow } from "./CrmPropertyInternalFields";
+import CrmPartnerFields from "./CrmPartnerFields";
+import { fetchPartnerListingMap } from "../../lib/partners";
 import {
   ALL_LOCALITIES, DEFAULT_POSTING_AMENITIES, FLAT_TYPES, FURNISHINGS, LIFESTYLE, MUST_HAVES, OCCUPANT_OPTIONS,
   parentAreaOf, withParentArea,
@@ -47,6 +49,7 @@ const BLANK = {
   occupants_allowed: [], amenities: [...DEFAULT_POSTING_AMENITIES], lifestyle: [], house_rules: [],
   poster_name: "", phone: "", posted_by: "owner",
   title: "", description: "", source_url: "", status: "published",
+  partner_visible: true, partner_share_pct: 50,
 };
 
 const DRAFT_KEY = "moveazy_crm_property_draft";
@@ -94,6 +97,8 @@ function rowToForm(row) {
     description: row.description ?? "",
     source_url: row.source_url ?? "",
     status: row.status || "published",
+    partner_visible: row.partner_visible !== false,
+    partner_share_pct: row.partner_share_pct ?? 50,
   };
 }
 
@@ -157,6 +162,12 @@ export default function CrmPropertyForm() {
    * business sitting in browser storage after the upload is done.
    */
   const [internal, setInternal] = useState({ ...BLANK_INTERNAL });
+  /** Set when the flat came from the partner app: who added it, how they shared it. */
+  const [partnerInfo, setPartnerInfo] = useState(null);
+  useEffect(() => {
+    if (!isEdit) return;
+    fetchPartnerListingMap([editId]).then((m) => setPartnerInfo(m[editId] ?? null), () => setPartnerInfo(null));
+  }, [isEdit, editId]);
   /**
    * What a new listing is published with. Every day, 8am to 8pm, unless the
    * agent narrows it: a flat with no bookable time offers a tenant only "next
@@ -437,6 +448,12 @@ export default function CrmPropertyForm() {
         source: sourceUrl ? detectSource(sourceUrl) : "crm",
         source_url: sourceUrl,
       };
+      // Sent only once changed from the column defaults, so publishing still
+      // works on a database that hasn't run partner_schema.sql yet.
+      if (f.partner_visible === false || Number(f.partner_share_pct ?? 50) !== 50 || isEdit) {
+        row.partner_visible = f.partner_visible !== false;
+        row.partner_share_pct = Number(f.partner_share_pct ?? 50);
+      }
 
       if (coords.lat == null || coords.lng == null) {
         showToast("Couldn't place this address on the map — add coordinates or it won't show", "error");
@@ -958,6 +975,8 @@ export default function CrmPropertyForm() {
                 <VisitWindow value={visitRule} onChange={setVisitRule} />
               </Field>
             )}
+
+            <CrmPartnerFields value={f} onChange={set} partnerInfo={partnerInfo} />
 
             <div style={{ marginTop: 4 }}>
               <InternalDetails

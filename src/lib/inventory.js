@@ -193,7 +193,11 @@ export async function createInventoryItem(draft, poster) {
  *
  * So these are asked for, and dropped on the one error that means "not yet".
  */
-const OPTIONAL_INVENTORY_COLS = ["maintenance", "floor_number", "total_floors"];
+// partner_*/property_type: partner_schema.sql. Written by the CRM form and the
+// partner app only; no public select names them.
+const OPTIONAL_INVENTORY_COLS = [
+  "maintenance", "floor_number", "total_floors", "partner_visible", "partner_share_pct", "property_type",
+];
 
 /**
  * "The database won't give me that column."

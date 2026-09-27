@@ -1,0 +1,103 @@
+/** PRD 08 — the lead book. No chat, no pipeline: All / Active / Closed. */
+import { useMemo, useState } from "react";
+import { Link } from "react-router-dom";
+import { Plus, Search } from "lucide-react";
+import { usePartner } from "./PartnerApp";
+import { Avatar, Empty, TopBar, WhatsAppIcon } from "./partnerUi";
+import { lastContactedLabel, requirementLine } from "./leadBits";
+import { patchLead, pp, waLink } from "../../lib/partners";
+import { hasRequirement, matchesForLead } from "../../lib/partnerMatch";
+
+const TABS = [["all", "All"], ["active", "Active"], ["closed", "Closed"]];
+
+export default function LeadsList() {
+  const { leads, setLeads, inventory } = usePartner();
+  const [tab, setTab] = useState("active");
+  const [q, setQ] = useState("");
+
+  const matchCount = useMemo(() => {
+    const m = new Map();
+    for (const lead of leads) m.set(lead.id, matchesForLead(lead, inventory ?? []).length);
+    return m;
+  }, [leads, inventory]);
+
+  const rows = useMemo(() => {
+    const needle = q.trim().toLowerCase();
+    const digits = q.replace(/\D/g, "");
+    return leads.filter((l) => {
+      if (tab !== "all" && l.status !== tab) return false;
+      if (!needle) return true;
+      return l.name.toLowerCase().includes(needle) || (digits.length >= 3 && String(l.phone).includes(digits));
+    });
+  }, [leads, tab, q]);
+
+  const counts = {
+    all: leads.length,
+    active: leads.filter((l) => l.status === "active").length,
+    closed: leads.filter((l) => l.status === "closed").length,
+  };
+
+  const whatsapp = async (lead) => {
+    window.open(waLink(lead.phone, `Hi ${lead.name.split(" ")[0]}, `), "_blank", "noopener");
+    try {
+      const row = await patchLead(lead.id, { last_contacted_at: new Date().toISOString() });
+      setLeads((ls) => ls.map((x) => (x.id === row.id ? row : x)));
+    } catch { /* timestamp only */ }
+  };
+
+  return (
+    <>
+      <TopBar title="Leads" right={
+        <Link to={pp("/leads/new")} className="pz-iconbtn" aria-label="Add lead" style={{ background: "var(--g)", color: "#fff", borderRadius: 999 }}>
+          <Plus size={20} />
+        </Link>
+      } />
+      <div className="pz-pad" style={{ paddingBottom: 0, background: "var(--card)" }}>
+        <div className="pz-search">
+          <Search size={17} />
+          <input className="pz-input" type="search" placeholder="Search leads by name or mobile…" value={q} onChange={(e) => setQ(e.target.value)} />
+        </div>
+      </div>
+      <div className="pz-tabs" role="tablist">
+        {TABS.map(([k, label]) => (
+          <button key={k} type="button" role="tab" aria-selected={tab === k} className={`pz-tab${tab === k ? " pz-tab--on" : ""}`}
+            onClick={() => setTab(k)}>{label} ({counts[k]})</button>
+        ))}
+      </div>
+      <div className="pz-pad">
+        {rows.length === 0 ? (
+          <Empty action={<Link to={pp("/leads/new")} className="pz-btn pz-btn--primary"><Plus size={16} /> Add lead</Link>}>
+            {leads.length ? "No leads match." : "Add your first customer — a name and mobile is enough."}
+          </Empty>
+        ) : (
+          <div className="pz-card">
+            {rows.map((lead, i) => {
+              const n = matchCount.get(lead.id) ?? 0;
+              return (
+                <div key={lead.id} className="pz-row" style={{ padding: 14, alignItems: "flex-start", borderTop: i ? "1px solid var(--line)" : 0 }}>
+                  <Avatar name={lead.name} size="lg" />
+                  <Link to={pp(`/leads/${lead.id}`)} style={{ flex: 1, minWidth: 0, color: "inherit", textDecoration: "none" }}>
+                    <strong style={{ display: "block", fontSize: 16 }}>{lead.name}</strong>
+                    {requirementLine(lead) && <span style={{ display: "block", fontSize: 14 }}>{requirementLine(lead)}</span>}
+                    {(lead.localities ?? []).length > 0 && <span className="pz-meta" style={{ display: "block" }}>{lead.localities.join(", ")}</span>}
+                    <span style={{ display: "block", color: "var(--g)", fontWeight: 600, fontSize: 13.5, marginTop: 2 }}>
+                      {hasRequirement(lead) ? `${n} matching propert${n === 1 ? "y" : "ies"}` : "Add a requirement to see matches"}
+                    </span>
+                    <span className="pz-hint">{lastContactedLabel(lead.last_contacted_at)}</span>
+                  </Link>
+                  <div style={{ display: "flex", flexDirection: "column", alignItems: "flex-end", gap: 8 }}>
+                    <button type="button" className="pz-iconbtn" aria-label={`WhatsApp ${lead.name}`} onClick={() => whatsapp(lead)}
+                      style={{ background: "#22C55E", color: "#fff", borderRadius: 999, width: 34, height: 34 }}>
+                      <WhatsAppIcon size={18} />
+                    </button>
+                    <Link to={pp(`/leads/${lead.id}/matches`)} className="pz-btn pz-btn--sm pz-btn--soft">View Matches</Link>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        )}
+      </div>
+    </>
+  );
+}

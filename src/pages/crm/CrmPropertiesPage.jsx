@@ -6,6 +6,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { useCrm } from "./CrmShell";
+import { describeSharing, fetchPartnerListingMap } from "../../lib/partners";
 import { matchListingToRequirements } from "../../lib/inventoryMatch";
 import {
   SHARE_COMPOSERS,
@@ -487,14 +488,16 @@ export default function CrmPropertiesPage() {
    * POC button that simply is not there is the correct outcome either way.
    */
   const [internalMap, setInternalMap] = useState({});
+  /** property_id → the partner who added it and their sharing (partner app listings only). */
+  const [partnerMap, setPartnerMap] = useState({});
 
   useEffect(() => {
     const ids = inventory.map((l) => l.property_id);
     if (!ids.length) return;
     let cancelled = false;
     (async () => {
-      const map = await fetchInternalMap(ids);
-      if (!cancelled) setInternalMap(map);
+      const [map, partners] = await Promise.all([fetchInternalMap(ids), fetchPartnerListingMap(ids)]);
+      if (!cancelled) { setInternalMap(map); setPartnerMap(partners); }
     })();
     return () => { cancelled = true; };
   }, [inventory]);
@@ -611,7 +614,15 @@ export default function CrmPropertiesPage() {
                     <td>{l.flat_type || "—"}{l.furnishing ? ` · ${l.furnishing}` : ""}</td>
                     <td>{l.area || "—"}</td>
                     <td className="crm-num">{inr(l.rent)}</td>
-                    <td className="crm-num">{l.poster_name || "—"}{l.phone ? ` · ${l.phone}` : ""}</td>
+                    <td className="crm-num">
+                      {l.poster_name || "—"}{l.phone ? ` · ${l.phone}` : ""}
+                      {partnerMap[l.property_id] && (
+                        <div style={{ fontSize: 10.5, color: C.accent, marginTop: 2 }}
+                          title="Added in the partner app — the broker chose who sees it">
+                          Partner app · {describeSharing(partnerMap[l.property_id])}
+                        </div>
+                      )}
+                    </td>
                     <td className="crm-mute">{l.source || "—"}</td>
                     <td className="crm-mute crm-num">{shortDate(l.created_at)}</td>
                     <td>

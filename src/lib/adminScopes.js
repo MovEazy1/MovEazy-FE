@@ -27,6 +27,8 @@ export const SCOPES = {
   TEMPLATES_USE: "crm.templates.use",
   TEMPLATES_WRITE: "crm.templates.write",
   ANALYTICS_READ: "crm.analytics.read",
+  // Approve / suspend broker partners, auto-approval, manual Premium (partner_schema.sql).
+  PARTNERS_MANAGE: "partners.manage",
   ROLES_WRITE: "admin.roles.write",
 };
 
@@ -43,6 +45,7 @@ export const SCOPE_LABELS = {
   [SCOPES.TEMPLATES_USE]: "Send using an existing template",
   [SCOPES.TEMPLATES_WRITE]: "Edit the templates everyone sends",
   [SCOPES.ANALYTICS_READ]: "See dashboards and export",
+  [SCOPES.PARTNERS_MANAGE]: "Approve broker partners and grant Premium",
   [SCOPES.ROLES_WRITE]: "Grant and revoke roles",
 };
 

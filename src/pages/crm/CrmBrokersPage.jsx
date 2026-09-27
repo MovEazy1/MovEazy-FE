@@ -13,6 +13,7 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { Link } from "react-router-dom";
 import { useCrm } from "./CrmShell";
+import CrmPartnersSection from "./CrmPartnersSection";
 import { Btn, C, Chip, Empty, Toast, inr, shortDate } from "./crmUi";
 import { SCOPES } from "../../lib/adminScopes";
 import { whatsappUrl } from "../../lib/crmSettings";
@@ -77,7 +78,7 @@ function Stat({ label, value, sub }) {
   );
 }
 
-export default function CrmBrokersPage() {
+function BrokerDirectory() {
   const { inventory, clients, requirements, access, user } = useCrm();
   const actorEmail = access.email || user?.email || "";
   const agentName = user?.name || actorEmail.split("@")[0] || "the team";
@@ -329,6 +330,27 @@ export default function CrmBrokersPage() {
       </div>
 
       <Toast {...(toast ?? {})} />
+    </div>
+  );
+}
+
+/**
+ * Two views of brokers: the directory of everyone who has brought us a flat,
+ * and the MovEazy partners who use the broker app. Kept on one tab because
+ * they are often the same people, reached the same way.
+ */
+export default function CrmBrokersPage() {
+  const { access } = useCrm();
+  const [view, setView] = useState(() =>
+    new URLSearchParams(window.location.search).get("view") === "partners" ? "partners" : "directory");
+  return (
+    <div style={{ display: "flex", flexDirection: "column", flex: 1, minHeight: 0 }}>
+      <div style={{ display: "flex", gap: 6, padding: "8px 12px 0", flex: "none", borderBottom: `1px solid ${C.line}` }}>
+        {[["directory", "Broker directory"], ["partners", "MovEazy partners"]].map(([k, label]) => (
+          <Chip key={k} on={view === k} onClick={() => setView(k)} style={{ marginBottom: 8 }}>{label}</Chip>
+        ))}
+      </div>
+      {view === "partners" ? <CrmPartnersSection access={access} /> : <BrokerDirectory />}
     </div>
   );
 }
