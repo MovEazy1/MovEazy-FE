@@ -17,16 +17,34 @@ import { supabase, isSupabaseConfigured } from "./supabase";
 
 const PROD_ORIGIN = "https://www.moveazy.co.in";
 
-/** The seven columns across the top of every dashboard, in funnel order. */
+/**
+ * The columns across the top of every dashboard, in funnel order.
+ *
+ * Counted per person, and people include pre-signup leads — someone who gave
+ * a number from this channel's link and never signed up is counted under
+ * Phone no. (see MovEazy-BE/supabase/marketing_funnel_v2.sql). Steps are
+ * independent rather than nested, so a column need not be smaller than the
+ * one before it.
+ */
 export const FUNNEL_STEPS = [
-  { key: "link_clicks",      label: "Link clicks",      hint: "Times the link was opened" },
-  { key: "visitors",         label: "Visitors",         hint: "Distinct browsers behind those opens" },
-  { key: "signups",          label: "Signups",          hint: "Created an account after arriving" },
-  { key: "prefs_filled",     label: "Pref filled",      hint: "Told us what they are looking for" },
-  { key: "shortlisted",      label: "Prop shortlisted", hint: "Saved or liked at least one flat" },
-  { key: "visits_scheduled", label: "Visit scheduled",  hint: "Booked at least one visit" },
-  { key: "closed",           label: "Closed",           hint: "Search ended with a MovEazy home" },
+  { key: "link_clicks",      label: "Clicks",            hint: "Times the link was opened" },
+  { key: "visitors",         label: "Visitors",          hint: "Distinct browsers behind those opens" },
+  { key: "phone_given",      label: "Phone no.",         hint: "Gave us a mobile number, before or after signing up" },
+  { key: "prop_reacted",     label: "Prop like/dislike", hint: "Liked or disliked at least one flat (needs an account)" },
+  { key: "prefs_filled",     label: "Pref given",        hint: "Told us what they are looking for" },
+  { key: "signups",          label: "Sign up",           hint: "Created an account" },
+  { key: "visits_scheduled", label: "Visit scheduled",   hint: "Booked at least one visit" },
+  { key: "closed",           label: "Closed",            hint: "Search ended with a MovEazy home" },
 ];
+
+/**
+ * Does the data have this step at all?
+ *
+ * A step the database hasn't started returning (its migration not yet run)
+ * must read "—", not 0: a zero says nobody got there, which is a claim about
+ * the channel rather than about the migration.
+ */
+export const hasStep = (rows, key) => (rows ?? []).some((r) => r && Object.hasOwn(r, key));
 
 function unconfigured(where) {
   return new Error(`${where}: Supabase is not configured.`);

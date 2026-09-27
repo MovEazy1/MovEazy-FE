@@ -9,7 +9,7 @@
  */
 import { useEffect, useMemo, useState } from "react";
 import { Link } from "react-router-dom";
-import { FUNNEL_STEPS, fetchOverview, isMissingMigration, pct } from "../../lib/marketing";
+import { FUNNEL_STEPS, fetchOverview, hasStep, isMissingMigration, pct } from "../../lib/marketing";
 import { StatTile, Table, Notice } from "./marketingUi";
 
 export default function MarketingHead() {
@@ -39,7 +39,11 @@ export default function MarketingHead() {
 
   const totals = useMemo(() => {
     const sum = (key) => rows.reduce((n, r) => n + Number(r[key] || 0), 0);
-    return Object.fromEntries(FUNNEL_STEPS.map((s) => [s.key, sum(s.key)]));
+    // A step the database isn't returning yet stays undefined, so its tile
+    // reads "—" rather than a zero that looks like a real result.
+    return Object.fromEntries(
+      FUNNEL_STEPS.map((s) => [s.key, rows.length && !hasStep(rows, s.key) ? undefined : sum(s.key)]),
+    );
   }, [rows]);
 
   if (loading) return <p className="text-[13px] text-gray-500">Loading…</p>;
@@ -66,14 +70,14 @@ export default function MarketingHead() {
       </div>
 
       {/* Totals. Each tile's small percentage is against the step before it, so
-          the row reads as a funnel rather than seven unrelated numbers. */}
-      <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-7 gap-2 mb-6">
+          the row reads as a funnel rather than eight unrelated numbers. */}
+      <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-8 gap-2 mb-6">
         {FUNNEL_STEPS.map((s, i) => (
           <StatTile
             key={s.key}
             label={s.label}
             hint={s.hint}
-            value={totals[s.key] ?? 0}
+            value={totals[s.key]}
             of={i === 0 ? undefined : totals[FUNNEL_STEPS[i - 1].key]}
           />
         ))}
@@ -103,9 +107,9 @@ export default function MarketingHead() {
             render: (r) => (
               <span className="inline-flex items-baseline gap-1.5">
                 <span className="font-semibold text-gray-900">
-                  {Number(r[s.key] || 0).toLocaleString("en-IN")}
+                  {Object.hasOwn(r, s.key) ? Number(r[s.key] || 0).toLocaleString("en-IN") : "—"}
                 </span>
-                {i > 0 && (
+                {i > 0 && Object.hasOwn(r, s.key) && (
                   <span className="text-[11px] text-gray-400">
                     {pct(r[s.key], r[FUNNEL_STEPS[i - 1].key])}
                   </span>

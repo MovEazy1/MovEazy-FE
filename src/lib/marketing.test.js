@@ -10,7 +10,7 @@
  */
 import { afterEach, describe, expect, it } from "vitest";
 import {
-  channelLink, groupByPlatform, isMissingMigration, normalizeChannels, normalizeSlug, pct,
+  FUNNEL_STEPS, channelLink, groupByPlatform, hasStep, isMissingMigration, normalizeChannels, normalizeSlug, pct,
 } from "./marketing.js";
 
 const PROD = "https://www.moveazy.co.in";
@@ -143,5 +143,37 @@ describe("filing channels under a share menu", () => {
   it("leaves a stored platform alone", () => {
     const out = normalizeChannels(withPlatform);
     expect(out.some((c) => c.platform_derived)).toBe(false);
+  });
+});
+
+describe("FUNNEL_STEPS", () => {
+  // Every dashboard under /marketing reads this, and each tile's small
+  // percentage is against the step before it — so the order is decided here
+  // and reordering it silently changes every rate shown.
+  it("runs in the order the head of marketing asked for", () => {
+    expect(FUNNEL_STEPS.map((s) => s.label)).toEqual([
+      "Clicks", "Visitors", "Phone no.", "Prop like/dislike", "Pref given", "Sign up", "Visit scheduled", "Closed",
+    ]);
+  });
+
+  it("names the columns the database returns", () => {
+    // marketing_funnel_v2.sql — a key that doesn't match a column reads "—".
+    expect(FUNNEL_STEPS.map((s) => s.key)).toEqual([
+      "link_clicks", "visitors", "phone_given", "prop_reacted", "prefs_filled", "signups", "visits_scheduled", "closed",
+    ]);
+  });
+});
+
+describe("hasStep", () => {
+  it("tells a step the database hasn't returned yet from a real zero", () => {
+    const before = [{ link_clicks: 4, visitors: 3, signups: 1 }];
+    const after = [{ link_clicks: 4, visitors: 3, signups: 1, phone_given: 0 }];
+    expect(hasStep(before, "phone_given")).toBe(false);
+    expect(hasStep(after, "phone_given")).toBe(true);
+  });
+
+  it("is false for nothing", () => {
+    expect(hasStep([], "signups")).toBe(false);
+    expect(hasStep(null, "signups")).toBe(false);
   });
 });

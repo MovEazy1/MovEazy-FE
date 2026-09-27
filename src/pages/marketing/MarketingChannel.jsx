@@ -10,7 +10,7 @@ import { useParams } from "react-router-dom";
 import { useMarketing } from "./MarketingShell";
 import MarketingHead from "./MarketingHead";
 import {
-  FUNNEL_STEPS, channelLink, fetchChannelLeads, fetchChannelStats, isMissingMigration, pct,
+  FUNNEL_STEPS, channelLink, fetchChannelLeads, fetchChannelStats, hasStep, isMissingMigration, pct,
 } from "../../lib/marketing";
 import { StatTile, StepCell, Table, CopyLink, Notice } from "./marketingUi";
 
@@ -137,16 +137,21 @@ export default function MarketingChannel() {
         )}
       </div>
 
-      <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-7 gap-2 mb-5">
-        {FUNNEL_STEPS.map((s, i) => (
-          <StatTile
-            key={s.key}
-            label={s.label}
-            hint={s.hint}
-            value={Number(stats?.[s.key] || 0)}
-            of={i === 0 ? undefined : Number(stats?.[FUNNEL_STEPS[i - 1].key] || 0)}
-          />
-        ))}
+      <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-8 gap-2 mb-5">
+        {FUNNEL_STEPS.map((s, i) => {
+          // "—" for a step the database isn't returning yet, not a zero that
+          // reads as "nobody got here".
+          const val = (key) => (stats && !hasStep([stats], key) ? undefined : Number(stats?.[key] || 0));
+          return (
+            <StatTile
+              key={s.key}
+              label={s.label}
+              hint={s.hint}
+              value={val(s.key)}
+              of={i === 0 ? undefined : val(FUNNEL_STEPS[i - 1].key)}
+            />
+          );
+        })}
       </div>
 
       {link && (
