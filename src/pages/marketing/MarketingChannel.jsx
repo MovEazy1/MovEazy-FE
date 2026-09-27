@@ -14,11 +14,18 @@ import {
 } from "../../lib/marketing";
 import { StatTile, StepCell, Table, CopyLink, Notice } from "./marketingUi";
 
-/** The per-person columns, in the same order as the tiles above them. */
+/**
+ * The per-person columns, in the same order as the tiles above them.
+ *
+ * The rows are the very set the tiles count (marketing_people.sql), so a
+ * tile's number is the count of rows with a date in its column — including
+ * people who gave a number and never signed up.
+ */
 const STEP_COLUMNS = [
-  { key: "signed_up_at", label: "Signup" },
-  { key: "prefs_filled_at", label: "Pref filled" },
-  { key: "shortlisted_at", label: "Shortlisted", countKey: "shortlist_count" },
+  { key: "phone_given_at", label: "Phone no." },
+  { key: "reacted_at", label: "Like/dislike", countKey: "reaction_count" },
+  { key: "prefs_filled_at", label: "Pref given" },
+  { key: "signed_up_at", label: "Sign up" },
   { key: "visit_scheduled_at", label: "Visit scheduled", countKey: "visit_count" },
   { key: "closed_at", label: "Closed" },
 ];
@@ -26,11 +33,14 @@ const STEP_COLUMNS = [
 const csvCell = (v) => `"${String(v ?? "").replace(/"/g, '""')}"`;
 
 function downloadCsv(slug, leads) {
-  const header = ["Name", "Email", "Phone", "Signed up", "Pref filled", "Shortlisted", "Shortlists", "Visit scheduled", "Visits", "Closed", "Source", "Medium", "Landing page"];
+  const header = [
+    "Name", "Email", "Phone", "Signed up?", "Phone given", "Like/dislike", "Reactions", "Pref given",
+    "Signed up", "Visit scheduled", "Visits", "Closed", "Source", "Medium", "Landing page",
+  ];
   const body = leads.map((l) => [
-    l.name, l.email, l.phone, l.signed_up_at, l.prefs_filled_at, l.shortlisted_at,
-    l.shortlist_count, l.visit_scheduled_at, l.visit_count, l.closed_at,
-    l.utm_source, l.utm_medium, l.landing_path,
+    l.name, l.email, l.phone, l.is_lead_only ? "No" : "Yes", l.phone_given_at, l.reacted_at,
+    l.reaction_count, l.prefs_filled_at, l.signed_up_at, l.visit_scheduled_at, l.visit_count,
+    l.closed_at, l.utm_source, l.utm_medium, l.landing_path,
   ]);
   const csv = [header, ...body].map((r) => r.map(csvCell).join(",")).join("\n");
 
@@ -84,7 +94,9 @@ export default function MarketingChannel() {
       .filter((l) =>
         !needle || [l.name, l.email, l.phone].filter(Boolean).join(" ").toLowerCase().includes(needle),
       )
-      .map((l) => ({ ...l, _key: l.user_id }));
+      // person_key, not user_id: someone who hasn't signed up has no user id,
+      // and keying on it collapsed every such row into one.
+      .map((l) => ({ ...l, _key: l.person_key || l.user_id }));
   }, [leads, q, step]);
 
   // The roll-up lives at whichever slug is flagged as the overview, so it is
@@ -172,8 +184,8 @@ export default function MarketingChannel() {
           onChange={(e) => setStep(e.target.value)}
           className="px-3 py-2.5 rounded-xl border border-gray-200 bg-white text-[13px] outline-none"
         >
-          <option value="all">Everyone who signed up</option>
-          {STEP_COLUMNS.slice(1).map((s) => (
+          <option value="all">Everyone this link brought in</option>
+          {STEP_COLUMNS.map((s) => (
             <option key={s.key} value={s.key}>
               Reached: {s.label}
             </option>
@@ -189,7 +201,7 @@ export default function MarketingChannel() {
       <Table
         empty={
           stats?.link_clicks
-            ? "People have opened this link, but nobody has created an account from it yet."
+            ? "People have opened this link, but nobody has left a number or signed up from it yet."
             : "Nothing yet. Share the tracking link above and the clicks will start landing here."
         }
         rows={rows}
@@ -199,8 +211,14 @@ export default function MarketingChannel() {
             label: "Who",
             render: (r) => (
               <div className="min-w-[190px]">
-                <p className="font-bold text-gray-900">{r.name || r.email}</p>
-                {r.name && <p className="text-[11px] text-gray-500">{r.email}</p>}
+                <p className="font-bold text-gray-900">{r.name || r.email || r.phone || "Unnamed"}</p>
+                {r.is_lead_only ? (
+                  // Counted under Phone no., never signed up — said outright so
+                  // the missing email doesn't read as a data problem.
+                  <p className="text-[11px] font-semibold text-amber-700">Gave a number · not signed up</p>
+                ) : (
+                  r.name && r.email && <p className="text-[11px] text-gray-500">{r.email}</p>
+                )}
               </div>
             ),
           },
