@@ -15,7 +15,7 @@ import {
 } from "../../lib/crmSettings";
 import { groupByPlatform } from "../../lib/marketing";
 import { SCOPES } from "../../lib/adminScopes";
-import { COLUMNS, matchesFilters, optionsFor } from "./propertyColumns";
+import { COLUMNS, listingIdIn, matchesFilters, matchesSearch, optionsFor } from "./propertyColumns";
 
 // One stable empty set, so an unfiltered column does not hand ColumnFilter a
 // brand-new Set on every render and re-run its effects for nothing.
@@ -226,7 +226,10 @@ function ColumnFilter({ column, values, picked, onChange }) {
 }
 
 function PropertyThumbs({ listing, onOpen }) {
-  const { photos } = splitMedia([listing.cover_image_url, ...(listing.images ?? [])].filter(Boolean));
+  // The cover is normally also the first image. Without the dedupe it was
+  // shown twice and keyed twice — React drops or repeats children that share
+  // a key when the list re-renders.
+  const { photos } = splitMedia([...new Set([listing.cover_image_url, ...(listing.images ?? [])].filter(Boolean))]);
   const shown = photos.slice(0, 4);
 
   return (
@@ -504,12 +507,13 @@ export default function CrmPropertiesPage() {
   // What the search box and the status chips leave. The column tick-lists are
   // built from this, so they only ever offer values that can actually appear.
   const base = useMemo(() => {
-    const needle = q.trim().toLowerCase();
+    // Looking a listing up by its id ignores the status chip: an agent who
+    // pasted a link wants that flat, and a rented or dormant one hidden behind
+    // "published" would read as missing from the CRM altogether.
+    const byId = Boolean(listingIdIn(q));
     return inventory.filter((l) => {
-      if (status && l.status !== status) return false;
-      if (!needle) return true;
-      return [l.property_id, l.area, l.title, l.flat_type, l.poster_name, l.phone]
-        .join(" ").toLowerCase().includes(needle);
+      if (status && !byId && l.status !== status) return false;
+      return matchesSearch(l, q);
     });
   }, [inventory, q, status]);
 

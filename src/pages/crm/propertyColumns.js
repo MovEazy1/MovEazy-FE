@@ -45,6 +45,33 @@ export function matchesFilters(listing, filters = {}) {
   });
 }
 
+/**
+ * A listing id inside whatever was typed — "MZ-FQ5U48" on its own, or the
+ * link it came in, "https://www.moveazy.co.in/property/MZ-FQ5U48?utm_…".
+ *
+ * Agents find a listing by pasting the link somebody sent them. The search
+ * used to look for the whole pasted text inside the row, and no row contains
+ * a URL — so every pasted link read "No listings match that" and the flat
+ * looked as if it were missing from the CRM.
+ */
+export function listingIdIn(query) {
+  const m = /\bMZ-[A-Z0-9]{4,}\b/i.exec(String(query ?? ""));
+  return m ? m[0].toUpperCase() : "";
+}
+
+/** Does this row answer the search box? */
+export function matchesSearch(listing, query) {
+  const raw = String(query ?? "").trim();
+  if (!raw) return true;
+  // An id anywhere in the query is an exact lookup: someone who pasted a link
+  // wants that flat, not every flat whose text happens to contain the rest.
+  const id = listingIdIn(raw);
+  if (id) return String(listing.property_id ?? "").toUpperCase() === id;
+  const needle = raw.toLowerCase();
+  return [listing.property_id, listing.area, listing.title, listing.flat_type, listing.poster_name, listing.phone]
+    .join(" ").toLowerCase().includes(needle);
+}
+
 /** Every distinct value each column holds, across the rows given. */
 export function optionsFor(rows = []) {
   const out = {};
