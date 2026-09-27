@@ -646,8 +646,13 @@ export default function CrmClientsPage() {
                 basis={basisLabel(inferredByClient.get(c.id))}
               />
               <span className="crm-mute crm-num" style={{ fontSize: 11 }}>
-                {/* The two clocks a follow-up runs on: when they were last on
-                    the site, and when we last reached out. */}
+                {/* The clock the list is sorted by comes first. Sorting by
+                    "Newest lead" while showing "on site 45h ago" made a correct
+                    sort look broken: those are different moments, and a lead
+                    who arrived an hour ago can last have done anything days
+                    back. So a Fresh row always says when it became a lead. */}
+                {bucket === "fresh" && c.created_at ? `lead ${agoLabel(new Date(c.created_at).getTime())}` : ""}
+                {bucket === "fresh" && c.created_at ? " · " : ""}
                 {sm?.lastSiteActionAt ? `on site ${agoLabel(sm.lastSiteActionAt)}` : "never on site"}
                 {bucket === "contacted" && sm?.lastContactAt ? ` · us ${agoLabel(sm.lastContactAt)}` : ""}
               </span>
