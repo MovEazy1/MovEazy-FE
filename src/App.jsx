@@ -33,6 +33,8 @@ const CuratedProperties = lazy(() => import("./pages/CuratedProperties"));
 const TopMatches = lazy(() => import("./pages/TopMatches"));
 const HowItWorks = lazy(() => import("./pages/HowItWorks"));
 const About = lazy(() => import("./pages/About"));
+const Terms = lazy(() => import("./pages/Terms"));
+const Privacy = lazy(() => import("./pages/Privacy"));
 const ListMyFlat = lazy(() => import("./pages/ListMyFlat"));
 const AdminDatabase = lazy(() => import("./pages/AdminDatabase"));
 const Visits = lazy(() => import("./pages/Visits"));
@@ -170,6 +172,8 @@ function AppRoutes() {
         <Route path="/curated/:token" element={<CuratedProperties />} />
         <Route path="/how-it-works" element={<HowItWorks />} />
         <Route path="/about" element={<About />} />
+        <Route path="/terms" element={<Terms />} />
+        <Route path="/privacy" element={<Privacy />} />
         <Route
           path="/list-my-flat"
           element={
