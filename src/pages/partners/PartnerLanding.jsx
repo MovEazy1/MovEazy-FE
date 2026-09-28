@@ -15,7 +15,7 @@ import {
   ArrowRight, BadgeCheck, Building2, ChevronRight, Copy, IndianRupee, Phone, Plus, QrCode, Search, Share2, ShieldCheck, Sparkles, X, Zap,
 } from "lucide-react";
 import {
-  Faq, LandingFooter, LandingNav, LandingStyles, PhoneFrame, Shot, SignupButton, Stepper, StickyCta, VideoButton, useInventory, useListingsWithPhotos,
+  AppLogo, Faq, LandingFooter, LandingNav, LandingStyles, PhoneFrame, Shot, SignupButton, Stepper, StickyCta, VideoButton, useInventory, useListingsWithPhotos,
 } from "../landing/landingKit";
 import { Avatar, Chip, PropertyCard, TopBar, WhatsAppIcon } from "./partnerUi";
 import { SmartListingImage } from "./partnerMedia";
@@ -59,7 +59,7 @@ function InventoryScreen({ listings, share, pad = 44 }) {
     <div style={{ background: "#F6F7F6", minHeight: "100%" }}>
       <div style={{ padding: `${pad}px 14px 10px`, background: "#fff", borderBottom: "1px solid #E5E7EB" }}>
         <div className="pz-between">
-          <strong style={{ fontSize: 20, color: "#166534" }}>Moveazy</strong>
+          <AppLogo />
           <span className="pz-chip" style={{ padding: "4px 10px", fontSize: 12 }}>Bangalore</span>
         </div>
         <div className="pz-search" style={{ marginTop: 10 }}>

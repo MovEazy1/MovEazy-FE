@@ -13,7 +13,7 @@ import {
   ArrowRight, CalendarClock, Check, ChevronRight, ClipboardList, Home, KeyRound, Paintbrush, Palette, Share2, TrendingUp, Users, Wrench,
 } from "lucide-react";
 import {
-  Faq, LandingFooter, LandingNav, LandingStyles, PhoneFrame, Shot, SignupButton, Stepper, StickyCta, VideoButton, useInventory, useListingsWithPhotos,
+  AppLogo, Faq, LandingFooter, LandingNav, LandingStyles, PhoneFrame, Shot, SignupButton, Stepper, StickyCta, VideoButton, useInventory, useListingsWithPhotos,
 } from "../landing/landingKit";
 import { Chip, Pill, PropertyThumb, TopBar } from "./ownerUi";
 import { ServiceIcon } from "./serviceIcons";
@@ -29,7 +29,7 @@ function HomeScreen({ photos }) {
   return (
     <div style={{ background: "#F7F4EC", minHeight: "100%", padding: "44px 12px 12px" }}>
       <div className="oz-between" style={{ marginBottom: 10 }}>
-        <strong style={{ fontSize: 20, color: "#063B2D" }}>Moveazy</strong>
+        <AppLogo />
         <span className="oz-avatar" style={{ width: 30, height: 30, fontSize: 12 }}>PK</span>
       </div>
       <div className="oz-hero" style={{ padding: 14 }}>

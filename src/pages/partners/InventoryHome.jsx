@@ -11,6 +11,7 @@ import { useInView } from "react-intersection-observer";
 import { ChevronDown, Crown, Search, SlidersHorizontal } from "lucide-react";
 import { usePartner } from "./PartnerApp";
 import FilterSheet from "./FilterSheet";
+import logo from "../../assets/logo/moveazy-logo-mint-light.png";
 import { Avatar, Chip, Empty, Loading, PropertyCard } from "./partnerUi";
 import { SOURCES, customerMessage, hasPremium, inSource, pp, waLink } from "../../lib/partners";
 import { EMPTY_FILTERS, activeFilterCount, applyFilters } from "../../lib/partnerFilters";
@@ -66,7 +67,7 @@ export default function InventoryHome() {
     <>
       <header className="pz-top" style={{ flexDirection: "column", alignItems: "stretch", gap: 10, paddingBottom: 0 }}>
         <div className="pz-between">
-          <h1 style={{ fontSize: 22, fontWeight: 800, color: "var(--g2)" }}>Moveazy</h1>
+          <h1 style={{ margin: 0, lineHeight: 0 }}><img src={logo} alt="MovEazy" style={{ height: 26, width: "auto" }} /></h1>
           <span className="pz-chip" style={{ cursor: "default" }}>Bangalore</span>
           <Link to={pp("/more")} aria-label="Your profile" style={{ textDecoration: "none" }}>
             <Avatar name={me?.partner?.name || "You"} />

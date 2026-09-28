@@ -11,6 +11,7 @@ import PropertyRow from "./PropertyRow";
 import { Avatar, Empty, Loading } from "./ownerUi";
 import { fetchActivity, inr, occupancyOf, op, propertyName } from "../../lib/owners";
 import { daysToLeaseEnd, isCurrentTenant } from "../../lib/ownerOccupancy";
+import logo from "../../assets/logo/moveazy-logo-mint-light.png";
 
 const SEEN_KEY = "mz_owner_seen_at";
 
@@ -77,7 +78,7 @@ export default function OwnerHome() {
   return (
     <>
       <header className="oz-top">
-        <h1 style={{ fontSize: 22, fontWeight: 800, color: "var(--deep)" }}>Moveazy</h1>
+        <h1 style={{ margin: 0, lineHeight: 0, flex: 1 }}><img src={logo} alt="MovEazy" style={{ height: 26, width: "auto" }} /></h1>
         <Link to={op("/notifications")} className="oz-iconbtn" aria-label={`Notifications${unseen ? ` (${unseen} new)` : ""}`}>
           <Bell size={21} />
           {unseen > 0 && <span className="oz-badge" style={{ top: 2, right: 2 }}>{unseen > 9 ? "9+" : unseen}</span>}

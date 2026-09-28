@@ -7,7 +7,11 @@
  * wide desktops; the page is a marketing page, not the phone-width app shell.
  */
 import { useEffect, useState } from "react";
-import { ArrowRight, Home, Minus, Play, Plus, X } from "lucide-react";
+import { ArrowRight, Minus, Play, Plus, X } from "lucide-react";
+// The official wordmark, as the main site's nav uses it: the mint pair has a
+// transparent ground (the red "dark" file carries a black plate).
+import logoOnLight from "../../assets/logo/moveazy-logo-mint-light.png";
+import logoOnDark from "../../assets/logo/moveazy-logo-mint-dark.png";
 import { useAuth } from "../../context/AuthContext";
 import { fetchPublishedInventory } from "../../lib/inventory";
 import { isVideoUrl } from "../../lib/listingMedia";
@@ -31,12 +35,8 @@ const CSS = `
 .lp-nav--dark.is-scrolled { background: rgba(5,30,22,.94); border-bottom-color: rgba(255,255,255,.08); box-shadow: 0 6px 24px rgba(0,0,0,.25); }
 .lp-nav .lp-wrap { display: flex; align-items: center; gap: 28px; height: 72px; }
 .lp-brand { display: flex; align-items: center; gap: 10px; text-decoration: none; flex: none; }
-.lp-mark { width: 34px; height: 34px; border-radius: 10px; display: grid; place-items: center; color: #fff;
-  background: linear-gradient(145deg, var(--acc), var(--deep)); box-shadow: inset 0 0 0 1px rgba(255,255,255,.14), 0 4px 10px rgba(6,40,28,.2); }
-.lp-nav--dark .lp-mark, .lp-footer .lp-mark { background: linear-gradient(145deg, #F2CD7A, var(--gold)); color: var(--deep2); }
-.lp-word { font-weight: 800; font-size: 19px; letter-spacing: -0.03em; line-height: 1; }
-.lp-word em { font-style: normal; color: var(--acc); }
-.lp-nav--dark .lp-word em, .lp-footer .lp-word em { color: var(--gold); }
+.lp-logo-img { display: block; height: 30px; width: auto; }
+.lp-footer .lp-logo-img { height: 32px; }
 .lp-product { font-size: 12px; font-weight: 700; letter-spacing: .06em; text-transform: uppercase; padding: 5px 9px; border-radius: 999px;
   background: var(--accl); color: var(--acc); }
 .lp-nav--dark .lp-product { background: rgba(228,182,89,.14); color: var(--gold); }
@@ -309,14 +309,18 @@ function useScrolledPast(y) {
   return past;
 }
 
-export function Brand({ product }) {
+export function Brand({ product, dark }) {
   return (
     <a href="#top" className="lp-brand" aria-label={`MovEazy ${product || ""}`.trim()}>
-      <span className="lp-mark"><Home size={18} strokeWidth={2.4} /></span>
-      <span className="lp-word">Mov<em>Eazy</em></span>
+      <img className="lp-logo-img" src={dark ? logoOnDark : logoOnLight} alt="MovEazy" width="169" height="40" draggable={false} />
       {product && <span className="lp-product">{product}</span>}
     </a>
   );
+}
+
+/** The wordmark alone, sized for an app header inside a phone mockup. */
+export function AppLogo({ height = 26 }) {
+  return <img src={logoOnLight} alt="MovEazy" style={{ height, width: "auto", display: "block" }} draggable={false} />;
 }
 
 /** The header: brand, section links, sign in and the one call to action. Solidifies on scroll. */
@@ -325,7 +329,7 @@ export function LandingNav({ product, links, dark, ctaClass }) {
   return (
     <nav className={`lp-nav${dark ? " lp-nav--dark" : ""}${scrolled ? " is-scrolled" : ""}`}>
       <div className="lp-wrap">
-        <Brand product={product} />
+        <Brand product={product} dark={dark} />
         <div className="lp-links">{links.map(([href, label]) => <a key={href} href={href}>{label}</a>)}</div>
         <span className="lp-spacer" />
         <div className="lp-navcta">
@@ -353,7 +357,7 @@ export function LandingFooter({ product, blurb, links, other }) {
     <footer className="lp-footer">
       <div className="lp-wrap">
         <div className="lp-footer-top">
-          <div><Brand product={product} /><p>{blurb}</p></div>
+          <div><Brand product={product} dark /><p>{blurb}</p></div>
           <div><h4>{product}</h4><ul>{links.map(([href, label]) => <li key={href}><a href={href}>{label}</a></li>)}</ul></div>
           <div><h4>MovEazy</h4><ul>
             <li><a href="https://www.moveazy.co.in/">Find a home</a></li>
