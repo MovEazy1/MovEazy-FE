@@ -31,6 +31,8 @@ const RAIL = [
   { to: "/crm/pipeline",   code: "PI", label: "Pipeline" },
   { to: "/crm/properties", code: "PR", label: "Properties" },
   { to: "/crm/brokers",    code: "BR", label: "Brokers" },
+  // The owner app's queue: repairs, service bookings, designer calls, owners.
+  { to: "/crm/ops",        code: "IO", label: "Inventory Ops" },
   { to: "/crm/visits",     code: "VS", label: "Visits" },
   { to: "/crm/payments",   code: "PY", label: "Payments" },
   { to: "/crm/team",       code: "TM", label: "Team", scope: SCOPES.ROLES_WRITE },

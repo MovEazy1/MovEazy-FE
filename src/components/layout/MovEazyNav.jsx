@@ -111,12 +111,10 @@ function TenantIcon() {
     </svg>
   );
 }
-function RentIcon() {
+function ServicesIcon() {
   return (
     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" width="23" height="23">
-      <rect x="3.5" y="5.5" width="17" height="13" rx="2" />
-      <circle cx="12" cy="12" r="2.6" />
-      <path d="M6.5 8.5v0M17.5 15.5v0" />
+      <path d="M14.7 6.3a4 4 0 0 0-5.4 5.2L3.6 17.2a1.9 1.9 0 0 0 2.7 2.7l5.7-5.7a4 4 0 0 0 5.2-5.4l-2.5 2.5-2.3-.4-.4-2.3z" />
     </svg>
   );
 }
@@ -478,7 +476,7 @@ export default function MovEazyNav({ active = "", transparentAtTop = false, onFi
                signed in, and the pill row is tight — only a logged-out visitor
                needs this as a top-level acquisition link. */}
             {!user && (
-              <button type="button" className="mzn-nav-link" onClick={listMyFlat} style={{ ...LINK_BASE, display: "flex", alignItems: "center", gap: 6, background: "none", border: "none" }}>
+              <button type="button" className="mzn-nav-link" onClick={() => navigate("/owners")} style={{ ...LINK_BASE, display: "flex", alignItems: "center", gap: 6, background: "none", border: "none" }}>
                 Register as an Owner<span className="mzn-badge-new">new</span>
               </button>
             )}
@@ -580,7 +578,7 @@ export default function MovEazyNav({ active = "", transparentAtTop = false, onFi
             <Link to="/" className={`mzn-sheet-link ${active === "home" ? "is-active" : ""}`}>Home</Link>
             <Link to="/how-it-works" className={`mzn-sheet-link ${active === "how" ? "is-active" : ""}`}>How it Works</Link>
             <Link to="/about" className={`mzn-sheet-link ${active === "about" ? "is-active" : ""}`}>About Us</Link>
-            <button type="button" className="mzn-sheet-link" onClick={closeThen(listMyFlat)}>
+            <button type="button" className="mzn-sheet-link" onClick={closeThen(() => navigate("/owners"))}>
               Register as an Owner<span className="mzn-badge-new">new</span>
             </button>
             <Link to="/register-broker" className={`mzn-sheet-link ${active === "register-broker" ? "is-active" : ""}`}>
@@ -643,9 +641,10 @@ export default function MovEazyNav({ active = "", transparentAtTop = false, onFi
           {isOwner ? (
             <>
               <button type="button" onClick={() => navigate("/")}><HomeIcon /><span>Home</span></button>
-              <button type="button" onClick={() => navigate("/my-properties")}><PropertiesIcon /><span>My Properties</span></button>
-              <button type="button" onClick={() => navigate("/tenant-management")}><TenantIcon /><span>Tenant Management</span></button>
-              <button type="button" onClick={() => navigate("/rent-management")}><RentIcon /><span>Rent Management</span></button>
+              {/* The owner app is where an owner's tools live now. */}
+              <button type="button" onClick={() => navigate("/owners/properties")}><PropertiesIcon /><span>My Properties</span></button>
+              <button type="button" onClick={() => navigate("/owners/tenants")}><TenantIcon /><span>Tenants</span></button>
+              <button type="button" onClick={() => navigate("/owners/services")}><ServicesIcon /><span>Services</span></button>
             </>
           ) : user ? (
             <>

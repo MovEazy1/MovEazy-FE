@@ -29,6 +29,8 @@ export const SCOPES = {
   ANALYTICS_READ: "crm.analytics.read",
   // Approve / suspend broker partners, auto-approval, manual Premium (partner_schema.sql).
   PARTNERS_MANAGE: "partners.manage",
+  // Owner requests, owner approvals and the service catalogue (owner_schema.sql).
+  INVENTORY_OPS: "inventory.ops",
   ROLES_WRITE: "admin.roles.write",
 };
 
@@ -46,6 +48,7 @@ export const SCOPE_LABELS = {
   [SCOPES.TEMPLATES_WRITE]: "Edit the templates everyone sends",
   [SCOPES.ANALYTICS_READ]: "See dashboards and export",
   [SCOPES.PARTNERS_MANAGE]: "Approve broker partners and grant Premium",
+  [SCOPES.INVENTORY_OPS]: "Run Inventory Ops: owner repairs, services, approvals",
   [SCOPES.ROLES_WRITE]: "Grant and revoke roles",
 };
 

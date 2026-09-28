@@ -196,7 +196,7 @@ export async function createInventoryItem(draft, poster) {
 // partner_*/property_type: partner_schema.sql. Written by the CRM form and the
 // partner app only; no public select names them.
 const OPTIONAL_INVENTORY_COLS = [
-  "maintenance", "floor_number", "total_floors", "partner_visible", "partner_share_pct", "property_type",
+  "maintenance", "floor_number", "total_floors", "partner_visible", "partner_share_pct", "property_type", "area_sqft",
 ];
 
 /**

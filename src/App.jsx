@@ -37,7 +37,6 @@ const ListMyFlat = lazy(() => import("./pages/ListMyFlat"));
 const AdminDatabase = lazy(() => import("./pages/AdminDatabase"));
 const Visits = lazy(() => import("./pages/Visits"));
 const Shortlists = lazy(() => import("./pages/Shortlists"));
-const TenantManagement = lazy(() => import("./pages/TenantManagement"));
 const RentManagement = lazy(() => import("./pages/RentManagement"));
 const MyProperties = lazy(() => import("./pages/MyProperties"));
 const SuperAdminPanel = lazy(() => import("./pages/SuperAdminPanel"));
@@ -62,6 +61,10 @@ const CrmSettingsPage = lazy(() => import("./pages/crm/CrmSettingsPage"));
 // The broker app. Its own route tree: at /partners here, and at the root of
 // partners.moveazy.co.in (same deployment, same bundle — see lib/partners.js).
 const PartnerApp = lazy(() => import("./pages/partners/PartnerApp"));
+// The owner app: /owners here, the root of owners.moveazy.co.in.
+const OwnerApp = lazy(() => import("./pages/owners/OwnerApp"));
+const CrmInventoryOpsPage = lazy(() => import("./pages/crm/CrmInventoryOpsPage"));
+const IS_OWNER_HOST = typeof window !== "undefined" && /^owners?\./i.test(window.location.hostname);
 const IS_PARTNER_HOST = typeof window !== "undefined" && /^partners\./i.test(window.location.hostname);
 
 function PageLoader() {
@@ -130,6 +133,15 @@ function SessionTrackerComponent() {
 }
 
 function AppRoutes() {
+  if (IS_OWNER_HOST) {
+    return (
+      <Suspense fallback={<PageLoader />}>
+        <Routes>
+          <Route path="/*" element={<OwnerApp />} />
+        </Routes>
+      </Suspense>
+    );
+  }
   if (IS_PARTNER_HOST) {
     return (
       <Suspense fallback={<PageLoader />}>
@@ -144,6 +156,7 @@ function AppRoutes() {
       <Routes>
         <Route path="/" element={<ForkHome />} />
         <Route path="/partners/*" element={<PartnerApp />} />
+        <Route path="/owners/*" element={<OwnerApp />} />
         {/* Browsing is off — see the note by the imports.
             <Route path="/map" element={<MapPage />} /> */}
         <Route path="/map" element={<MapRedirect />} />
@@ -199,6 +212,7 @@ function AppRoutes() {
           <Route path="properties/new" element={<CrmPropertyForm />} />
           <Route path="properties/:propertyId/edit" element={<CrmPropertyForm />} />
           <Route path="brokers" element={<CrmBrokersPage />} />
+          <Route path="ops" element={<CrmInventoryOpsPage />} />
           <Route path="visits" element={<CrmVisitsPage />} />
           <Route path="notifications" element={<CrmNotificationsPage />} />
           <Route path="payments" element={<CrmPaymentsPage />} />
@@ -221,14 +235,8 @@ function AppRoutes() {
             </ProfileRoute>
           }
         />
-        <Route
-          path="/tenant-management"
-          element={
-            <ProfileRoute>
-              <TenantManagement />
-            </ProfileRoute>
-          }
-        />
+        {/* Superseded by the owner app, which keeps the same tenants table. */}
+        <Route path="/tenant-management" element={<Navigate to="/owners/tenants" replace />} />
         <Route
           path="/rent-management"
           element={
