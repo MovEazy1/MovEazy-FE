@@ -27,6 +27,8 @@ import { isSuperAdminEmail } from "../../lib/adminAccess";
 import { fetchRecentActivity } from "../../lib/ownerDashboard";
 import logoMint from "../../assets/logo/moveazy-logo-mint-dark.png";
 
+const OWNERS_URL = "https://owners.moveazy.co.in/";
+
 const LINK_BASE = {
   color: "#CBD9D5", fontWeight: 600, fontSize: "clamp(12px,1vw,14px)",
   padding: "10px clamp(9px,1.1vw,18px)", borderRadius: 100, whiteSpace: "nowrap", flex: "none",
@@ -292,6 +294,8 @@ export default function MovEazyNav({ active = "", transparentAtTop = false, onFi
     });
   };
 
+  // The owner app lives on its own subdomain; every "Register as an Owner" goes straight there.
+  const registerOwner = () => { window.location.href = OWNERS_URL; };
   const listMyFlat = () => { if (authLoading) return; user ? navigate("/list-my-flat") : openLogin(() => navigate("/list-my-flat")); };
   const findFlat = () => { if (authLoading) return; onFindFlat ? onFindFlat() : navigate("/?search=1"); };
   const getAgent = () => { if (authLoading) return; onGetAgent ? onGetAgent() : navigate("/?find=1"); };
@@ -476,7 +480,7 @@ export default function MovEazyNav({ active = "", transparentAtTop = false, onFi
                signed in, and the pill row is tight — only a logged-out visitor
                needs this as a top-level acquisition link. */}
             {!user && (
-              <button type="button" className="mzn-nav-link" onClick={() => navigate("/owners")} style={{ ...LINK_BASE, display: "flex", alignItems: "center", gap: 6, background: "none", border: "none" }}>
+              <button type="button" className="mzn-nav-link" onClick={registerOwner} style={{ ...LINK_BASE, display: "flex", alignItems: "center", gap: 6, background: "none", border: "none" }}>
                 Register as an Owner<span className="mzn-badge-new">new</span>
               </button>
             )}
@@ -578,7 +582,7 @@ export default function MovEazyNav({ active = "", transparentAtTop = false, onFi
             <Link to="/" className={`mzn-sheet-link ${active === "home" ? "is-active" : ""}`}>Home</Link>
             <Link to="/how-it-works" className={`mzn-sheet-link ${active === "how" ? "is-active" : ""}`}>How it Works</Link>
             <Link to="/about" className={`mzn-sheet-link ${active === "about" ? "is-active" : ""}`}>About Us</Link>
-            <button type="button" className="mzn-sheet-link" onClick={closeThen(() => navigate("/owners"))}>
+            <button type="button" className="mzn-sheet-link" onClick={closeThen(registerOwner)}>
               Register as an Owner<span className="mzn-badge-new">new</span>
             </button>
             <Link to="/register-broker" className={`mzn-sheet-link ${active === "register-broker" ? "is-active" : ""}`}>
@@ -663,7 +667,7 @@ export default function MovEazyNav({ active = "", transparentAtTop = false, onFi
           ) : (
             <>
               <button type="button" onClick={findFlat}><FlatIcon /><span>Find My Flat</span></button>
-              <button type="button" onClick={listMyFlat}><OwnerIcon /><span>List as Owner</span></button>
+              <button type="button" onClick={registerOwner}><OwnerIcon /><span>Register as Owner</span></button>
               <button type="button" onClick={() => navigate("/register-broker")}><BrokerIcon /><span>Register as Broker</span></button>
             </>
           )}
