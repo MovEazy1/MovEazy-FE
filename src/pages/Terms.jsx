@@ -10,10 +10,13 @@ export default function Terms() {
   const program = useLandingSettings();
   const price = `₹${Number(program.premiumPrice).toLocaleString("en-IN")}`;
   // Links like /terms#refunds arrive before the page has rendered, so the
-  // browser's own jump to the anchor misses; do it once the section exists.
+  // browser's own jump to the anchor misses; do it once the section exists,
+  // after the app's scroll-to-top on navigation has run.
   useEffect(() => {
     const id = window.location.hash.slice(1);
-    if (id) document.getElementById(id)?.scrollIntoView({ block: "start" });
+    if (!id) return undefined;
+    const t = setTimeout(() => document.getElementById(id)?.scrollIntoView({ block: "start" }), 250);
+    return () => clearTimeout(t);
   }, []);
   return (
     <div className="relative min-h-screen overflow-x-hidden antialiased bg-gradient-to-b from-stone-50 via-white to-rose-50/30">
