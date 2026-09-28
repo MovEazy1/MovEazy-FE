@@ -28,6 +28,7 @@ import { fetchUserRequirement } from "../lib/userRequirements";
 import { hasLeadPhone } from "../lib/leadIntake";
 import { useLandingSettings } from "../lib/landingSettings";
 import { LandingStyles } from "./landing/landingKit";
+import { HighlightScene, Phone, SITE_CSS, SiteFooter, clamp, ease, reduced, useScrollScene } from "./home/homeKit";
 import { PerfectHomeScreen, SwipeScreen, useSteps } from "./home/homeScreens";
 import logoOnDark from "../assets/logo/moveazy-logo-mint-dark.png";
 
@@ -45,60 +46,6 @@ const SOURCES = [
   [MessageCircle, "WhatsApp groups"], [UserRound, "Offline brokers"], [Globe, "Rental platforms"],
   [Megaphone, "Social media posts"], [ClipboardList, "Society notice boards"], [Home, "Owners’ own listings"],
 ];
-
-const clamp = (x, a = 0, b = 1) => Math.max(a, Math.min(b, x));
-const ease = (t) => (t < 0.5 ? 2 * t * t : 1 - Math.pow(-2 * t + 2, 2) / 2);
-const reduced = () => typeof window !== "undefined" && window.matchMedia?.("(prefers-reduced-motion: reduce)").matches;
-
-/** Progress 0→1 of a tall section scrolling past its sticky child. */
-function useScrollScene(ref, onProgress) {
-  const cb = useRef(onProgress);
-  cb.current = onProgress;
-  useEffect(() => {
-    let raf = 0;
-    const tick = () => {
-      raf = 0;
-      const el = ref.current;
-      if (!el) return;
-      const r = el.getBoundingClientRect();
-      const span = r.height - window.innerHeight;
-      cb.current(clamp(span > 0 ? -r.top / span : 1));
-    };
-    const on = () => { if (!raf) raf = requestAnimationFrame(tick); };
-    tick();
-    window.addEventListener("scroll", on, { passive: true });
-    window.addEventListener("resize", on);
-    return () => { window.removeEventListener("scroll", on); window.removeEventListener("resize", on); cancelAnimationFrame(raf); };
-  }, [ref]);
-}
-
-function StoryScene() {
-  const ref = useRef(null);
-  const words = useRef([]);
-  useScrollScene(ref, (p) => {
-    const ws = words.current;
-    const lit = reduced() ? ws.length + 4 : clamp(p / 0.85) * (ws.length + 4) - 2;
-    ws.forEach((w, i) => { if (w) w.style.color = lit - i >= 0 ? "#0B1A17" : lit - i > -2.5 ? "#9DAAA6" : "#DCE3E1"; });
-  });
-  let n = 0;
-  return (
-    <section ref={ref} className="th-story">
-      <div className="th-sticky th-story-in">
-        <div className="th-wrap">
-          <p className="th-kicker">The old way of renting</p>
-          {STORY.map((line, li) => (
-            <p key={li} className={`th-story-line${li === 3 ? " big" : ""}`}>
-              {line.split(" ").map((w, wi) => {
-                const i = n++;
-                return <span key={wi} ref={(el) => { words.current[i] = el; }}>{w} </span>;
-              })}
-            </p>
-          ))}
-        </div>
-      </div>
-    </section>
-  );
-}
 
 function LineScene() {
   const ref = useRef(null);
@@ -132,15 +79,6 @@ function LineScene() {
         </h2>
       </div>
     </section>
-  );
-}
-
-/** A phone whose screen is laid out at a true 375px and scaled to fit. */
-function Phone({ children, className = "" }) {
-  return (
-    <div className={`th-phone ${className}`} aria-hidden>
-      <div className="th-scr"><div className="th-scr-in">{children}</div></div>
-    </div>
   );
 }
 
@@ -281,7 +219,7 @@ export default function ForkHome() {
   return (
     <div className="lp lp--tenant th">
       <LandingStyles />
-      <style>{CSS}</style>
+      <style>{SITE_CSS + CSS}</style>
       <MovEazyNav active="home" transparentAtTop onFindFlat={startFlatSearch} />
 
       {/* ── HERO ── */}
@@ -322,7 +260,7 @@ export default function ForkHome() {
         </div>
       </div>
 
-      <StoryScene />
+      <HighlightScene kicker="The old way of renting" lines={STORY} big={3} />
       <LineScene />
       <HowScene steps={steps} />
 
@@ -387,32 +325,7 @@ export default function ForkHome() {
         </div>
       </section>
 
-      <footer className="lp-footer">
-        <div className="lp-wrap">
-          <div className="lp-footer-top">
-            <div>
-              <a href="#top" className="lp-brand" aria-label="MovEazy"><img className="lp-logo-img" src={logoOnDark} alt="MovEazy" width="169" height="40" /></a>
-              <p>India’s first Speed-Renting Platform. Bengaluru first.</p>
-            </div>
-            <div><h4>Renters</h4><ul>
-              <li><a href="#" onClick={find}>Find a home</a></li>
-              <li><Link to="/how-it-works">How it works</Link></li>
-              <li><Link to="/about">About us</Link></li>
-            </ul></div>
-            <div><h4>Owners &amp; brokers</h4><ul>
-              <li><a href="#" onClick={list}>List a flat</a></li>
-              <li><a href="https://owners.moveazy.co.in/">MovEazy for owners</a></li>
-              <li><a href="https://partners.moveazy.co.in/">MovEazy for brokers</a></li>
-            </ul></div>
-            <div><h4>Legal</h4><ul>
-              <li><Link to="/terms">Terms</Link></li>
-              <li><Link to="/privacy">Privacy</Link></li>
-              <li><Link to="/terms#refunds">Refunds</Link></li>
-            </ul></div>
-          </div>
-          <div className="lp-footer-bottom"><span>© {new Date().getFullYear()} MovEazy. All rights reserved.</span><span>Made in Bengaluru</span></div>
-        </div>
-      </footer>
+      <SiteFooter onFind={find} onList={list} />
 
       <RequirePhoneFirst
         open={showPhoneGate}
@@ -425,12 +338,6 @@ export default function ForkHome() {
 }
 
 const CSS = `
-.lp--tenant { --deep:#04211D; --deep2:#02140E; --acc:#0E7C68; --accl:#E4F6F1; --gold:#5EEAD4; --gold2:#E4F6F1; --gold3:#0E7C68;
-  --cream:#F4F2ED; --line:#E4E1D8; --ink:#0B1A17; --dim:#5C6B67; font-family: 'Manrope', Inter, system-ui, sans-serif; }
-.lp.th { background: var(--cream); overflow-x: clip; }
-.th-wrap { max-width: 1200px; margin: 0 auto; padding: 0 24px; }
-.th-sticky { position: sticky; top: 0; height: 100vh; overflow: hidden; }
-.th-kicker { font-size: 12.5px; font-weight: 800; letter-spacing: .18em; text-transform: uppercase; color: var(--acc); margin: 0 0 18px; }
 
 /* hero */
 .th-hero { position: relative; overflow: hidden; color: #F1F6F4;
@@ -443,15 +350,6 @@ const CSS = `
 .th-h1 span { color: #5EEAD4; }
 .th-lead { font-size: clamp(17px, 1.5vw, 20px); line-height: 1.5; color: #A9C2BC; max-width: 470px; margin: 0 0 30px; }
 .th-ctas { display: flex; flex-wrap: wrap; gap: 12px; }
-.th-btn { display: inline-flex; align-items: center; justify-content: center; gap: 9px; border: 0; border-radius: 999px; font: inherit; font-weight: 800;
-  font-size: 16.5px; padding: 0 28px; min-height: 56px; cursor: pointer; text-decoration: none; transition: transform .12s ease, box-shadow .2s ease, background .2s; }
-.th-btn:active { transform: translateY(1px); }
-.th-btn--mint { background: #5EEAD4; color: #04211D; box-shadow: 0 14px 34px rgba(94,234,212,.3); }
-.th-btn--mint:hover { box-shadow: 0 18px 40px rgba(94,234,212,.42); }
-.th-btn--ghost { background: transparent; color: #F1F6F4; border: 1.5px solid rgba(255,255,255,.26); }
-.th-btn--ghost:hover { border-color: rgba(255,255,255,.5); }
-.th-btn--ink { background: #04211D; color: #fff; min-height: 46px; padding: 0 20px; font-size: 15px; }
-.th-btn--lg { min-height: 62px; font-size: 18px; padding: 0 36px; }
 .th-checks { display: flex; flex-wrap: wrap; gap: 10px 20px; margin: 30px 0 0; padding: 0; list-style: none; font-size: 14.5px; font-weight: 600; color: #CFE1DC; }
 .th-checks li { display: flex; align-items: center; gap: 8px; }
 .th-checks li::before { content: "✓"; width: 20px; height: 20px; border-radius: 99px; display: grid; place-items: center; font-size: 11px; background: rgba(94,234,212,.16); color: #5EEAD4; }
@@ -464,16 +362,8 @@ const CSS = `
 @keyframes thFloat { 0%, 100% { transform: translateY(0); } 50% { transform: translateY(-8px); } }
 
 /* phones: a real 375px screen, scaled */
-.th-phone { --w: 320px; --h: 660px; width: var(--w); height: var(--h); border-radius: 48px; padding: 10px; background: #0C0F0E; position: relative; flex: none;
-  box-shadow: 0 50px 100px rgba(0,0,0,.4), inset 0 0 0 2px #2A2F2D; }
-.th-phone::before { content: ""; position: absolute; top: 18px; left: 50%; transform: translateX(-50%); width: 90px; height: 24px; border-radius: 99px; background: #0C0F0E; z-index: 5; }
-.th-scr { width: calc(var(--w) - 20px); height: calc(var(--h) - 20px); border-radius: 38px; overflow: hidden; position: relative; background: #fff; color: #111827; pointer-events: none; }
-.th-scr-in { position: absolute; top: 0; left: 0; width: 375px; max-width: none; height: calc((var(--h) - 20px) / var(--s, .8)); text-align: left;
-  transform: scale(var(--s, .8)); transform-origin: 0 0; overflow: hidden; }
 .th-phone--hero { --s: .8; }
 .th-phone--how { --s: .8; }
-.th-screen { position: absolute; inset: 0; opacity: 0; transform: translateY(18px) scale(.98); transition: opacity .45s ease, transform .55s cubic-bezier(.16,1,.3,1); }
-.th-screen.on { opacity: 1; transform: none; }
 
 /* proof */
 .th-proof { display: grid; grid-template-columns: repeat(3, 1fr); background: #fff; border-radius: 22px; border: 1px solid var(--line); margin-top: -40px;
@@ -483,12 +373,6 @@ const CSS = `
 .th-proof b { display: block; font-size: clamp(26px, 3vw, 36px); letter-spacing: -.03em; color: #04211D; }
 .th-proof span { font-size: 13px; color: var(--dim); font-weight: 600; }
 
-/* story */
-.th-story { height: 300vh; background: #fff; margin-top: 70px; }
-.th-story-in { display: flex; align-items: center; background: #fff; }
-.th-story-line { font-weight: 800; font-size: clamp(22px, 2.6vw, 38px); line-height: 1.32; letter-spacing: -.02em; margin: 0 0 14px; max-width: 980px; }
-.th-story-line.big { font-style: italic; font-size: clamp(28px, 3.8vw, 56px); line-height: 1.2; margin: 6px 0 20px; }
-.th-story-line span { color: #DCE3E1; transition: color .25s ease; }
 
 /* line */
 .th-line { height: 190vh; background: #04211D; color: #F1F6F4; }
@@ -504,8 +388,6 @@ const CSS = `
 .th-how { background: var(--cream); }
 .th-how-in { display: flex; align-items: center; padding-top: 64px; }
 .th-how-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 40px; align-items: center; width: 100%; }
-.th-h2 { font-size: clamp(38px, 5vw, 66px); line-height: 1; letter-spacing: -.04em; font-weight: 800; color: #04211D; margin: 0 0 34px; }
-.th-h2 span { color: var(--acc); }
 .th-steps { list-style: none; margin: 0; padding: 0; display: grid; gap: 6px; }
 .th-steps li { display: flex; gap: 16px; align-items: center; padding: 14px 18px; border-radius: 18px; transition: background .3s, box-shadow .3s; }
 .th-steps li b { display: block; font-size: clamp(20px, 2.1vw, 28px); letter-spacing: -.025em; color: #B5C2BE; transition: color .3s; }
@@ -594,7 +476,6 @@ const CSS = `
   .th-proof span { font-size: 11.5px; }
   .th-btn { width: 100%; }
   .th-final { padding: 100px 0 120px; }
-  .th-story { height: 260vh; }
 }
 /* the AI agents' search screen */
 .th-live { width: 8px; height: 8px; border-radius: 99px; background: #5EEAD4; box-shadow: 0 0 0 0 rgba(94,234,212,.6); animation: thLive 1.6s ease-out infinite; }
