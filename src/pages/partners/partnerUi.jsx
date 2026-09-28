@@ -234,7 +234,7 @@ export function ToastHost() {
 export function BrokeragePill({ listing }) {
   const pct = Number(listing?.brokerage_pct);
   if (listing?.locked) {
-    return <span className="pz-pill pz-pill--warn"><Lock size={12} /> 100% with Premium</span>;
+    return <span className="pz-pill pz-pill--warn"><Lock size={12} /> {Number.isFinite(pct) ? `${pct}% ` : ""}with Premium</span>;
   }
   if (!Number.isFinite(pct) || listing?.brokerage_pct == null) return null;
   return <span className="pz-pill">{pct}% Brokerage</span>;

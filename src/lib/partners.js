@@ -320,6 +320,7 @@ export async function deleteLead(id) {
 export const adminListPartners = () => rpc("partner_admin_list").then((r) => r ?? []);
 export const adminSetStatus = (userId, status) => rpc("partner_admin_set_status", { p_user: userId, p_status: status });
 export const adminSetAutoApprove = (on) => rpc("partner_admin_set_auto_approve", { p_on: on });
+export const adminSetClientShare = (userId, pct) => rpc("partner_admin_set_client_share", { p_user: userId, p_pct: pct });
 export const adminGrantPremium = (userId, months) =>
   rpc("partner_admin_grant_tier", { p_user: userId, p_tier: "moveazy_inventory", p_months: months });
 

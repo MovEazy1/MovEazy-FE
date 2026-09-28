@@ -29,7 +29,7 @@ function mapsUrl(l) {
 export default function PropertyDetail() {
   const { id } = useParams();
   const navigate = useNavigate();
-  const { inventory, byId, saved, toggleSave, leads, setLeads, groups, reloadInventory } = usePartner();
+  const { me, inventory, byId, saved, toggleSave, leads, setLeads, groups, reloadInventory } = usePartner();
   const l = byId.get(id);
   const [share, setShare] = useState(false);
   const [menu, setMenu] = useState(false);
@@ -129,7 +129,7 @@ export default function PropertyDetail() {
         {l.locked ? (
           <Link to={pp("/premium")} className="pz-lockbar" style={{ textDecoration: "none", marginBottom: 12 }}>
             <Lock size={18} />
-            <span style={{ flex: 1 }}><strong>Address and owner contact are locked.</strong><br />Go Premium to unlock 1000+ listings and keep 100% brokerage.</span>
+            <span style={{ flex: 1 }}><strong>Address and owner contact are locked.</strong><br />Go Premium to unlock 1000+ listings and keep {me?.property_share ?? 50}% of the brokerage.</span>
             <ChevronRight size={18} />
           </Link>
         ) : (

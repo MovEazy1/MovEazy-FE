@@ -9,14 +9,19 @@
  *
  * Premium is granted by hand until the payment gateway lands. It writes the
  * same entitlement row the gateway will, so switching over changes nothing here.
+ *
+ * "Prices, shares & landing pages" edits program_settings (CrmProgramSettings);
+ * the Client share column overrides that default for one broker.
  */
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { Btn, C, Chip, Empty, Toast, shortDate } from "./crmUi";
+import CrmProgramSettings from "./CrmProgramSettings";
+import { useLandingSettings } from "../../lib/landingSettings";
 import { SCOPES } from "../../lib/adminScopes";
 import { whatsappUrl } from "../../lib/crmSettings";
 import { formatForDisplay } from "../../lib/mobile";
 import {
-  adminGrantPremium, adminListPartners, adminSetAutoApprove, adminSetStatus, fetchProgramSettings, friendlyError,
+  adminGrantPremium, adminListPartners, adminSetAutoApprove, adminSetClientShare, adminSetStatus, fetchProgramSettings, friendlyError,
 } from "../../lib/partners";
 
 const STATUS_TONE = { pending: C.gold, approved: C.accent, suspended: C.coral };
@@ -30,6 +35,10 @@ export default function CrmPartnersSection({ access }) {
   const [busy, setBusy] = useState("");
   const [toast, setToast] = useState(null);
   const [error, setError] = useState("");
+  const [pricing, setPricing] = useState(false);
+  const loaded = useLandingSettings();
+  const [savedProgram, setSavedProgram] = useState(null);
+  const program = savedProgram || loaded;
 
   const showToast = useCallback((message, tone = "ok") => {
     setToast({ message, tone });
@@ -102,6 +111,14 @@ export default function CrmPartnersSection({ access }) {
             </span>
           </span>
         </label>
+        <div>
+          <Btn sm onClick={() => setPricing((o) => !o)}>{pricing ? "Hide" : "Prices, shares & landing pages"}</Btn>
+          <span className="crm-mute" style={{ fontSize: 11.5, marginLeft: 8 }}>
+            Premium {`₹${Number(program.premiumPrice).toLocaleString("en-IN")}`}/month · brokers keep {program.propertyShare}% on MovEazy
+            properties, {program.clientShare}% on MovEazy clients
+          </span>
+        </div>
+        {pricing && <CrmProgramSettings canManage={canManage} onToast={showToast} onSaved={setSavedProgram} />}
         <span className="crm-mute" style={{ fontSize: 11.5 }}>
           Partner app: <a href={partnerUrl} target="_blank" rel="noreferrer" style={{ color: C.accent }}>{partnerUrl.replace("https://", "")}</a>
           {" "}(also at moveazy.co.in/partners). Premium is granted by hand here until online payment is live.
@@ -123,7 +140,7 @@ export default function CrmPartnersSection({ access }) {
           <table className="crm-table">
             <thead>
               <tr>
-                <th>Partner</th><th>Mobile</th><th>Status</th><th>Joined</th><th>Listings</th><th>Groups</th><th>Premium</th><th />
+                <th>Partner</th><th>Mobile</th><th>Status</th><th>Joined</th><th>Listings</th><th>Groups</th><th>Premium</th><th>Client share</th><th />
               </tr>
             </thead>
             <tbody>
@@ -145,6 +162,21 @@ export default function CrmPartnersSection({ access }) {
                   <td className="crm-num">{r.listing_count}</td>
                   <td className="crm-num">{r.group_count}</td>
                   <td className="crm-num">{r.premium_until ? `until ${shortDate(r.premium_until)}` : <span className="crm-mute">—</span>}</td>
+                  <td className="crm-num">
+                    <button type="button" disabled={!canManage || !!busy}
+                      title={canManage ? "Change this broker's share on MovEazy clients" : ""}
+                      style={{ background: "none", border: 0, padding: 0, font: "inherit", color: C.text, cursor: canManage ? "pointer" : "default" }}
+                      onClick={() => {
+                        const v = window.prompt(`${r.name}'s share of the brokerage on MovEazy clients, in %.\nLeave empty to use the default (${program.clientShare}%).`,
+                          r.client_share_pct ?? "");
+                        if (v === null) return;
+                        const pct = v.trim() === "" ? null : Number(v);
+                        if (pct !== null && !(pct >= 0 && pct <= 100)) { showToast("Enter a share between 0 and 100", "error"); return; }
+                        act(r.user_id, () => adminSetClientShare(r.user_id, pct), pct === null ? "Back to the default share" : `${r.name} keeps ${pct}% on MovEazy clients`);
+                      }}>
+                      {r.client_share_pct != null ? `${Number(r.client_share_pct)}%` : <span className="crm-mute">{program.clientShare}% (default)</span>}
+                    </button>
+                  </td>
                   <td>
                     <div style={{ display: "flex", gap: 5, flexWrap: "wrap" }}>
                       {r.status !== "approved" && (

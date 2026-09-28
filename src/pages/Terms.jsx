@@ -1,10 +1,20 @@
 import Navbar from "../components/layout/Navbar";
 import Footer from "../components/layout/Footer";
 import PremiumPageBackdrop from "../components/ui/PremiumPageBackdrop";
+import { useEffect } from "react";
 import { useSitePublicSettings } from "../hooks/useSitePublicSettings";
+import { useLandingSettings } from "../lib/landingSettings";
 
 export default function Terms() {
   const { sitePublic } = useSitePublicSettings();
+  const program = useLandingSettings();
+  const price = `₹${Number(program.premiumPrice).toLocaleString("en-IN")}`;
+  // Links like /terms#refunds arrive before the page has rendered, so the
+  // browser's own jump to the anchor misses; do it once the section exists.
+  useEffect(() => {
+    const id = window.location.hash.slice(1);
+    if (id) document.getElementById(id)?.scrollIntoView({ block: "start" });
+  }, []);
   return (
     <div className="relative min-h-screen overflow-x-hidden antialiased bg-gradient-to-b from-stone-50 via-white to-rose-50/30">
       <PremiumPageBackdrop variant="marketing" overlayOnly />
@@ -16,7 +26,7 @@ export default function Terms() {
             Terms of Service
           </span>
         </h1>
-        <p className="text-slate-500 text-sm mb-10 font-medium">Last updated: April 2026</p>
+        <p className="text-slate-500 text-sm mb-10 font-medium">Last updated: September 2026</p>
 
         <div className="prose prose-gray max-w-none space-y-6 text-[15px] leading-relaxed text-gray-600">
           <section>
@@ -54,8 +64,22 @@ export default function Terms() {
             </p>
           </section>
 
+          <section id="refunds" style={{ scrollMarginTop: 96 }}>
+            <h2 className="text-xl font-bold text-gray-900 mt-8 mb-3">5. MovEazy Partners Premium — 100% Refundable</h2>
+            <p>
+              MovEazy Premium for broker partners is billed monthly (currently {price} per month). It unlocks MovEazy's own
+              inventory with owner contacts. The share of the brokerage a partner keeps on MovEazy-posted properties is
+              the one shown in the partner app when the deal is made (currently {program.propertyShare}%).
+            </p>
+            <p className="mt-3">
+              <strong className="text-gray-900">Refunds.</strong> If you find Premium isn't useful, tell us on WhatsApp or by
+              email during that month. We will end your Premium access and refund that month's fee in full — no questions
+              asked. Refunds go back to the original payment method within 7–14 business days.
+            </p>
+          </section>
+
           <section>
-            <h2 className="text-xl font-bold text-gray-900 mt-8 mb-3">5. Limitation of Liability</h2>
+            <h2 className="text-xl font-bold text-gray-900 mt-8 mb-3">6. Limitation of Liability</h2>
             <p>
               MovEazy acts as a technology intermediary and is not a party to any rental agreement between
               tenants and landlords. We do not guarantee the accuracy of all listing details and encourage
@@ -64,7 +88,7 @@ export default function Terms() {
           </section>
 
           <section>
-            <h2 className="text-xl font-bold text-gray-900 mt-8 mb-3">6. Intellectual Property</h2>
+            <h2 className="text-xl font-bold text-gray-900 mt-8 mb-3">7. Intellectual Property</h2>
             <p>
               All content, branding, and technology on the MovEazy platform are the property of
               MovEazy Architectural Relocation. Unauthorized reproduction or distribution is prohibited.
@@ -72,7 +96,7 @@ export default function Terms() {
           </section>
 
           <section>
-            <h2 className="text-xl font-bold text-gray-900 mt-8 mb-3">7. Contact</h2>
+            <h2 className="text-xl font-bold text-gray-900 mt-8 mb-3">8. Contact</h2>
             <p>
               For questions about these terms, contact us at{" "}
               <a href={`mailto:${sitePublic.supportEmail}`} className="text-red-500 hover:underline">

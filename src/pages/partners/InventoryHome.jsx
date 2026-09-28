@@ -117,7 +117,7 @@ export default function InventoryHome() {
             <span className="pz-avatar" style={{ background: "var(--g)", color: "#fff" }}><Crown size={17} /></span>
             <span style={{ flex: 1 }}>
               <strong style={{ display: "block" }}>Unlock {lockedCount.toLocaleString("en-IN")} MovEazy listings</strong>
-              <span className="pz-meta">Updated daily · owner contacts · 100% brokerage. Go Premium →</span>
+              <span className="pz-meta">Updated daily · owner contacts · {me?.property_share ?? 50}% brokerage. Go Premium →</span>
             </span>
           </Link>
         )}

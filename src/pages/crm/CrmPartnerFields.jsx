@@ -41,7 +41,7 @@ export default function CrmPartnerFields({ value, onChange, partnerInfo }) {
         <span style={{ fontSize: 12.5 }}>
           Share with broker partners
           <span className="crm-mute" style={{ display: "block", fontSize: 11 }}>
-            Shown locked in the broker app; Premium partners unlock it at 100% brokerage.
+            Shown locked in the broker app; Premium partners unlock it and keep the share set in Brokers → Prices &amp; shares.
           </span>
         </span>
       </label>

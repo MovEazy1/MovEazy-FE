@@ -25,7 +25,7 @@ import {
 } from "../../lib/partners";
 import { MOVEAZY_TEAM_WHATSAPP } from "../../config/contactChannels";
 import { BottomNav, CreateSheet, Loading, PartnerStyles, ToastHost, WhatsAppIcon, toast } from "./partnerUi";
-import PartnerWelcome from "./PartnerWelcome";
+import PartnerLanding from "./PartnerLanding";
 
 const InventoryHome = lazy(() => import("./InventoryHome"));
 const PropertyDetail = lazy(() => import("./PropertyDetail"));
@@ -220,7 +220,8 @@ function Gate() {
   }, [loading, user?.uid, hasPhone, load]);
 
   if (loading) return <Loading label="Opening MovEazy Partners…" />;
-  if (!user) return <PartnerWelcome />;
+  // Signed-out visitors get the landing page; its sign-up returns here.
+  if (!user) return <PartnerLanding />;
   if (!hasPhone || state === "need_phone") {
     // RequirePhoneModal (mounted app-wide) is open over this.
     return <Holding icon={<Clock size={28} />} title="Verify your mobile number">One step left — add the number clients and brokers reach you on.</Holding>;

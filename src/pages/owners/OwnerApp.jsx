@@ -22,7 +22,7 @@ import {
   teamWa,
 } from "../../lib/owners";
 import { BottomNav, Loading, OwnerStyles, ToastHost, WhatsAppIcon } from "./ownerUi";
-import OwnerWelcome from "./OwnerWelcome";
+import OwnerLanding from "./OwnerLanding";
 
 const OwnerHome = lazy(() => import("./OwnerHome"));
 const PropertiesList = lazy(() => import("./PropertiesList"));
@@ -171,7 +171,8 @@ function Gate() {
   }, [loading, user?.uid, hasPhone, load]);
 
   if (loading) return <Loading label="Opening MovEazy Owners…" />;
-  if (!user) return <OwnerWelcome />;
+  // Signed-out visitors get the landing page; its sign-up returns here.
+  if (!user) return <OwnerLanding />;
   if (!hasPhone || state === "need_phone") {
     return <Holding icon={<Clock size={28} />} title="Verify your mobile number">One step left — add the number MovEazy can reach you on.</Holding>;
   }
