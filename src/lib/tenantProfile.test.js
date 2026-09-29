@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { FIRST_JOB, missingSteps, normalizeLinkedIn, profileScore, scoreLabel } from "./tenantProfile";
+import { FIRST_JOB, fromRow, missingSteps, normalizeLinkedIn, profileScore, scoreLabel, toRow } from "./tenantProfile";
 
 const signup = { name: "Riya Sharma", phone: "9876543210" };
 const all = {
@@ -49,5 +49,24 @@ describe("tenant profile score", () => {
     const p = { ...signup, currentCompany: "  ", college: "BITS Pilani", inBangaloreSince: "2024" };
     expect(profileScore(p).score).toBe(40);
     expect(missingSteps(p).map((s) => s.id)).toEqual(["linkedin", "currentCompany", "pastCompany", "education", "maritalStatus"]);
+  });
+
+  it("saves in the database's shape and reads back the same profile", () => {
+    const p = { ...all, pastCompany: FIRST_JOB, maritalStatus: "family" };
+    const row = toRow("u1", p);
+    expect(row).toMatchObject({
+      user_id: "u1", linkedin: "https://www.linkedin.com/in/riya-sharma", past_company: "", first_job: true,
+      graduation_year: 2021, marital_status: "family",
+    });
+    expect(row).not.toHaveProperty("name");
+    const { name, phone, ...fields } = p;
+    expect(name && phone).toBeTruthy();
+    expect(fromRow({ ...row, score: 100 })).toEqual({ ...fields, linkedin: row.linkedin });
+  });
+
+  it("never sends a value the database would refuse", () => {
+    const row = toRow("u1", { linkedin: "linkedin.com/company/x", graduationYear: "1800", maritalStatus: "complicated", currentCompany: "x".repeat(300) });
+    expect(row).toMatchObject({ linkedin: "", graduation_year: null, marital_status: "" });
+    expect(row.current_company).toHaveLength(120);
   });
 });

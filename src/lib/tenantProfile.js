@@ -17,9 +17,10 @@
  *   every field filled                                     90  Excellent
  *   every field filled, and a family (married)            100  Outstanding
  *
- * Kept on this device for now (a design preview); the same shape moves to the
- * user's profile row when the flow goes live.
+ * Stored in public.tenant_profiles — see Storage below.
  */
+
+import { supabase, isSupabaseConfigured } from "./supabase";
 
 export const STATUS = [
   { value: "single", label: "Single", sub: "Bachelor / spinster", family: false },
@@ -96,13 +97,74 @@ export const missingSteps = (profile = {}) => PROFILE_STEPS.filter((s) => s.fiel
 export const pastCompanyLabel = (v) => (v === FIRST_JOB ? "First job" : v || "");
 export const statusLabel = (v) => STATUS.find((s) => s.value === v)?.label || "";
 
+/* ── Storage ──────────────────────────────────────────────────────────────
+ * public.tenant_profiles (MovEazy-BE/supabase/tenant_profile_schema.sql) is
+ * the record — the database also works out the score there, so the owner-facing
+ * verification portal never trusts a number from a browser. The device keeps a
+ * copy so the home paints instantly and survives a failed save.
+ */
+
 const KEY = (uid) => `moveazy_tenant_profile_${uid || "guest"}`;
 
 export function loadTenantProfile(uid) {
   try { return JSON.parse(localStorage.getItem(KEY(uid)) || "{}") || {}; } catch { return {}; }
 }
 
-export function saveTenantProfile(uid, profile) {
+export function cacheTenantProfile(uid, profile) {
   try { localStorage.setItem(KEY(uid), JSON.stringify(profile)); } catch { /* private mode: keep it in memory */ }
   return profile;
+}
+
+/** Row → the flow's shape. Name and mobile aren't stored here; they come from sign-up. */
+export function fromRow(r) {
+  if (!r) return {};
+  const p = {
+    linkedin: r.linkedin || "",
+    currentCompany: r.current_company || "",
+    pastCompany: r.first_job ? FIRST_JOB : r.past_company || "",
+    college: r.college || "",
+    graduationYear: r.graduation_year ? String(r.graduation_year) : "",
+    inBangaloreSince: r.in_bangalore_since || "",
+    maritalStatus: r.marital_status || "",
+  };
+  return Object.fromEntries(Object.entries(p).filter(([, v]) => v !== ""));
+}
+
+/** The flow's shape → row. Empty fields go as empty, so clearing one sticks. */
+export function toRow(uid, p = {}) {
+  const t = (v) => String(v ?? "").trim();
+  const year = parseInt(p.graduationYear, 10);
+  return {
+    user_id: uid,
+    linkedin: normalizeLinkedIn(p.linkedin),
+    current_company: t(p.currentCompany).slice(0, 120),
+    past_company: p.pastCompany === FIRST_JOB ? "" : t(p.pastCompany).slice(0, 120),
+    first_job: p.pastCompany === FIRST_JOB,
+    college: t(p.college).slice(0, 160),
+    graduation_year: Number.isFinite(year) && year >= 1950 && year <= 2100 ? year : null,
+    in_bangalore_since: t(p.inBangaloreSince).slice(0, 30),
+    marital_status: STATUS.some((s) => s.value === p.maritalStatus) ? p.maritalStatus : "",
+  };
+}
+
+/** The signed-in tenant's saved profile, or the device copy if the database can't be reached. */
+export async function fetchMyTenantProfile(uid) {
+  if (!uid) return {};
+  if (!isSupabaseConfigured || !supabase) return loadTenantProfile(uid);
+  const { data, error } = await supabase.from("tenant_profiles").select("*").eq("user_id", uid).maybeSingle();
+  if (error) return loadTenantProfile(uid);
+  const profile = data ? fromRow(data) : loadTenantProfile(uid);
+  cacheTenantProfile(uid, profile);
+  return profile;
+}
+
+/** Save to the database (and the device). Throws if the database refused it. */
+export async function saveMyTenantProfile(uid, profile) {
+  const { name, phone, ...fields } = profile || {};
+  void name; void phone;
+  cacheTenantProfile(uid, fields);
+  if (!uid || !isSupabaseConfigured || !supabase) return fields;
+  const { error } = await supabase.from("tenant_profiles").upsert(toRow(uid, fields), { onConflict: "user_id" });
+  if (error) throw error;
+  return fields;
 }

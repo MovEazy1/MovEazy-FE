@@ -7,9 +7,10 @@
  * lib/tenantProfile.js.
  *
  * LinkedIn: the tenant pastes their profile link. "Continue with LinkedIn"
- * (Sign in with LinkedIn) can only ever fill name, email and photo — LinkedIn
- * does not hand work history or education to apps outside its partner
- * program — so the questions after it stay.
+ * (shown only when onLinkedIn is given — Sign in with LinkedIn isn't set up
+ * yet) can only ever fill name, email and photo — LinkedIn does not hand work
+ * history or education to apps outside its partner program — so the
+ * questions after it stay.
  */
 import { useMemo, useState } from "react";
 import { ArrowRight, Baby, BadgeCheck, Check, ChevronLeft, GraduationCap, Heart, Sparkles, User, X } from "lucide-react";
@@ -123,9 +124,13 @@ export default function TenantProfileFlow({ initial = {}, onSave, onClose, onFin
 
           {step.id === "linkedin" && (
             <>
-              <button type="button" className="tn-li-btn" onClick={onLinkedIn}><LinkedInMark /> Continue with LinkedIn</button>
-              <p className="tn-li-note">Fills your name and photo. Your job history stays yours to add.</p>
-              <div className="tn-or"><span>or paste your profile link</span></div>
+              {onLinkedIn && (
+                <>
+                  <button type="button" className="tn-li-btn" onClick={onLinkedIn}><LinkedInMark /> Continue with LinkedIn</button>
+                  <p className="tn-li-note">Fills your name and photo. Your job history stays yours to add.</p>
+                  <div className="tn-or"><span>or paste your profile link</span></div>
+                </>
+              )}
               <div className="tn-input-wrap">
                 <input className="tn-input" inputMode="url" autoCapitalize="none" placeholder="linkedin.com/in/your-name" value={li}
                   onChange={(e) => set("linkedin", e.target.value)} />

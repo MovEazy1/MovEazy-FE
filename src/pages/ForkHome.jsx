@@ -31,6 +31,9 @@ import { LandingStyles } from "./landing/landingKit";
 import { HighlightScene, Phone, SITE_CSS, SiteFooter, clamp, ease, reduced, useScrollScene } from "./home/homeKit";
 import { PerfectHomeScreen, SwipeScreen, useSteps } from "./home/homeScreens";
 import logoOnDark from "../assets/logo/moveazy-logo-mint-dark.png";
+import TenantHome from "./tenant/TenantHome";
+import { hasOwnerListing } from "../lib/inventory";
+import { fetchMyTenantProfile, loadTenantProfile } from "../lib/tenantProfile";
 
 /* ── copy: kept to the bone ─────────────────────────────────────────────── */
 const STORY = [
@@ -127,6 +130,20 @@ export default function ForkHome() {
   const settings = useLandingSettings();
   const { steps, matches } = useSteps();
 
+  // Signed in, the home is the tenant's own: their card, their profile score,
+  // Find / List / Profile. Owners (anyone who has listed a flat as an owner)
+  // keep this page — their tools live in the owner app. Until that's known the
+  // tenant home shows, drawn from the profile kept on the device.
+  const [ownerAccount, setOwnerAccount] = useState(null);
+  const [tenantProfile, setTenantProfile] = useState(() => (user ? loadTenantProfile(user.uid) : {}));
+  useEffect(() => {
+    let alive = true;
+    if (!user?.uid) { setOwnerAccount(false); return undefined; }
+    hasOwnerListing(user.uid).then((v) => { if (alive) setOwnerAccount(v); });
+    fetchMyTenantProfile(user.uid).then((p) => { if (alive) setTenantProfile(p); });
+    return () => { alive = false; };
+  }, [user]);
+
   // "List my Flat" — auth-gate, then open the inventory listing form.
   // Wait out the persisted-session restore before deciding: without this, a
   // signed-in visitor who clicks right after page load can see a false
@@ -215,6 +232,33 @@ export default function ForkHome() {
   const find = (e) => { e?.preventDefault?.(); startFlatSearch(); };
   const list = (e) => { e?.preventDefault?.(); listMyFlat(); };
   const top = matches[0];
+
+  const flows = (
+    <>
+      <RequirePhoneFirst
+        open={showPhoneGate}
+        onClose={() => setShowPhoneGate(false)}
+        onDone={() => { setShowPhoneGate(false); setShowChatbot(true); }}
+      />
+      <AIBroker open={showChatbot} onClose={() => setShowChatbot(false)} />
+    </>
+  );
+
+  if (user && ownerAccount !== true) {
+    return (
+      <>
+        <MovEazyNav active="home" onFindFlat={startFlatSearch} />
+        <TenantHome
+          name={user.name}
+          profile={{ name: user.name, phone: user.phone, ...tenantProfile }}
+          onFind={() => startFlatSearch()}
+          onList={() => listMyFlat()}
+          onProfile={() => navigate("/tenant-profile")}
+        />
+        {flows}
+      </>
+    );
+  }
 
   return (
     <div className="lp lp--tenant th">
@@ -327,12 +371,7 @@ export default function ForkHome() {
 
       <SiteFooter onFind={find} onList={list} />
 
-      <RequirePhoneFirst
-        open={showPhoneGate}
-        onClose={() => setShowPhoneGate(false)}
-        onDone={() => { setShowPhoneGate(false); setShowChatbot(true); }}
-      />
-      <AIBroker open={showChatbot} onClose={() => setShowChatbot(false)} />
+      {flows}
     </div>
   );
 }
