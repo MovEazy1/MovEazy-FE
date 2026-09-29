@@ -34,6 +34,7 @@ const TopMatches = lazy(() => import("./pages/TopMatches"));
 const HowItWorks = lazy(() => import("./pages/HowItWorks"));
 const About = lazy(() => import("./pages/About"));
 const Terms = lazy(() => import("./pages/Terms"));
+const TenantPreview = lazy(() => import("./pages/tenant/TenantPreview"));
 const Privacy = lazy(() => import("./pages/Privacy"));
 const ListMyFlat = lazy(() => import("./pages/ListMyFlat"));
 const AdminDatabase = lazy(() => import("./pages/AdminDatabase"));
@@ -173,6 +174,7 @@ function AppRoutes() {
         <Route path="/how-it-works" element={<HowItWorks />} />
         <Route path="/about" element={<About />} />
         <Route path="/terms" element={<Terms />} />
+        <Route path="/preview/tenant" element={<TenantPreview />} />
         <Route path="/privacy" element={<Privacy />} />
         <Route
           path="/list-my-flat"
