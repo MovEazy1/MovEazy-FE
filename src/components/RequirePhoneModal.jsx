@@ -22,6 +22,8 @@ import { useAuth } from "../context/AuthContext";
 // Shared with RequirePhoneFirst, the gate that now runs before signup, so the
 // two screens cannot disagree about what a valid number is.
 import { formatForDisplay, normalizeIndianMobile } from "../lib/mobile";
+import { isPartnerHost } from "../lib/partners";
+import { pendingSignupPhone } from "../lib/partnerSignup";
 
 const INK     = "#1A2421";
 const WHITE   = "#FFFEFB";
@@ -38,8 +40,11 @@ export default function RequirePhoneModal() {
   const [err, setErr] = useState("");
   const inputRef = useRef(null);
 
+  // A partner who gave their number on "Become Partner" has it saved by the
+  // partner app's gate a moment after Google; asking again would be a second prompt.
+  const partnerPending = (isPartnerHost() || pathname.startsWith("/partners")) && Boolean(pendingSignupPhone());
   const needsPhone =
-    !loading && !!user?.uid && !String(user.phone || "").trim() && !pathname.startsWith("/auth");
+    !loading && !!user?.uid && !String(user.phone || "").trim() && !pathname.startsWith("/auth") && !partnerPending;
 
   // The modal owns the scroll lock while it's up, so the page behind can't be
   // scrolled past a gate the visitor can't dismiss.

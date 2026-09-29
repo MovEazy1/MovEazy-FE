@@ -6,9 +6,12 @@
  */
 import { bedroomsOf } from "./partnerMatch";
 
-export const BHK_CHIPS = ["1 RK", "1 BHK", "2 BHK", "3 BHK", "4+ BHK"];
+export const ROOM_LABEL = "Room in shared flat";
+export const BHK_CHIPS = ["1 RK", "1 BHK", "2 BHK", "3 BHK", "4+ BHK", "Room"];
 /** What a listing or a lead can say it is. */
-export const BHK_OPTIONS = ["1 RK", "1 BHK", "2 BHK", "3 BHK", "4 BHK", "5+ BHK"];
+export const BHK_OPTIONS = ["1 RK", "1 BHK", "2 BHK", "3 BHK", "4 BHK", "5+ BHK", ROOM_LABEL];
+/** What a partner lists: one tap each, 1 BHK preselected. */
+export const HOUSE_TYPES = ["1 RK", "1 BHK", "2 BHK", "3 BHK", "4 BHK", "5 BHK", ROOM_LABEL];
 export const BROKERAGE_CHIPS = [
   { label: "Any", min: 0 },
   { label: "100%", min: 100 },
@@ -31,6 +34,7 @@ const num = (v) => (v === "" || v == null || !Number.isFinite(Number(v)) ? null 
 export function bhkChipOf(l) {
   const b = bedroomsOf(l.flat_type) ?? num(l.bedrooms);
   if (b == null) return "";
+  if (b === 0.25) return "Room";
   if (b === 0.5) return "1 RK";
   if (b >= 4) return "4+ BHK";
   return `${b} BHK`;

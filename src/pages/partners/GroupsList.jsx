@@ -4,6 +4,7 @@ import { Link, useNavigate } from "react-router-dom";
 import { ChevronRight, Plus, Search } from "lucide-react";
 import { usePartner } from "./PartnerApp";
 import { Avatar, Empty, Sheet, TopBar, toast } from "./partnerUi";
+import { DEMO_GROUPS, DemoBanner } from "./demoMode";
 import { createGroup, friendlyError, pp } from "../../lib/partners";
 
 export function CreateGroupSheet({ onClose }) {
@@ -46,29 +47,34 @@ export function CreateGroupSheet({ onClose }) {
 }
 
 export default function GroupsList() {
-  const { groups } = usePartner();
+  const { groups: realGroups, demo, explain } = usePartner();
+  const groups = demo ? DEMO_GROUPS : realGroups;
   const [q, setQ] = useState("");
-  const [create, setCreate] = useState(false);
+  const [creating, setCreate] = useState(false);
+  const create = creating && !demo;
+  const startCreate = () => (demo ? explain("create_group") : setCreate(true));
   const rows = useMemo(() => groups.filter((g) => g.name.toLowerCase().includes(q.trim().toLowerCase())), [groups, q]);
 
   return (
     <>
       <TopBar title="Groups" right={
-        <button type="button" className="pz-btn pz-btn--primary pz-btn--sm" onClick={() => setCreate(true)}><Plus size={16} /> Create</button>
+        <button type="button" className="pz-btn pz-btn--primary pz-btn--sm" onClick={startCreate}><Plus size={16} /> Create</button>
       } />
       <div className="pz-pad">
         <div className="pz-search" style={{ marginBottom: 12 }}>
           <Search size={17} />
           <input className="pz-input" type="search" placeholder="Search groups…" value={q} onChange={(e) => setQ(e.target.value)} />
         </div>
+        {demo && <DemoBanner>6 sample groups, 20 listings each.</DemoBanner>}
         {rows.length === 0 ? (
-          <Empty action={<button type="button" className="pz-btn pz-btn--primary" onClick={() => setCreate(true)}><Plus size={16} /> Create a group</button>}>
+          <Empty action={<button type="button" className="pz-btn pz-btn--primary" onClick={startCreate}><Plus size={16} /> Create a group</button>}>
             {groups.length ? "No group by that name." : "Groups are how your association shares inventory privately. Create one, then invite brokers on WhatsApp."}
           </Empty>
         ) : (
           <div className="pz-card">
             {rows.map((g, i) => (
-              <Link key={g.id} to={pp(`/groups/${g.id}`)} className="pz-row" style={{ padding: 14, color: "inherit", textDecoration: "none", borderTop: i ? "1px solid var(--line)" : 0 }}>
+              <Link key={g.id} to={pp(`/groups/${g.id}`)} onClick={g.demo ? (e) => { e.preventDefault(); explain("group"); } : undefined}
+                className="pz-row" style={{ padding: 14, color: "inherit", textDecoration: "none", borderTop: i ? "1px solid var(--line)" : 0 }}>
                 <span style={{ transform: "scale(1.35)", margin: "0 8px 0 4px" }}><Avatar name={g.name} /></span>
                 <span style={{ flex: 1, minWidth: 0 }}>
                   <strong style={{ display: "block", fontSize: 16 }}>{g.name}</strong>

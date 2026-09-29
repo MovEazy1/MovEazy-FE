@@ -247,13 +247,15 @@ export function sourceLabel(l) {
 }
 
 /** The inventory card (PRD 01): enough to act without opening the property. */
-export function PropertyCard({ listing: l, saved, onToggleSave, onWhatsApp, extra, detailsTo }) {
+export function PropertyCard({ listing: l, saved, onToggleSave, onWhatsApp, extra, detailsTo, onOpen }) {
   const navigate = useNavigate();
   const available = l.status === "published";
   const to = detailsTo || pp(`/property/${l.property_id}`);
+  // onOpen: something other than the details page (demo mode explains instead).
+  const open = (e) => { if (onOpen) { e?.preventDefault?.(); onOpen(); } else navigate(to); };
   return (
     <article className="pz-card pz-prop">
-      <div className="pz-prop-img" onClick={() => navigate(to)} role="link" tabIndex={-1} style={{ cursor: "pointer" }}>
+      <div className="pz-prop-img" onClick={open} role="link" tabIndex={-1} style={{ cursor: "pointer" }}>
         <SmartListingImage listing={l} />
         <span className="pz-prop-badge">
           {available
@@ -302,7 +304,7 @@ export function PropertyCard({ listing: l, saved, onToggleSave, onWhatsApp, extr
           <button type="button" className="pz-btn pz-wa" onClick={onWhatsApp}>
             <WhatsAppIcon /> WhatsApp
           </button>
-          <Link to={to} className="pz-btn" style={{ color: "var(--g)", borderColor: "var(--gl2)" }}>Details</Link>
+          <Link to={to} onClick={onOpen ? open : undefined} className="pz-btn" style={{ color: "var(--g)", borderColor: "var(--gl2)" }}>Details</Link>
         </div>
       </div>
     </article>

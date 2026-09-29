@@ -364,7 +364,7 @@ export default function QrFeature({ listings }) {
     <section className="lp-sec lp-sec--dark qr" id="qr">
       <style>{CSS}</style>
       <div className="lp-wrap lp-center">
-        <p className="lp-kicker"><span className="qr-soon">New · Free with every account</span></p>
+        <p className="lp-kicker"><span className="qr-soon">New</span></p>
         <h2 className="lp-h2">Your QR. <span className="hl">Your storefront.</span></h2>
         <p className="lp-sub">Paste it across your areas. Tenants scan and see all your homes. You see who liked what.</p>
 

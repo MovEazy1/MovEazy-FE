@@ -5,7 +5,10 @@
  *
  * Screens first, few words. Every phone shows the real app's components over
  * MovEazy's real published inventory:
- *   - prices, shares and stats come from the CRM (useLandingSettings);
+ *   - shares and stats come from the CRM (useLandingSettings); no plan price is
+ *     shown signed out — plans are presented inside the app, after sign-up;
+ *   - every call to action is "Become Partner": mobile number first
+ *     (BecomePartnerSheet), then Google;
  *   - the matching demo runs the app's own matching engine, so counts are live;
  *   - features that aren't live yet (MovEazy clients) are marked "Coming soon";
  *   - no testimonials until there are real ones to show.
@@ -15,11 +18,13 @@ import {
   ArrowRight, BadgeCheck, Building2, ChevronRight, Copy, IndianRupee, Phone, Plus, QrCode, Search, Share2, Sparkles, X, Zap,
 } from "lucide-react";
 import {
-  AppLogo, Faq, LandingFooter, LandingNav, LandingStyles, PhoneFrame, Shot, SignupButton, Stepper, StickyCta, VideoButton, useInventory, useListingsWithPhotos, useScrollSlide,
+  AppLogo, Faq, LandingFooter, LandingNav, LandingStyles, PhoneFrame, Shot, SignupButton, SignupProvider, Stepper, StickyCta, VideoButton, useInventory, useListingsWithPhotos, useScrollSlide,
 } from "../landing/landingKit";
 import { Avatar, Chip, PropertyCard, TopBar, WhatsAppIcon } from "./partnerUi";
 import { SmartListingImage } from "./partnerMedia";
 import QrFeature from "./QrFeature";
+import BecomePartnerSheet from "./BecomePartnerSheet";
+import { captureSource } from "../../lib/partnerSignup";
 import { requirementLine } from "./leadBits";
 import { matchesForLead } from "../../lib/partnerMatch";
 import { customerMessage, displayLink } from "../../lib/partners";
@@ -304,7 +309,7 @@ function Calculator({ s }) {
   const [properties, setProperties] = useState(2);
   const [clients, setClients] = useState(1);
   const r = brokerEarnings({
-    properties, clients, avgBrokerage: s.avgBrokerage, propertyShare: s.propertyShare, clientShare: s.clientShare, fee: s.premiumPrice,
+    properties, clients, avgBrokerage: s.avgBrokerage, propertyShare: s.propertyShare, clientShare: s.clientShare, fee: 0,
   });
   return (
     <div className="lp-calc">
@@ -316,10 +321,9 @@ function Calculator({ s }) {
         <h3>Extra income / month</h3>
         <div className="lp-rline"><span>Properties<small>{properties} × {inr(s.avgBrokerage)} × {s.propertyShare}%</small></span><b>{inr(r.fromProperties)}</b></div>
         <div className="lp-rline"><span>Clients<small>{clients} × {inr(s.avgBrokerage)} × {s.clientShare}%</small></span><b>{inr(r.fromClients)}</b></div>
-        <div className="lp-rline"><span>Premium<small><s>{inr(s.premiumListPrice)}</s> offer</small></span><b>− {inr(s.premiumPrice)}</b></div>
         <div className="lp-total">
-          <b>{inr(r.net)}<span style={{ fontSize: 16, color: "#fff", opacity: 0.7, fontWeight: 600 }}> / month</span></b>
-          {r.multiple ? <span className="lp-badge"><Zap size={14} /> {r.multiple}× your fee</span> : null}
+          <b>{inr(r.gross)}<span style={{ fontSize: 16, color: "#fff", opacity: 0.7, fontWeight: 600 }}> / month</span></b>
+          {r.gross > 0 ? <span className="lp-badge"><Zap size={14} /> {inr(r.gross * 12)} a year</span> : null}
         </div>
       </div>
     </div>
@@ -334,10 +338,14 @@ export default function PartnerLanding() {
   const appPin = useRef(null);
   const appTrack = useRef(null);
   useScrollSlide(appPin, appTrack);
+  const [joining, setJoining] = useState(false);
+  const signup = useMemo(() => ({ label: "Become Partner", start: () => setJoining(true) }), []);
+  useEffect(() => { captureSource(); }, []);
 
   const stats = [[s.statBrokers, "Brokers"], [s.statProperties, "Verified properties"], [s.statRating, "Rating"]];
 
   return (
+    <SignupProvider value={signup}>
     <div className="lp lp--broker">
       <LandingStyles />
       <LandingNav dark product="Partners" ctaClass="lp-btn lp-btn--gold"
@@ -349,10 +357,9 @@ export default function PartnerLanding() {
             <h1 className="lp-h1">More Properties.<br />More Clients.<br /><span className="hl">More Earnings.</span></h1>
             <ul className="lp-checks"><li>Verified inventory</li><li>AI matching</li><li>Broker network</li></ul>
             <div className="lp-ctas">
-              <SignupButton>Join free</SignupButton>
+              <SignupButton />
               <a href="#earnings" className="lp-btn lp-btn--ghost" style={{ color: "#fff" }}>My earnings</a>
             </div>
-            <div className="lp-price" style={{ marginTop: 16 }}>Premium <b>{inr(s.premiumPrice)}/month</b><s>{inr(s.premiumListPrice)}</s></div>
             <div style={{ marginTop: 14 }}><VideoButton url={s.videoBroker} /></div>
           </div>
           <div className="lp-phone-stage">
@@ -403,8 +410,7 @@ export default function PartnerLanding() {
         <div className="lp-wrap">
           <h2 className="lp-h2">FAQs</h2>
           <Faq items={[
-            ["Is it free?", "Yes. Premium unlocks MovEazy inventory with owner contacts."],
-            ["What does Premium cost?", `${inr(s.premiumPrice)}/month (regular ${inr(s.premiumListPrice)}).`],
+            ["Is it free to join?", "Yes. You get the full app to explore right away; Premium unlocks MovEazy inventory with owner contacts, AI curated lists and your groups."],
             ["How much brokerage do I keep?", `${s.propertyShare}% on MovEazy properties, ${s.clientShare}% on MovEazy clients.`],
             ["What is the QR storefront?", "Your own QR poster, free. Print it as an A4 PDF from My QR in the app. Tenants scan it to see all your homes; you see who viewed and who liked what."],
             ["Who sees my listings?", "You choose: only you, your groups, or all MovEazy brokers."],
@@ -415,8 +421,7 @@ export default function PartnerLanding() {
       <section className="lp-sec lp-sec--dark lp-final">
         <div className="lp-wrap">
           <h2 className="lp-h2">Your next deal is <span className="hl">on MovEazy.</span></h2>
-          <div className="lp-ctas" style={{ justifyContent: "center", marginTop: 24 }}><SignupButton>Join free <ArrowRight size={18} /></SignupButton></div>
-          <div className="lp-pricebar"><span>Premium {inr(s.premiumPrice)}/month</span></div>
+          <div className="lp-ctas" style={{ justifyContent: "center", marginTop: 24 }}><SignupButton>Become Partner <ArrowRight size={18} /></SignupButton></div>
         </div>
       </section>
 
@@ -424,7 +429,9 @@ export default function PartnerLanding() {
         links={[["#app", "The app"], ["#qr", "Your QR"], ["#matching", "AI matching"], ["#earnings", "Earnings"], ["#faq", "FAQs"]]}
         other={["https://owners.moveazy.co.in/", "For owners"]} />
 
-      <StickyCta title="Free to join" sub={`Premium ${inr(s.premiumPrice)}/mo`} ctaClass="lp-btn lp-btn--gold" />
+      <StickyCta title="MovEazy Partners" sub="Verified inventory · AI matching" ctaClass="lp-btn lp-btn--gold" />
+      <BecomePartnerSheet open={joining} onClose={() => setJoining(false)} />
     </div>
+    </SignupProvider>
   );
 }

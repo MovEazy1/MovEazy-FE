@@ -82,6 +82,18 @@ export function customerMessage(l, { leadName = "" } = {}) {
   return `${hi}sharing this ${bhkLabel(l)} in ${l?.area || "Bengaluru"}${rent}.\n\nYou can view the full property details here:\n${partnerPropertyLink(l.property_id)}`;
 }
 
+/**
+ * WhatsApp on someone else's listing: ask its lister whether it is still
+ * available and where exactly it is. MovEazy's own stock goes to the team.
+ */
+export function listerWhatsApp(l, fromName = "") {
+  const what = `${bhkLabel(l)} in ${l?.area || "Bengaluru"}${Number(l?.rent) > 0 ? ` (${inr(l.rent)}/month)` : ""}`;
+  const text = `Hi${l?.lister_name && l.source !== "moveazy" ? ` ${String(l.lister_name).split(" ")[0]}` : ""}, is this ${what} still available? `
+    + `Please share the exact location.\n${partnerPropertyLink(l.property_id)}${fromName ? `\n— ${fromName}, via MovEazy Partners` : ""}`;
+  if (l?.source === "moveazy" || !l?.lister_phone) return `https://wa.me/919146969162?text=${encodeURIComponent(text)}`;
+  return waLink(l.lister_phone, text);
+}
+
 /* ── Errors ──────────────────────────────────────────────────────────────── */
 
 function need() {
@@ -133,7 +145,8 @@ export async function fetchPartnerInventory() {
 /** Which tab(s) a row belongs to. A listing shared both ways shows in both. */
 export function inSource(row, source) {
   switch (source) {
-    case "mine": return row.source === "mine";
+    // Closed (rented) listings leave the list; the record stays.
+    case "mine": return row.source === "mine" && row.status !== "rented";
     case "moveazy": return row.source === "moveazy";
     case "broker": return row.source === "broker" && row.on_platform;
     case "group": return row.group_ids.length > 0;
@@ -155,6 +168,8 @@ export async function createPartnerListing(draft, user, sharing) {
     ...buildInventoryRow({ ...draft, postedBy: "broker", phone: user?.phone || draft.phone }, user),
     property_type: draft.propertyType || "",
   };
+  // Furnishing not asked yet (the quick add flow): unknown, not "Unfurnished".
+  if ("furnishing" in draft && !draft.furnishing) row.furnishing = "";
   let propertyId = row.property_id;
   for (let attempt = 0; attempt < 4; attempt++) {
     // `returning` only the id: the full row carries columns a broker may not read back.
@@ -265,20 +280,29 @@ export function inviteMessage(groupName, token, fromName = "") {
 
 /* ── Leads ───────────────────────────────────────────────────────────────── */
 
-const LEAD_COLS = "id,name,phone,status,flat_types,budget_min,budget_max,localities,furnishing,notes,last_contacted_at,created_at,updated_at";
+const LEAD_COLS = "id,name,phone,status,household,gender_pref,flat_types,budget_min,budget_max,localities,furnishing,notes,last_contacted_at,created_at,updated_at";
+
+/** Only the mobile is required: a lead saved without a name reads as "Tenant ··3210". */
+function withName(r) {
+  if (!r || String(r.name || "").trim()) return r;
+  const tail = String(r.phone || "").replace(/\D/g, "").slice(-4);
+  return { ...r, name: tail ? `Tenant ··${tail}` : "Tenant", no_name: true };
+}
 
 export async function fetchLeads() {
   need();
   const { data, error } = await supabase.from("partner_leads").select(LEAD_COLS).order("updated_at", { ascending: false });
   if (error) throw error;
-  return data ?? [];
+  return (data ?? []).map(withName);
 }
 
 function leadRow(f) {
   const num = (v) => (v === "" || v == null || !Number.isFinite(Number(v)) ? null : Number(v));
   return {
-    name: String(f.name || "").trim().slice(0, 120),
+    name: f.no_name ? "" : String(f.name || "").trim().slice(0, 120),
     phone: normalizeIndianMobile(f.phone) || String(f.phone || "").trim().slice(0, 20),
+    household: ["bachelor", "family"].includes(f.household) ? f.household : "",
+    gender_pref: ["male", "female", "coed"].includes(f.gender_pref) ? f.gender_pref : "",
     flat_types: f.flat_types ?? [],
     budget_min: num(f.budget_min),
     budget_max: num(f.budget_max),
@@ -298,7 +322,7 @@ export async function saveLead(f, id = null) {
     : supabase.from("partner_leads").insert(row);
   const { data, error } = await q.select(LEAD_COLS).single();
   if (error) throw error;
-  return data;
+  return withName(data);
 }
 
 export async function patchLead(id, patch) {
@@ -306,7 +330,7 @@ export async function patchLead(id, patch) {
   const { data, error } = await supabase.from("partner_leads")
     .update({ ...patch, updated_at: new Date().toISOString() }).eq("id", id).select(LEAD_COLS).single();
   if (error) throw error;
-  return data;
+  return withName(data);
 }
 
 export async function deleteLead(id) {

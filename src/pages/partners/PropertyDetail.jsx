@@ -4,12 +4,13 @@
  * which answers nothing for a listing the caller may not see or has not unlocked.
  */
 import { useEffect, useMemo, useState } from "react";
-import { Link, useNavigate, useParams } from "react-router-dom";
+import { Link, useNavigate, useParams, useSearchParams } from "react-router-dom";
 import {
-  Calendar, ChevronRight, Crown, ExternalLink, Heart, Lock, MapPin, MoreVertical, Pencil, Phone, Share2, Users,
+  Archive, Calendar, ChevronRight, ClipboardList, Crown, ExternalLink, Heart, Lock, MapPin, MoreVertical, Pencil, Phone, Share2, Users,
 } from "lucide-react";
 import { usePartner } from "./PartnerApp";
 import ShareSheet from "./ShareSheet";
+import PropertyDetailsSheet from "./PropertyDetailsSheet";
 import { MediaItem, listingMedia } from "./partnerMedia";
 import { Avatar, BrokeragePill, Empty, Loading, Sheet, TopBar, WhatsAppIcon, sourceLabel, toast } from "./partnerUi";
 import {
@@ -35,6 +36,13 @@ export default function PropertyDetail() {
   const [menu, setMenu] = useState(false);
   const [contacts, setContacts] = useState(null);
   const [slide, setSlide] = useState(0);
+  const [params, setParams] = useSearchParams();
+  const [details, setDetails] = useState(() => params.get("details") === "1");
+  const [closing, setClosing] = useState(false);
+  const closeDetails = () => {
+    setDetails(false);
+    if (params.get("details")) setParams({}, { replace: true });
+  };
 
   useEffect(() => {
     if (!l || l.locked) { setContacts([]); return; }
@@ -65,7 +73,7 @@ export default function PropertyDetail() {
     try {
       await setListingStatus(l.property_id, status);
       await reloadInventory();
-      toast(status === "published" ? "Listing is live" : `Marked ${status}`);
+      toast(status === "published" ? "Listing is live" : status === "rented" ? "Closed — removed from your list" : `Marked ${status}`);
     } catch (e) {
       toast(friendlyError(e), "error");
     }
@@ -204,6 +212,22 @@ export default function PropertyDetail() {
       </div>
 
       {share && <ShareSheet listing={l} onClose={() => setShare(false)} />}
+      {details && mine && <PropertyDetailsSheet listing={l} onClose={closeDetails} onSaved={reloadInventory} />}
+      {closing && (
+        <Sheet title="Mark as closed?" onClose={() => setClosing(false)}>
+          <div className="pz-pad">
+            <p style={{ margin: "0 0 16px", fontSize: 15, lineHeight: 1.55 }}>
+              The deal is done? Closing removes this property from your list, for easier management. It comes off MovEazy for tenants
+              and other brokers too — MovEazy keeps the record.
+            </p>
+            <button type="button" className="pz-btn pz-btn--primary pz-btn--block"
+              onClick={async () => { setClosing(false); await changeStatus("rented"); navigate(pp("/"), { replace: true }); }}>
+              Yes, mark as closed
+            </button>
+            <button type="button" className="pz-btn pz-btn--ghost" style={{ width: "100%", marginTop: 8 }} onClick={() => setClosing(false)}>Keep it</button>
+          </div>
+        </Sheet>
+      )}
       {menu && (
         <Sheet title="Property actions" onClose={() => setMenu(false)}>
           {mine && (
@@ -211,8 +235,15 @@ export default function PropertyDetail() {
               <Pencil size={18} /> <span>Edit sharing, brokerage & contacts</span>
             </button>
           )}
+          {mine && (
+            <button type="button" className="pz-menurow" onClick={() => { setMenu(false); setDetails(true); }}>
+              <ClipboardList size={18} /> <span>Add more details</span>
+            </button>
+          )}
           {mine && l.status !== "rented" && (
-            <button type="button" className="pz-menurow" onClick={() => changeStatus("rented")}>Mark as rented</button>
+            <button type="button" className="pz-menurow" onClick={() => { setMenu(false); setClosing(true); }}>
+              <Archive size={18} /> <span>Mark as closed</span>
+            </button>
           )}
           {mine && l.status === "published" && (
             <button type="button" className="pz-menurow" onClick={() => changeStatus("paused")}>Pause listing</button>

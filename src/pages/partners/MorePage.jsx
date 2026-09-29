@@ -1,7 +1,7 @@
 /** More — profile, QR poster, plan, saved, help, activity. */
 import { useState } from "react";
 import { Link } from "react-router-dom";
-import { Bookmark, ChevronRight, Crown, HelpCircle, LayoutDashboard, LogOut, Pencil, QrCode } from "lucide-react";
+import { Bookmark, ChevronRight, Crown, Eye, Gift, HelpCircle, LayoutDashboard, LogOut, Pencil, QrCode, TrendingUp } from "lucide-react";
 import { useAuth } from "../../context/AuthContext";
 import { usePartner } from "./PartnerApp";
 import { Avatar, Sheet, TopBar, WhatsAppIcon, formatPhone, toast } from "./partnerUi";
@@ -41,7 +41,7 @@ function EditProfile({ partner, onClose, onSaved }) {
 
 export default function MorePage() {
   const { logout } = useAuth();
-  const { me, reloadMe, inventory, leads, groups, saved } = usePartner();
+  const { me, reloadMe, inventory, leads, groups, saved, demo, status } = usePartner();
   const [edit, setEdit] = useState(false);
   const p = me?.partner;
   const mine = (inventory ?? []).filter((l) => l.source === "mine");
@@ -76,12 +76,19 @@ export default function MorePage() {
 
         <div className="pz-card" style={{ marginBottom: 12 }}>
           {row(pp("/qr"), <QrCode size={19} color="var(--g)" />, "My QR poster", "Print it · see who viewed and liked your flats")}
-          {row(pp("/premium"), <Crown size={19} color="var(--g)" />, premium ? "MovEazy Premium — active" : "Get MovEazy Premium",
-            premium ? "Full MovEazy inventory unlocked" : "Unlock 1000+ listings updated daily")}
+          {row(pp("/premium"), <Crown size={19} color="#8A6419" />, premium ? "MovEazy Premium — active" : "Join Premium",
+            premium ? `Plans${status?.plan?.until ? ` · till ${new Date(status.plan.until).toLocaleDateString("en-IN", { day: "numeric", month: "short" })}` : ""}` : "Unlock 1000+ listings, AI matching and groups")}
+          {premium && row(pp("/referrals"), <Gift size={19} color="#8A6419" />, "Refer & Earn ₹1,500", "Per broker who joins with your link")}
           {row(pp("/saved"), <Bookmark size={19} />, "Saved properties", `${saved.size} saved`)}
           {row(`${MOVEAZY_TEAM_WHATSAPP}?text=${encodeURIComponent("Hi MovEazy, I need help with the partner app.")}`,
             <HelpCircle size={19} />, "Help", "Chat with the MovEazy team", true)}
           {me?.staff && row(`${isPartnerHost() ? PUBLIC_ORIGIN : ""}/crm/brokers`, <LayoutDashboard size={19} />, "Open CRM", "Partners, approvals and premium", true)}
+          {me?.staff && row(pp("/sales-funnel"), <TrendingUp size={19} />, "Sales funnel", "Sign-ups, payments, referrals")}
+          {me?.staff && (
+            <a className="pz-menurow" href={`${pp("/")}?demo=${demo ? "0" : "1"}`}>
+              <Eye size={19} /><span style={{ flex: 1 }}>{demo ? "Leave demo preview" : "Preview demo mode"}<span className="pz-sub">What a broker without a plan sees</span></span>
+            </a>
+          )}
         </div>
 
         <div className="pz-card">

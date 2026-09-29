@@ -1,9 +1,14 @@
-/** PRD 08 — the lead book. No chat, no pipeline: All / Active / Closed. */
+/**
+ * PRD 08 — the lead book. No chat, no pipeline: All / Active / Closed.
+ * Every lead has AI matching one tap away. In demo mode sample tenants sit
+ * alongside the partner's own, and premium buttons explain themselves.
+ */
 import { useMemo, useState } from "react";
 import { Link } from "react-router-dom";
-import { Plus, Search } from "lucide-react";
+import { Plus, Search, Sparkles } from "lucide-react";
 import { usePartner } from "./PartnerApp";
 import { Avatar, Empty, TopBar, WhatsAppIcon } from "./partnerUi";
+import { DEMO_LEADS, DemoBanner } from "./demoMode";
 import { lastContactedLabel, requirementLine } from "./leadBits";
 import { patchLead, pp, waLink } from "../../lib/partners";
 import { hasRequirement, matchesForLead } from "../../lib/partnerMatch";
@@ -11,7 +16,8 @@ import { hasRequirement, matchesForLead } from "../../lib/partnerMatch";
 const TABS = [["all", "All"], ["active", "Active"], ["closed", "Closed"]];
 
 export default function LeadsList() {
-  const { leads, setLeads, inventory } = usePartner();
+  const { leads: realLeads, setLeads, inventory, demo, explain } = usePartner();
+  const leads = useMemo(() => (demo ? [...realLeads, ...DEMO_LEADS] : realLeads), [demo, realLeads]);
   const [tab, setTab] = useState("active");
   const [q, setQ] = useState("");
 
@@ -27,7 +33,7 @@ export default function LeadsList() {
     return leads.filter((l) => {
       if (tab !== "all" && l.status !== tab) return false;
       if (!needle) return true;
-      return l.name.toLowerCase().includes(needle) || (digits.length >= 3 && String(l.phone).includes(digits));
+      return String(l.name || "").toLowerCase().includes(needle) || (digits.length >= 3 && String(l.phone).includes(digits));
     });
   }, [leads, tab, q]);
 
@@ -38,7 +44,8 @@ export default function LeadsList() {
   };
 
   const whatsapp = async (lead) => {
-    window.open(waLink(lead.phone, `Hi ${lead.name.split(" ")[0]}, `), "_blank", "noopener");
+    if (lead.demo) { explain("lead_whatsapp"); return; }
+    window.open(waLink(lead.phone, `Hi ${String(lead.name || "").split(" ")[0] || "there"}, `), "_blank", "noopener");
     try {
       const row = await patchLead(lead.id, { last_contacted_at: new Date().toISOString() });
       setLeads((ls) => ls.map((x) => (x.id === row.id ? row : x)));
@@ -65,6 +72,7 @@ export default function LeadsList() {
         ))}
       </div>
       <div className="pz-pad">
+        {demo && <DemoBanner>Sample tenants are mixed in with yours.</DemoBanner>}
         {rows.length === 0 ? (
           <Empty action={<Link to={pp("/leads/new")} className="pz-btn pz-btn--primary"><Plus size={16} /> Add lead</Link>}>
             {leads.length ? "No leads match." : "Add your first customer — a name and mobile is enough."}
@@ -76,8 +84,9 @@ export default function LeadsList() {
               return (
                 <div key={lead.id} className="pz-row" style={{ padding: 14, alignItems: "flex-start", borderTop: i ? "1px solid var(--line)" : 0 }}>
                   <Avatar name={lead.name} size="lg" />
-                  <Link to={pp(`/leads/${lead.id}`)} style={{ flex: 1, minWidth: 0, color: "inherit", textDecoration: "none" }}>
-                    <strong style={{ display: "block", fontSize: 16 }}>{lead.name}</strong>
+                  <Link to={pp(`/leads/${lead.id}`)} onClick={lead.demo ? (e) => { e.preventDefault(); explain("ai_match"); } : undefined}
+                    style={{ flex: 1, minWidth: 0, color: "inherit", textDecoration: "none" }}>
+                    <strong style={{ display: "block", fontSize: 16 }}>{lead.name}{lead.demo && <span className="pz-pill pz-pill--grey" style={{ marginLeft: 6, fontSize: 11 }}>Sample</span>}</strong>
                     {requirementLine(lead) && <span style={{ display: "block", fontSize: 14 }}>{requirementLine(lead)}</span>}
                     {(lead.localities ?? []).length > 0 && <span className="pz-meta" style={{ display: "block" }}>{lead.localities.join(", ")}</span>}
                     <span style={{ display: "block", color: "var(--g)", fontWeight: 600, fontSize: 13.5, marginTop: 2 }}>
@@ -90,7 +99,11 @@ export default function LeadsList() {
                       style={{ background: "#22C55E", color: "#fff", borderRadius: 999, width: 34, height: 34 }}>
                       <WhatsAppIcon size={18} />
                     </button>
-                    <Link to={pp(`/leads/${lead.id}/matches`)} className="pz-btn pz-btn--sm pz-btn--soft">View Matches</Link>
+                    {demo ? (
+                      <button type="button" className="pz-btn pz-btn--sm pz-btn--soft" onClick={() => explain("ai_match")}><Sparkles size={14} /> AI matching</button>
+                    ) : (
+                      <Link to={pp(`/leads/${lead.id}/matches`)} className="pz-btn pz-btn--sm pz-btn--soft"><Sparkles size={14} /> AI matching</Link>
+                    )}
                   </div>
                 </div>
               );

@@ -6,8 +6,10 @@
  * creates a Property or a Lead; WhatsApp is always an external hand-off.
  *
  * The gate, in order:
- *   signed out            → sign in with Google (the join page shows who invited you)
- *   no mobile on file     → the site-wide RequirePhoneModal asks for it
+ *   signed out            → the landing page; "Become Partner" takes the mobile
+ *                           number first, then Google (lib/partnerSignup.js)
+ *   no mobile on file     → the number from Become Partner is saved to the
+ *                           account; otherwise the site-wide RequirePhoneModal asks
  *   not yet a partner     → registered automatically (partner_register)
  *   pending               → a holding screen, until the CRM approves
  *                           (auto-approve is on by default, so usually never)
@@ -16,14 +18,17 @@
  * clears, so "tap link → Google → number → you're in the group" is one flow.
  */
 import { createContext, lazy, Suspense, useCallback, useContext, useEffect, useMemo, useRef, useState } from "react";
-import { Navigate, Route, Routes, useNavigate } from "react-router-dom";
+import { Navigate, Route, Routes, useLocation, useNavigate } from "react-router-dom";
 import { Clock, ShieldOff } from "lucide-react";
 import { useAuth } from "../../context/AuthContext";
 import {
   acceptInvite, fetchLeads, fetchMyGroups, fetchPartnerInventory, fetchPartnerMe, fetchSavedIds, friendlyError,
-  pp, registerPartner, toggleSaved,
+  hasPremium, pp, registerPartner, toggleSaved,
 } from "../../lib/partners";
+import { fetchPartnerStatus } from "../../lib/partnerPlans";
+import { JoinPremiumBar, PremiumExplainer } from "./demoMode";
 import { MOVEAZY_TEAM_WHATSAPP } from "../../config/contactChannels";
+import { clearPendingSignup, pendingSignupPhone, stampPartnerSignup } from "../../lib/partnerSignup";
 import { BottomNav, CreateSheet, Loading, PartnerStyles, ToastHost, WhatsAppIcon, toast } from "./partnerUi";
 import PartnerLanding from "./PartnerLanding";
 
@@ -43,6 +48,10 @@ const PremiumPage = lazy(() => import("./PremiumPage"));
 const MyQrPage = lazy(() => import("./MyQrPage"));
 const SavedPage = lazy(() => import("./SavedPage"));
 const JoinPage = lazy(() => import("./JoinPage"));
+const PaymentReturn = lazy(() => import("./PremiumJourney").then((m) => ({ default: m.PaymentReturn })));
+const WelcomePremium = lazy(() => import("./PremiumJourney").then((m) => ({ default: m.WelcomePremium })));
+const ReferralsPage = lazy(() => import("./PremiumJourney").then((m) => ({ default: m.ReferralsPage })));
+const SalesFunnel = lazy(() => import("./SalesFunnel"));
 
 const PartnerContext = createContext(null);
 export const usePartner = () => useContext(PartnerContext);
@@ -76,8 +85,30 @@ function teamWa(text) {
 }
 
 /** Everything after the gate: shared data, nav, routes. */
+// Screens where the sticky Join Premium button would be in the way.
+const NO_BAR = /^\/(premium|welcome|referrals|add|leads\/new|leads\/[^/]+\/edit|property\/[^/]+\/(sharing|contacts))/;
+
 function PartnerWorkspace({ me, reloadMe }) {
   const navigate = useNavigate();
+  const { pathname } = useLocation();
+  const [status, setStatus] = useState(null);
+  const [explaining, setExplaining] = useState(null);
+  // No plan, not staff: the app runs on sample data and premium buttons explain themselves.
+  // Staff can preview that with ?demo=1 (and turn it off with ?demo=0) — remembered on this device.
+  const [previewDemo] = useState(() => {
+    try {
+      const q = new URLSearchParams(window.location.search).get("demo");
+      if (q === "1" || q === "0") localStorage.setItem("mz_demo_preview", q);
+      return localStorage.getItem("mz_demo_preview") === "1";
+    } catch {
+      return false;
+    }
+  });
+  const demo = me?.staff ? previewDemo : !hasPremium(me);
+  const explain = useCallback((what) => setExplaining(what), []);
+  const reloadStatus = useCallback(async () => {
+    try { setStatus(await fetchPartnerStatus()); } catch { /* keep what we had */ }
+  }, []);
   const [inventory, setInventory] = useState(null);
   const [invError, setInvError] = useState("");
   const [groups, setGroups] = useState([]);
@@ -114,8 +145,15 @@ function PartnerWorkspace({ me, reloadMe }) {
     reloadInventory();
     reloadGroups();
     reloadLeads();
+    reloadStatus();
     fetchSavedIds().then(setSaved);
-  }, [reloadInventory, reloadGroups, reloadLeads]);
+  }, [reloadInventory, reloadGroups, reloadLeads, reloadStatus]);
+
+  // A plan just started: the congratulations page, once.
+  const rel = pathname.slice(pp("/").replace(/\/$/, "").length) || "/";
+  useEffect(() => {
+    if (status?.congrats_due && !rel.startsWith("/welcome") && !rel.startsWith("/premium/return")) navigate(pp("/welcome"));
+  }, [status?.congrats_due, rel, navigate]);
 
   // An invite opened before sign-in is redeemed here, once.
   const redeemed = useRef(false);
@@ -154,13 +192,14 @@ function PartnerWorkspace({ me, reloadMe }) {
 
   const value = useMemo(() => ({
     me, reloadMe, inventory, invError, reloadInventory, byId, groups, reloadGroups, leads, setLeads, reloadLeads,
-    saved, toggleSave, ui, setUi,
+    saved, toggleSave, ui, setUi, status, reloadStatus, demo, explain,
   }), [me, reloadMe, inventory, invError, reloadInventory, byId, groups, reloadGroups, leads, reloadLeads, saved,
-    toggleSave, ui, setUi]);
+    toggleSave, ui, setUi, status, reloadStatus, demo, explain]);
+  const showBar = demo && !NO_BAR.test(rel);
 
   return (
     <PartnerContext.Provider value={value}>
-      <div className="pz-col">
+      <div className="pz-col" style={showBar ? { paddingBottom: "calc(140px + env(safe-area-inset-bottom))" } : undefined}>
         <Suspense fallback={<Loading />}>
           <Routes>
             <Route index element={<InventoryHome />} />
@@ -177,25 +216,45 @@ function PartnerWorkspace({ me, reloadMe }) {
             <Route path="groups/:id" element={<GroupDetail />} />
             <Route path="more" element={<MorePage />} />
             <Route path="premium" element={<PremiumPage />} />
+            <Route path="premium/return" element={<PaymentReturn />} />
+            <Route path="welcome" element={<WelcomePremium />} />
+            <Route path="referrals" element={<ReferralsPage />} />
             <Route path="qr" element={<MyQrPage />} />
             <Route path="saved" element={<SavedPage />} />
             <Route path="*" element={<Navigate to={pp("/")} replace />} />
           </Routes>
         </Suspense>
-        <BottomNav onPlus={() => setPlusOpen(true)} />
+        {!rel.startsWith("/welcome") && <BottomNav onPlus={() => setPlusOpen(true)} />}
+        {showBar && <JoinPremiumBar />}
         {plusOpen && <CreateSheet onClose={() => setPlusOpen(false)} />}
+        <PremiumExplainer what={explaining} onClose={() => setExplaining(null)} />
       </div>
     </PartnerContext.Provider>
   );
 }
 
 function Gate() {
-  const { user, loading } = useAuth();
+  const { user, loading, updateUserProfile } = useAuth();
   const [me, setMe] = useState(null);
   const [state, setState] = useState("idle"); // idle | loading | need_phone | ready | error
   const [error, setError] = useState("");
 
   const hasPhone = Boolean(String(user?.phone || "").trim());
+  const stamped = useRef(false);
+  const applying = useRef(false);
+
+  // Back from Google after "Become Partner": the number they gave is the account's.
+  useEffect(() => {
+    if (loading || !user?.uid) return;
+    if (hasPhone) { clearPendingSignup(); return; }
+    const phone = pendingSignupPhone();
+    if (!phone || applying.current) return;
+    applying.current = true;
+    updateUserProfile(user.name || "", phone).then((r) => {
+      if (r?.success) clearPendingSignup();
+      else applying.current = false;
+    });
+  }, [loading, user?.uid, user?.name, hasPhone, updateUserProfile]);
 
   const load = useCallback(async () => {
     setState((s) => (s === "ready" ? s : "loading"));
@@ -204,6 +263,10 @@ function Gate() {
       if (!m?.partner) {
         await registerPartner({ name: user?.name });
         m = await fetchPartnerMe();
+      }
+      if (!stamped.current) {
+        stamped.current = true;
+        await stampPartnerSignup();
       }
       setMe(m);
       setState("ready");
@@ -274,6 +337,8 @@ export default function PartnerApp() {
         <Routes>
           {/* The join page renders before the gate so a signed-out invitee sees who invited them. */}
           <Route path="join/:token" element={<JoinGate />} />
+          {/* Internal: the broker sales funnel, for MovEazy staff. */}
+          <Route path="sales-funnel/*" element={<SalesFunnel />} />
           <Route path="*" element={<Gate />} />
         </Routes>
       </Suspense>

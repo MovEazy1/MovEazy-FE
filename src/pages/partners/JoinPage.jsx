@@ -11,6 +11,7 @@ import { Users } from "lucide-react";
 import { previewInvite, pp } from "../../lib/partners";
 import { GoogleButton } from "./PartnerWelcome";
 import { INVITE_KEY } from "./PartnerApp";
+import { captureSource } from "../../lib/partnerSignup";
 import logo from "../../assets/logo/moveazy-logo-light.png";
 
 export default function JoinPage({ redirectWhenReady = false }) {
@@ -19,6 +20,7 @@ export default function JoinPage({ redirectWhenReady = false }) {
 
   useEffect(() => {
     try { sessionStorage.setItem(INVITE_KEY, token); } catch { /* private tab: joining still works signed in */ }
+    captureSource("group_invite");
   }, [token]);
 
   useEffect(() => {

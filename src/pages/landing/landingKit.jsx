@@ -6,7 +6,7 @@
  * two pages share structure but not colour. Responsive from 360px phones to
  * wide desktops; the page is a marketing page, not the phone-width app shell.
  */
-import { useEffect, useState } from "react";
+import { createContext, useContext, useEffect, useState } from "react";
 import { ArrowRight, Minus, Play, Plus, X } from "lucide-react";
 // The official wordmark, as the main site's nav uses it: the mint pair has a
 // transparent ground (the red "dark" file carries a black plate).
@@ -283,10 +283,26 @@ export function LandingStyles() {
  * The one call to action on both pages: Google sign-in, which returns to this
  * same URL, where the app's gate takes over (phone number, then the app).
  */
-export function SignupButton({ children = "Join free", className = "lp-btn lp-btn--gold", icon = true }) {
+/**
+ * A page can take over its sign-up: `label` replaces "Join free" on every
+ * call to action and `start()` runs instead of going straight to Google (the
+ * partners page asks for a mobile number first). "Sign in" stays Google.
+ */
+const SignupCtx = createContext(null);
+export const SignupProvider = SignupCtx.Provider;
+const useSignupLabel = () => useContext(SignupCtx)?.label || "Join free";
+
+export function SignupButton({ children, className = "lp-btn lp-btn--gold", icon = true, signIn = false }) {
   const { loginWithGoogle } = useAuth();
+  const custom = useContext(SignupCtx);
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState("");
+  const label = children ?? custom?.label ?? "Join free";
+  if (custom?.start && !signIn) {
+    return (
+      <button type="button" className={className} onClick={custom.start}>{label}</button>
+    );
+  }
   const go = async () => {
     setBusy(true);
     setErr("");
@@ -308,7 +324,7 @@ export function SignupButton({ children = "Join free", className = "lp-btn lp-bt
             <path fill="#1976D2" d="M43.6 20.5H42V20H24v8h11.3c-.8 2.2-2.2 4.2-4.1 5.6l6.2 5.2C37 39.2 44 34 44 24c0-1.3-.1-2.4-.4-3.5z" />
           </svg>
         )}
-        {busy ? "Opening Google…" : children}
+        {busy ? "Opening Google…" : label}
       </button>
       {err && <span className="lp-err" role="alert">{err}</span>}
     </span>
@@ -373,6 +389,7 @@ export function AppLogo({ height = 26 }) {
 /** The header: brand, section links, sign in and the one call to action. Solidifies on scroll. */
 export function LandingNav({ product, links, dark, ctaClass }) {
   const scrolled = useScrolledPast(8);
+  const cta = useSignupLabel();
   return (
     <nav className={`lp-nav${dark ? " lp-nav--dark" : ""}${scrolled ? " is-scrolled" : ""}`}>
       <div className="lp-wrap">
@@ -380,8 +397,8 @@ export function LandingNav({ product, links, dark, ctaClass }) {
         <div className="lp-links">{links.map(([href, label]) => <a key={href} href={href}>{label}</a>)}</div>
         <span className="lp-spacer" />
         <div className="lp-navcta">
-          <SignupButton className="lp-signin" icon={false}>Sign in</SignupButton>
-          <SignupButton className={`${ctaClass} lp-btn--sm`} icon={false}>Join free <ArrowRight size={16} /></SignupButton>
+          <SignupButton className="lp-signin" icon={false} signIn>Sign in</SignupButton>
+          <SignupButton className={`${ctaClass} lp-btn--sm`} icon={false}>{cta} <ArrowRight size={16} /></SignupButton>
         </div>
       </div>
     </nav>
@@ -391,10 +408,11 @@ export function LandingNav({ product, links, dark, ctaClass }) {
 /** Phones only: a floating sign-up bar that appears once the hero's own button has scrolled away. */
 export function StickyCta({ title, sub, ctaClass }) {
   const on = useScrolledPast(560);
+  const cta = useSignupLabel();
   return (
     <div className={`lp-sticky${on ? " is-on" : ""}`} aria-hidden={!on}>
       <div className="lp-sticky-txt"><b>{title}</b>{sub}</div>
-      <SignupButton className={ctaClass}>Join free</SignupButton>
+      <SignupButton className={ctaClass}>{cta}</SignupButton>
     </div>
   );
 }

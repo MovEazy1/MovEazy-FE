@@ -23,6 +23,8 @@ const num = (v) => (v === null || v === undefined || v === "" || !Number.isFinit
 /** "2 BHK" → 2, "1 RK" → 0.5, "Villa" → null. */
 export function bedroomsOf(label) {
   const s = norm(label);
+  // A room in a flat someone already lives in: its own size, below a 1 RK.
+  if (/\broom\b/.test(s)) return 0.25;
   if (/\brk\b/.test(s)) return 0.5;
   const m = /(\d+)\s*\+?\s*bhk/.exec(s);
   return m ? Number(m[1]) : null;
