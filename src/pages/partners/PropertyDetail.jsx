@@ -11,6 +11,7 @@ import {
 import { usePartner } from "./PartnerApp";
 import ShareSheet from "./ShareSheet";
 import PropertyDetailsSheet from "./PropertyDetailsSheet";
+import { decideSoldOut, markSoldOut } from "../../lib/partnerCurated";
 import { MediaItem, listingMedia } from "./partnerMedia";
 import { Avatar, BrokeragePill, Empty, Loading, Sheet, TopBar, WhatsAppIcon, sourceLabel, toast } from "./partnerUi";
 import {
@@ -30,7 +31,7 @@ function mapsUrl(l) {
 export default function PropertyDetail() {
   const { id } = useParams();
   const navigate = useNavigate();
-  const { me, inventory, byId, saved, toggleSave, leads, setLeads, groups, reloadInventory } = usePartner();
+  const { me, inventory, byId, saved, toggleSave, leads, setLeads, groups, reloadInventory, demo, explain } = usePartner();
   const l = byId.get(id);
   const [share, setShare] = useState(false);
   const [menu, setMenu] = useState(false);
@@ -39,6 +40,26 @@ export default function PropertyDetail() {
   const [params, setParams] = useSearchParams();
   const [details, setDetails] = useState(() => params.get("details") === "1");
   const [closing, setClosing] = useState(false);
+  const [soldOut, setSoldOut] = useState(false);
+  const flagSoldOut = async () => {
+    setSoldOut(false);
+    try {
+      await markSoldOut(id);
+      await reloadInventory();
+      toast("Flagged — MovEazy and the listing broker are told");
+    } catch (e) {
+      toast(friendlyError(e, "Could not flag it."), "error");
+    }
+  };
+  const decide = async (approve) => {
+    try {
+      await decideSoldOut(id, approve);
+      await reloadInventory();
+      toast(approve ? "Marked sold out" : "Kept available");
+    } catch (e) {
+      toast(friendlyError(e), "error");
+    }
+  };
   const closeDetails = () => {
     setDetails(false);
     if (params.get("details")) setParams({}, { replace: true });
@@ -116,6 +137,20 @@ export default function PropertyDetail() {
       </div>
 
       <div className="pz-pad">
+        {l.rent_flag === "potentially_rented" && (
+          <div className="pz-section" style={{ background: "#FFF7ED", borderColor: "#FED7AA", marginTop: 8 }}>
+            <strong style={{ color: "#9A3412" }}>Potentially rented</strong>
+            <p className="pz-meta" style={{ margin: "4px 0 0" }}>
+              {mine ? "A broker in your group says this flat is taken. Confirm to mark it sold out, or keep it available." : "A broker flagged this as taken; the listing broker is confirming."}
+            </p>
+            {mine && (
+              <div className="pz-actions">
+                <button type="button" className="pz-btn pz-btn--primary" onClick={() => decide(true)}>Mark sold out</button>
+                <button type="button" className="pz-btn" onClick={() => decide(false)}>Still available</button>
+              </div>
+            )}
+          </div>
+        )}
         <h2 style={{ fontSize: 21, margin: "4px 0 2px" }}>{bhkLabel(l)} in {l.area || "Bengaluru"}</h2>
         <div className="pz-rent">{inr(l.rent)} <small>/ month</small></div>
         <div className="pz-meta" style={{ margin: "2px 0 10px" }}>
@@ -213,6 +248,17 @@ export default function PropertyDetail() {
 
       {share && <ShareSheet listing={l} onClose={() => setShare(false)} />}
       {details && mine && <PropertyDetailsSheet listing={l} onClose={closeDetails} onSaved={reloadInventory} />}
+      {soldOut && (
+        <Sheet title="Mark sold out?" onClose={() => setSoldOut(false)}>
+          <div className="pz-pad">
+            <p style={{ margin: "0 0 16px", fontSize: 15, lineHeight: 1.55 }}>
+              It shows as “potentially rented” for everyone until the listing broker confirms. MovEazy and the listing broker are notified.
+            </p>
+            <button type="button" className="pz-btn pz-btn--primary pz-btn--block" onClick={flagSoldOut}>Yes, it’s rented</button>
+            <button type="button" className="pz-btn pz-btn--ghost" style={{ width: "100%", marginTop: 8 }} onClick={() => setSoldOut(false)}>Cancel</button>
+          </div>
+        </Sheet>
+      )}
       {closing && (
         <Sheet title="Mark as closed?" onClose={() => setClosing(false)}>
           <div className="pz-pad">
@@ -254,6 +300,11 @@ export default function PropertyDetail() {
           <a className="pz-menurow" href={partnerPropertyLink(id, "open")} target="_blank" rel="noreferrer">
             <ExternalLink size={18} /> <span>Open public page</span>
           </a>
+          {!mine && l.status === "published" && l.rent_flag !== "potentially_rented" && (
+            <button type="button" className="pz-menurow" onClick={() => { setMenu(false); if (demo) explain("sold_out"); else setSoldOut(true); }}>
+              <Archive size={18} /> <span>Mark sold out</span>
+            </button>
+          )}
           {!mine && (
             <a className="pz-menurow" target="_blank" rel="noreferrer"
               href={`${MOVEAZY_TEAM_WHATSAPP}?text=${encodeURIComponent(`Reporting ${id} on MovEazy Partners — duplicate / no longer available / wrong details:`)}`}>

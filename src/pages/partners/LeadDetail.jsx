@@ -1,9 +1,10 @@
 /** PRD 10 — a lead is a requirement to map onto inventory, not a conversation. */
 import { useMemo } from "react";
 import { Link, useParams } from "react-router-dom";
-import { Building2, IndianRupee, MapPin, Phone } from "lucide-react";
+import { Building2, IndianRupee, MapPin, Phone, Sparkles } from "lucide-react";
 import { usePartner } from "./PartnerApp";
 import { Avatar, Empty, Loading, PropertyCard, TopBar, WhatsAppIcon, formatPhone, toast } from "./partnerUi";
+import { LeadCuratedLists } from "./PartnerInbox";
 import { budgetLabel, lastContactedLabel } from "./leadBits";
 import { customerMessage, friendlyError, patchLead, pp, waLink } from "../../lib/partners";
 import { hasRequirement, matchesForLead } from "../../lib/partnerMatch";
@@ -22,7 +23,7 @@ export function useSendToLead(lead) {
 
 export default function LeadDetail() {
   const { id } = useParams();
-  const { leads, inventory, setLeads, saved, toggleSave } = usePartner();
+  const { leads, inventory, setLeads, saved, toggleSave, demo, explain } = usePartner();
   const lead = leads.find((l) => l.id === id);
   const matches = useMemo(() => (lead ? matchesForLead(lead, inventory ?? []) : []), [lead, inventory]);
   const send = useSendToLead(lead || { id, name: "", phone: "" });
@@ -70,6 +71,14 @@ export default function LeadDetail() {
             <Link to={pp(`/leads/${id}/edit`)} className="pz-btn pz-btn--soft" style={{ width: "100%" }}>Add BHK, budget and locations</Link>
           )}
         </div>
+
+        {hasRequirement(lead) && (
+          <Link to={pp(`/leads/${id}/matches`)} onClick={demo ? (e) => { e.preventDefault(); explain("ai_match"); } : undefined}
+            className="pz-btn pz-btn--primary pz-btn--block" style={{ marginBottom: 12 }}>
+            <Sparkles size={18} /> AI matching · send a curated list
+          </Link>
+        )}
+        {!demo && <LeadCuratedLists leadId={lead.id} />}
 
         <div className="pz-between" style={{ margin: "4px 0 10px" }}>
           <h2 style={{ fontSize: 16, margin: 0 }}>Matching Properties{hasRequirement(lead) ? ` (${matches.length})` : ""}</h2>

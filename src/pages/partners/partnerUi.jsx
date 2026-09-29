@@ -258,7 +258,9 @@ export function PropertyCard({ listing: l, saved, onToggleSave, onWhatsApp, extr
       <div className="pz-prop-img" onClick={open} role="link" tabIndex={-1} style={{ cursor: "pointer" }}>
         <SmartListingImage listing={l} />
         <span className="pz-prop-badge">
-          {available
+          {l.rent_flag === "potentially_rented"
+            ? <span className="pz-pill" style={{ background: "#FFEDD5", color: "#9A3412" }}>Potentially rented</span>
+            : available
             ? <span className="pz-pill pz-pill--solid">Available</span>
             : <span className="pz-pill pz-pill--grey" style={{ textTransform: "capitalize" }}>{l.status}</span>}
         </span>

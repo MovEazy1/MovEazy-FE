@@ -27,6 +27,7 @@ import {
 } from "../../lib/partners";
 import { fetchPartnerStatus } from "../../lib/partnerPlans";
 import { JoinPremiumBar, PremiumExplainer } from "./demoMode";
+import { useUnreadCount } from "./PartnerInbox";
 import { MOVEAZY_TEAM_WHATSAPP } from "../../config/contactChannels";
 import { clearPendingSignup, pendingSignupPhone, stampPartnerSignup } from "../../lib/partnerSignup";
 import { BottomNav, CreateSheet, Loading, PartnerStyles, ToastHost, WhatsAppIcon, toast } from "./partnerUi";
@@ -52,6 +53,8 @@ const PaymentReturn = lazy(() => import("./PremiumJourney").then((m) => ({ defau
 const WelcomePremium = lazy(() => import("./PremiumJourney").then((m) => ({ default: m.WelcomePremium })));
 const ReferralsPage = lazy(() => import("./PremiumJourney").then((m) => ({ default: m.ReferralsPage })));
 const SalesFunnel = lazy(() => import("./SalesFunnel"));
+const NotificationsPage = lazy(() => import("./PartnerInbox").then((m) => ({ default: m.NotificationsPage })));
+const CuratedListPage = lazy(() => import("./PartnerInbox").then((m) => ({ default: m.CuratedListPage })));
 
 const PartnerContext = createContext(null);
 export const usePartner = () => useContext(PartnerContext);
@@ -106,6 +109,7 @@ function PartnerWorkspace({ me, reloadMe }) {
   });
   const demo = me?.staff ? previewDemo : !hasPremium(me);
   const explain = useCallback((what) => setExplaining(what), []);
+  const unread = useUnreadCount(!demo);
   const reloadStatus = useCallback(async () => {
     try { setStatus(await fetchPartnerStatus()); } catch { /* keep what we had */ }
   }, []);
@@ -192,9 +196,9 @@ function PartnerWorkspace({ me, reloadMe }) {
 
   const value = useMemo(() => ({
     me, reloadMe, inventory, invError, reloadInventory, byId, groups, reloadGroups, leads, setLeads, reloadLeads,
-    saved, toggleSave, ui, setUi, status, reloadStatus, demo, explain,
+    saved, toggleSave, ui, setUi, status, reloadStatus, demo, explain, unread,
   }), [me, reloadMe, inventory, invError, reloadInventory, byId, groups, reloadGroups, leads, reloadLeads, saved,
-    toggleSave, ui, setUi, status, reloadStatus, demo, explain]);
+    toggleSave, ui, setUi, status, reloadStatus, demo, explain, unread]);
   const showBar = demo && !NO_BAR.test(rel);
 
   return (
@@ -219,6 +223,8 @@ function PartnerWorkspace({ me, reloadMe }) {
             <Route path="premium/return" element={<PaymentReturn />} />
             <Route path="welcome" element={<WelcomePremium />} />
             <Route path="referrals" element={<ReferralsPage />} />
+            <Route path="notifications" element={<NotificationsPage />} />
+            <Route path="curated/:id" element={<CuratedListPage />} />
             <Route path="qr" element={<MyQrPage />} />
             <Route path="saved" element={<SavedPage />} />
             <Route path="*" element={<Navigate to={pp("/")} replace />} />

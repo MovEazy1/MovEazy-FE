@@ -35,6 +35,7 @@ const HowItWorks = lazy(() => import("./pages/HowItWorks"));
 const About = lazy(() => import("./pages/About"));
 const Terms = lazy(() => import("./pages/Terms"));
 const Storefront = lazy(() => import("./pages/Storefront"));
+const CuratedSwipe = lazy(() => import("./pages/CuratedSwipe"));
 const TenantPreview = lazy(() => import("./pages/tenant/TenantPreview"));
 const TenantProfilePage = lazy(() => import("./pages/tenant/TenantProfilePage"));
 const Privacy = lazy(() => import("./pages/Privacy"));
@@ -58,6 +59,7 @@ const CrmPipelinePage = lazy(() => import("./pages/crm/CrmPipelinePage"));
 const CrmPropertiesPage = lazy(() => import("./pages/crm/CrmPropertiesPage"));
 const CrmPropertyForm = lazy(() => import("./pages/crm/CrmPropertyForm"));
 const CrmBrokersPage = lazy(() => import("./pages/crm/CrmBrokersPage"));
+const CrmBrokerLeadsPage = lazy(() => import("./pages/crm/CrmBrokerLeadsPage"));
 const CrmVisitsPage = lazy(() => import("./pages/crm/CrmVisitsPage"));
 const CrmNotificationsPage = lazy(() => import("./pages/crm/CrmNotificationsPage"));
 const CrmTeamPage = lazy(() => import("./pages/crm/CrmTeamPage"));
@@ -173,6 +175,8 @@ function AppRoutes() {
         <Route path="/property/:propertyId" element={<PropertyPage />} />
         {/* A broker's storefront: what their printed QR poster opens. */}
         <Route path="/b/:code" element={<Storefront />} />
+        {/* A partner broker's curated list for their tenant (not MovEazy's /curated). */}
+        <Route path="/c/:token" element={<CuratedSwipe />} />
         {/* The shortlist our team curated for one person. With a token it is the
             WhatsApp link and works signed out; without one it is the same set
             for whoever is signed in. */}
@@ -226,6 +230,7 @@ function AppRoutes() {
           <Route path="properties/new" element={<CrmPropertyForm />} />
           <Route path="properties/:propertyId/edit" element={<CrmPropertyForm />} />
           <Route path="brokers" element={<CrmBrokersPage />} />
+          <Route path="broker-leads" element={<CrmBrokerLeadsPage />} />
           <Route path="ops" element={<CrmInventoryOpsPage />} />
           <Route path="visits" element={<CrmVisitsPage />} />
           <Route path="notifications" element={<CrmNotificationsPage />} />

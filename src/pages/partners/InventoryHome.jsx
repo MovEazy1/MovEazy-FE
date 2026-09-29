@@ -15,13 +15,14 @@ import logo from "../../assets/logo/moveazy-logo-mint-light.png";
 import { Avatar, Chip, Empty, Loading, PropertyCard } from "./partnerUi";
 import { DEMO_COUNTS, DEMO_GROUPS, DemoBanner, demoRows } from "./demoMode";
 import { CompleteProfileCard, PremiumCard, useGoldLogo } from "./PremiumJourney";
+import { NotificationBell } from "./PartnerInbox";
 import { SOURCES, customerMessage, hasPremium, inSource, listerWhatsApp, pp, waLink } from "../../lib/partners";
 import { EMPTY_FILTERS, activeFilterCount, applyFilters } from "../../lib/partnerFilters";
 
 const PAGE = 20;
 
 export default function InventoryHome() {
-  const { me, inventory, invError, ui, setUi, saved, toggleSave, groups, demo, explain, status, reloadStatus } = usePartner();
+  const { me, inventory, invError, ui, setUi, saved, toggleSave, groups, demo, explain, status, reloadStatus, unread } = usePartner();
   const [q, setQ] = useState(ui.q || "");
   const [sheet, setSheet] = useState(false);
   const [shown, setShown] = useState(PAGE);
@@ -84,6 +85,7 @@ export default function InventoryHome() {
           <h1 style={{ margin: 0, lineHeight: 0 }}><img src={goldLogo || logo} alt="MovEazy" height="26" style={{ height: 26, width: "auto" }} /></h1>
           <span className="pz-chip" style={{ cursor: "default" }}>Bangalore</span>
           <span className="pz-row" style={{ gap: 4 }}>
+            {!demo && <NotificationBell count={unread} />}
             <Link to={pp("/qr")} className="pz-iconbtn" aria-label="My QR poster" title="My QR poster"><QrCode size={21} /></Link>
             <Link to={pp("/more")} aria-label="Your profile" style={{ textDecoration: "none" }}>
               <Avatar name={me?.partner?.name || "You"} />

@@ -176,6 +176,12 @@ export default function PropertyPage() {
           /* Above the photos: this flat is one of many, and somebody who was
              sent a link has no other way into the rest. The visit CTA sits at
              the bottom of the modal, so the two never compete for the thumb. */
+          <>
+          {listing.potentiallyRented && (
+            <div style={{ padding: "10px 18px", background: "#FFEDD5", color: "#9A3412", fontSize: 13.5, fontWeight: 700, textAlign: "center" }}>
+              Potentially rented — we’re confirming with the broker.
+            </div>
+          )}
           <button
             type="button"
             onClick={() => setShowBroker(true)}
@@ -189,6 +195,7 @@ export default function PropertyPage() {
             Get personalised flats
             <span aria-hidden="true">→</span>
           </button>
+          </>
         }
       />
       {/* startFresh: an invitation to start, not a half-finished form to

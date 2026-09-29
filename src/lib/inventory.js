@@ -197,6 +197,7 @@ export async function createInventoryItem(draft, poster) {
 // partner app only; no public select names them.
 const OPTIONAL_INVENTORY_COLS = [
   "maintenance", "floor_number", "total_floors", "partner_visible", "partner_share_pct", "property_type", "area_sqft",
+  "rent_flag",
 ];
 
 /**
@@ -253,7 +254,7 @@ const PUBLIC_INVENTORY_COLS =
   "bathrooms, furnishing, max_flatmates, gender_pref, occupants_allowed, maintenance, " +
   "floor_number, total_floors, " +
   "amenities, lifestyle, house_rules, title, description, images, " +
-  "cover_image_url, status, is_verified, view_count, created_at, updated_at";
+  "cover_image_url, status, is_verified, view_count, created_at, updated_at, rent_flag";
 
 /** All published inventory (for matching / listings) — public, no poster PII. */
 export async function fetchPublishedInventory({ limit = 500 } = {}) {
@@ -395,6 +396,8 @@ export function mapInventoryToListing(row) {
     landmark: String(row.landmark || "").trim(),
     nearbyAreas: list(row.nearby_areas),
     isVerified: Boolean(row.is_verified),
+    // A partner broker flagged it as taken; the listing broker hasn't confirmed yet.
+    potentiallyRented: row.rent_flag === "potentially_rented",
   };
 }
 

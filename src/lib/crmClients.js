@@ -60,7 +60,9 @@ export const fetchClients = () =>
       "assigned_to,next_follow_up_at,tags,closed_property_id,closed_rent,closed_reason,closed_at," +
       "brokerage_amount,expected_credit_date,payment_status,payment_marked_by,payment_marked_at," +
       "payment_approved_by,payment_approved_at,created_at,updated_at",
-    (q) => q.order("updated_at", { ascending: false }).limit(4000),
+    // MovEazy's own leads only: a number that first came through a partner
+    // broker is theirs (crm_clients.attributed_to) and lives under Broker leads.
+    (q) => q.eq("attributed_to", "moveazy").order("updated_at", { ascending: false }).limit(4000),
   );
 
 export const fetchClientRequirements = () =>
