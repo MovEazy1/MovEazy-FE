@@ -91,7 +91,7 @@ export default function LeadsList() {
               return (
                 <div key={lead.id} className="pz-row" style={{ padding: 14, alignItems: "flex-start", borderTop: i ? "1px solid var(--line)" : 0 }}>
                   <Avatar name={lead.name} size="lg" />
-                  <Link to={pp(`/leads/${lead.id}`)} onClick={lead.demo ? (e) => { e.preventDefault(); explain("ai_match"); } : undefined}
+                  <Link to={pp(lead.demo ? `/leads/${lead.id}/matches` : `/leads/${lead.id}`)}
                     style={{ flex: 1, minWidth: 0, color: "inherit", textDecoration: "none" }}>
                     <strong style={{ display: "block", fontSize: 16 }}>{lead.name}{lead.demo && <span className="pz-pill pz-pill--grey" style={{ marginLeft: 6, fontSize: 11 }}>Sample</span>}</strong>
                     {requirementLine(lead) && <span style={{ display: "block", fontSize: 14 }}>{requirementLine(lead)}</span>}
@@ -106,11 +106,7 @@ export default function LeadsList() {
                       style={{ background: "var(--goldg)", color: "#1F1605", borderRadius: 999, width: 34, height: 34 }}>
                       <WhatsAppIcon size={18} />
                     </button>
-                    {demo ? (
-                      <button type="button" className="pz-btn pz-btn--sm pz-btn--ai" onClick={() => explain("ai_match")}><Sparkles size={14} /> AI matching</button>
-                    ) : (
-                      <Link to={pp(`/leads/${lead.id}/matches`)} className="pz-btn pz-btn--sm pz-btn--ai"><Sparkles size={14} /> AI matching</Link>
-                    )}
+                    <Link to={pp(`/leads/${lead.id}/matches`)} className="pz-btn pz-btn--sm pz-btn--ai"><Sparkles size={14} /> AI matching</Link>
                   </div>
                 </div>
               );

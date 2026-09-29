@@ -17,6 +17,8 @@ import { friendlyError, pp } from "../../lib/partners";
 import { matchesForLead } from "../../lib/partnerMatch";
 import { EMPTY_FILTERS, activeFilterCount, applyFilters } from "../../lib/partnerFilters";
 import { createCuratedList, curatedMessage, curatedUrl } from "../../lib/partnerCurated";
+import { DemoListPreview, useMatchPool } from "./AiMatcher";
+import { DEMO_LEADS, DemoBanner } from "./demoMode";
 
 const SORTS = [["match", "Best match"], ["rent", "Rent: low to high"], ["brokerage", "Brokerage: high to low"]];
 const PRESELECT = 10;
@@ -24,7 +26,9 @@ const PRESELECT = 10;
 export default function LeadMatches() {
   const { id } = useParams();
   const { me, leads, inventory, saved, toggleSave, demo, explain } = usePartner();
-  const lead = leads.find((l) => l.id === id);
+  const lead = leads.find((l) => l.id === id) || (demo ? DEMO_LEADS.find((l) => l.id === id) : null);
+  const pool = useMatchPool();
+  const [preview, setPreview] = useState(false);
   const [filters, setFilters] = useState(EMPTY_FILTERS);
   const [sheet, setSheet] = useState(false);
   const [sort, setSort] = useState("match");
@@ -34,7 +38,7 @@ export default function LeadMatches() {
   const [sent, setSent] = useState(null);
   const send = useSendToLead(lead || { id, name: "", phone: "" });
 
-  const all = useMemo(() => (lead ? matchesForLead(lead, inventory ?? []) : []), [lead, inventory]);
+  const all = useMemo(() => (lead ? matchesForLead(lead, pool) : []), [lead, pool]);
   const rows = useMemo(() => {
     const keep = new Set(applyFilters(all.map((m) => m.listing), filters).map((l) => l.property_id));
     const list = all.filter((m) => keep.has(m.listing.property_id));
@@ -59,7 +63,7 @@ export default function LeadMatches() {
   const count = picked?.size || 0;
 
   const create = async () => {
-    if (demo) { explain("curated"); return; }
+    if (demo) { if (count) setPreview(true); else explain("curated"); return; }
     if (!count) { toast("Pick at least one home.", "error"); return; }
     setBusy(true);
     try {
@@ -102,6 +106,7 @@ export default function LeadMatches() {
         )}
       </div>
       <div className="pz-pad pz-list" style={{ paddingBottom: 110 }}>
+        {demo && <DemoBanner>Sample homes — try the curated list, then send for real with Premium.</DemoBanner>}
         {!inventory ? <Loading /> : rows.length === 0 ? (
           <Empty action={<Link className="pz-btn" to={pp(`/leads/${id}/edit`)}>Edit requirement</Link>}>
             {all.length ? "No matches with those filters." : "Nothing matches this requirement yet."}
@@ -132,6 +137,10 @@ export default function LeadMatches() {
         </div>
       )}
 
+      {preview && (
+        <DemoListPreview lead={lead} onClose={() => setPreview(false)}
+          homes={all.map((m) => m.listing).filter((l) => picked?.has(l.property_id))} />
+      )}
       {sent && (
         <Sheet title="Curated list ready" onClose={() => setSent(null)}>
           <div className="pz-pad">

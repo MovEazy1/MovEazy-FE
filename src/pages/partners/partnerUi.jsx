@@ -21,11 +21,11 @@ const CSS = `
    noir    the frame: header, nav, primary buttons
    gold    money and action: WhatsApp, Join Premium, the + button
    emerald the MovEazy brand: availability, brokerage, success
-   royal   AI only: the matcher, match scores, curated lists */
+   AI      noir into deep emerald, with gold: the matcher, scores, curated lists */
 .pz { --noir:#0E0D12; --noir2:#1C1A24; --noir3:#2A2733;
   --gold:#D4A437; --goldg:linear-gradient(180deg,#F0CF7C,#D4A437); --gold2:#F6E7BF; --gold3:#7A5A12;
   --g:#0B6E4F; --g2:#08503A; --gl:#E4F2EC; --gl2:#CBE5D9;
-  --ai:#6B4EFF; --ai2:#4930C9; --ail:#EFEBFF; --aig:linear-gradient(135deg,#7B5CFF,#4930C9);
+  --ai:#0F6B52; --ai2:#0A4A39; --ail:#E8F1EC; --aig:linear-gradient(135deg,#1C4F3E 0%,#11261E 55%,#0E0D12 100%);
   --ink:#16141C; --dim:#6B6776; --mute:#A09CAB;
   --line:#E7E4DD; --bg:#F5F3EE; --card:#FFFFFF; --warn:#B45309; --warnbg:#FEF3C7; --red:#B91C1C;
   font-family: Inter, system-ui, -apple-system, "Segoe UI", sans-serif; color: var(--ink); background: var(--bg);
@@ -71,7 +71,8 @@ const CSS = `
 .pz-btn--primary { background: var(--noir); border-color: var(--noir); color: #fff; }
 .pz-btn--primary:active { background: var(--noir3); }
 .pz-btn--gold { background: var(--goldg); border-color: transparent; color: #1F1605; font-weight: 800; }
-.pz-btn--ai { background: var(--aig); border-color: transparent; color: #fff; font-weight: 800; }
+.pz-btn--ai { background: var(--aig); border: 1px solid rgba(212,164,55,.45); color: #fff; font-weight: 800; }
+.pz-btn--ai svg { color: var(--gold); }
 .pz-btn--soft { background: var(--gl); border-color: var(--gl); color: var(--g2); }
 .pz-btn--ghost { border-color: transparent; background: transparent; color: var(--g); padding: 6px 8px; min-height: 0; }
 .pz-btn--block { width: 100%; min-height: 50px; font-size: 16px; border-radius: 12px; }

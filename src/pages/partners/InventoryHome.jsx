@@ -59,6 +59,9 @@ export default function InventoryHome() {
 
   useEffect(() => { setShown(PAGE); }, [source, filters, ui.q, groupId]);
   const { ref: more, inView } = useInView({ rootMargin: "600px" });
+  // The AI matcher card, once it scrolls up under the header, lives on as a slim bar inside it.
+  const { ref: aiRef, entry: aiEntry } = useInView({ rootMargin: "-150px 0px 0px 0px" });
+  const aiCompact = Boolean(aiEntry && !aiEntry.isIntersecting && aiEntry.boundingClientRect.top < 150);
   useEffect(() => { if (inView) setShown((n) => n + PAGE); }, [inView]);
 
   // Scroll: restore once the list exists, remember on the way out.
@@ -107,6 +110,7 @@ export default function InventoryHome() {
             </button>
           ))}
         </div>
+        {aiCompact && <div style={{ paddingBottom: 8 }}><AiMatcherCard compact /></div>}
       </header>
 
       <div className="pz-pad" style={{ paddingBottom: 4 }}>
@@ -134,7 +138,7 @@ export default function InventoryHome() {
       <div className="pz-pad pz-list">
         {planActive && !status?.profile?.completed_at && <CompleteProfileCard onDone={reloadStatus} />}
         {gold && <PremiumCard me={me} status={status} />}
-        <AiMatcherCard />
+        <div ref={aiRef}><AiMatcherCard /></div>
         {showingDemo && (
           <DemoBanner>
             {source === "moveazy" ? `Showing 6 of ${DEMO_COUNTS.moveazy.toLocaleString("en-IN")} MovEazy listings.`

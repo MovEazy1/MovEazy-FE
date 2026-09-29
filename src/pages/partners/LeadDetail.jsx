@@ -23,7 +23,7 @@ export function useSendToLead(lead) {
 
 export default function LeadDetail() {
   const { id } = useParams();
-  const { leads, inventory, setLeads, saved, toggleSave, demo, explain } = usePartner();
+  const { leads, inventory, setLeads, saved, toggleSave, demo } = usePartner();
   const lead = leads.find((l) => l.id === id);
   const matches = useMemo(() => (lead ? matchesForLead(lead, inventory ?? []) : []), [lead, inventory]);
   const send = useSendToLead(lead || { id, name: "", phone: "" });
@@ -73,7 +73,7 @@ export default function LeadDetail() {
         </div>
 
         {hasRequirement(lead) && (
-          <Link to={pp(`/leads/${id}/matches`)} onClick={demo ? (e) => { e.preventDefault(); explain("ai_match"); } : undefined}
+          <Link to={pp(`/leads/${id}/matches`)}
             className="pz-btn pz-btn--ai pz-btn--block" style={{ marginBottom: 12 }}>
             <Sparkles size={18} /> AI matching · send a curated list
           </Link>
