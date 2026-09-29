@@ -7,18 +7,19 @@
  * MovEazy's real published inventory:
  *   - prices, shares and stats come from the CRM (useLandingSettings);
  *   - the matching demo runs the app's own matching engine, so counts are live;
- *   - features that aren't live yet (MovEazy clients) are marked "Coming soon";
+ *   - features that aren't live yet (MovEazy clients, the QR storefront) are marked "Coming soon";
  *   - no testimonials until there are real ones to show.
  */
 import { useEffect, useMemo, useState } from "react";
 import {
-  ArrowRight, BadgeCheck, Building2, ChevronRight, Copy, IndianRupee, Phone, Plus, QrCode, Search, Share2, ShieldCheck, Sparkles, X, Zap,
+  ArrowRight, BadgeCheck, Building2, ChevronRight, Copy, IndianRupee, Phone, Plus, QrCode, Search, Share2, Sparkles, X, Zap,
 } from "lucide-react";
 import {
   AppLogo, Faq, LandingFooter, LandingNav, LandingStyles, PhoneFrame, Shot, SignupButton, Stepper, StickyCta, VideoButton, useInventory, useListingsWithPhotos,
 } from "../landing/landingKit";
 import { Avatar, Chip, PropertyCard, TopBar, WhatsAppIcon } from "./partnerUi";
 import { SmartListingImage } from "./partnerMedia";
+import QrFeature from "./QrFeature";
 import { requirementLine } from "./leadBits";
 import { matchesForLead } from "../../lib/partnerMatch";
 import { customerMessage, displayLink } from "../../lib/partners";
@@ -332,13 +333,12 @@ export default function PartnerLanding() {
   const best = useBestLead(inventory);
 
   const stats = [[s.statBrokers, "Brokers"], [s.statProperties, "Verified properties"], [s.statRating, "Rating"]];
-  const refund = <a href="https://www.moveazy.co.in/terms#refunds">100% refundable</a>;
 
   return (
     <div className="lp lp--broker">
       <LandingStyles />
       <LandingNav dark product="Partners" ctaClass="lp-btn lp-btn--gold"
-        links={[["#app", "App"], ["#matching", "AI Matching"], ["#earnings", "Earnings"], ["#faq", "FAQs"]]} />
+        links={[["#app", "App"], ["#qr", "Your QR"], ["#matching", "AI Matching"], ["#earnings", "Earnings"], ["#faq", "FAQs"]]} />
 
       <header className="lp-hero lp-hero--dark" id="top">
         <div className="lp-wrap">
@@ -349,7 +349,7 @@ export default function PartnerLanding() {
               <SignupButton>Join free</SignupButton>
               <a href="#earnings" className="lp-btn lp-btn--ghost" style={{ color: "#fff" }}>My earnings</a>
             </div>
-            <div className="lp-price" style={{ marginTop: 16 }}>Premium <b>{inr(s.premiumPrice)}/month</b><s>{inr(s.premiumListPrice)}</s>· {refund}</div>
+            <div className="lp-price" style={{ marginTop: 16 }}>Premium <b>{inr(s.premiumPrice)}/month</b><s>{inr(s.premiumListPrice)}</s></div>
             <div style={{ marginTop: 14 }}><VideoButton url={s.videoBroker} /></div>
           </div>
           <div className="lp-phone-stage">
@@ -377,6 +377,8 @@ export default function PartnerLanding() {
         </div>
       </section>
 
+      <QrFeature listings={photos} />
+
       <section className="lp-sec lp-sec--white" id="matching">
         <div className="lp-wrap">
           <MatchingDemo inventory={inventory} best={best} share={s.propertyShare} />
@@ -387,10 +389,6 @@ export default function PartnerLanding() {
         <div className="lp-wrap">
           <h2 className="lp-h2">Your extra <span className="hl">earnings.</span></h2>
           <Calculator s={s} />
-          <div className="lp-guarantee">
-            <ShieldCheck size={24} color="#8A6419" style={{ flex: "none" }} />
-            <div><b>100% refundable monthly fee</b><p>Not useful? We refund the month in full. <a href="https://www.moveazy.co.in/terms#refunds" style={{ fontWeight: 700 }}>Terms</a></p></div>
-          </div>
         </div>
       </section>
 
@@ -399,8 +397,9 @@ export default function PartnerLanding() {
           <h2 className="lp-h2">FAQs</h2>
           <Faq items={[
             ["Is it free?", "Yes. Premium unlocks MovEazy inventory with owner contacts."],
-            ["What does Premium cost?", `${inr(s.premiumPrice)}/month (regular ${inr(s.premiumListPrice)}). 100% refundable.`],
+            ["What does Premium cost?", `${inr(s.premiumPrice)}/month (regular ${inr(s.premiumListPrice)}).`],
             ["How much brokerage do I keep?", `${s.propertyShare}% on MovEazy properties, ${s.clientShare}% on MovEazy clients.`],
+            ["What is the QR storefront?", "Coming soon: your own QR poster. Tenants scan it to see all your homes; you see who viewed and who liked what."],
             ["Who sees my listings?", "You choose: only you, your groups, or all MovEazy brokers."],
           ]} />
         </div>
@@ -410,15 +409,15 @@ export default function PartnerLanding() {
         <div className="lp-wrap">
           <h2 className="lp-h2">Your next deal is <span className="hl">on MovEazy.</span></h2>
           <div className="lp-ctas" style={{ justifyContent: "center", marginTop: 24 }}><SignupButton>Join free <ArrowRight size={18} /></SignupButton></div>
-          <div className="lp-pricebar"><span>Premium {inr(s.premiumPrice)}/month</span>{refund}</div>
+          <div className="lp-pricebar"><span>Premium {inr(s.premiumPrice)}/month</span></div>
         </div>
       </section>
 
       <LandingFooter product="Partners" blurb="Verified inventory, AI matching and a broker network for Bengaluru's rental brokers."
-        links={[["#app", "The app"], ["#matching", "AI matching"], ["#earnings", "Earnings"], ["#faq", "FAQs"]]}
+        links={[["#app", "The app"], ["#qr", "Your QR"], ["#matching", "AI matching"], ["#earnings", "Earnings"], ["#faq", "FAQs"]]}
         other={["https://owners.moveazy.co.in/", "For owners"]} />
 
-      <StickyCta title="Free to join" sub={`Premium ${inr(s.premiumPrice)}/mo · refundable`} ctaClass="lp-btn lp-btn--gold" />
+      <StickyCta title="Free to join" sub={`Premium ${inr(s.premiumPrice)}/mo`} ctaClass="lp-btn lp-btn--gold" />
     </div>
   );
 }

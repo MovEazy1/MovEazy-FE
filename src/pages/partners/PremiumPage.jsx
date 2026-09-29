@@ -9,7 +9,7 @@
  * same one a gateway webhook will write, so nothing here changes then but the
  * button.
  */
-import { Check, Crown, ShieldCheck } from "lucide-react";
+import { Check, Crown } from "lucide-react";
 import { usePartner } from "./PartnerApp";
 import { TopBar, WhatsAppIcon } from "./partnerUi";
 import { MOVEAZY_TEAM_WHATSAPP } from "../../config/contactChannels";
@@ -68,13 +68,6 @@ export default function PremiumPage() {
             <a className="pz-btn pz-btn--primary pz-btn--block" href={ask} target="_blank" rel="noreferrer">
               <WhatsAppIcon /> Get Premium — ₹{price.toLocaleString("en-IN")}/month
             </a>
-            <div className="pz-row" style={{ marginTop: 12, padding: 12, borderRadius: 12, background: "#FFF8E8", border: "1px solid #F1DCA7", alignItems: "flex-start" }}>
-              <ShieldCheck size={20} color="#8A6419" style={{ flex: "none" }} />
-              <span style={{ fontSize: 13.5 }}>
-                <strong>100% refundable.</strong> Not useful? We end your access and refund that month in full.{" "}
-                <a href="https://www.moveazy.co.in/terms#refunds" target="_blank" rel="noreferrer" style={{ color: "var(--g)", fontWeight: 600 }}>Terms</a>
-              </span>
-            </div>
             <p className="pz-hint" style={{ textAlign: "center" }}>
               Online payment is coming soon. For now, message us and we'll activate your plan within a few hours.
             </p>
