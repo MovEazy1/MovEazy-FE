@@ -142,6 +142,13 @@ Item "8. at all places" was cut off — see Q12.
 7. AI curated list → tenant swipe page → actions → notifications → broker leads in CRM (C1–C7).
 8. Groups sold-out with potentially-rented marker (G1–G4).
 
+## 8b. Build status (30 Sep 2026)
+
+All of §1–§6 is built and live (FE `33bd548`, BE `38e01b0`, SQL applied). Waiting on the business:
+
+- **Razorpay keys** in Vercel (`RAZORPAY_KEY_ID`, `RAZORPAY_KEY_SECRET`, `RAZORPAY_WEBHOOK_SECRET`, `SUPABASE_SERVICE_ROLE_KEY`) and the webhook in Razorpay (`https://www.moveazy.co.in/api/razorpay-webhook`, event `payment_link.paid`). Until then "Pay" records the attempt and hands the broker to the team on WhatsApp; the super admin approves it in /sales-funnel.
+- **Not yet exercised with a real (non-staff) broker account:** mobile → Google → number saved; a real Razorpay payment; photo upload from a phone gallery.
+
 ## 9. Decisions (29 Sep 2026)
 
 | # | Question | Decision |
