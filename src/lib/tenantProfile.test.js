@@ -42,6 +42,18 @@ describe("tenant profile score", () => {
     expect(normalizeLinkedIn("in.linkedin.com/in/riya_s?trk=x")).toBe("https://www.linkedin.com/in/riya_s");
     expect(normalizeLinkedIn("linkedin.com/company/swiggy")).toBe("");
     expect(normalizeLinkedIn("riya sharma")).toBe("");
+    // How people actually paste it
+    expect(normalizeLinkedIn("riya-sharma-12a3b4")).toBe("https://www.linkedin.com/in/riya-sharma-12a3b4");
+    expect(normalizeLinkedIn("@riya-sharma")).toBe("https://www.linkedin.com/in/riya-sharma");
+    expect(normalizeLinkedIn("/in/riya-sharma/")).toBe("https://www.linkedin.com/in/riya-sharma");
+    expect(normalizeLinkedIn("https://www.linkedin.com/in/riya-sharma-12a3b4?utm_source=share&utm_campaign=share_via&utm_medium=android_app"))
+      .toBe("https://www.linkedin.com/in/riya-sharma-12a3b4");
+    expect(normalizeLinkedIn("www.linkedin.com/in/riya-sharma/details/experience/")).toBe("https://www.linkedin.com/in/riya-sharma");
+    expect(normalizeLinkedIn("LinkedIn.com/in/Riya-Sharma")).toBe("https://www.linkedin.com/in/Riya-Sharma");
+    expect(normalizeLinkedIn("linkedin.com/in/%E0%A4%B0%E0%A4%BF%E0%A4%AF%E0%A4%BE")).toBe("https://www.linkedin.com/in/%E0%A4%B0%E0%A4%BF%E0%A4%AF%E0%A4%BE");
+    expect(normalizeLinkedIn("ab")).toBe("");
+    expect(normalizeLinkedIn("riya.sharma@gmail.com")).toBe("");
+    expect(normalizeLinkedIn("https://www.linkedin.com/posts/riya_activity-123")).toBe("");
     expect(profileScore({ ...signup, linkedin: "not a link" }).score).toBe(20);
   });
 

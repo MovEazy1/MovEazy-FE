@@ -70,6 +70,8 @@ const OwnerApp = lazy(() => import("./pages/owners/OwnerApp"));
 const CrmInventoryOpsPage = lazy(() => import("./pages/crm/CrmInventoryOpsPage"));
 const IS_OWNER_HOST = typeof window !== "undefined" && /^owners?\./i.test(window.location.hostname);
 const IS_PARTNER_HOST = typeof window !== "undefined" && /^partners\./i.test(window.location.hostname);
+// tenant.moveazy.co.in: the whole site, but its front door is the tenant app.
+const IS_TENANT_HOST = typeof window !== "undefined" && /^tenants?\./i.test(window.location.hostname);
 
 function PageLoader() {
   return (
@@ -158,7 +160,8 @@ function AppRoutes() {
   return (
     <Suspense fallback={<PageLoader />}>
       <Routes>
-        <Route path="/" element={<ForkHome />} />
+        <Route path="/" element={IS_TENANT_HOST ? <ForkHome tenantEntry /> : <ForkHome />} />
+        <Route path="/tenant" element={<ForkHome tenantEntry />} />
         <Route path="/partners/*" element={<PartnerApp />} />
         <Route path="/owners/*" element={<OwnerApp />} />
         {/* Browsing is off — see the note by the imports.

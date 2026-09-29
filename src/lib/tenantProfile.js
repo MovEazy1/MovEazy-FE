@@ -56,10 +56,28 @@ export const FAMILY_BONUS = 10;
 export const pointsOf = (key) => FIELDS.find((f) => f.key === key)?.points ?? 0;
 export const stepPoints = (step) => step.fields.reduce((n, k) => n + pointsOf(k), 0);
 
-/** linkedin.com/in/<handle>, with or without https / www; anything else isn't a profile. */
+/**
+ * A LinkedIn profile, however it's pasted: the full link (with or without
+ * https, www or a country prefix, and with the share-link tracking or a
+ * /details/... tail the LinkedIn app adds), "/in/handle", "@handle", or just
+ * the handle — the ID people usually type. Returns the canonical link, or ""
+ * if it isn't a profile (a company page, a post, a sentence).
+ */
 export function normalizeLinkedIn(raw) {
-  const m = String(raw || "").trim().match(/^(?:https?:\/\/)?(?:[a-z]{2,3}\.)?linkedin\.com\/in\/([A-Za-z0-9\-_%]{3,100})\/?(?:[?#].*)?$/i);
-  return m ? `https://www.linkedin.com/in/${m[1]}` : "";
+  const v = String(raw || "").trim();
+  if (!v) return "";
+  const handle = (h) => {
+    let x = h;
+    try { x = decodeURIComponent(h); } catch { /* keep as typed */ }
+    x = x.trim();
+    // LinkedIn IDs are letters, digits and hyphens (3–100); anything else is encoded.
+    if (!/^[\p{L}\p{M}\p{N}_-]{3,100}$/u.test(x)) return "";
+    return `https://www.linkedin.com/in/${encodeURIComponent(x)}`;
+  };
+  const url = v.match(/^(?:https?:\/\/)?(?:[a-z]{2,3}\.)?linkedin\.com\/in\/([^/?#\s]+)(?:[/?#].*)?$/i);
+  if (url) return handle(url[1]);
+  if (/linkedin\.com/i.test(v) || /[\s/.]/.test(v.replace(/^\/?in\//i, "").replace(/\/$/, ""))) return "";
+  return handle(v.replace(/^@/, "").replace(/^\/?in\//i, "").replace(/\/$/, ""));
 }
 
 const filled = (key, v) => {

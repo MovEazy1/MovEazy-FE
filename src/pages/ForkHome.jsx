@@ -32,6 +32,7 @@ import { HighlightScene, Phone, SITE_CSS, SiteFooter, clamp, ease, reduced, useS
 import { PerfectHomeScreen, SwipeScreen, useSteps } from "./home/homeScreens";
 import logoOnDark from "../assets/logo/moveazy-logo-mint-dark.png";
 import TenantHome from "./tenant/TenantHome";
+import TenantSignIn from "./tenant/TenantSignIn";
 import { hasOwnerListing } from "../lib/inventory";
 import { fetchMyTenantProfile, loadTenantProfile } from "../lib/tenantProfile";
 
@@ -119,7 +120,11 @@ function HowScene({ steps }) {
   );
 }
 
-export default function ForkHome() {
+/**
+ * tenantEntry: tenant.moveazy.co.in and /tenant — always the tenant app: the
+ * tenant home when signed in (owners too), the tenant sign-in when not.
+ */
+export default function ForkHome({ tenantEntry = false }) {
   const { user, loading: authLoading } = useAuth();
   const { openLogin } = useLoginModal();
   const navigate = useNavigate();
@@ -244,11 +249,17 @@ export default function ForkHome() {
     </>
   );
 
-  if (user && ownerAccount !== true) {
+  if (tenantEntry && !user) {
+    return authLoading ? <div style={{ minHeight: "100vh", background: "#F4F2ED" }} /> : <TenantSignIn />;
+  }
+
+  if (user && (tenantEntry || ownerAccount !== true)) {
+    // The cream runs under the nav's own spacer too, so there is no white band above the card.
     return (
-      <>
+      <div style={{ background: "#F4F2ED", minHeight: "100vh" }}>
         <MovEazyNav active="home" onFindFlat={startFlatSearch} />
         <TenantHome
+          underNav
           name={user.name}
           profile={{ name: user.name, phone: user.phone, ...tenantProfile }}
           onFind={() => startFlatSearch()}
@@ -256,7 +267,7 @@ export default function ForkHome() {
           onProfile={() => navigate("/tenant-profile")}
         />
         {flows}
-      </>
+      </div>
     );
   }
 

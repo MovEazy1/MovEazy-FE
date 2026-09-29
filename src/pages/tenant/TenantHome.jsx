@@ -94,13 +94,14 @@ function TasteJourney() {
   );
 }
 
-export default function TenantHome({ name = "", profile = {}, onFind, onList, onProfile }) {
+/** underNav: mounted under the site nav, which already leaves room for itself. */
+export default function TenantHome({ name = "", profile = {}, onFind, onList, onProfile, underNav = false }) {
   const { score, complete } = profileScore(profile);
   const { matches, requirement } = useShowcaseMatches();
   const first = (profile.name || name || "there").split(" ")[0];
 
   return (
-    <div className="tn">
+    <div className={`tn${underNav ? " tn--undernav" : ""}`}>
       <style>{SITE_CSS + TN_CSS + CSS}</style>
 
       <header className="tn-head">
@@ -175,6 +176,7 @@ export default function TenantHome({ name = "", profile = {}, onFind, onList, on
 }
 
 const CSS = `
+.tn--undernav .tn-head { padding-top: 18px !important; }
 .tn-head { padding: 96px 0 8px; background: radial-gradient(90% 60% at 100% 0%, rgba(94,234,212,.22), transparent 60%), var(--cream); }
 .tn-hello { margin: 0; font-size: 15px; color: var(--dim); font-weight: 600; }
 .tn-name { font-size: 34px; font-weight: 800; letter-spacing: -.035em; margin: 2px 0 18px; }

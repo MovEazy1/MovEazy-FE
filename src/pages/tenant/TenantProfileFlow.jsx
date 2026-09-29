@@ -55,15 +55,17 @@ export default function TenantProfileFlow({ initial = {}, onSave, onClose, onFin
     return miss.length ? PROFILE_STEPS.findIndex((s) => s.id === miss[0].id) : 0;
   });
   const [dir, setDir] = useState(1);
+  const [nudge, setNudge] = useState(false);
   const [done, setDone] = useState(false);
   const { score, complete } = profileScore(profile);
   const step = PROFILE_STEPS[i];
   const val = (k) => profile[k] ?? "";
   const set = (k, v) => setProfile((p) => ({ ...p, [k]: v }));
   const years = useMemo(() => yearChips(), []);
-  const go = (n) => { setDir(n > i ? 1 : -1); setI(n); };
+  const go = (n) => { setDir(n > i ? 1 : -1); setI(n); setNudge(false); };
 
   const next = () => {
+    if (!step.fields.every((k) => isFilled(profile, k))) { setNudge(true); return; }
     const tidy = { ...profile };
     if (tidy.linkedin) tidy.linkedin = normalizeLinkedIn(tidy.linkedin) || tidy.linkedin;
     setProfile(tidy);
@@ -112,7 +114,8 @@ export default function TenantProfileFlow({ initial = {}, onSave, onClose, onFin
         <div className="tn-scorebar">
           <ScoreRing score={score} size={64} stroke={6} label={false} />
           <div style={{ flex: 1 }}>
-            <b>Profile score · {scoreLabel(score)}</b>
+            <span className="tn-scorebar-k">Profile score</span>
+            <b>{scoreLabel(score)}</b>
             <em>{complete ? "Every field in." : score >= 70 ? "Almost there." : "A good profile gets you flats faster."}</em>
           </div>
           <span className={`tn-pts${stepDone ? " got" : ""}`}>+{stepPoints(step)}</span>
@@ -132,11 +135,12 @@ export default function TenantProfileFlow({ initial = {}, onSave, onClose, onFin
                 </>
               )}
               <div className="tn-input-wrap">
-                <input className="tn-input" inputMode="url" autoCapitalize="none" placeholder="linkedin.com/in/your-name" value={li}
+                <input className="tn-input" inputMode="url" autoCapitalize="none" autoCorrect="off" spellCheck={false} placeholder="Profile link or LinkedIn ID" value={li}
                   onChange={(e) => set("linkedin", e.target.value)} />
                 {liValid && <span className="tn-input-ok"><Check size={16} strokeWidth={3} /></span>}
               </div>
-              {li && !liValid && <p className="tn-hint">That doesn’t look like a profile link — it should have /in/ in it.</p>}
+              {li && !liValid && <p className="tn-hint">Paste your profile link, or just your LinkedIn ID — the part after linkedin.com/in/.</p>}
+              {liValid && <p className="tn-ok">{normalizeLinkedIn(li).replace("https://www.", "")}</p>}
             </>
           )}
 
@@ -200,9 +204,10 @@ export default function TenantProfileFlow({ initial = {}, onSave, onClose, onFin
           )}
         </div>
 
+        {nudge && !stepDone && <p className="tn-nudge" role="status">Fill this in to continue — or skip it for now.</p>}
         <div className="tn-flow-foot">
           <button type="button" className="tn-skip" onClick={() => (i < PROFILE_STEPS.length - 1 ? go(i + 1) : setDone(true))}>Skip for now</button>
-          <button type="button" className="tn-btn tn-btn--ink" disabled={!stepDone} onClick={next}>
+          <button type="button" className={`tn-btn tn-btn--ink${stepDone ? "" : " soft"}`} onClick={next}>
             {i < PROFILE_STEPS.length - 1 ? "Continue" : "Finish"} <ArrowRight size={18} />
           </button>
         </div>
@@ -221,11 +226,13 @@ const CSS = `
 .tn-steps span.done { background: var(--teal); }
 .tn-steps span.on { background: linear-gradient(90deg, var(--teal) 50%, #E3EAE8 50%); }
 .tn-scorebar { display: flex; align-items: center; gap: 12px; padding: 12px; border-radius: 18px; background: var(--wash); }
-.tn-scorebar b { display: block; font-size: 14.5px; }
+.tn-scorebar-k { display: block; font-size: 10.5px; font-weight: 800; letter-spacing: .12em; text-transform: uppercase; color: var(--teal); }
+.tn-scorebar b { display: block; font-size: 16px; letter-spacing: -.01em; margin-top: 1px; }
 .tn-scorebar em { display: block; font-style: normal; font-size: 12.5px; color: var(--dim); margin-top: 2px; }
 .tn-pts { font-size: 13px; font-weight: 800; padding: 6px 10px; border-radius: 99px; background: #fff; color: #9DAAA6; transition: all .3s; }
 .tn-pts.got { background: var(--teal); color: #fff; transform: scale(1.06); }
-.tn-slidein { animation: tnIn .42s cubic-bezier(.16,1,.3,1) both; }
+/* No fill-mode: if an animation never runs (a throttled tab), the step is simply there. */
+.tn-slidein { animation: tnIn .42s cubic-bezier(.16,1,.3,1); }
 .tn-slidein.back { animation-name: tnInBack; }
 @keyframes tnIn { from { opacity: 0; transform: translateX(36px); } to { opacity: 1; transform: none; } }
 @keyframes tnInBack { from { opacity: 0; transform: translateX(-36px); } to { opacity: 1; transform: none; } }
@@ -236,7 +243,8 @@ const CSS = `
 .tn-input:focus { border-color: var(--ink); box-shadow: 0 0 0 4px var(--wash); }
 .tn-input:disabled { background: #F4F7F6; }
 .tn-input-ok { position: absolute; right: 14px; top: 50%; transform: translateY(-50%); width: 26px; height: 26px; border-radius: 99px; background: var(--teal); color: #fff; display: grid; place-items: center; }
-.tn-hint { margin: 8px 2px 0; font-size: 13px; color: #B45309; }
+.tn-hint { margin: 8px 2px 0; font-size: 13px; line-height: 1.45; color: #B45309; }
+.tn-ok { margin: 8px 2px 0; font-size: 13px; font-weight: 700; color: var(--teal); overflow-wrap: anywhere; }
 .tn-li-btn { width: 100%; display: flex; align-items: center; justify-content: center; gap: 10px; min-height: 54px; border: 0; border-radius: 16px; cursor: pointer;
   font: inherit; font-size: 16px; font-weight: 800; color: #fff; background: #0A66C2; box-shadow: 0 10px 24px rgba(10,102,194,.28); }
 .tn-li-note { margin: 8px 2px 0; font-size: 12.5px; color: var(--dim); text-align: center; }
@@ -276,7 +284,10 @@ const CSS = `
 .tn-note b { color: var(--ink); }
 .tn-flow-foot { margin-top: auto; padding-top: 24px; display: flex; align-items: center; justify-content: space-between; gap: 12px; }
 .tn-skip { font: inherit; font-size: 14.5px; font-weight: 700; color: var(--dim); background: none; border: 0; cursor: pointer; }
-.tn-flow-foot .tn-btn { flex: 0 0 auto; min-width: 150px; }
+.tn-flow-foot .tn-btn { flex: 0 0 auto; min-width: 150px; transition: background .2s, opacity .2s, transform .12s; }
+.tn-flow-foot .tn-btn.soft { opacity: .45; }
+.tn-nudge { margin: 18px 0 0; padding: 10px 12px; border-radius: 12px; background: #FFF7E6; color: #8A5A06; font-size: 13.5px; font-weight: 700; animation: tnShake .35s ease; }
+@keyframes tnShake { 20%, 60% { transform: translateX(-4px); } 40%, 80% { transform: translateX(4px); } }
 
 .tn-done { min-height: 100vh; display: flex; flex-direction: column; justify-content: center; padding-top: 30px; padding-bottom: 30px; text-align: center; }
 .tn-done-burst { width: 72px; height: 72px; margin: 0 auto 14px; border-radius: 99px; display: grid; place-items: center; background: var(--wash); color: var(--teal);

@@ -142,7 +142,7 @@ export const TN_CSS = `
 /* the accomplishment star, from 90 */
 .tn-star { position: absolute; top: -3px; right: -4px; border-radius: 99px; display: grid; place-items: center; color: #7A5200;
   background: radial-gradient(circle at 35% 30%, #FFF6D6, #F5C451 55%, #D9A437); box-shadow: 0 0 0 2px #fff, 0 4px 10px rgba(185,140,30,.45);
-  animation: tnStarPop .6s cubic-bezier(.34,1.56,.64,1) both, tnStarGlow 2.4s ease-in-out .6s infinite; }
+  animation: tnStarPop .6s cubic-bezier(.34,1.56,.64,1), tnStarGlow 2.4s ease-in-out .6s infinite; }
 .tn-ring--gold .tn-star { color: #F5C451; background: radial-gradient(circle at 35% 30%, #0E4B42, #04211D 70%); box-shadow: 0 0 0 2px #F9DD8E, 0 4px 10px rgba(4,33,29,.35); }
 .tn-ring--dark .tn-star { box-shadow: 0 0 0 2px #04211D, 0 4px 10px rgba(0,0,0,.4); }
 @keyframes tnStarPop { from { transform: scale(0) rotate(-40deg); } to { transform: scale(1) rotate(0); } }
