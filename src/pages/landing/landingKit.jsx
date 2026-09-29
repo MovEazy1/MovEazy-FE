@@ -248,9 +248,8 @@ export function useScrollSlide(pinRef, trackRef) {
     if (!pin || !track || typeof window.matchMedia !== "function") return undefined;
     const mq = window.matchMedia("(max-width: 520px)");
     let dist = 0;
-    let frame = 0;
+    // Straight from the scroll event: browsers already deliver those once a frame.
     const update = () => {
-      frame = 0;
       if (!dist) return;
       const p = Math.min(1, Math.max(0, (PIN_TOP - pin.getBoundingClientRect().top) / dist));
       track.scrollLeft = p * dist;
@@ -262,16 +261,14 @@ export function useScrollSlide(pinRef, trackRef) {
       pin.style.height = dist ? `${track.parentElement.offsetHeight + dist}px` : "";
       update();
     };
-    const onScroll = () => { if (!frame) frame = requestAnimationFrame(update); };
     measure();
-    window.addEventListener("scroll", onScroll, { passive: true });
+    window.addEventListener("scroll", update, { passive: true });
     window.addEventListener("resize", measure);
     mq.addEventListener?.("change", measure);
     return () => {
-      window.removeEventListener("scroll", onScroll);
+      window.removeEventListener("scroll", update);
       window.removeEventListener("resize", measure);
       mq.removeEventListener?.("change", measure);
-      if (frame) cancelAnimationFrame(frame);
       pin.style.height = "";
     };
   }, [pinRef, trackRef]);
