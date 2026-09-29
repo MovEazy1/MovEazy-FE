@@ -130,7 +130,7 @@ const CSS = `
 .dm-go { width: 100%; min-height: 52px; border: 0; border-radius: 14px; font: inherit; font-size: 16px; font-weight: 800; cursor: pointer;
   display: flex; align-items: center; justify-content: center; gap: 8px; color: #1F1605; background: linear-gradient(180deg, #F2CD7A, #E4B659); }
 .dm-later { margin-top: 8px; width: 100%; min-height: 44px; border: 0; background: none; color: rgba(255,255,255,.75); font: inherit; font-weight: 700; cursor: pointer; }
-.dm-bar { position: fixed; left: 0; right: 0; bottom: calc(70px + env(safe-area-inset-bottom)); z-index: 30; display: flex; justify-content: center; pointer-events: none; }
+.dm-bar { position: fixed; left: 0; right: 0; bottom: calc(92px + env(safe-area-inset-bottom)); z-index: 30; display: flex; justify-content: center; pointer-events: none; }
 .dm-bar button { pointer-events: auto; display: inline-flex; align-items: center; gap: 8px; min-height: 46px; padding: 0 22px; border-radius: 99px; border: 0; cursor: pointer;
   font: inherit; font-size: 15px; font-weight: 800; color: #1F1605; background: linear-gradient(180deg, #F2CD7A, #E4B659);
   box-shadow: 0 12px 28px rgba(138,100,25,.35), 0 0 0 4px rgba(255,255,255,.9); animation: dmglow 2.8s ease-in-out infinite; }

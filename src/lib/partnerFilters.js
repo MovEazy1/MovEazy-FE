@@ -6,7 +6,8 @@
  */
 import { bedroomsOf } from "./partnerMatch";
 
-export const ROOM_LABEL = "Room in shared flat";
+// The site-wide name for it (FLAT_TYPES, tenant search, the CRM importer).
+export const ROOM_LABEL = "Room in Preoccupied flat";
 export const BHK_CHIPS = ["1 RK", "1 BHK", "2 BHK", "3 BHK", "4+ BHK", "Room"];
 /** What a listing or a lead can say it is. */
 export const BHK_OPTIONS = ["1 RK", "1 BHK", "2 BHK", "3 BHK", "4 BHK", "5+ BHK", ROOM_LABEL];

@@ -42,6 +42,11 @@ export async function startPlanPayment(planId) {
   }
   if (res.body?.url) return { url: res.body.url, payment: pay, mode: "razorpay" };
   if (res.body?.fallback && pay.payment_link) return { url: pay.payment_link, payment: pay, mode: "manual" };
+  if (res.body?.fallback) {
+    // No online payment configured yet: the team takes it on WhatsApp and a super admin approves it in /sales-funnel.
+    const text = `Hi MovEazy, I'd like the ${pay.label} Premium plan (₹${Number(pay.amount).toLocaleString("en-IN")}) on MovEazy Partners. Ref ${String(pay.id).slice(0, 8)}`;
+    return { url: `https://wa.me/919146969162?text=${encodeURIComponent(text)}`, payment: pay, mode: "whatsapp" };
+  }
   throw new Error(res.body?.error || "Online payment isn't available right now. Please message the MovEazy team.");
 }
 

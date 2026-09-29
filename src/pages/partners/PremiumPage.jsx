@@ -47,7 +47,7 @@ export default function PremiumPage() {
     setBusy(true);
     try {
       const r = await startPlanPayment(plan.id);
-      if (r.mode === "manual") { setManual(r); setBusy(false); return; }
+      if (r.mode !== "razorpay") { setManual(r); setBusy(false); return; }
       window.location.assign(r.url);
     } catch (e) {
       toast(friendlyError(e, "Could not start the payment."), "error");
@@ -96,9 +96,15 @@ export default function PremiumPage() {
 
         {manual ? (
           <div className="pz-section jp-manual">
-            <strong>Pay {inr(manual.payment.amount)} on Razorpay</strong>
-            <p className="pz-meta">Your plan is activated within a few hours of payment. Keep the receipt; the team may ask for it.</p>
-            <a className="pz-btn pz-btn--primary pz-btn--block" href={manual.url} target="_blank" rel="noreferrer">Open payment page</a>
+            <strong>{manual.mode === "whatsapp" ? `Pay ${inr(manual.payment.amount)} with the MovEazy team` : `Pay ${inr(manual.payment.amount)} on Razorpay`}</strong>
+            <p className="pz-meta">
+              {manual.mode === "whatsapp"
+                ? "Message us and we'll send you the payment link. Your plan is activated as soon as it's paid."
+                : "Your plan is activated within a few hours of payment. Keep the receipt; the team may ask for it."}
+            </p>
+            <a className={`pz-btn pz-btn--block ${manual.mode === "whatsapp" ? "pz-wa" : "pz-btn--primary"}`} href={manual.url} target="_blank" rel="noreferrer">
+              {manual.mode === "whatsapp" ? <><WhatsAppIcon /> Message MovEazy</> : "Open payment page"}
+            </a>
           </div>
         ) : null}
       </div>
