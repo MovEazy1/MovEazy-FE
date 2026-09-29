@@ -1,5 +1,5 @@
 /**
- * "Your QR. Your storefront." — the partner landing's QR section (coming soon).
+ * "Your QR. Your storefront." — the partner landing's QR section (live: My QR in the app).
  *
  * One looping scene tells it: the broker's QR poster lifts out of the app,
  * gets pasted on a wall in their area, a tenant walks up and scans it, and the
@@ -18,7 +18,7 @@
 import { useEffect, useId, useMemo, useRef, useState } from "react";
 import QRCode from "qrcode";
 import { BadgeCheck, Heart, MapPin, Phone, Star } from "lucide-react";
-import { Shot } from "../landing/landingKit";
+import { Shot, useScrollSlide } from "../landing/landingKit";
 import { Avatar, TopBar, WhatsAppIcon } from "./partnerUi";
 import { SmartListingImage } from "./partnerMedia";
 import { inr } from "../../lib/landingCalc";
@@ -340,45 +340,6 @@ function InsightsScreen({ listings }) {
   );
 }
 
-/** Pins `pin`'s sticky child on phones and turns vertical scroll into the strip's horizontal scroll. */
-function useScrollSlide(pinRef, trackRef) {
-  useEffect(() => {
-    const pin = pinRef.current;
-    const track = trackRef.current;
-    if (!pin || !track || typeof window.matchMedia !== "function") return undefined;
-    const mq = window.matchMedia("(max-width: 520px)");
-    let dist = 0;
-    let frame = 0;
-    const update = () => {
-      frame = 0;
-      if (!dist) return;
-      const p = Math.min(1, Math.max(0, (PIN_TOP - pin.getBoundingClientRect().top) / dist));
-      track.scrollLeft = p * dist;
-    };
-    const measure = () => {
-      track.scrollLeft = 0;
-      dist = mq.matches ? Math.max(0, track.scrollWidth - track.clientWidth) : 0;
-      // The pinned stretch is as long as the strip has left to travel.
-      pin.style.height = dist ? `${track.parentElement.offsetHeight + dist}px` : "";
-      update();
-    };
-    const onScroll = () => { if (!frame) frame = requestAnimationFrame(update); };
-    measure();
-    window.addEventListener("scroll", onScroll, { passive: true });
-    window.addEventListener("resize", measure);
-    mq.addEventListener?.("change", measure);
-    return () => {
-      window.removeEventListener("scroll", onScroll);
-      window.removeEventListener("resize", measure);
-      mq.removeEventListener?.("change", measure);
-      if (frame) cancelAnimationFrame(frame);
-      pin.style.height = "";
-    };
-  }, [pinRef, trackRef]);
-}
-
-const PIN_TOP = 70; // px below the viewport top, clear of the nav; matches .qr-pin-in's top
-
 export default function QrFeature({ listings }) {
   const ref = useRef(null);
   const pinRef = useRef(null);
@@ -403,7 +364,7 @@ export default function QrFeature({ listings }) {
     <section className="lp-sec lp-sec--dark qr" id="qr">
       <style>{CSS}</style>
       <div className="lp-wrap lp-center">
-        <p className="lp-kicker"><span className="qr-soon">Coming soon</span></p>
+        <p className="lp-kicker"><span className="qr-soon">New · Free with every account</span></p>
         <h2 className="lp-h2">Your QR. <span className="hl">Your storefront.</span></h2>
         <p className="lp-sub">Paste it across your areas. Tenants scan and see all your homes. You see who liked what.</p>
 
@@ -416,8 +377,8 @@ export default function QrFeature({ listings }) {
           </ol>
         </div>
 
-        <div className="qr-pin" ref={pinRef}>
-          <div className="qr-pin-in">
+        <div className="qr-pin lp-pin" ref={pinRef}>
+          <div className="lp-pin-in">
             <div className="qr-shots" ref={trackRef}>
               <Shot title="What tenants see" sub="All your homes, one scan"><StorefrontScreen listings={listings} /></Shot>
               <Shot title="What you see" sub="Views, likes and who liked what"><InsightsScreen listings={listings} /></Shot>
@@ -432,8 +393,6 @@ export default function QrFeature({ listings }) {
 // Every element's resting style is the story's last frame; the loop lives in
 // the motion query, keyed to one 12-second clock.
 const CSS = `
-/* Sticky needs no clipping scroll container above it; clip hides the sideways overflow just the same. */
-.lp.lp--broker { overflow-x: clip; }
 .qr-soon { display: inline-block; padding: 5px 12px; border-radius: 999px; background: rgba(228,182,89,.16); color: var(--gold); }
 .qr-stage { max-width: 880px; margin: 30px auto 0; }
 .qr-svg { width: 100%; height: auto; display: block; border-radius: 26px; box-shadow: 0 30px 70px rgba(0,0,0,.35); }
@@ -457,8 +416,7 @@ const CSS = `
   .qr-step strong { font-size: 13.5px; }
   .qr-step span { display: none; }
   .qr-pin { margin-top: 40px; }
-  .qr-pin-in { position: sticky; top: ${PIN_TOP}px; }
-  .qr-shots { flex-wrap: nowrap; justify-content: flex-start; overflow-x: hidden; gap: 16px; margin: 0 -20px; padding: 4px 20px 16px; }
+  .qr-shots { flex-wrap: nowrap; justify-content: flex-start; gap: 16px; margin: 0 -20px; padding: 4px 20px 16px; }
 }
 @media (prefers-reduced-motion: no-preference) {
   .qr-stage.is-on .qr-svg * { animation-duration: 12s; animation-iteration-count: infinite; animation-timing-function: ease-in-out; }

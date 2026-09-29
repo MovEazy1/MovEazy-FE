@@ -8,7 +8,7 @@
 import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { Link } from "react-router-dom";
 import { useInView } from "react-intersection-observer";
-import { ChevronDown, Crown, Search, SlidersHorizontal } from "lucide-react";
+import { ChevronDown, Crown, QrCode, Search, SlidersHorizontal } from "lucide-react";
 import { usePartner } from "./PartnerApp";
 import FilterSheet from "./FilterSheet";
 import logo from "../../assets/logo/moveazy-logo-mint-light.png";
@@ -69,9 +69,12 @@ export default function InventoryHome() {
         <div className="pz-between">
           <h1 style={{ margin: 0, lineHeight: 0 }}><img src={logo} alt="MovEazy" style={{ height: 26, width: "auto" }} /></h1>
           <span className="pz-chip" style={{ cursor: "default" }}>Bangalore</span>
-          <Link to={pp("/more")} aria-label="Your profile" style={{ textDecoration: "none" }}>
-            <Avatar name={me?.partner?.name || "You"} />
-          </Link>
+          <span className="pz-row" style={{ gap: 4 }}>
+            <Link to={pp("/qr")} className="pz-iconbtn" aria-label="My QR poster" title="My QR poster"><QrCode size={21} /></Link>
+            <Link to={pp("/more")} aria-label="Your profile" style={{ textDecoration: "none" }}>
+              <Avatar name={me?.partner?.name || "You"} />
+            </Link>
+          </span>
         </div>
         <div className="pz-search">
           <Search size={17} />

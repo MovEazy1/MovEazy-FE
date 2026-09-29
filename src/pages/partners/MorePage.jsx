@@ -1,7 +1,7 @@
-/** More — profile, plan, saved, help, activity. */
+/** More — profile, QR poster, plan, saved, help, activity. */
 import { useState } from "react";
 import { Link } from "react-router-dom";
-import { Bookmark, ChevronRight, Crown, HelpCircle, LayoutDashboard, LogOut, Pencil } from "lucide-react";
+import { Bookmark, ChevronRight, Crown, HelpCircle, LayoutDashboard, LogOut, Pencil, QrCode } from "lucide-react";
 import { useAuth } from "../../context/AuthContext";
 import { usePartner } from "./PartnerApp";
 import { Avatar, Sheet, TopBar, WhatsAppIcon, formatPhone, toast } from "./partnerUi";
@@ -75,6 +75,7 @@ export default function MorePage() {
         </div>
 
         <div className="pz-card" style={{ marginBottom: 12 }}>
+          {row(pp("/qr"), <QrCode size={19} color="var(--g)" />, "My QR poster", "Print it · see who viewed and liked your flats")}
           {row(pp("/premium"), <Crown size={19} color="var(--g)" />, premium ? "MovEazy Premium — active" : "Get MovEazy Premium",
             premium ? "Full MovEazy inventory unlocked" : "Unlock 1000+ listings updated daily")}
           {row(pp("/saved"), <Bookmark size={19} />, "Saved properties", `${saved.size} saved`)}

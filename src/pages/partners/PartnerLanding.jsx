@@ -7,15 +7,15 @@
  * MovEazy's real published inventory:
  *   - prices, shares and stats come from the CRM (useLandingSettings);
  *   - the matching demo runs the app's own matching engine, so counts are live;
- *   - features that aren't live yet (MovEazy clients, the QR storefront) are marked "Coming soon";
+ *   - features that aren't live yet (MovEazy clients) are marked "Coming soon";
  *   - no testimonials until there are real ones to show.
  */
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import {
   ArrowRight, BadgeCheck, Building2, ChevronRight, Copy, IndianRupee, Phone, Plus, QrCode, Search, Share2, Sparkles, X, Zap,
 } from "lucide-react";
 import {
-  AppLogo, Faq, LandingFooter, LandingNav, LandingStyles, PhoneFrame, Shot, SignupButton, Stepper, StickyCta, VideoButton, useInventory, useListingsWithPhotos,
+  AppLogo, Faq, LandingFooter, LandingNav, LandingStyles, PhoneFrame, Shot, SignupButton, Stepper, StickyCta, VideoButton, useInventory, useListingsWithPhotos, useScrollSlide,
 } from "../landing/landingKit";
 import { Avatar, Chip, PropertyCard, TopBar, WhatsAppIcon } from "./partnerUi";
 import { SmartListingImage } from "./partnerMedia";
@@ -331,6 +331,9 @@ export default function PartnerLanding() {
   const inventory = useInventory();
   const photos = useListingsWithPhotos(inventory, 4);
   const best = useBestLead(inventory);
+  const appPin = useRef(null);
+  const appTrack = useRef(null);
+  useScrollSlide(appPin, appTrack);
 
   const stats = [[s.statBrokers, "Brokers"], [s.statProperties, "Verified properties"], [s.statRating, "Rating"]];
 
@@ -368,11 +371,15 @@ export default function PartnerLanding() {
       <section className="lp-sec" id="app">
         <div className="lp-wrap lp-center">
           <h2 className="lp-h2">One app. <span className="hl">Every deal.</span></h2>
-          <div className="lp-shots" style={{ marginTop: 36 }}>
-            <Shot title="Lead book" sub="Matches counted live"><LeadsScreen inventory={inventory} /></Shot>
-            <Shot title="Broker groups" sub="Share privately"><GroupsScreen listings={photos} /></Shot>
-            <Shot title="Owner contacts" sub="Unlocked with Premium"><ContactsScreen listing={photos[2] || photos[0]} share={s.propertyShare} /></Shot>
-            <Shot title="Share in one tap" sub="WhatsApp, link or QR"><ShareScreen listing={photos[3] || photos[0]} /></Shot>
+          <div className="lp-pin" ref={appPin} style={{ marginTop: 36 }}>
+            <div className="lp-pin-in">
+              <div className="lp-shots" ref={appTrack}>
+                <Shot title="Lead book" sub="Matches counted live"><LeadsScreen inventory={inventory} /></Shot>
+                <Shot title="Broker groups" sub="Share privately"><GroupsScreen listings={photos} /></Shot>
+                <Shot title="Owner contacts" sub="Unlocked with Premium"><ContactsScreen listing={photos[2] || photos[0]} share={s.propertyShare} /></Shot>
+                <Shot title="Share in one tap" sub="WhatsApp, link or QR"><ShareScreen listing={photos[3] || photos[0]} /></Shot>
+              </div>
+            </div>
           </div>
         </div>
       </section>
@@ -399,7 +406,7 @@ export default function PartnerLanding() {
             ["Is it free?", "Yes. Premium unlocks MovEazy inventory with owner contacts."],
             ["What does Premium cost?", `${inr(s.premiumPrice)}/month (regular ${inr(s.premiumListPrice)}).`],
             ["How much brokerage do I keep?", `${s.propertyShare}% on MovEazy properties, ${s.clientShare}% on MovEazy clients.`],
-            ["What is the QR storefront?", "Coming soon: your own QR poster. Tenants scan it to see all your homes; you see who viewed and who liked what."],
+            ["What is the QR storefront?", "Your own QR poster, free. Print it as an A4 PDF from My QR in the app. Tenants scan it to see all your homes; you see who viewed and who liked what."],
             ["Who sees my listings?", "You choose: only you, your groups, or all MovEazy brokers."],
           ]} />
         </div>

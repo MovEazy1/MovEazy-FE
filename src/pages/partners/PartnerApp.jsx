@@ -40,6 +40,7 @@ const GroupsList = lazy(() => import("./GroupsList"));
 const GroupDetail = lazy(() => import("./GroupDetail"));
 const MorePage = lazy(() => import("./MorePage"));
 const PremiumPage = lazy(() => import("./PremiumPage"));
+const MyQrPage = lazy(() => import("./MyQrPage"));
 const SavedPage = lazy(() => import("./SavedPage"));
 const JoinPage = lazy(() => import("./JoinPage"));
 
@@ -176,6 +177,7 @@ function PartnerWorkspace({ me, reloadMe }) {
             <Route path="groups/:id" element={<GroupDetail />} />
             <Route path="more" element={<MorePage />} />
             <Route path="premium" element={<PremiumPage />} />
+            <Route path="qr" element={<MyQrPage />} />
             <Route path="saved" element={<SavedPage />} />
             <Route path="*" element={<Navigate to={pp("/")} replace />} />
           </Routes>

@@ -16,9 +16,13 @@ import { useAuth } from "../../context/AuthContext";
 import { fetchPublishedInventory } from "../../lib/inventory";
 import { isVideoUrl } from "../../lib/listingMedia";
 
+/** px below the viewport top a pinned strip sits at: clear of the nav. */
+const PIN_TOP = 70;
+
 const CSS = `
 .lp { --ink:#13201B; --dim:#56655F; --line:#E6E2D6; --white:#fff; font-family: Inter, system-ui, -apple-system, "Segoe UI", sans-serif;
-  color: var(--ink); background: var(--cream); overflow-x: hidden; -webkit-font-smoothing: antialiased; }
+  color: var(--ink); background: var(--cream); overflow-x: hidden; overflow-x: clip; -webkit-font-smoothing: antialiased; }
+/* clip, not hidden, where supported: hidden makes .lp a scroll container, and sticky (.lp-pin-in) stops working inside one. */
 .lp--broker { --deep:#0A3A2A; --deep2:#05241A; --acc:#15803D; --accl:#E7F4EB; --gold:#E4B659; --gold2:#F7E9C6; --gold3:#8A6419; --cream:#F7F5EE; }
 .lp--owner { --deep:#063B2D; --deep2:#032419; --acc:#0A6B4E; --accl:#E7F2EC; --gold:#D6B77C; --gold2:#F4EBD8; --gold3:#7E6031; --cream:#F7F4EC; }
 .lp *, .lp *::before, .lp *::after { box-sizing: border-box; }
@@ -225,8 +229,54 @@ const CSS = `
   .lp-phone { height: 600px; }
   .lp-shots { display: flex; overflow-x: auto; scroll-snap-type: x mandatory; gap: 16px; margin: 0 -20px; padding: 4px 20px 16px; justify-items: initial; }
   .lp-shot { flex: none; width: 250px; scroll-snap-align: center; }
+  .lp-pin-in { position: sticky; top: ${PIN_TOP}px; }
+  .lp-pin .lp-shots, .lp-pin .qr-shots { overflow-x: hidden; scroll-snap-type: none; }
 }
 `;
+
+/**
+ * A strip of screens on a phone, driven by the page's own scroll: `pinRef`'s
+ * child (.lp-pin-in) sticks under the nav while the page scrolls past, and
+ * scrolling down slides `trackRef` right to its end — up slides it back. The
+ * pinned stretch is exactly as long as the strip has left to travel. Wider
+ * than a phone, nothing changes.
+ */
+export function useScrollSlide(pinRef, trackRef) {
+  useEffect(() => {
+    const pin = pinRef.current;
+    const track = trackRef.current;
+    if (!pin || !track || typeof window.matchMedia !== "function") return undefined;
+    const mq = window.matchMedia("(max-width: 520px)");
+    let dist = 0;
+    let frame = 0;
+    const update = () => {
+      frame = 0;
+      if (!dist) return;
+      const p = Math.min(1, Math.max(0, (PIN_TOP - pin.getBoundingClientRect().top) / dist));
+      track.scrollLeft = p * dist;
+    };
+    const measure = () => {
+      track.scrollLeft = 0;
+      dist = mq.matches ? Math.max(0, track.scrollWidth - track.clientWidth) : 0;
+      // The pinned stretch is as long as the strip has left to travel.
+      pin.style.height = dist ? `${track.parentElement.offsetHeight + dist}px` : "";
+      update();
+    };
+    const onScroll = () => { if (!frame) frame = requestAnimationFrame(update); };
+    measure();
+    window.addEventListener("scroll", onScroll, { passive: true });
+    window.addEventListener("resize", measure);
+    mq.addEventListener?.("change", measure);
+    return () => {
+      window.removeEventListener("scroll", onScroll);
+      window.removeEventListener("resize", measure);
+      mq.removeEventListener?.("change", measure);
+      if (frame) cancelAnimationFrame(frame);
+      pin.style.height = "";
+    };
+  }, [pinRef, trackRef]);
+}
+
 
 export function LandingStyles() {
   return <style>{CSS}</style>;

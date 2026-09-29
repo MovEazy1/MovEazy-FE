@@ -34,6 +34,7 @@ const TopMatches = lazy(() => import("./pages/TopMatches"));
 const HowItWorks = lazy(() => import("./pages/HowItWorks"));
 const About = lazy(() => import("./pages/About"));
 const Terms = lazy(() => import("./pages/Terms"));
+const Storefront = lazy(() => import("./pages/Storefront"));
 const TenantPreview = lazy(() => import("./pages/tenant/TenantPreview"));
 const TenantProfilePage = lazy(() => import("./pages/tenant/TenantProfilePage"));
 const Privacy = lazy(() => import("./pages/Privacy"));
@@ -170,6 +171,8 @@ function AppRoutes() {
         <Route path="/matches" element={<TopMatches />} />
         {/* One home, at its own address: where every shared link lands. */}
         <Route path="/property/:propertyId" element={<PropertyPage />} />
+        {/* A broker's storefront: what their printed QR poster opens. */}
+        <Route path="/b/:code" element={<Storefront />} />
         {/* The shortlist our team curated for one person. With a token it is the
             WhatsApp link and works signed out; without one it is the same set
             for whoever is signed in. */}
