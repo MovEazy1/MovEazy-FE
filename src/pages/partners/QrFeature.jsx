@@ -10,6 +10,10 @@
  * The scene is one SVG so it scales as a single picture. Its resting state is
  * the story's last frame; the loop only runs once it's on screen, and never
  * for people who asked for reduced motion.
+ *
+ * On a phone the two screens sit side by side in a strip that is pinned while
+ * the page scrolls past it: scrolling down slides the strip right, to its end,
+ * and scrolling up slides it back.
  */
 import { useEffect, useId, useMemo, useRef, useState } from "react";
 import QRCode from "qrcode";
@@ -336,9 +340,51 @@ function InsightsScreen({ listings }) {
   );
 }
 
+/** Pins `pin`'s sticky child on phones and turns vertical scroll into the strip's horizontal scroll. */
+function useScrollSlide(pinRef, trackRef) {
+  useEffect(() => {
+    const pin = pinRef.current;
+    const track = trackRef.current;
+    if (!pin || !track || typeof window.matchMedia !== "function") return undefined;
+    const mq = window.matchMedia("(max-width: 520px)");
+    let dist = 0;
+    let frame = 0;
+    const update = () => {
+      frame = 0;
+      if (!dist) return;
+      const p = Math.min(1, Math.max(0, (PIN_TOP - pin.getBoundingClientRect().top) / dist));
+      track.scrollLeft = p * dist;
+    };
+    const measure = () => {
+      track.scrollLeft = 0;
+      dist = mq.matches ? Math.max(0, track.scrollWidth - track.clientWidth) : 0;
+      // The pinned stretch is as long as the strip has left to travel.
+      pin.style.height = dist ? `${track.parentElement.offsetHeight + dist}px` : "";
+      update();
+    };
+    const onScroll = () => { if (!frame) frame = requestAnimationFrame(update); };
+    measure();
+    window.addEventListener("scroll", onScroll, { passive: true });
+    window.addEventListener("resize", measure);
+    mq.addEventListener?.("change", measure);
+    return () => {
+      window.removeEventListener("scroll", onScroll);
+      window.removeEventListener("resize", measure);
+      mq.removeEventListener?.("change", measure);
+      if (frame) cancelAnimationFrame(frame);
+      pin.style.height = "";
+    };
+  }, [pinRef, trackRef]);
+}
+
+const PIN_TOP = 70; // px below the viewport top, clear of the nav; matches .qr-pin-in's top
+
 export default function QrFeature({ listings }) {
   const ref = useRef(null);
+  const pinRef = useRef(null);
+  const trackRef = useRef(null);
   const [on, setOn] = useState(false);
+  useScrollSlide(pinRef, trackRef);
   useEffect(() => {
     const el = ref.current;
     if (!el || typeof IntersectionObserver === "undefined") { setOn(true); return undefined; }
@@ -370,9 +416,13 @@ export default function QrFeature({ listings }) {
           </ol>
         </div>
 
-        <div className="qr-shots">
-          <Shot title="What tenants see" sub="All your homes, one scan"><StorefrontScreen listings={listings} /></Shot>
-          <Shot title="What you see" sub="Views, likes and who liked what"><InsightsScreen listings={listings} /></Shot>
+        <div className="qr-pin" ref={pinRef}>
+          <div className="qr-pin-in">
+            <div className="qr-shots" ref={trackRef}>
+              <Shot title="What tenants see" sub="All your homes, one scan"><StorefrontScreen listings={listings} /></Shot>
+              <Shot title="What you see" sub="Views, likes and who liked what"><InsightsScreen listings={listings} /></Shot>
+            </div>
+          </div>
         </div>
       </div>
     </section>
@@ -382,6 +432,8 @@ export default function QrFeature({ listings }) {
 // Every element's resting style is the story's last frame; the loop lives in
 // the motion query, keyed to one 12-second clock.
 const CSS = `
+/* Sticky needs no clipping scroll container above it; clip hides the sideways overflow just the same. */
+.lp.lp--broker { overflow-x: clip; }
 .qr-soon { display: inline-block; padding: 5px 12px; border-radius: 999px; background: rgba(228,182,89,.16); color: var(--gold); }
 .qr-stage { max-width: 880px; margin: 30px auto 0; }
 .qr-svg { width: 100%; height: auto; display: block; border-radius: 26px; box-shadow: 0 30px 70px rgba(0,0,0,.35); }
@@ -404,8 +456,9 @@ const CSS = `
   .qr-steps { gap: 10px; }
   .qr-step strong { font-size: 13.5px; }
   .qr-step span { display: none; }
-  .qr-shots { flex-wrap: nowrap; justify-content: flex-start; overflow-x: auto; scroll-snap-type: x mandatory; gap: 16px; margin: 40px -20px 0; padding: 4px 20px 16px; }
-  .qr-shots .lp-shot { scroll-snap-align: center; }
+  .qr-pin { margin-top: 40px; }
+  .qr-pin-in { position: sticky; top: ${PIN_TOP}px; }
+  .qr-shots { flex-wrap: nowrap; justify-content: flex-start; overflow-x: hidden; gap: 16px; margin: 0 -20px; padding: 4px 20px 16px; }
 }
 @media (prefers-reduced-motion: no-preference) {
   .qr-stage.is-on .qr-svg * { animation-duration: 12s; animation-iteration-count: infinite; animation-timing-function: ease-in-out; }
