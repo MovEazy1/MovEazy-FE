@@ -17,17 +17,36 @@ import { bhkLabel, inr, pp } from "../../lib/partners";
 export const G = "#15803D";
 
 const CSS = `
-.pz { --g:#15803D; --g2:#166534; --gl:#E8F5EC; --gl2:#D1ECD9; --ink:#111827; --dim:#6B7280; --mute:#9CA3AF;
-  --line:#E5E7EB; --bg:#F6F7F6; --card:#FFFFFF; --warn:#B45309; --warnbg:#FEF3C7; --red:#B91C1C;
+/* MovEazy Partners — Noir & Gold.
+   noir    the frame: header, nav, primary buttons
+   gold    money and action: WhatsApp, Join Premium, the + button
+   emerald the MovEazy brand: availability, brokerage, success
+   royal   AI only: the matcher, match scores, curated lists */
+.pz { --noir:#0E0D12; --noir2:#1C1A24; --noir3:#2A2733;
+  --gold:#D4A437; --goldg:linear-gradient(180deg,#F0CF7C,#D4A437); --gold2:#F6E7BF; --gold3:#7A5A12;
+  --g:#0B6E4F; --g2:#08503A; --gl:#E4F2EC; --gl2:#CBE5D9;
+  --ai:#6B4EFF; --ai2:#4930C9; --ail:#EFEBFF; --aig:linear-gradient(135deg,#7B5CFF,#4930C9);
+  --ink:#16141C; --dim:#6B6776; --mute:#A09CAB;
+  --line:#E7E4DD; --bg:#F5F3EE; --card:#FFFFFF; --warn:#B45309; --warnbg:#FEF3C7; --red:#B91C1C;
   font-family: Inter, system-ui, -apple-system, "Segoe UI", sans-serif; color: var(--ink); background: var(--bg);
   min-height: 100dvh; -webkit-tap-highlight-color: transparent; }
 .pz *, .pz *::before, .pz *::after { box-sizing: border-box; }
 .pz-col { max-width: 520px; margin: 0 auto; min-height: 100dvh; background: var(--bg); position: relative;
   padding-bottom: calc(76px + env(safe-area-inset-bottom)); }
 @media (min-width: 560px) { .pz-col { border-left: 1px solid var(--line); border-right: 1px solid var(--line); } }
-.pz-top { position: sticky; top: 0; z-index: 20; background: var(--card); border-bottom: 1px solid var(--line);
+.pz-top { position: sticky; top: 0; z-index: 20; background: var(--noir); color: #fff; border-bottom: 1px solid var(--noir3);
   padding: 10px 16px; display: flex; align-items: center; gap: 10px; min-height: 54px; }
-.pz-top h1 { font-size: 18px; font-weight: 700; margin: 0; flex: 1; letter-spacing: -0.01em; }
+.pz-top h1 { font-size: 18px; font-weight: 700; margin: 0; flex: 1; letter-spacing: -0.01em; color: #fff; }
+.pz-top .pz-iconbtn { color: #fff; }
+.pz-top .pz-iconbtn:active { background: var(--noir3); }
+.pz-top .pz-btn--ghost { color: var(--gold); }
+.pz-top .pz-btn--primary { background: var(--goldg); border-color: transparent; color: #1F1605; }
+.pz-top .pz-chip { background: var(--noir2); border-color: var(--noir3); color: #E9E6F0; }
+.pz-top .pz-search input { background: var(--noir2); color: #fff; }
+.pz-top .pz-search input::placeholder { color: var(--mute); }
+.pz-top .pz-tabs { background: transparent; border-bottom: 0; }
+.pz-top .pz-tab { color: #A7A3B3; }
+.pz-top .pz-tab--on { color: #fff; border-bottom-color: var(--gold); }
 .pz-iconbtn { width: 38px; height: 38px; border-radius: 10px; border: 0; background: transparent; display: grid;
   place-items: center; color: var(--ink); cursor: pointer; flex: none; }
 .pz-iconbtn:active { background: var(--gl); }
@@ -49,8 +68,10 @@ const CSS = `
   background: #fff; color: var(--ink); font: inherit; font-weight: 600; font-size: 14px; padding: 10px 14px; cursor: pointer;
   text-decoration: none; min-height: 42px; }
 .pz-btn:disabled { opacity: .55; cursor: default; }
-.pz-btn--primary { background: var(--g); border-color: var(--g); color: #fff; }
-.pz-btn--primary:active { background: var(--g2); }
+.pz-btn--primary { background: var(--noir); border-color: var(--noir); color: #fff; }
+.pz-btn--primary:active { background: var(--noir3); }
+.pz-btn--gold { background: var(--goldg); border-color: transparent; color: #1F1605; font-weight: 800; }
+.pz-btn--ai { background: var(--aig); border-color: transparent; color: #fff; font-weight: 800; }
 .pz-btn--soft { background: var(--gl); border-color: var(--gl); color: var(--g2); }
 .pz-btn--ghost { border-color: transparent; background: transparent; color: var(--g); padding: 6px 8px; min-height: 0; }
 .pz-btn--block { width: 100%; min-height: 50px; font-size: 16px; border-radius: 12px; }
@@ -60,7 +81,7 @@ const CSS = `
 .pz-chips--scroll::-webkit-scrollbar { display: none; }
 .pz-chip { border: 1px solid var(--line); background: #fff; color: var(--ink); border-radius: 999px; padding: 7px 13px; font: inherit;
   font-size: 13px; font-weight: 500; cursor: pointer; white-space: nowrap; display: inline-flex; align-items: center; gap: 6px; }
-.pz-chip--on { background: var(--g); border-color: var(--g); color: #fff; }
+.pz-chip--on { background: var(--noir); border-color: var(--noir); color: #fff; }
 .pz-chip--soft { background: var(--gl); border-color: var(--gl); color: var(--g2); }
 .pz-pill { display: inline-flex; align-items: center; gap: 4px; border-radius: 999px; padding: 3px 9px; font-size: 12px; font-weight: 600;
   background: var(--gl); color: var(--g2); white-space: nowrap; }
@@ -70,16 +91,24 @@ const CSS = `
 .pz-tabs { display: flex; gap: 4px; border-bottom: 1px solid var(--line); background: var(--card); padding: 0 12px; }
 .pz-tab { flex: 1; border: 0; background: transparent; font: inherit; font-size: 14px; font-weight: 600; color: var(--dim);
   padding: 11px 4px 10px; border-bottom: 2px solid transparent; cursor: pointer; }
-.pz-tab--on { color: var(--g); border-bottom-color: var(--g); }
+.pz-tab--on { color: var(--ink); border-bottom-color: var(--gold); }
 .pz-list > * + * { margin-top: 12px; }
 .pz-prop { overflow: hidden; }
-.pz-prop-img { position: relative; aspect-ratio: 16/9; background: #E5E7EB; }
-.pz-prop-img img { width: 100%; height: 100%; object-fit: cover; display: block; }
-.pz-prop-badge { position: absolute; top: 10px; left: 10px; }
-.pz-prop-heart { position: absolute; top: 8px; right: 8px; width: 36px; height: 36px; border-radius: 999px; border: 0;
-  background: rgba(255,255,255,.92); display: grid; place-items: center; cursor: pointer; color: var(--ink); }
-.pz-prop-body { padding: 12px 14px 14px; }
-.pz-prop-title { font-size: 16px; font-weight: 700; margin: 0; }
+.pz-prop-img { position: relative; aspect-ratio: 16/9; background: #E9E6DF; overflow: hidden; }
+.pz-prop-img img, .pz-prop-img video { width: 100%; height: 100% !important; object-fit: cover; display: block; }
+.pz-prop-row { display: grid; grid-template-columns: 112px 1fr; height: 132px; }
+.pz-prop-row .pz-prop-img { aspect-ratio: auto; height: 132px; }
+.pz-prop-badge { position: absolute; top: 6px; left: 6px; }
+.pz-prop-badge .pz-pill { font-size: 10.5px; padding: 2px 7px; }
+.pz-prop-heart { position: absolute; bottom: 6px; left: 6px; width: 30px; height: 30px; border-radius: 999px; border: 0;
+  background: rgba(255,255,255,.94); display: grid; place-items: center; cursor: pointer; color: var(--ink); }
+.pz-prop-body { padding: 10px 12px; min-width: 0; display: flex; flex-direction: column; }
+.pz-prop-title { font-size: 14.5px; font-weight: 700; margin: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.pz-prop-body .pz-rent { font-size: 17px; }
+.pz-prop-body .pz-meta { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; font-size: 12px; }
+.pz-prop-actions { display: flex; gap: 6px; margin-top: auto; }
+.pz-prop-actions .pz-btn { min-height: 32px; padding: 5px 10px; font-size: 12.5px; border-radius: 9px; }
+.pz-prop-extra { padding: 8px 12px 10px; border-top: 1px solid var(--line); }
 .pz-rent { font-size: 20px; font-weight: 800; letter-spacing: -0.01em; }
 .pz-rent small { font-size: 13px; font-weight: 500; color: var(--dim); }
 .pz-meta { font-size: 13px; color: var(--dim); }
@@ -89,15 +118,15 @@ const CSS = `
   font-size: 13px; font-weight: 700; flex: none; }
 .pz-avatar--lg { width: 48px; height: 48px; font-size: 16px; }
 .pz-actions { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-top: 12px; }
-.pz-wa { background: var(--g); border-color: var(--g); color: #fff; }
+.pz-wa { background: var(--goldg); border-color: transparent; color: #1F1605; font-weight: 800; }
 .pz-nav { position: fixed; bottom: 0; left: 50%; transform: translateX(-50%); width: 100%; max-width: 520px; z-index: 30;
-  background: var(--card); border-top: 1px solid var(--line); display: grid; grid-template-columns: repeat(5, 1fr);
+  background: var(--noir); border-top: 1px solid var(--noir3); display: grid; grid-template-columns: repeat(5, 1fr);
   padding: 6px 4px calc(6px + env(safe-area-inset-bottom)); }
 .pz-nav a, .pz-nav button { display: flex; flex-direction: column; align-items: center; gap: 2px; font-size: 11px; font-weight: 600;
-  color: var(--dim); text-decoration: none; border: 0; background: transparent; font-family: inherit; cursor: pointer; padding: 4px 0; }
-.pz-nav .on { color: var(--g); }
-.pz-nav-plus { width: 54px; height: 54px; border-radius: 999px; background: var(--g) !important; color: #fff !important;
-  margin-top: -22px; box-shadow: 0 6px 16px rgba(21,128,61,.35); justify-content: center; align-self: center; }
+  color: #8E8A9A; text-decoration: none; border: 0; background: transparent; font-family: inherit; cursor: pointer; padding: 4px 0; }
+.pz-nav .on { color: var(--gold); }
+.pz-nav-plus { width: 54px; height: 54px; border-radius: 999px; background: var(--goldg) !important; color: #1F1605 !important;
+  margin-top: -22px; box-shadow: 0 6px 18px rgba(212,164,55,.45), 0 0 0 4px var(--noir); justify-content: center; align-self: center; }
 .pz-sheet-bg { position: fixed; inset: 0; background: rgba(17,24,39,.45); z-index: 60; display: flex; align-items: flex-end; justify-content: center; }
 .pz-sheet { background: var(--card); width: 100%; max-width: 520px; border-radius: 18px 18px 0 0; max-height: 92dvh; overflow: auto;
   padding: 0 0 calc(16px + env(safe-area-inset-bottom)); animation: pzUp .18s ease-out; }
@@ -111,7 +140,7 @@ const CSS = `
 .pz-menurow .pz-sub { display: block; font-size: 12.5px; color: var(--dim); margin-top: 2px; }
 .pz-empty { text-align: center; color: var(--dim); padding: 36px 20px; font-size: 14px; line-height: 1.5; }
 .pz-toast { position: fixed; left: 50%; bottom: calc(92px + env(safe-area-inset-bottom)); transform: translateX(-50%); z-index: 90;
-  background: #111827; color: #fff; padding: 10px 16px; border-radius: 10px; font-size: 14px; max-width: calc(100% - 32px);
+  background: var(--noir); color: #fff; border: 1px solid var(--noir3); padding: 10px 16px; border-radius: 10px; font-size: 14px; max-width: calc(100% - 32px);
   box-shadow: 0 8px 20px rgba(0,0,0,.2); }
 .pz-toast--error { background: var(--red); }
 .pz-lockbar { display: flex; align-items: center; gap: 10px; background: #FFFBEB; border: 1px solid #FDE68A; border-radius: 12px;
@@ -123,8 +152,8 @@ const CSS = `
 .pz-gallery { display: flex; overflow-x: auto; scroll-snap-type: x mandatory; scrollbar-width: none; aspect-ratio: 4/3; background: #E5E7EB; }
 .pz-gallery::-webkit-scrollbar { display: none; }
 .pz-gallery > * { flex: 0 0 100%; scroll-snap-align: start; width: 100%; height: 100%; object-fit: cover; }
-.pz-score { width: 40px; height: 40px; border-radius: 999px; display: grid; place-items: center; font-size: 12px; font-weight: 800;
-  border: 3px solid var(--g); color: var(--g2); background: #fff; flex: none; }
+.pz-score { width: 36px; height: 36px; border-radius: 999px; display: grid; place-items: center; font-size: 12px; font-weight: 800;
+  border: 3px solid var(--ai); color: var(--ai2); background: var(--ail); flex: none; }
 `;
 
 export function PartnerStyles() {
@@ -246,69 +275,52 @@ export function sourceLabel(l) {
   return l.lister_name || "Partner broker";
 }
 
-/** The inventory card (PRD 01): enough to act without opening the property. */
+/**
+ * The inventory card: compact and one fixed size (112px photo, 132px tall),
+ * whatever the photo's shape — the photo is cropped to fit, never the card to
+ * the photo. Enough to act without opening the property.
+ */
 export function PropertyCard({ listing: l, saved, onToggleSave, onWhatsApp, extra, detailsTo, onOpen }) {
   const navigate = useNavigate();
   const available = l.status === "published";
   const to = detailsTo || pp(`/property/${l.property_id}`);
   // onOpen: something other than the details page (demo mode explains instead).
   const open = (e) => { if (onOpen) { e?.preventDefault?.(); onOpen(); } else navigate(to); };
+  const who = l.source === "moveazy" ? (l.locked ? "MovEazy · contacts with Premium" : "MovEazy inventory")
+    : l.source === "mine" ? "Your listing" : l.lister_name || "Partner broker";
   return (
     <article className="pz-card pz-prop">
-      <div className="pz-prop-img" onClick={open} role="link" tabIndex={-1} style={{ cursor: "pointer" }}>
-        <SmartListingImage listing={l} />
-        <span className="pz-prop-badge">
-          {l.rent_flag === "potentially_rented"
-            ? <span className="pz-pill" style={{ background: "#FFEDD5", color: "#9A3412" }}>Potentially rented</span>
-            : available
-            ? <span className="pz-pill pz-pill--solid">Available</span>
-            : <span className="pz-pill pz-pill--grey" style={{ textTransform: "capitalize" }}>{l.status}</span>}
-        </span>
-        {onToggleSave && (
-          <button type="button" className="pz-prop-heart" aria-label={saved ? "Remove from saved" : "Save"}
-            onClick={(e) => { e.stopPropagation(); onToggleSave(); }}>
-            <Heart size={19} fill={saved ? "#DC2626" : "none"} color={saved ? "#DC2626" : "currentColor"} />
-          </button>
-        )}
-      </div>
-      <div className="pz-prop-body">
-        <div className="pz-between" style={{ alignItems: "flex-start" }}>
-          <h3 className="pz-prop-title">{bhkLabel(l)} • {l.area || "Bengaluru"}</h3>
-          <BrokeragePill listing={l} />
-        </div>
-        <div className="pz-rent" style={{ marginTop: 2 }}>{inr(l.rent)} <small>/ month</small></div>
-        <div className="pz-meta" style={{ marginTop: 2 }}>
-          {[l.furnishing, l.property_type].filter(Boolean).join(" • ") || " "}
-        </div>
-        <div className="pz-row" style={{ marginTop: 10 }}>
-          {l.source === "moveazy" ? (
-            <>
-              <span className="pz-avatar" style={{ background: "#DCFCE7", color: "#166534" }}><Building2 size={16} /></span>
-              <span style={{ minWidth: 0 }}>
-                <span style={{ display: "block", fontSize: 14, fontWeight: 600 }}>MovEazy inventory</span>
-                <span className="pz-meta">{l.locked ? "Contacts unlock with Premium" : "Owner contact in Details"}</span>
-              </span>
-            </>
-          ) : (
-            <>
-              <Avatar name={l.lister_name} />
-              <span style={{ minWidth: 0 }}>
-                <span style={{ display: "block", fontSize: 14, fontWeight: 600 }}>
-                  {l.source === "mine" ? "You" : l.lister_name || "Partner broker"}
-                </span>
-                <span className="pz-meta">{l.lister_phone ? formatPhone(l.lister_phone) : l.lister_agency || ""}</span>
-              </span>
-            </>
+      <div className="pz-prop-row">
+        <div className="pz-prop-img" onClick={open} role="link" tabIndex={-1} style={{ cursor: "pointer" }}>
+          <SmartListingImage listing={l} />
+          <span className="pz-prop-badge">
+            {l.rent_flag === "potentially_rented"
+              ? <span className="pz-pill" style={{ background: "#FFEDD5", color: "#9A3412" }}>Potentially rented</span>
+              : available
+              ? <span className="pz-pill pz-pill--solid">Available</span>
+              : <span className="pz-pill pz-pill--grey" style={{ textTransform: "capitalize" }}>{l.status}</span>}
+          </span>
+          {onToggleSave && (
+            <button type="button" className="pz-prop-heart" aria-label={saved ? "Remove from saved" : "Save"}
+              onClick={(e) => { e.stopPropagation(); onToggleSave(); }}>
+              <Heart size={16} fill={saved ? "#DC2626" : "none"} color={saved ? "#DC2626" : "currentColor"} />
+            </button>
           )}
         </div>
-        {extra}
-        <div className="pz-actions">
-          <button type="button" className="pz-btn pz-wa" onClick={onWhatsApp}>
-            <WhatsAppIcon /> WhatsApp
-          </button>
-          <Link to={to} onClick={onOpen ? open : undefined} className="pz-btn" style={{ color: "var(--g)", borderColor: "var(--gl2)" }}>Details</Link>
+        <div className="pz-prop-body">
+          <div className="pz-between" style={{ alignItems: "flex-start", gap: 6 }}>
+            <h3 className="pz-prop-title">{bhkLabel(l)} • {l.area || "Bengaluru"}</h3>
+          </div>
+          <div className="pz-rent">{inr(l.rent)} <small>/ mo</small></div>
+          <div className="pz-meta">{who}{l.furnishing ? ` · ${l.furnishing}` : ""}</div>
+          <div style={{ marginTop: 3 }}><BrokeragePill listing={l} /></div>
+          <div className="pz-prop-actions">
+            <button type="button" className="pz-btn pz-wa" onClick={onWhatsApp}><WhatsAppIcon size={15} /> WhatsApp</button>
+            <Link to={to} onClick={onOpen ? open : undefined} className="pz-btn">Details</Link>
+          </div>
         </div>
       </div>
+      {extra && <div className="pz-prop-extra">{extra}</div>}
     </article>
   );
 }

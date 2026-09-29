@@ -9,14 +9,16 @@
  */
 import { useCallback, useEffect, useRef, useState } from "react";
 import { Link } from "react-router-dom";
-import { Camera, Copy, Download, ExternalLink, Heart, Phone, QrCode, Star, Trash2 } from "lucide-react";
+import { BarChart3, Camera, Download, ExternalLink, Heart, MapPin, Phone, Plus, QrCode, Search, Star, Trash2, X } from "lucide-react";
 import { useAuth } from "../../context/AuthContext";
 import { usePartner } from "./PartnerApp";
-import { Avatar, Loading, TopBar, WhatsAppIcon, toast } from "./partnerUi";
+import { Avatar, Chip, Loading, TopBar, WhatsAppIcon, toast } from "./partnerUi";
+import ShareOptions from "./ShareOptions";
+import { useLocalities } from "./useLocalities";
 import { SmartListingImage } from "./partnerMedia";
 import { friendlyError, inr, pp, telLink, waLink } from "../../lib/partners";
 import {
-  fetchMyStorefront, removeStorefrontPhoto, storefrontDisplay, storefrontUrl, uploadStorefrontPhoto,
+  addPosterSpot, fetchInsights, fetchMyStorefront, removePosterSpot, removeStorefrontPhoto, storefrontDisplay, storefrontUrl, uploadStorefrontPhoto,
 } from "../../lib/storefront";
 import { POSTER_DESIGNS, drawPoster, loadImage, posterFontsReady, posterPdf } from "../../lib/qrPoster";
 import logoOnDark from "../../assets/logo/moveazy-logo-mint-dark.png";
@@ -57,16 +59,46 @@ export default function MyQrPage() {
     load().then((d) => { if (d?.photo_url) setPhotoSrc((cur) => cur || d.photo_url); });
   }, [load]);
 
+  // Poster spots: one QR per place a poster is pasted, so scans can be counted by area.
+  const localities = useLocalities();
+  const [spots, setSpots] = useState([]);
+  const [spot, setSpot] = useState("");
+  const [adding, setAdding] = useState(false);
+  const [spotArea, setSpotArea] = useState("");
+  const [spotQ, setSpotQ] = useState("");
+  const [spotLabel, setSpotLabel] = useState("");
+  const loadSpots = useCallback(() => fetchInsights().then((d) => setSpots(d?.spots || []), () => {}), []);
+  useEffect(() => { loadSpots(); }, [loadSpots]);
+  const spotMatches = spotQ.trim().length < 2 ? [] : localities.filter((a) => a.toLowerCase().includes(spotQ.trim().toLowerCase())).slice(0, 8);
+  const saveSpot = async () => {
+    if (!spotArea) { toast("Pick the area.", "error"); return; }
+    try {
+      const s2 = await addPosterSpot(spotArea, spotLabel);
+      await loadSpots();
+      setSpot(s2.code);
+      setAdding(false);
+      setSpotArea("");
+      setSpotLabel("");
+      toast(`Poster for ${s2.area} ready — download it below`);
+    } catch (ex) {
+      toast(friendlyError(ex, "Could not add the spot."), "error");
+    }
+  };
+  const dropSpot = async (id) => {
+    try { await removePosterSpot(id); setSpot(""); await loadSpots(); } catch (ex) { toast(friendlyError(ex), "error"); }
+  };
+  const currentSpot = spots.find((x) => x.code === spot);
+
   const posterData = useCallback(async () => {
     const [photo, logo] = await Promise.all([loadImage(photoSrc), loadImage(logoOnDark), posterFontsReady()]);
     return {
       broker: { name: partner.name, agency: partner.agency, phone: partner.phone, rating: sf?.rating, ratings: sf?.ratings },
-      url: storefrontUrl(sf.code, { qr: true }),
+      url: storefrontUrl(sf.code, { qr: true, spot }),
       displayUrl: storefrontDisplay(sf.code),
       photo,
       logo,
     };
-  }, [photoSrc, partner.name, partner.agency, partner.phone, sf]);
+  }, [photoSrc, partner.name, partner.agency, partner.phone, sf, spot]);
 
   // The preview: the same drawing the PDF gets, smaller.
   useEffect(() => {
@@ -117,7 +149,7 @@ export default function MyQrPage() {
       const url = URL.createObjectURL(blob);
       const a = document.createElement("a");
       a.href = url;
-      a.download = `MovEazy-QR-${design === "premium" ? "premium-home" : "profile"}-${sf.code}.pdf`;
+      a.download = `MovEazy-QR-${design === "premium" ? "premium-home" : "profile"}-${currentSpot ? currentSpot.area.replace(/\W+/g, "-") : sf.code}.pdf`;
       document.body.appendChild(a);
       a.click();
       a.remove();
@@ -129,14 +161,6 @@ export default function MyQrPage() {
     }
   };
 
-  const copy = async () => {
-    try {
-      await navigator.clipboard.writeText(storefrontUrl(sf.code));
-      toast("Link copied");
-    } catch {
-      toast(storefrontDisplay(sf.code));
-    }
-  };
 
   if (!sf && !err) return <><TopBar title="My QR poster" back /><Loading /></>;
   if (!sf) {
@@ -150,7 +174,6 @@ export default function MyQrPage() {
 
   const days = sf.by_day || [];
   const peak = Math.max(1, ...days.map((d) => d.views));
-  const share = `https://wa.me/?text=${encodeURIComponent(`See the homes I have on MovEazy: ${storefrontUrl(sf.code)}`)}`;
 
   return (
     <>
@@ -194,6 +217,41 @@ export default function MyQrPage() {
               </button>
             ))}
           </div>
+          <span className="pz-label" style={{ marginTop: 14 }}><MapPin size={14} style={{ verticalAlign: -2 }} /> Where will you paste it?</span>
+          <div className="pz-chips">
+            <Chip on={!spot} onClick={() => setSpot("")}>Anywhere</Chip>
+            {spots.map((x) => (
+              <Chip key={x.id} on={spot === x.code} onClick={() => setSpot(x.code)}>
+                {x.area}{x.label ? ` · ${x.label}` : ""} <span style={{ opacity: 0.6 }}>{x.scans}</span>
+              </Chip>
+            ))}
+            <Chip soft onClick={() => setAdding((v) => !v)}><Plus size={14} /> Add a spot</Chip>
+          </div>
+          {adding && (
+            <div className="myqr-spot">
+              <div className="pz-chips">
+                {[...new Set([spotArea, ...(partner.operational_areas || []), "HSR Layout", "Koramangala", "Bellandur", "BTM Layout"])].filter(Boolean).slice(0, 8).map((a) => (
+                  <Chip key={a} on={spotArea === a} onClick={() => setSpotArea(a)}>{a}</Chip>
+                ))}
+              </div>
+              <div className="pz-search" style={{ marginTop: 8 }}>
+                <Search size={17} />
+                <input className="pz-input" placeholder="Search another area" value={spotQ} onChange={(e) => setSpotQ(e.target.value)} aria-label="Search areas" />
+              </div>
+              {spotMatches.length > 0 && <div className="pz-chips" style={{ marginTop: 8 }}>{spotMatches.map((a) => <Chip key={a} onClick={() => { setSpotArea(a); setSpotQ(""); }}>+ {a}</Chip>)}</div>}
+              <input className="pz-input" style={{ marginTop: 8 }} placeholder="Label (optional) — e.g. 27th Main gate, Chai Point" value={spotLabel} onChange={(e) => setSpotLabel(e.target.value)} maxLength={80} />
+              <div className="pz-actions">
+                <button type="button" className="pz-btn pz-btn--primary" onClick={saveSpot} disabled={!spotArea}>Save spot</button>
+                <button type="button" className="pz-btn" onClick={() => setAdding(false)}>Cancel</button>
+              </div>
+            </div>
+          )}
+          {currentSpot && (
+            <p className="pz-hint" style={{ margin: "8px 0 0", display: "flex", alignItems: "center", gap: 6 }}>
+              This poster’s scans count for <b style={{ color: "var(--ink)" }}>{currentSpot.area}</b>.
+              <button type="button" className="pz-btn pz-btn--ghost" style={{ padding: 0, color: "var(--red)" }} onClick={() => dropSpot(currentSpot.id)}><X size={13} /> remove spot</button>
+            </p>
+          )}
           <div className={`myqr-preview myqr-preview--${design}`}>
             <canvas ref={canvasRef} aria-label="Poster preview" />
           </div>
@@ -206,9 +264,10 @@ export default function MyQrPage() {
             )}
             <input ref={fileRef} type="file" accept="image/*" hidden onChange={pickPhoto} />
           </div>
-          <button type="button" className="pz-btn pz-btn--primary pz-btn--block" style={{ marginTop: 10 }} onClick={download} disabled={busy === "pdf"}>
-            <Download size={18} /> {busy === "pdf" ? "Making your PDF…" : "Download A4 PDF"}
+          <button type="button" className="pz-btn pz-btn--gold pz-btn--block" style={{ marginTop: 10 }} onClick={download} disabled={busy === "pdf"}>
+            <Download size={18} /> {busy === "pdf" ? "Making your PDF…" : `Download A4 PDF${currentSpot ? ` · ${currentSpot.area}` : ""}`}
           </button>
+          <Link to={pp("/insights")} className="pz-btn pz-btn--ghost" style={{ width: "100%", marginTop: 6 }}><BarChart3 size={16} /> Scans by area in your leads dashboard</Link>
           <p className="pz-hint" style={{ textAlign: "center", margin: "8px 0 0" }}>Print it and paste it where tenants look — society gates, cafés, PG notice boards.</p>
         </div>
 
@@ -222,11 +281,10 @@ export default function MyQrPage() {
               Nothing to show yet. <Link to={pp("/add/property")} style={{ fontWeight: 700, color: "inherit" }}>Add a property</Link>
             </p>
           )}
-          <div className="pz-actions" style={{ gridTemplateColumns: "repeat(3, 1fr)", marginTop: 0 }}>
-            <a className="pz-btn pz-wa" href={share} target="_blank" rel="noreferrer"><WhatsAppIcon /> Share</a>
-            <button type="button" className="pz-btn" onClick={copy}><Copy size={16} /> Copy</button>
-            <a className="pz-btn" href={storefrontUrl(sf.code)} target="_blank" rel="noreferrer"><ExternalLink size={16} /> Open</a>
-          </div>
+          <ShareOptions url={storefrontUrl(sf.code)} title={`${partner.name || "My"} homes on MovEazy`}
+            message={`See the homes I have for rent on MovEazy — tap ♥ on the ones you like: ${storefrontUrl(sf.code)}`}
+            post={`🏠 ${sf.homes} verified rental home${Number(sf.homes) === 1 ? "" : "s"} available${partner.operational_areas?.length ? ` in ${partner.operational_areas.slice(0, 3).join(", ")}` : ""}. Photos, rent and details here — tap ♥ on what you like and I'll call you.${partner.phone ? ` ${partner.name ? `— ${partner.name}, ` : ""}${partner.phone}` : ""}`} />
+          <a className="pz-btn" style={{ width: "100%", marginTop: 10 }} href={storefrontUrl(sf.code)} target="_blank" rel="noreferrer"><ExternalLink size={16} /> Open my storefront</a>
         </div>
 
         <div className="pz-section" style={{ padding: 0 }}>
@@ -279,6 +337,7 @@ const CSS = `
 .myqr-thumb { flex: none; display: grid; place-items: center; border-radius: 5px; }
 .myqr-thumb--profile { width: 38px; height: 27px; background: #F7F5EE; border: 1px solid var(--line); color: var(--ink); }
 .myqr-thumb--premium { width: 27px; height: 38px; background: #0A3A2A; color: #E4B659; }
+.myqr-spot { margin-top: 10px; padding: 12px; border-radius: 12px; background: #FBFAF7; border: 1px solid var(--line); }
 .myqr-preview { margin-top: 12px; display: flex; justify-content: center; background: #EEF0EE; border-radius: 12px; padding: 12px; }
 .myqr-preview canvas { display: block; width: 100%; height: auto; border-radius: 4px; box-shadow: 0 8px 24px rgba(0,0,0,.18); background: #fff; }
 .myqr-preview--premium canvas { width: min(100%, 300px); }

@@ -11,11 +11,12 @@ import { useInView } from "react-intersection-observer";
 import { ChevronDown, Crown, QrCode, Search, SlidersHorizontal } from "lucide-react";
 import { usePartner } from "./PartnerApp";
 import FilterSheet from "./FilterSheet";
-import logo from "../../assets/logo/moveazy-logo-mint-light.png";
+import logo from "../../assets/logo/moveazy-logo-mint-dark.png";
 import { Avatar, Chip, Empty, Loading, PropertyCard } from "./partnerUi";
 import { DEMO_COUNTS, DEMO_GROUPS, DemoBanner, demoRows } from "./demoMode";
 import { CompleteProfileCard, PremiumCard, useGoldLogo } from "./PremiumJourney";
 import { NotificationBell } from "./PartnerInbox";
+import { AiMatcherCard } from "./AiMatcher";
 import { SOURCES, customerMessage, hasPremium, inSource, listerWhatsApp, pp, waLink } from "../../lib/partners";
 import { EMPTY_FILTERS, activeFilterCount, applyFilters } from "../../lib/partnerFilters";
 
@@ -133,6 +134,7 @@ export default function InventoryHome() {
       <div className="pz-pad pz-list">
         {planActive && !status?.profile?.completed_at && <CompleteProfileCard onDone={reloadStatus} />}
         {gold && <PremiumCard me={me} status={status} />}
+        <AiMatcherCard />
         {showingDemo && (
           <DemoBanner>
             {source === "moveazy" ? `Showing 6 of ${DEMO_COUNTS.moveazy.toLocaleString("en-IN")} MovEazy listings.`

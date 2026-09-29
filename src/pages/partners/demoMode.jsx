@@ -67,6 +67,7 @@ export const EXPLAIN = {
   curated: ["Curated list for your tenant", "Your tenant swipes through your picks on their phone. You see what they liked, and get a notification the moment they like a home."],
   lead_whatsapp: ["Message your tenant", "Opens WhatsApp with your tenant and logs when you last contacted them."],
   create_group: ["Create a group", "Start a private group for your association and invite brokers with a WhatsApp link."],
+  insights: ["Leads dashboard", "Your QR scans by area, how many clients opened your lists, which homes they like most, and every like and skip as it happens."],
   sold_out: ["Mark sold out", "Tell your group a flat is taken. MovEazy and the listing broker are notified, so nobody wastes a call."],
 };
 
@@ -119,7 +120,7 @@ const CSS = `
   display: flex; align-items: flex-end; justify-content: center; animation: dmfade .18s ease; }
 @keyframes dmfade { from { opacity: 0; } }
 @keyframes dmup { from { transform: translateY(30px); opacity: 0; } }
-.dm-pop { position: relative; width: min(520px, 100%); background: radial-gradient(120% 90% at 0% 0%, #145C43, #0A3A2A 55%, #05241A); color: #fff;
+.dm-pop { position: relative; width: min(520px, 100%); background: radial-gradient(120% 90% at 0% 0%, #3A2A8C, #16131F 55%, #0E0D12); color: #fff;
   border-radius: 26px 26px 0 0; padding: 28px 22px calc(20px + env(safe-area-inset-bottom)); text-align: center; animation: dmup .24s ease; }
 .dm-x { position: absolute; top: 12px; right: 12px; width: 36px; height: 36px; border-radius: 99px; border: 0; background: rgba(255,255,255,.1); color: #fff; display: grid; place-items: center; cursor: pointer; }
 .dm-ic { width: 58px; height: 58px; border-radius: 18px; margin: 0 auto 12px; display: grid; place-items: center; color: #1F1605;

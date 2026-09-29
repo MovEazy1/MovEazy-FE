@@ -79,7 +79,7 @@ export default function Storefront() {
       if (!alive || !d) return;
       if (!counted.current) {
         counted.current = true;
-        recordStorefrontView(code, params.get("s"));
+        recordStorefrontView(code, params.get("s"), params.get("p"));
       }
       // A heart or rating tapped before signing in, finished now.
       const pending = uid ? readPending(code) : null;

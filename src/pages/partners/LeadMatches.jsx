@@ -6,13 +6,14 @@
  */
 import { useEffect, useMemo, useState } from "react";
 import { Link, useParams } from "react-router-dom";
-import { ArrowUpDown, Check, Copy, SlidersHorizontal, Sparkles } from "lucide-react";
+import { ArrowUpDown, Check, SlidersHorizontal, Sparkles } from "lucide-react";
 import { usePartner } from "./PartnerApp";
 import FilterSheet from "./FilterSheet";
 import { useSendToLead } from "./LeadDetail";
-import { Avatar, Chip, Empty, Loading, PropertyCard, Sheet, TopBar, WhatsAppIcon, toast } from "./partnerUi";
+import { Avatar, Chip, Empty, Loading, PropertyCard, Sheet, TopBar, toast } from "./partnerUi";
+import ShareOptions from "./ShareOptions";
 import { requirementLine } from "./leadBits";
-import { friendlyError, pp, waLink } from "../../lib/partners";
+import { friendlyError, pp } from "../../lib/partners";
 import { matchesForLead } from "../../lib/partnerMatch";
 import { EMPTY_FILTERS, activeFilterCount, applyFilters } from "../../lib/partnerFilters";
 import { createCuratedList, curatedMessage, curatedUrl } from "../../lib/partnerCurated";
@@ -125,7 +126,7 @@ export default function LeadMatches() {
       {rows.length > 0 && (
         <div style={{ position: "fixed", left: 0, right: 0, bottom: "calc(64px + env(safe-area-inset-bottom))", zIndex: 25, maxWidth: 520, margin: "0 auto",
           padding: "10px 16px", background: "linear-gradient(rgba(246,247,246,0), var(--bg) 30%)" }}>
-          <button type="button" className="pz-btn pz-btn--primary pz-btn--block" onClick={create} disabled={busy || !count}>
+          <button type="button" className="pz-btn pz-btn--ai pz-btn--block" onClick={create} disabled={busy || !count}>
             <Sparkles size={18} /> {busy ? "Making the list…" : `Send curated list · ${count} home${count === 1 ? "" : "s"}`}
           </button>
         </div>
@@ -137,16 +138,11 @@ export default function LeadMatches() {
             <p style={{ margin: "0 0 14px", fontSize: 15, lineHeight: 1.55 }}>
               {lead.name.split(" ")[0]} swipes through your {sent.count} pick{sent.count === 1 ? "" : "s"} on their phone. You’ll get a notification the moment they like one.
             </p>
-            <a className="pz-btn pz-wa pz-btn--block" target="_blank" rel="noreferrer"
-              href={waLink(lead.phone, curatedMessage(sent.token, { leadName: lead.no_name ? "" : lead.name, count: sent.count, brokerName: me?.partner?.name }))}>
-              <WhatsAppIcon /> Send to {lead.no_name ? "tenant" : lead.name.split(" ")[0]} on WhatsApp
-            </a>
-            <div className="pz-actions">
-              <button type="button" className="pz-btn" onClick={async () => {
-                try { await navigator.clipboard.writeText(curatedUrl(sent.token)); toast("Link copied"); } catch { toast(curatedUrl(sent.token)); }
-              }}><Copy size={16} /> Copy link</button>
-              <Link className="pz-btn" to={pp(`/curated/${sent.id}`)}>Track responses</Link>
-            </div>
+            <ShareOptions url={curatedUrl(sent.token)} phone={lead.phone}
+              waLabel={`WhatsApp ${lead.no_name ? "client" : lead.name.split(" ")[0]}`}
+              message={curatedMessage(sent.token, { leadName: lead.no_name ? "" : lead.name, count: sent.count, brokerName: me?.partner?.name })}
+              post={`${sent.count} verified rental homes picked for you — swipe and tap ♥ on the ones you like.`} />
+            <Link className="pz-btn pz-btn--block" style={{ marginTop: 12 }} to={pp(`/curated/${sent.id}`)}>Track opens, likes & skips</Link>
           </div>
         </Sheet>
       )}

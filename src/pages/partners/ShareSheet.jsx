@@ -4,33 +4,16 @@
  */
 import { useState } from "react";
 import QRCode from "qrcode";
-import { ChevronRight, Copy, Globe, QrCode, Share2 } from "lucide-react";
-import { Sheet, WhatsAppIcon, toast } from "./partnerUi";
+import { ChevronRight, QrCode } from "lucide-react";
+import { Sheet, toast } from "./partnerUi";
+import ShareOptions from "./ShareOptions";
 import { SmartListingImage } from "./partnerMedia";
-import { bhkLabel, customerMessage, displayLink, inr, partnerPropertyLink, waLink } from "../../lib/partners";
+import { bhkLabel, customerMessage, displayLink, inr, partnerPropertyLink } from "../../lib/partners";
 
 export default function ShareSheet({ listing: l, leadPhone = "", leadName = "", onClose, onSent }) {
   const [qr, setQr] = useState("");
   const message = customerMessage(l, { leadName });
 
-  const copy = async () => {
-    const link = partnerPropertyLink(l.property_id, "copy");
-    try {
-      await navigator.clipboard.writeText(link);
-      toast("Link copied");
-    } catch {
-      window.prompt("Copy this link", link);
-    }
-  };
-
-  const native = async () => {
-    const url = partnerPropertyLink(l.property_id, "native_share");
-    if (navigator.share) {
-      try { await navigator.share({ title: `${bhkLabel(l)} in ${l.area}`, text: message.split("\n")[0], url }); } catch { /* dismissed */ }
-    } else {
-      copy();
-    }
-  };
 
   const showQr = async () => {
     try {
@@ -76,22 +59,12 @@ export default function ShareSheet({ listing: l, leadPhone = "", leadName = "", 
       ) : (
         <>
           <div className="pz-pad" style={{ paddingTop: 0 }}>
-            <span className="pz-label">Share via WhatsApp</span>
-            <a className="pz-card pz-menurow" style={{ borderRadius: 12 }} target="_blank" rel="noreferrer"
-              href={waLink(leadPhone, message)} onClick={() => onSent?.()}>
-              <span className="pz-avatar" style={{ background: "#22C55E", color: "#fff" }}><WhatsAppIcon /></span>
-              <span style={{ flex: 1 }}>Send on WhatsApp
-                <span className="pz-sub">{leadName ? `To ${leadName}` : "Open WhatsApp with property link"}</span></span>
-              <ChevronRight size={18} color="#9CA3AF" />
-            </a>
+            <ShareOptions url={partnerPropertyLink(l.property_id, leadPhone ? "whatsapp" : "share")} phone={leadPhone} onShare={() => onSent?.()}
+              waLabel={leadName ? `WhatsApp ${leadName.split(" ")[0]}` : undefined} title={`${bhkLabel(l)} in ${l.area}`}
+              message={message} post={`🏠 ${bhkLabel(l)} for rent in ${l.area || "Bengaluru"} — ${inr(l.rent)}/month. Photos and details:`} />
           </div>
           <div className="pz-pad" style={{ paddingTop: 0 }}>
-            <span className="pz-label">Other options</span>
             <div className="pz-card">
-              {row(<Copy size={17} />, "Copy Link", "", copy)}
-              {row(<Globe size={17} />, "Share on Facebook", "Opens Facebook's share window", null,
-                `https://www.facebook.com/sharer/sharer.php?u=${encodeURIComponent(partnerPropertyLink(l.property_id, "facebook"))}`)}
-              {row(<Share2 size={17} />, "Share via More Apps", "", native)}
               {row(<QrCode size={17} />, "Show QR Code", "When you're with the customer", showQr)}
             </div>
           </div>

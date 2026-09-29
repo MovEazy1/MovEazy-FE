@@ -1,7 +1,7 @@
 /** More — profile, QR poster, plan, saved, help, activity. */
 import { useState } from "react";
 import { Link } from "react-router-dom";
-import { Bookmark, ChevronRight, Crown, Eye, Gift, HelpCircle, LayoutDashboard, LogOut, Pencil, QrCode, TrendingUp } from "lucide-react";
+import { BarChart3, Bookmark, ChevronRight, Crown, Eye, Gift, HelpCircle, LayoutDashboard, LogOut, Pencil, QrCode, TrendingUp, WandSparkles } from "lucide-react";
 import { useAuth } from "../../context/AuthContext";
 import { usePartner } from "./PartnerApp";
 import { Avatar, Sheet, TopBar, WhatsAppIcon, formatPhone, toast } from "./partnerUi";
@@ -75,6 +75,8 @@ export default function MorePage() {
         </div>
 
         <div className="pz-card" style={{ marginBottom: 12 }}>
+          {row(pp("/insights"), <BarChart3 size={19} color="#8A6419" />, "Leads dashboard", "QR scans by area, likes and skips")}
+          {row(pp("/ai-matcher"), <WandSparkles size={19} color="#6B4EFF" />, "AI Property Matcher", "A shortlist for every client")}
           {row(pp("/qr"), <QrCode size={19} color="var(--g)" />, "My QR poster", "Print it · see who viewed and liked your flats")}
           {row(pp("/premium"), <Crown size={19} color="#8A6419" />, premium ? "MovEazy Premium — active" : "Join Premium",
             premium ? `Plans${status?.plan?.until ? ` · till ${new Date(status.plan.until).toLocaleDateString("en-IN", { day: "numeric", month: "short" })}` : ""}` : "Unlock 1000+ listings, AI matching and groups")}

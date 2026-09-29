@@ -53,6 +53,8 @@ const PaymentReturn = lazy(() => import("./PremiumJourney").then((m) => ({ defau
 const WelcomePremium = lazy(() => import("./PremiumJourney").then((m) => ({ default: m.WelcomePremium })));
 const ReferralsPage = lazy(() => import("./PremiumJourney").then((m) => ({ default: m.ReferralsPage })));
 const SalesFunnel = lazy(() => import("./SalesFunnel"));
+const AiMatcher = lazy(() => import("./AiMatcher"));
+const Insights = lazy(() => import("./Insights"));
 const NotificationsPage = lazy(() => import("./PartnerInbox").then((m) => ({ default: m.NotificationsPage })));
 const CuratedListPage = lazy(() => import("./PartnerInbox").then((m) => ({ default: m.CuratedListPage })));
 
@@ -224,6 +226,8 @@ function PartnerWorkspace({ me, reloadMe }) {
             <Route path="welcome" element={<WelcomePremium />} />
             <Route path="referrals" element={<ReferralsPage />} />
             <Route path="notifications" element={<NotificationsPage />} />
+            <Route path="ai-matcher" element={<AiMatcher />} />
+            <Route path="insights" element={<Insights />} />
             <Route path="curated/:id" element={<CuratedListPage />} />
             <Route path="qr" element={<MyQrPage />} />
             <Route path="saved" element={<SavedPage />} />

@@ -9,8 +9,9 @@ import { Bell, Heart, Home, Sparkles, ThumbsDown } from "lucide-react";
 import { usePartner } from "./PartnerApp";
 import { Empty, Loading, TopBar, WhatsAppIcon, toast } from "./partnerUi";
 import { SmartListingImage } from "./partnerMedia";
+import ShareOptions from "./ShareOptions";
 import { bhkLabel, friendlyError, inr, pp, waLink } from "../../lib/partners";
-import { fetchMyCuratedLists, fetchNotifications, markNotificationsRead } from "../../lib/partnerCurated";
+import { curatedMessage, curatedUrl, fetchMyCuratedLists, fetchNotifications, markNotificationsRead } from "../../lib/partnerCurated";
 
 const ago = (iso) => {
   const s = Math.max(0, (Date.now() - new Date(iso).getTime()) / 1000);
@@ -18,17 +19,28 @@ const ago = (iso) => {
   if (s < 86400) return `${Math.round(s / 3600)}h`;
   return `${Math.round(s / 86400)}d`;
 };
-const ICON = { tenant_liked: Heart, storefront_like: Heart, sold_out_request: Home, sold_out_decided: Home };
+const ICON = { tenant_liked: Heart, storefront_like: Heart, sold_out_request: Home, sold_out_decided: Home, list_opened: Sparkles, list_done: Sparkles };
 
-/** Unread count for the bell, refreshed every minute while the app is open. */
+/**
+ * Unread count for the bell, checked every 30 seconds while the app is open —
+ * and a toast the moment something new lands (a like, a skip-summary, an open).
+ */
 export function useUnreadCount(enabled) {
   const [n, setN] = useState(0);
   useEffect(() => {
     if (!enabled) return undefined;
     let alive = true;
-    const tick = () => fetchNotifications().then((r) => { if (alive) setN(Number(r?.unread) || 0); }, () => {});
+    let last = null; // newest notification id seen
+    const tick = () => fetchNotifications().then((r) => {
+      if (!alive) return;
+      setN(Number(r?.unread) || 0);
+      const newest = r?.items?.[0];
+      if (newest && last != null && newest.id > last && !newest.read) toast(`${newest.title} — ${newest.body}`.slice(0, 140));
+      if (newest) last = Math.max(last ?? 0, newest.id);
+      else if (last == null) last = 0;
+    }, () => {});
     tick();
-    const id = setInterval(tick, 60000);
+    const id = setInterval(tick, 30000);
     return () => { alive = false; clearInterval(id); };
   }, [enabled]);
   return n;
@@ -103,7 +115,7 @@ export function CuratedListPage() {
         <div className="pz-section">
           <strong style={{ fontSize: 17 }}>{list.lead_name || tenant?.name || "Your tenant"}</strong>
           <p className="pz-meta" style={{ margin: "4px 0 0" }}>
-            {list.property_ids.length} homes · opened {list.open_count}× · <b style={{ color: "#E11D48" }}>{liked} liked</b>
+            {list.property_ids.length} homes · opened {list.open_count}× · <b style={{ color: "#E11D48" }}>♥ {liked} liked</b> · ✕ {list.property_ids.filter((p) => acts[p]?.action === "skipped").length} skipped
           </p>
           {tenant?.phone ? (
             <a className="pz-btn pz-wa pz-btn--block" style={{ marginTop: 12 }} target="_blank" rel="noreferrer"
@@ -111,6 +123,14 @@ export function CuratedListPage() {
               <WhatsAppIcon /> WhatsApp {tenant.name || tenant.phone}
             </a>
           ) : <p className="pz-hint" style={{ margin: "10px 0 0" }}>Not opened yet — the tenant enters their number when they do.</p>}
+          <details style={{ marginTop: 12 }}>
+            <summary className="pz-meta" style={{ cursor: "pointer", fontWeight: 700 }}>Share this list again</summary>
+            <div style={{ marginTop: 12 }}>
+              <ShareOptions url={curatedUrl(list.token)} phone={tenant?.phone || ""}
+                message={curatedMessage(list.token, { leadName: list.lead_name, count: list.property_ids.length })}
+                post={`${list.property_ids.length} verified rental homes — swipe and tap ♥ on the ones you like.`} />
+            </div>
+          </details>
         </div>
         <div className="pz-card">
           {list.property_ids.map((pid, i) => {

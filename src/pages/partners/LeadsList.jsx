@@ -5,7 +5,7 @@
  */
 import { useMemo, useState } from "react";
 import { Link } from "react-router-dom";
-import { Plus, Search, Sparkles } from "lucide-react";
+import { BarChart3, ChevronRight, Plus, Search, Sparkles } from "lucide-react";
 import { usePartner } from "./PartnerApp";
 import { Avatar, Empty, TopBar, WhatsAppIcon } from "./partnerUi";
 import { DEMO_LEADS, DemoBanner } from "./demoMode";
@@ -55,7 +55,7 @@ export default function LeadsList() {
   return (
     <>
       <TopBar title="Leads" right={
-        <Link to={pp("/leads/new")} className="pz-iconbtn" aria-label="Add lead" style={{ background: "var(--g)", color: "#fff", borderRadius: 999 }}>
+        <Link to={pp("/leads/new")} className="pz-iconbtn" aria-label="Add lead" style={{ background: "var(--goldg)", color: "#1F1605", borderRadius: 999 }}>
           <Plus size={20} />
         </Link>
       } />
@@ -73,6 +73,13 @@ export default function LeadsList() {
       </div>
       <div className="pz-pad">
         {demo && <DemoBanner>Sample tenants are mixed in with yours.</DemoBanner>}
+        <Link to={pp("/insights")} onClick={demo ? (e) => { e.preventDefault(); explain("insights"); } : undefined} className="pz-card pz-row"
+          style={{ padding: 14, marginBottom: 12, color: "inherit", textDecoration: "none", background: "var(--noir)", borderColor: "var(--noir)" }}>
+          <span className="pz-avatar" style={{ background: "var(--goldg)", color: "#1F1605" }}><BarChart3 size={17} /></span>
+          <span style={{ flex: 1, color: "#fff" }}><strong style={{ display: "block" }}>Leads dashboard</strong>
+            <span style={{ fontSize: 12.5, color: "#A7A3B3" }}>QR scans by area · what clients like · every like & skip</span></span>
+          <ChevronRight size={18} color="#D4A437" />
+        </Link>
         {rows.length === 0 ? (
           <Empty action={<Link to={pp("/leads/new")} className="pz-btn pz-btn--primary"><Plus size={16} /> Add lead</Link>}>
             {leads.length ? "No leads match." : "Add your first customer — a name and mobile is enough."}
@@ -96,13 +103,13 @@ export default function LeadsList() {
                   </Link>
                   <div style={{ display: "flex", flexDirection: "column", alignItems: "flex-end", gap: 8 }}>
                     <button type="button" className="pz-iconbtn" aria-label={`WhatsApp ${lead.name}`} onClick={() => whatsapp(lead)}
-                      style={{ background: "#22C55E", color: "#fff", borderRadius: 999, width: 34, height: 34 }}>
+                      style={{ background: "var(--goldg)", color: "#1F1605", borderRadius: 999, width: 34, height: 34 }}>
                       <WhatsAppIcon size={18} />
                     </button>
                     {demo ? (
-                      <button type="button" className="pz-btn pz-btn--sm pz-btn--soft" onClick={() => explain("ai_match")}><Sparkles size={14} /> AI matching</button>
+                      <button type="button" className="pz-btn pz-btn--sm pz-btn--ai" onClick={() => explain("ai_match")}><Sparkles size={14} /> AI matching</button>
                     ) : (
-                      <Link to={pp(`/leads/${lead.id}/matches`)} className="pz-btn pz-btn--sm pz-btn--soft"><Sparkles size={14} /> AI matching</Link>
+                      <Link to={pp(`/leads/${lead.id}/matches`)} className="pz-btn pz-btn--sm pz-btn--ai"><Sparkles size={14} /> AI matching</Link>
                     )}
                   </div>
                 </div>

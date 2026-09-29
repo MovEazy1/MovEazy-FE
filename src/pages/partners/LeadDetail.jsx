@@ -52,7 +52,7 @@ export default function LeadDetail() {
             <span className="pz-hint">{lastContactedLabel(lead.last_contacted_at)}</span>
           </div>
           <button type="button" aria-label={`WhatsApp ${lead.name}`} onClick={() => send(null)}
-            className="pz-iconbtn" style={{ background: "#22C55E", color: "#fff", borderRadius: 999, width: 44, height: 44 }}>
+            className="pz-iconbtn" style={{ background: "var(--goldg)", color: "#1F1605", borderRadius: 999, width: 44, height: 44 }}>
             <WhatsAppIcon size={22} />
           </button>
         </div>
@@ -74,7 +74,7 @@ export default function LeadDetail() {
 
         {hasRequirement(lead) && (
           <Link to={pp(`/leads/${id}/matches`)} onClick={demo ? (e) => { e.preventDefault(); explain("ai_match"); } : undefined}
-            className="pz-btn pz-btn--primary pz-btn--block" style={{ marginBottom: 12 }}>
+            className="pz-btn pz-btn--ai pz-btn--block" style={{ marginBottom: 12 }}>
             <Sparkles size={18} /> AI matching · send a curated list
           </Link>
         )}

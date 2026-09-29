@@ -19,7 +19,9 @@ async function rpc(fn, args) {
 }
 
 /** The public page for a code, always on moveazy.co.in. `qr` marks it as scanned from a poster. */
-export const storefrontUrl = (code, { qr = false } = {}) => `${PUBLIC_ORIGIN}/b/${code}${qr ? "?s=qr" : ""}`;
+/** `spot`: the poster spot's code, so a scan is counted for the area the poster is pasted in. */
+export const storefrontUrl = (code, { qr = false, spot = "" } = {}) =>
+  `${PUBLIC_ORIGIN}/b/${code}${qr ? `?s=qr${spot ? `&p=${spot}` : ""}` : ""}`;
 export const storefrontDisplay = (code) => `moveazy.co.in/b/${code}`;
 
 /* ── The public page ─────────────────────────────────────────────────────── */
@@ -40,11 +42,17 @@ export function visitorId() {
   }
 }
 
-export function recordStorefrontView(code, source) {
+export function recordStorefrontView(code, source, spot = "") {
   const v = visitorId();
-  return rpc("partner_storefront_view", { p_code: code, p_visitor: v || "anonymous-visitor", p_source: source === "qr" ? "qr" : "link" })
-    .catch(() => {});
+  return rpc("partner_storefront_view", {
+    p_code: code, p_visitor: v || "anonymous-visitor", p_source: source === "qr" ? "qr" : "link", p_spot: String(spot || ""),
+  }).catch(() => {});
 }
+
+/* ── Poster spots and the dashboard ──────────────────────────────────────── */
+export const addPosterSpot = (area, label = "") => rpc("partner_add_spot", { p_area: area, p_label: label });
+export const removePosterSpot = (id) => rpc("partner_remove_spot", { p_id: id });
+export const fetchInsights = () => rpc("partner_insights");
 
 export const likeStorefrontHome = (code, propertyId, on) =>
   rpc("partner_storefront_like", { p_code: code, p_property: propertyId, p_on: Boolean(on) });
