@@ -106,7 +106,8 @@ const CSS = `
 .pz-prop-title { font-size: 14.5px; font-weight: 700; margin: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .pz-prop-body .pz-rent { font-size: 17px; }
 .pz-prop-body .pz-meta { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; font-size: 12px; }
-.pz-prop-actions { display: flex; gap: 6px; margin-top: auto; }
+.pz-prop-actions { display: flex; gap: 6px; margin-top: auto; padding-top: 6px; }
+.pz-prop-body .pz-pill { font-size: 10.5px; padding: 2px 7px; }
 .pz-prop-actions .pz-btn { min-height: 32px; padding: 5px 10px; font-size: 12.5px; border-radius: 9px; }
 .pz-prop-extra { padding: 8px 12px 10px; border-top: 1px solid var(--line); }
 .pz-rent { font-size: 20px; font-weight: 800; letter-spacing: -0.01em; }
@@ -308,12 +309,12 @@ export function PropertyCard({ listing: l, saved, onToggleSave, onWhatsApp, extr
           )}
         </div>
         <div className="pz-prop-body">
-          <div className="pz-between" style={{ alignItems: "flex-start", gap: 6 }}>
-            <h3 className="pz-prop-title">{bhkLabel(l)} • {l.area || "Bengaluru"}</h3>
+          <h3 className="pz-prop-title">{bhkLabel(l)} • {l.area || "Bengaluru"}</h3>
+          <div className="pz-between" style={{ gap: 6 }}>
+            <div className="pz-rent">{inr(l.rent)} <small>/ mo</small></div>
+            <BrokeragePill listing={l} />
           </div>
-          <div className="pz-rent">{inr(l.rent)} <small>/ mo</small></div>
           <div className="pz-meta">{who}{l.furnishing ? ` · ${l.furnishing}` : ""}</div>
-          <div style={{ marginTop: 3 }}><BrokeragePill listing={l} /></div>
           <div className="pz-prop-actions">
             <button type="button" className="pz-btn pz-wa" onClick={onWhatsApp}><WhatsAppIcon size={15} /> WhatsApp</button>
             <Link to={to} onClick={onOpen ? open : undefined} className="pz-btn">Details</Link>
