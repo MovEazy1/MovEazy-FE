@@ -45,12 +45,12 @@ const yy = (y) => (/^\d{4}$/.test(String(y)) ? `’${String(y).slice(2)}` : "");
 
 /** What the card shows for each part of the profile, and what an empty part is worth. */
 const CARD_ROWS = [
-  { id: "linkedin", icon: Link2, keys: ["linkedin"], text: () => "LinkedIn", add: "LinkedIn" },
   { id: "currentCompany", icon: Briefcase, keys: ["currentCompany"], text: (p) => p.currentCompany, add: "Current company" },
   { id: "pastCompany", icon: History, keys: ["pastCompany"], text: (p) => `Before: ${pastCompanyLabel(p.pastCompany)}`, add: "Past company" },
   { id: "education", icon: GraduationCap, keys: ["college", "graduationYear"], text: (p) => `${p.college} ${yy(p.graduationYear)}`.trim(), add: "College & year" },
   { id: "inBangaloreSince", icon: CalendarDays, keys: ["inBangaloreSince"], text: (p) => (/^\d{4}$/.test(p.inBangaloreSince) ? `Since ${p.inBangaloreSince}` : p.inBangaloreSince), add: "In Bangalore since" },
   { id: "maritalStatus", icon: Heart, keys: ["maritalStatus"], text: (p) => statusLabel(p.maritalStatus), add: "Married / single" },
+  { id: "linkedin", icon: Link2, keys: ["linkedin"], text: () => "LinkedIn", add: "LinkedIn" },
 ];
 
 /** Fixed positions, so the glitter doesn't jump between renders. */

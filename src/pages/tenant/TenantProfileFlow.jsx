@@ -33,7 +33,7 @@ function yearChips() {
 }
 
 const COPY = {
-  linkedin: { q: "Add your LinkedIn", sub: "The quickest way for an owner to trust who’s asking." },
+  linkedin: { q: "Last one: your LinkedIn", sub: "The quickest way for an owner to trust who’s asking." },
   currentCompany: { q: "Where do you work now?", sub: "Owners trust tenants they can place." },
   pastCompany: { q: "And before that?", sub: "Your last company — or tell us it’s your first job." },
   education: { q: "Where did you study?", sub: "Your college, and the year you graduated." },
@@ -55,17 +55,20 @@ export default function TenantProfileFlow({ initial = {}, onSave, onClose, onFin
     return miss.length ? PROFILE_STEPS.findIndex((s) => s.id === miss[0].id) : 0;
   });
   const [dir, setDir] = useState(1);
-  const [nudge, setNudge] = useState(false);
+  const [nudge, setNudge] = useState("");
   const [done, setDone] = useState(false);
   const { score, complete } = profileScore(profile);
   const step = PROFILE_STEPS[i];
   const val = (k) => profile[k] ?? "";
   const set = (k, v) => setProfile((p) => ({ ...p, [k]: v }));
   const years = useMemo(() => yearChips(), []);
-  const go = (n) => { setDir(n > i ? 1 : -1); setI(n); setNudge(false); };
+  const go = (n) => { setDir(n > i ? 1 : -1); setI(n); setNudge(""); };
 
   const next = () => {
-    if (!step.fields.every((k) => isFilled(profile, k))) { setNudge(true); return; }
+    if (!step.fields.every((k) => isFilled(profile, k))) {
+      setNudge(step.id === "linkedin" && String(profile.linkedin || "").trim() ? "Invalid LinkedIn ID" : "Fill this in to continue — or skip it for now.");
+      return;
+    }
     const tidy = { ...profile };
     if (tidy.linkedin) tidy.linkedin = normalizeLinkedIn(tidy.linkedin) || tidy.linkedin;
     setProfile(tidy);
@@ -135,25 +138,25 @@ export default function TenantProfileFlow({ initial = {}, onSave, onClose, onFin
                 </>
               )}
               <div className="tn-input-wrap">
-                <input className="tn-input" inputMode="url" autoCapitalize="none" autoCorrect="off" spellCheck={false} placeholder="Profile link or LinkedIn ID" value={li}
+                <input className="tn-input" enterKeyHint="next" onKeyDown={(e) => { if (e.key === "Enter") { e.preventDefault(); next(); } }} inputMode="url" autoCapitalize="none" autoCorrect="off" spellCheck={false} placeholder="Profile link or LinkedIn ID" value={li}
                   onChange={(e) => set("linkedin", e.target.value)} />
                 {liValid && <span className="tn-input-ok"><Check size={16} strokeWidth={3} /></span>}
               </div>
-              {li && !liValid && <p className="tn-hint">Paste your profile link, or just your LinkedIn ID — the part after linkedin.com/in/.</p>}
+              {li && !liValid && nudge && <p className="tn-hint" role="alert">Invalid LinkedIn ID</p>}
               {liValid && <p className="tn-ok">{normalizeLinkedIn(li).replace("https://www.", "")}</p>}
             </>
           )}
 
           {step.id === "currentCompany" && (
             <>
-              <input className="tn-input" placeholder="Company name" value={val("currentCompany")} onChange={(e) => set("currentCompany", e.target.value)} />
+              <input className="tn-input" enterKeyHint="next" onKeyDown={(e) => { if (e.key === "Enter") { e.preventDefault(); next(); } }} placeholder="Company name" value={val("currentCompany")} onChange={(e) => set("currentCompany", e.target.value)} />
               <div className="tn-chips">{COMPANIES.map((c) => <button key={c} type="button" className={val("currentCompany") === c ? "on" : ""} onClick={() => set("currentCompany", c)}>{c}</button>)}</div>
             </>
           )}
 
           {step.id === "pastCompany" && (
             <>
-              <input className="tn-input" placeholder="Previous company" value={val("pastCompany") === FIRST_JOB ? "" : val("pastCompany")} disabled={val("pastCompany") === FIRST_JOB}
+              <input className="tn-input" enterKeyHint="next" onKeyDown={(e) => { if (e.key === "Enter") { e.preventDefault(); next(); } }} placeholder="Previous company" value={val("pastCompany") === FIRST_JOB ? "" : val("pastCompany")} disabled={val("pastCompany") === FIRST_JOB}
                 onChange={(e) => set("pastCompany", e.target.value)} />
               <button type="button" className={`tn-toggle${val("pastCompany") === FIRST_JOB ? " on" : ""}`}
                 onClick={() => set("pastCompany", val("pastCompany") === FIRST_JOB ? "" : FIRST_JOB)}>
@@ -164,7 +167,7 @@ export default function TenantProfileFlow({ initial = {}, onSave, onClose, onFin
 
           {step.id === "education" && (
             <>
-              <input className="tn-input" placeholder="College name" value={val("college")} onChange={(e) => set("college", e.target.value)} />
+              <input className="tn-input" enterKeyHint="next" onKeyDown={(e) => { if (e.key === "Enter") { e.preventDefault(); next(); } }} placeholder="College name" value={val("college")} onChange={(e) => set("college", e.target.value)} />
               <div className="tn-chips">{COLLEGES.map((c) => <button key={c} type="button" className={val("college") === c ? "on" : ""} onClick={() => set("college", c)}>{c}</button>)}</div>
               <div className={`tn-grad${grad ? " set" : ""}`}>
                 <div className="tn-grad-top">
@@ -204,7 +207,7 @@ export default function TenantProfileFlow({ initial = {}, onSave, onClose, onFin
           )}
         </div>
 
-        {nudge && !stepDone && <p className="tn-nudge" role="status">Fill this in to continue — or skip it for now.</p>}
+        {nudge && !stepDone && !(step.id === "linkedin" && li) && <p className="tn-nudge" role="status">{nudge}</p>}
         <div className="tn-flow-foot">
           <button type="button" className="tn-skip" onClick={() => (i < PROFILE_STEPS.length - 1 ? go(i + 1) : setDone(true))}>Skip for now</button>
           <button type="button" className={`tn-btn tn-btn--ink${stepDone ? "" : " soft"}`} onClick={next}>
@@ -218,7 +221,8 @@ export default function TenantProfileFlow({ initial = {}, onSave, onClose, onFin
 
 const CSS = `
 .tn-flow { background: #fff; }
-.tn-flow-in { min-height: 100vh; display: flex; flex-direction: column; padding-top: 18px; padding-bottom: 24px; }
+/* dvh, not vh: on phones 100vh includes the browser's own bars, which pushed Continue out of reach. */
+.tn-flow-in { min-height: 100vh; min-height: 100dvh; display: flex; flex-direction: column; padding-top: 18px; padding-bottom: 0; }
 .tn-flow-top { display: flex; align-items: center; justify-content: space-between; font-weight: 800; font-size: 15px; }
 .tn-icon { width: 40px; height: 40px; border-radius: 99px; border: 0; background: #F1F4F3; color: var(--ink); display: grid; place-items: center; cursor: pointer; }
 .tn-steps { display: flex; gap: 6px; margin: 16px 0 18px; }
@@ -282,14 +286,15 @@ const CSS = `
 .tn-status button.on .ic { background: var(--ink); color: var(--mint); }
 .tn-note { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; font-size: 13px; color: var(--dim); margin: 14px 0 0; }
 .tn-note b { color: var(--ink); }
-.tn-flow-foot { margin-top: auto; padding-top: 24px; display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+.tn-flow-foot { margin-top: auto; position: sticky; bottom: 0; z-index: 5; display: flex; align-items: center; justify-content: space-between; gap: 12px;
+  padding: 14px 0 calc(14px + env(safe-area-inset-bottom)); background: linear-gradient(rgba(255,255,255,0), #fff 22%); }
 .tn-skip { font: inherit; font-size: 14.5px; font-weight: 700; color: var(--dim); background: none; border: 0; cursor: pointer; }
 .tn-flow-foot .tn-btn { flex: 0 0 auto; min-width: 150px; transition: background .2s, opacity .2s, transform .12s; }
 .tn-flow-foot .tn-btn.soft { opacity: .45; }
 .tn-nudge { margin: 18px 0 0; padding: 10px 12px; border-radius: 12px; background: #FFF7E6; color: #8A5A06; font-size: 13.5px; font-weight: 700; animation: tnShake .35s ease; }
 @keyframes tnShake { 20%, 60% { transform: translateX(-4px); } 40%, 80% { transform: translateX(4px); } }
 
-.tn-done { min-height: 100vh; display: flex; flex-direction: column; justify-content: center; padding-top: 30px; padding-bottom: 30px; text-align: center; }
+.tn-done { min-height: 100vh; min-height: 100dvh; display: flex; flex-direction: column; justify-content: center; padding-top: 30px; padding-bottom: 30px; text-align: center; }
 .tn-done-burst { width: 72px; height: 72px; margin: 0 auto 14px; border-radius: 99px; display: grid; place-items: center; background: var(--wash); color: var(--teal);
   box-shadow: 0 0 0 10px rgba(94,234,212,.12); }
 .tn-done h1 { font-size: 32px; letter-spacing: -.035em; line-height: 1.1; }

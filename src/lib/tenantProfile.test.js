@@ -60,7 +60,7 @@ describe("tenant profile score", () => {
   it("blank answers don't count and their screen is asked again", () => {
     const p = { ...signup, currentCompany: "  ", college: "BITS Pilani", inBangaloreSince: "2024" };
     expect(profileScore(p).score).toBe(40);
-    expect(missingSteps(p).map((s) => s.id)).toEqual(["linkedin", "currentCompany", "pastCompany", "education", "maritalStatus"]);
+    expect(missingSteps(p).map((s) => s.id)).toEqual(["currentCompany", "pastCompany", "education", "maritalStatus", "linkedin"]);
   });
 
   it("saves in the database's shape and reads back the same profile", () => {

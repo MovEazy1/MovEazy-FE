@@ -44,12 +44,12 @@ export const FIELDS = [
 
 /** The screens of the profile flow, in order; a screen can ask for more than one field. */
 export const PROFILE_STEPS = [
-  { id: "linkedin", fields: ["linkedin"] },
   { id: "currentCompany", fields: ["currentCompany"] },
   { id: "pastCompany", fields: ["pastCompany"] },
   { id: "education", fields: ["college", "graduationYear"] },
   { id: "inBangaloreSince", fields: ["inBangaloreSince"] },
   { id: "maritalStatus", fields: ["maritalStatus"] },
+  { id: "linkedin", fields: ["linkedin"] },
 ];
 
 export const FAMILY_BONUS = 10;
