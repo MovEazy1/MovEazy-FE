@@ -141,7 +141,7 @@ export function DemoListPreview({ lead, homes, onClose }) {
           )}
         </div>
 
-        <span className="pz-label" style={{ marginTop: 14 }}><Bell size={14} style={{ verticalAlign: -2 }} /> What you’d get</span>
+        <span className="pz-label" style={{ marginTop: 14, display: "flex", alignItems: "center", gap: 6 }}><Bell size={14} /> What you’d get</span>
         <div className="dlp-feed">
           {feed.map((f, k) => (
             <div key={k} className={`dlp-n ${f.kind}`}>

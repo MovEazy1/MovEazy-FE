@@ -59,9 +59,24 @@ export default function InventoryHome() {
 
   useEffect(() => { setShown(PAGE); }, [source, filters, ui.q, groupId]);
   const { ref: more, inView } = useInView({ rootMargin: "600px" });
-  // The AI matcher card, once it scrolls up under the header, lives on as a slim bar inside it.
-  const { ref: aiRef, entry: aiEntry } = useInView({ rootMargin: "-150px 0px 0px 0px" });
-  const aiCompact = Boolean(aiEntry && !aiEntry.isIntersecting && aiEntry.boundingClientRect.top < 150);
+  // The header scrolls away with the page. Only the AI matcher stays: once its card has
+  // scrolled off the top it pins as a slim bar — and scrolling back up brings the search
+  // in above it, like a browser's address bar.
+  const aiRef = useRef(null);
+  const [aiCompact, setAiCompact] = useState(false);
+  const [scrollingUp, setScrollingUp] = useState(false);
+  useEffect(() => {
+    let last = window.scrollY;
+    const onScroll = () => {
+      const y = window.scrollY;
+      const card = aiRef.current?.getBoundingClientRect();
+      setAiCompact(Boolean(card && card.bottom < 4));
+      if (Math.abs(y - last) > 6) { setScrollingUp(y < last); last = y; }
+    };
+    onScroll();
+    window.addEventListener("scroll", onScroll, { passive: true });
+    return () => window.removeEventListener("scroll", onScroll);
+  }, []);
   useEffect(() => { if (inView) setShown((n) => n + PAGE); }, [inView]);
 
   // Scroll: restore once the list exists, remember on the way out.
@@ -84,7 +99,7 @@ export default function InventoryHome() {
 
   return (
     <>
-      <header className="pz-top" style={{ flexDirection: "column", alignItems: "stretch", gap: 10, paddingBottom: 0 }}>
+      <header className="pz-top" style={{ position: "relative", flexDirection: "column", alignItems: "stretch", gap: 10, paddingBottom: 0 }}>
         <div className="pz-between">
           <h1 style={{ margin: 0, lineHeight: 0 }}><img src={goldLogo || logo} alt="MovEazy" height="26" style={{ height: 26, width: "auto" }} /></h1>
           <span className="pz-chip" style={{ cursor: "default" }}>Bangalore</span>
@@ -110,8 +125,21 @@ export default function InventoryHome() {
             </button>
           ))}
         </div>
-        {aiCompact && <div style={{ paddingBottom: 8 }}><AiMatcherCard compact /></div>}
       </header>
+
+      {aiCompact && (
+        <div className="ih-float">
+          <style>{FLOAT_CSS}</style>
+          {scrollingUp && (
+            <div className="pz-search ih-float-search">
+              <Search size={17} />
+              <input className="pz-input" type="search" placeholder="Search by location, BHK, rent…" value={q}
+                onChange={(e) => setQ(e.target.value)} aria-label="Search inventory" />
+            </div>
+          )}
+          <AiMatcherCard compact />
+        </div>
+      )}
 
       <div className="pz-pad" style={{ paddingBottom: 4 }}>
         <div className="pz-chips pz-chips--scroll">
@@ -191,3 +219,17 @@ export default function InventoryHome() {
     </>
   );
 }
+
+// The pinned strip: the AI matcher bar, with the search above it while scrolling up.
+const FLOAT_CSS = `
+.ih-float { position: fixed; top: 0; left: 50%; transform: translateX(-50%); width: 100%; max-width: 520px; z-index: 25;
+  padding: 0 12px 8px; background: rgba(14,13,18,.94); backdrop-filter: blur(10px); -webkit-backdrop-filter: blur(10px);
+  border-bottom: 1px solid var(--noir3); animation: ihin .18s ease; }
+.ih-float .aim-bar { margin-top: 8px; }
+.ih-float-search { margin-top: 8px; animation: ihin .18s ease; }
+.ih-float-search input { background: var(--noir2); color: #fff; border-color: transparent; }
+.ih-float-search input::placeholder { color: var(--mute); }
+@keyframes ihin { from { opacity: 0; transform: translate(-50%, -8px); } }
+.ih-float-search { animation-name: ihsearch; }
+@keyframes ihsearch { from { opacity: 0; transform: translateY(-8px); } }
+`;
