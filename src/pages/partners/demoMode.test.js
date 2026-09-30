@@ -15,6 +15,17 @@ describe("demo matcher", () => {
     }
   });
 
+  it("ranks a believable top 10: not every home a perfect 100", () => {
+    for (const lead of DEMO_LEADS) {
+      for (const seed of [0, 1, 2]) {
+        const top = matchesForLead(lead, demoHomesFor(lead, photos, seed)).slice(0, 10).map((m) => m.score);
+        expect(top[0]).toBe(100);
+        expect(new Set(top).size).toBeGreaterThanOrEqual(3);
+        expect(top.filter((s) => s === 100).length).toBeLessThanOrEqual(5);
+      }
+    }
+  });
+
   it("is stable for one run and reshuffles on the next", () => {
     const lead = DEMO_LEADS[0];
     const a = demoHomesFor(lead, photos, 0).map((h) => `${h.area}:${h.rent}`);

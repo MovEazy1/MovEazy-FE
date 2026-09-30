@@ -27,10 +27,10 @@ import { createCuratedList, curatedMessage, curatedUrl, fetchMyCuratedLists } fr
 const TOP = 10;
 
 /**
- * What the matcher can pick from: the partner's inventory — and in demo mode the
- * sample network and groups, plus sample homes shaped around each of `forLeads`,
- * so every client gets a real-looking shortlist from the real engine. `seed`
- * reshuffles the samples.
+ * What the matcher can pick from: the partner's inventory — or in demo mode,
+ * sample homes shaped around each of `forLeads` (tagged `for_lead`), so every
+ * client gets a real-looking shortlist, with a real spread of scores, from the
+ * real engine. `seed` reshuffles the samples.
  */
 export function useMatchPool(forLeads = [], seed = 0) {
   const { inventory, demo } = usePartner();
@@ -39,8 +39,7 @@ export function useMatchPool(forLeads = [], seed = 0) {
     if (!demo) return base;
     const d = demoRows(base);
     const photos = [...base, ...d.broker, ...d.group];
-    const shaped = forLeads.filter(hasRequirement).flatMap((lead) => demoHomesFor(lead, photos, seed));
-    return [...base, ...d.broker, ...d.group, ...shaped];
+    return forLeads.filter(hasRequirement).flatMap((lead) => demoHomesFor(lead, photos, seed));
   }, [inventory, demo, forLeads, seed]);
 }
 
@@ -51,7 +50,8 @@ function useShortlists(seed = 0) {
   const pool = useMatchPool(clients, seed);
   return useMemo(() => {
     const ready = clients.filter(hasRequirement).map((lead) => {
-      const matches = matchesForLead(lead, pool);
+      // In demo mode each client is ranked against the sample homes made for them.
+      const matches = matchesForLead(lead, demo ? pool.filter((h) => h.for_lead === lead.id) : pool);
       return { lead, matches, top: matches.slice(0, TOP) };
     }).sort((a, b) => b.top.length - a.top.length);
     // In demo mode the scale is the one a plan unlocks, not the handful of samples on screen.

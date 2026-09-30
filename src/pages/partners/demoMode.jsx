@@ -23,12 +23,15 @@ export const DEMO_GROUPS = [
 ].map((name, i) => ({ id: `demo-g${i + 1}`, name, member_count: [18, 12, 15, 9, 21, 11][i], property_count: 20, demo: true }));
 
 export const DEMO_LEADS = [
-  ["Anjali Sharma", "2 BHK", "HSR Layout", 35000, "family"], ["Rahul Menon", "1 BHK", "Koramangala", 25000, "bachelor"],
-  ["Priya Iyer", "3 BHK", "Bellandur", 55000, "family"], ["Vikram Singh", "1 RK", "BTM Layout", 15000, "bachelor"],
-  ["Neha Gupta", "2 BHK", "Sarjapur Road", 30000, "family"], ["Aditya Rao", "1 BHK", "Indiranagar", 32000, "bachelor"],
-].map(([name, bhk, area, budget, household], i) => ({
+  ["Anjali Sharma", "2 BHK", "HSR Layout", 35000, "family", "Semi Furnished"],
+  ["Rahul Menon", "1 BHK", "Koramangala", 25000, "bachelor", "Fully Furnished"],
+  ["Priya Iyer", "3 BHK", "Bellandur", 55000, "family", "Semi Furnished"],
+  ["Vikram Singh", "1 RK", "BTM Layout", 15000, "bachelor", ""],
+  ["Neha Gupta", "2 BHK", "Sarjapur Road", 30000, "family", "Unfurnished"],
+  ["Aditya Rao", "1 BHK", "Indiranagar", 32000, "bachelor", "Fully Furnished"],
+].map(([name, bhk, area, budget, household, furnishing], i) => ({
   id: `demo-l${i + 1}`, demo: true, name, phone: "", status: "active", household, gender_pref: "",
-  flat_types: [bhk], localities: [area], budget_min: Math.round(budget * 0.7), budget_max: budget, furnishing: "",
+  flat_types: [bhk], localities: [area], budget_min: Math.round(budget * 0.7), budget_max: budget, furnishing,
   notes: "", last_contacted_at: null,
 }));
 
@@ -67,6 +70,16 @@ function rng(seedText) {
 
 const NEARBY = ["HSR Layout", "Koramangala", "Bellandur", "BTM Layout", "Sarjapur Road", "Indiranagar", "Whitefield", "Marathahalli", "JP Nagar", "Electronic City"];
 const FURNISH = ["Fully Furnished", "Semi Furnished", "Unfurnished"];
+// The furnishing one step away from what was asked for (the engine gives it half marks).
+const NEXT_FURNISH = { "Unfurnished": "Semi Furnished", "Semi Furnished": "Fully Furnished", "Fully Furnished": "Semi Furnished" };
+
+/** One bedroom off what was asked for: "2 BHK" → "1 BHK", "1 BHK" → "2 BHK", "1 RK" → "1 BHK". */
+function bhkOff(type) {
+  const m = /(\d+)\s*BHK/i.exec(type || "");
+  if (!m) return "1 BHK";
+  const n = Number(m[1]);
+  return `${n >= 2 ? n - 1 : n + 1} BHK`;
+}
 
 /**
  * Demo mode: sample homes shaped around one client's requirement — their BHK,
@@ -85,10 +98,15 @@ export function demoHomesFor(lead, photoPool = [], seed = 0, count = 12) {
   const photos = photoPool.filter((l) => l.cover_image_url || (l.images ?? []).length);
   const brokers = BROKERS.map(([name, agency]) => ({ name, agency }));
   return Array.from({ length: count }, (_, i) => {
-    // A steady mix, so every shortlist has a spread of scores: some a little
-    // over budget, some just outside the areas asked for.
-    const over = Boolean(hi) && i % 4 === 1;
-    const near = i % 5 === 3;
+    // A steady mix, so every shortlist has a spread of scores the way real
+    // inventory does: some a little over budget, some a furnishing or a
+    // bedroom off, and a few outside the areas asked for (the engine drops
+    // those). The seed rotates which homes get which.
+    const j = (i + seed) % count;
+    const over = Boolean(hi) && j % 4 === 1;
+    const near = j % 5 === 3;
+    const offBhk = (lead.flat_types ?? []).length > 0 && j % 6 === 4;
+    const offFurnish = Boolean(NEXT_FURNISH[lead.furnishing]) && j % 3 === 2;
     const base = hi ? lo + r() * (hi - lo) : 15000 + r() * 45000;
     const rent = Math.round((over ? hi * (1.03 + r() * 0.06) : base) / 500) * 500;
     const photo = photos.length ? photos[Math.floor(r() * photos.length)] : {};
@@ -97,6 +115,7 @@ export function demoHomesFor(lead, photoPool = [], seed = 0, count = 12) {
     return {
       property_id: `DEMO-AI-${lead.id}-${seed}-${i}`,
       demo: true,
+      for_lead: lead.id,
       status: "published",
       locked: false,
       source: kind === "moveazy" ? "moveazy" : "broker",
@@ -106,10 +125,10 @@ export function demoHomesFor(lead, photoPool = [], seed = 0, count = 12) {
       lister_agency: kind === "group" ? DEMO_GROUPS[i % DEMO_GROUPS.length].name : b.agency,
       lister_phone: "",
       brokerage_pct: kind === "moveazy" ? 50 : pick([50, 50, 75, 100]),
-      flat_type: pick(types),
+      flat_type: offBhk ? bhkOff(types[0]) : pick(types),
       area: near ? pick(NEARBY.filter((a) => !areas.includes(a))) : pick(areas),
       rent,
-      furnishing: lead.furnishing && r() < 0.6 ? lead.furnishing : pick(FURNISH),
+      furnishing: offFurnish ? NEXT_FURNISH[lead.furnishing] : lead.furnishing || pick(FURNISH),
       property_type: "Apartment",
       cover_image_url: photo.cover_image_url || "",
       images: photo.images || [],
