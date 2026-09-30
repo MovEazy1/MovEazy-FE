@@ -54,6 +54,70 @@ export function demoRows(inventory = []) {
   };
 }
 
+/** A small seeded random generator, so one "run" of the demo matcher is stable and the next is different. */
+function rng(seedText) {
+  let h = 1779033703;
+  for (const ch of String(seedText)) h = Math.imul(h ^ ch.charCodeAt(0), 3432918353);
+  return () => {
+    h = Math.imul(h ^ (h >>> 16), 2246822507);
+    h = Math.imul(h ^ (h >>> 13), 3266489909);
+    return ((h ^= h >>> 16) >>> 0) / 4294967296;
+  };
+}
+
+const NEARBY = ["HSR Layout", "Koramangala", "Bellandur", "BTM Layout", "Sarjapur Road", "Indiranagar", "Whitefield", "Marathahalli", "JP Nagar", "Electronic City"];
+const FURNISH = ["Fully Furnished", "Semi Furnished", "Unfurnished"];
+
+/**
+ * Demo mode: sample homes shaped around one client's requirement — their BHK,
+ * their areas (a few just outside), rents around their budget (a few just
+ * over), mixed furnishing — with real listing photos. Run through the real
+ * matching engine they score like real stock would, so a partner sees exactly
+ * how a shortlist forms. `seed` reshuffles them ("Run again").
+ */
+export function demoHomesFor(lead, photoPool = [], seed = 0, count = 12) {
+  const r = rng(`${lead.id}:${seed}`);
+  const pick = (arr) => arr[Math.floor(r() * arr.length)];
+  const types = (lead.flat_types ?? []).length ? lead.flat_types : ["1 BHK", "2 BHK"];
+  const areas = (lead.localities ?? []).length ? lead.localities : ["HSR Layout", "Koramangala"];
+  const hi = Number(lead.budget_max) || 0;
+  const lo = Number(lead.budget_min) || (hi ? Math.round(hi * 0.6) : 0);
+  const photos = photoPool.filter((l) => l.cover_image_url || (l.images ?? []).length);
+  const brokers = BROKERS.map(([name, agency]) => ({ name, agency }));
+  return Array.from({ length: count }, (_, i) => {
+    // A steady mix, so every shortlist has a spread of scores: some a little
+    // over budget, some just outside the areas asked for.
+    const over = Boolean(hi) && i % 4 === 1;
+    const near = i % 5 === 3;
+    const base = hi ? lo + r() * (hi - lo) : 15000 + r() * 45000;
+    const rent = Math.round((over ? hi * (1.03 + r() * 0.06) : base) / 500) * 500;
+    const photo = photos.length ? photos[Math.floor(r() * photos.length)] : {};
+    const kind = pick(["moveazy", "moveazy", "broker", "group"]);
+    const b = pick(brokers);
+    return {
+      property_id: `DEMO-AI-${lead.id}-${seed}-${i}`,
+      demo: true,
+      status: "published",
+      locked: false,
+      source: kind === "moveazy" ? "moveazy" : "broker",
+      on_platform: kind === "broker",
+      group_ids: kind === "group" ? [DEMO_GROUPS[i % DEMO_GROUPS.length].id] : [],
+      lister_name: kind === "moveazy" ? "" : b.name,
+      lister_agency: kind === "group" ? DEMO_GROUPS[i % DEMO_GROUPS.length].name : b.agency,
+      lister_phone: "",
+      brokerage_pct: kind === "moveazy" ? 50 : pick([50, 50, 75, 100]),
+      flat_type: pick(types),
+      area: near ? pick(NEARBY.filter((a) => !areas.includes(a))) : pick(areas),
+      rent,
+      furnishing: lead.furnishing && r() < 0.6 ? lead.furnishing : pick(FURNISH),
+      property_type: "Apartment",
+      cover_image_url: photo.cover_image_url || "",
+      images: photo.images || [],
+      available_from: null,
+    };
+  });
+}
+
 /** What each premium button does — shown instead of doing it, in demo mode. */
 export const EXPLAIN = {
   whatsapp: ["WhatsApp the lister", "Sends the listing broker a ready message asking if the flat is still available and for its exact location. One tap, nothing to type."],

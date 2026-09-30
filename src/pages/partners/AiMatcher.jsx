@@ -11,51 +11,98 @@
  * The card sits on top of the home screen and shrinks to a slim sticky bar
  * under the header once it scrolls away (InventoryHome).
  */
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
-import { Bell, ChevronRight, Crown, Heart, MapPin, Sparkles, WandSparkles, X } from "lucide-react";
+import { Bell, Check, ChevronRight, Crown, Heart, MapPin, RefreshCw, Sparkles, WandSparkles, X } from "lucide-react";
 import { usePartner } from "./PartnerApp";
 import { Avatar, Empty, Loading, Sheet, TopBar, toast } from "./partnerUi";
 import { SmartListingImage } from "./partnerMedia";
 import ShareOptions from "./ShareOptions";
 import { requirementLine } from "./leadBits";
-import { DEMO_LEADS, DemoBanner, demoRows } from "./demoMode";
+import { DEMO_COUNTS, DEMO_LEADS, DemoBanner, demoHomesFor, demoRows } from "./demoMode";
 import { bhkLabel, friendlyError, inr, pp } from "../../lib/partners";
 import { hasRequirement, matchesForLead } from "../../lib/partnerMatch";
 import { createCuratedList, curatedMessage, curatedUrl, fetchMyCuratedLists } from "../../lib/partnerCurated";
 
 const TOP = 10;
 
-/** What the matcher can pick from: the partner's inventory, plus the sample network and groups in demo mode. */
-export function useMatchPool() {
+/**
+ * What the matcher can pick from: the partner's inventory — and in demo mode the
+ * sample network and groups, plus sample homes shaped around each of `forLeads`,
+ * so every client gets a real-looking shortlist from the real engine. `seed`
+ * reshuffles the samples.
+ */
+export function useMatchPool(forLeads = [], seed = 0) {
   const { inventory, demo } = usePartner();
   return useMemo(() => {
     const base = inventory ?? [];
     if (!demo) return base;
     const d = demoRows(base);
-    return [...base, ...d.broker, ...d.group];
-  }, [inventory, demo]);
+    const photos = [...base, ...d.broker, ...d.group];
+    const shaped = forLeads.filter(hasRequirement).flatMap((lead) => demoHomesFor(lead, photos, seed));
+    return [...base, ...d.broker, ...d.group, ...shaped];
+  }, [inventory, demo, forLeads, seed]);
 }
 
 /** Every active client with a requirement, and their best matches. */
-function useShortlists() {
+function useShortlists(seed = 0) {
   const { leads, demo } = usePartner();
-  const pool = useMatchPool();
+  const clients = useMemo(() => (demo ? [...leads, ...DEMO_LEADS] : leads).filter((l) => l.status !== "closed"), [leads, demo]);
+  const pool = useMatchPool(clients, seed);
   return useMemo(() => {
-    const clients = demo ? [...leads, ...DEMO_LEADS] : leads;
-    const active = clients.filter((l) => l.status !== "closed");
-    const ready = active.filter(hasRequirement).map((lead) => {
+    const ready = clients.filter(hasRequirement).map((lead) => {
       const matches = matchesForLead(lead, pool);
       return { lead, matches, top: matches.slice(0, TOP) };
     }).sort((a, b) => b.top.length - a.top.length);
-    return { ready, needs: active.filter((l) => !hasRequirement(l)), homes: pool.length };
-  }, [leads, pool, demo]);
+    // In demo mode the scale is the one a plan unlocks, not the handful of samples on screen.
+    const homes = demo ? DEMO_COUNTS.moveazy + DEMO_COUNTS.broker + DEMO_COUNTS.group : pool.length;
+    return { ready, needs: clients.filter((l) => !hasRequirement(l)), homes };
+  }, [clients, pool, demo]);
+}
+
+const RUN_STEPS = (clients, homes) => [
+  `Reading ${clients} client requirement${clients === 1 ? "" : "s"}`,
+  `Scanning ${homes.toLocaleString("en-IN")} homes`,
+  "Matching budget, area, BHK and furnishing",
+  `Ranking the best ${TOP} for each client`,
+];
+
+/** The matcher at work: four steps, then the results. */
+function MatcherRun({ clients, homes, onDone }) {
+  const [step, setStep] = useState(0);
+  const done = useRef(onDone);
+  done.current = onDone;
+  useEffect(() => {
+    const steps = RUN_STEPS(clients, homes);
+    let i = 0;
+    const id = setInterval(() => {
+      i += 1;
+      if (i >= steps.length) { clearInterval(id); setTimeout(() => done.current(), 350); }
+      setStep(i);
+    }, 520);
+    return () => clearInterval(id);
+  }, [clients, homes]);
+  const steps = RUN_STEPS(clients, homes);
+  return (
+    <div className="amr">
+      <div className="amr-orb"><WandSparkles size={26} /></div>
+      <b>AI Property Matcher is running</b>
+      <div className="amr-bar"><i style={{ width: `${Math.min(100, (step / steps.length) * 100)}%` }} /></div>
+      <ul>
+        {steps.map((t, k) => (
+          <li key={t} className={k < step ? "ok" : k === step ? "now" : ""}>
+            <span>{k < step ? <Check size={13} /> : k === step ? <i className="amr-spin" /> : null}</span>{t}
+          </li>
+        ))}
+      </ul>
+    </div>
+  );
 }
 
 /** The card on the home screen; `compact` is the slim sticky bar it becomes on scroll. */
 export function AiMatcherCard({ compact = false }) {
   const navigate = useNavigate();
-  const { ready, homes } = useShortlists();
+  const { ready, homes } = useShortlists(0);
   const matched = ready.filter((r) => r.top.length).length;
   const go = () => navigate(pp("/ai-matcher"));
   if (compact) {
@@ -161,7 +208,10 @@ export function DemoListPreview({ lead, homes, onClose }) {
 export default function AiMatcher() {
   const navigate = useNavigate();
   const { me, inventory, demo } = usePartner();
-  const { ready, needs, homes } = useShortlists();
+  const [seed, setSeed] = useState(0);
+  const [running, setRunning] = useState(true);
+  const { ready, needs, homes } = useShortlists(seed);
+  const rerun = () => { if (demo) setSeed((s) => s + 1); setRunning(true); window.scrollTo(0, 0); };
   const [sent, setSent] = useState({}); // lead id → latest list
   const [busy, setBusy] = useState("");
   const [share, setShare] = useState(null);
@@ -204,7 +254,9 @@ export default function AiMatcher() {
           </div>
         </div>
 
-        {!inventory ? <Loading label="Matching…" /> : ready.length === 0 ? (
+        {!inventory ? <Loading label="Matching…" /> : running && ready.length > 0 ? (
+          <MatcherRun clients={ready.length} homes={homes} onDone={() => setRunning(false)} />
+        ) : ready.length === 0 ? (
           <Empty action={<Link className="pz-btn pz-btn--primary" to={pp("/leads/new")}>Add a client</Link>}>
             Add a client with a budget, area or BHK and the matcher builds their shortlist.
           </Empty>
@@ -212,7 +264,7 @@ export default function AiMatcher() {
           const last = sent[r.lead.id];
           const liked = last ? Object.values(last.actions || {}).filter((a) => a.action === "liked").length : 0;
           return (
-            <div key={r.lead.id} className="aim-row">
+            <div key={`${r.lead.id}-${seed}`} className="aim-row" style={{ animationDelay: `${Math.min(ready.indexOf(r), 8) * 70}ms` }}>
               <div className="pz-row" style={{ alignItems: "flex-start" }}>
                 <Avatar name={r.lead.name} />
                 <div style={{ flex: 1, minWidth: 0 }}>
@@ -237,6 +289,12 @@ export default function AiMatcher() {
             </div>
           );
         })}
+
+        {!running && ready.length > 0 && (
+          <button type="button" className="pz-btn pz-btn--ai pz-btn--block" style={{ marginTop: 4 }} onClick={rerun}>
+            <RefreshCw size={16} /> Run AI matcher again
+          </button>
+        )}
 
         {needs.length > 0 && (
           <div className="pz-section" style={{ marginTop: 12 }}>
@@ -288,7 +346,25 @@ const CSS = `
   background: radial-gradient(130% 160% at 0% 0%, #235C49 0%, #14372B 40%, #0E0D12 85%); border: 1px solid rgba(212,164,55,.3); }
 .aim-hero b { display: block; font-size: 15px; }
 .aim-hero span { display: block; font-size: 13px; color: rgba(255,255,255,.72); margin-top: 3px; line-height: 1.45; }
-.aim-row { background: #fff; border: 1px solid var(--line); border-radius: 16px; padding: 14px; margin-bottom: 10px; }
+.aim-row { background: #fff; border: 1px solid var(--line); border-radius: 16px; padding: 14px; margin-bottom: 10px; animation: amrin .35s ease both; }
+@keyframes amrin { from { opacity: 0; transform: translateY(10px); } }
+.amr { display: grid; justify-items: center; gap: 12px; padding: 26px 18px; border-radius: 18px; color: #fff; text-align: center;
+  background: radial-gradient(130% 160% at 50% 0%, #235C49 0%, #14372B 40%, #0E0D12 85%); border: 1px solid rgba(212,164,55,.3); }
+.amr-orb { width: 64px; height: 64px; border-radius: 20px; display: grid; place-items: center; color: #1F1605; background: var(--goldg);
+  box-shadow: 0 0 0 0 rgba(212,164,55,.5); animation: amrpulse 1.4s ease-out infinite; }
+@keyframes amrpulse { 70% { box-shadow: 0 0 0 16px rgba(212,164,55,0); } 100% { box-shadow: 0 0 0 0 rgba(212,164,55,0); } }
+.amr b { font-size: 16px; }
+.amr-bar { width: 100%; height: 6px; border-radius: 99px; background: rgba(255,255,255,.12); overflow: hidden; }
+.amr-bar i { display: block; height: 100%; background: var(--goldg); border-radius: 99px; transition: width .45s ease; }
+.amr ul { list-style: none; margin: 0; padding: 0; width: 100%; display: grid; gap: 8px; text-align: left; }
+.amr li { display: flex; align-items: center; gap: 10px; font-size: 13.5px; color: rgba(255,255,255,.45); transition: color .2s; }
+.amr li.now { color: #fff; font-weight: 700; }
+.amr li.ok { color: rgba(255,255,255,.8); }
+.amr li > span { width: 20px; height: 20px; border-radius: 99px; display: grid; place-items: center; flex: none; border: 1.5px solid rgba(255,255,255,.25); }
+.amr li.ok > span { background: var(--gold); border-color: var(--gold); color: #1F1605; }
+.amr-spin { width: 12px; height: 12px; border-radius: 99px; border: 2px solid rgba(255,255,255,.25); border-top-color: var(--gold); animation: amrspin .7s linear infinite; }
+@keyframes amrspin { to { transform: rotate(360deg); } }
+@media (prefers-reduced-motion: reduce) { .amr-orb, .aim-row { animation: none; } }
 .aim-count { display: grid; justify-items: center; font-size: 18px; font-weight: 800; color: var(--ai2); line-height: 1; }
 .aim-count small { font-size: 10.5px; font-weight: 600; color: var(--dim); margin-top: 3px; }
 .aim-thumbs { display: flex; gap: 6px; margin-top: 10px; }

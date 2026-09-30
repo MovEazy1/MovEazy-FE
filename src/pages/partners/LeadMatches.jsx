@@ -27,7 +27,8 @@ export default function LeadMatches() {
   const { id } = useParams();
   const { me, leads, inventory, saved, toggleSave, demo, explain } = usePartner();
   const lead = leads.find((l) => l.id === id) || (demo ? DEMO_LEADS.find((l) => l.id === id) : null);
-  const pool = useMatchPool();
+  const forLead = useMemo(() => (lead ? [lead] : []), [lead]);
+  const pool = useMatchPool(forLead);
   const [preview, setPreview] = useState(false);
   const [filters, setFilters] = useState(EMPTY_FILTERS);
   const [sheet, setSheet] = useState(false);
@@ -115,7 +116,9 @@ export default function LeadMatches() {
           const on = picked?.has(m.listing.property_id);
           return (
             <PropertyCard key={m.listing.property_id} listing={m.listing} saved={saved.has(m.listing.property_id)}
-              onToggleSave={() => toggleSave(m.listing.property_id)} onWhatsApp={() => send(m.listing)}
+              onOpen={m.listing.demo ? () => explain("details") : undefined}
+              onToggleSave={() => (m.listing.demo ? explain("save") : toggleSave(m.listing.property_id))}
+              onWhatsApp={() => (m.listing.demo ? explain("whatsapp") : send(m.listing))}
               extra={
                 <div className="pz-row" style={{ marginTop: 10, gap: 8 }}>
                   <span className="pz-score" title="Match score">{m.score}</span>
