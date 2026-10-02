@@ -21,6 +21,7 @@ import {
   fetchOwnerMe, fetchOwnerProperties, fetchOwnerTenants, fetchRatings, fetchRequests, friendlyError, op, registerOwner,
   teamWa,
 } from "../../lib/owners";
+import { fetchMyBuildings } from "../../lib/buildings";
 import { BottomNav, Loading, OwnerStyles, ToastHost, WhatsAppIcon } from "./ownerUi";
 import OwnerLanding from "./OwnerLanding";
 
@@ -41,6 +42,8 @@ const DesignerCall = lazy(() => import("./DesignerCall"));
 const DocumentsPage = lazy(() => import("./DocumentsPage"));
 const NotificationsPage = lazy(() => import("./NotificationsPage"));
 const MorePage = lazy(() => import("./MorePage"));
+const BuildingForm = lazy(() => import("./BuildingForm"));
+const BuildingDetail = lazy(() => import("./BuildingDetail"));
 
 export const OwnerContext = createContext(null);
 export const useOwner = () => useContext(OwnerContext);
@@ -69,6 +72,7 @@ function OwnerWorkspace({ me, reloadMe }) {
   const [tenants, setTenants] = useState([]);
   const [ratings, setRatings] = useState({});
   const [requests, setRequests] = useState([]);
+  const [buildings, setBuildings] = useState(null);
   const [ui, setUiState] = useState(() => ({ occ: "all", q: "", sort: "recent", area: "", type: "", ...readUi() }));
 
   const setUi = useCallback((patch) => {
@@ -94,21 +98,25 @@ function OwnerWorkspace({ me, reloadMe }) {
   const reloadRequests = useCallback(async () => {
     try { setRequests(await fetchRequests()); } catch { /* keep */ }
   }, []);
+  const reloadBuildings = useCallback(async () => {
+    try { setBuildings(await fetchMyBuildings()); } catch { setBuildings((cur) => cur ?? []); }
+  }, []);
 
   useEffect(() => {
     reloadProperties();
     reloadTenants();
     reloadRequests();
+    reloadBuildings();
     fetchRatings().then(setRatings);
-  }, [reloadProperties, reloadTenants, reloadRequests]);
+  }, [reloadProperties, reloadTenants, reloadRequests, reloadBuildings]);
 
   const byId = useMemo(() => new Map((properties ?? []).map((p) => [p.property_id, p])), [properties]);
 
   const value = useMemo(() => ({
     me, reloadMe, properties, propError, reloadProperties, byId, tenants, setTenants, reloadTenants,
-    ratings, setRatings, requests, setRequests, reloadRequests, ui, setUi,
+    ratings, setRatings, requests, setRequests, reloadRequests, ui, setUi, buildings, reloadBuildings,
   }), [me, reloadMe, properties, propError, reloadProperties, byId, tenants, reloadTenants, ratings, requests,
-    reloadRequests, ui, setUi]);
+    reloadRequests, ui, setUi, buildings, reloadBuildings]);
 
   return (
     <OwnerContext.Provider value={value}>
@@ -121,6 +129,9 @@ function OwnerWorkspace({ me, reloadMe }) {
             <Route path="properties/:id" element={<PropertyDetail />} />
             <Route path="properties/:id/edit" element={<PropertyForm />} />
             <Route path="properties/:id/find-tenant" element={<FindTenant />} />
+            <Route path="buildings/new" element={<BuildingForm />} />
+            <Route path="buildings/:id" element={<BuildingDetail />} />
+            <Route path="buildings/:id/edit" element={<BuildingForm />} />
             <Route path="tenants" element={<TenantsList />} />
             <Route path="tenants/new" element={<TenantForm />} />
             <Route path="tenants/:id" element={<TenantProfile />} />

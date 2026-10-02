@@ -4,6 +4,7 @@ import { ChevronRight } from "lucide-react";
 import { OCCUPANCY_PILL, Pill, PropertyThumb } from "./ownerUi";
 import { inr, occupancyOf, op, propertyName } from "../../lib/owners";
 import { isCurrentTenant, occupancyPct } from "../../lib/ownerOccupancy";
+import { floorLabel } from "../../lib/buildings";
 
 export function propertyTenants(p, tenants) {
   return tenants.filter((t) => t.property_id === p.property_id);
@@ -29,6 +30,11 @@ export default function PropertyRow({ property: p, tenants = [], showCta = true 
           <h3 className="oz-prop-title">{propertyName(p)}</h3>
           <div className="oz-rent" style={{ marginTop: 2 }}>{inr(p.rent)} <small>/ month</small></div>
           <div className="oz-meta" style={{ marginTop: 2 }}>{line}</div>
+          {p.building_name && (
+            <div className="oz-meta" style={{ marginTop: 2, fontSize: 12, color: "var(--champ3)", fontWeight: 600 }}>
+              {p.building_name}{p.floor_number != null ? ` · ${floorLabel(p.floor_number)}` : ""}
+            </div>
+          )}
           <div className="oz-chips" style={{ marginTop: 6, gap: 6 }}>
             {occ === "occupied" && pct != null
               ? <Pill tone="green">{pct}% occupancy</Pill>

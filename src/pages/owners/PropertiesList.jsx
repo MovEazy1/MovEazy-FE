@@ -1,7 +1,7 @@
 /** PRD 02 — the portfolio: All / Occupied / Vacant, search, sort, location and type filters. */
 import { useEffect, useMemo, useState } from "react";
 import { Link } from "react-router-dom";
-import { ArrowUpDown, Building2, MapPin, Plus, Search } from "lucide-react";
+import { ArrowUpDown, Building2, ChevronRight, MapPin, Plus, QrCode, Search } from "lucide-react";
 import { useOwner } from "./OwnerApp";
 import PropertyRow from "./PropertyRow";
 import { Chip, Empty, Loading, Sheet, TopBar } from "./ownerUi";
@@ -16,8 +16,60 @@ const SORTS = [
   ["activity", "Most interest"],
 ];
 
+/** The owner's buildings — each with its QR — above the flat list. */
+function BuildingsStrip({ buildings }) {
+  if (!buildings) return null;
+  return (
+    <div className="oz-pad" style={{ paddingBottom: 0 }}>
+      <div className="oz-between" style={{ margin: "2px 2px 8px" }}>
+        <b style={{ fontSize: 15 }}>Buildings & QR</b>
+        <Link to={op("/buildings/new")} className="oz-btn oz-btn--ghost"><Plus size={15} /> New</Link>
+      </div>
+      {buildings.length === 0 ? (
+        <Link to={op("/buildings/new")} className="oz-card bl-new">
+          <span className="bl-ic"><QrCode size={22} /></span>
+          <span style={{ flex: 1 }}>
+            <b>Group your flats into a building</b>
+            <small>Get one QR for the gate. Tenants scan, see every flat floor by floor, and book a visit.</small>
+          </span>
+          <ChevronRight size={18} color="#94A09B" />
+        </Link>
+      ) : (
+        <div className="bl-row">
+          {buildings.map((b) => (
+            <Link key={b.id} to={op(`/buildings/${b.id}`)} className="oz-card bl-card">
+              <div className="bl-top"><span className="bl-ic bl-ic--sm"><Building2 size={16} /></span><b>{b.name}</b></div>
+              <div className="oz-meta" style={{ fontSize: 12 }}>{b.area || "Bengaluru"} · {b.flats} flat{b.flats === 1 ? "" : "s"}</div>
+              <div className="bl-stats">
+                <span><b>{b.stats?.scans ?? 0}</b> scans</span>
+                <span><b>{b.stats?.scheduled ?? 0}</b> visits</span>
+                <span><b>{b.stats?.booked ?? 0}</b> booked</span>
+              </div>
+            </Link>
+          ))}
+        </div>
+      )}
+      <style>{`
+        .bl-new { display: flex; align-items: center; gap: 12px; padding: 14px; text-decoration: none; color: inherit;
+          background: linear-gradient(135deg, #fff, var(--champ2)); border-color: #EADFC6; }
+        .bl-new b { display: block; font-size: 14.5px; }
+        .bl-new small { display: block; font-size: 12.5px; color: var(--dim); margin-top: 2px; line-height: 1.4; }
+        .bl-ic { width: 42px; height: 42px; border-radius: 12px; background: var(--deep); color: var(--champ); display: grid; place-items: center; flex: none; }
+        .bl-ic--sm { width: 28px; height: 28px; border-radius: 9px; }
+        .bl-row { display: flex; gap: 10px; overflow-x: auto; scrollbar-width: none; padding-bottom: 2px; }
+        .bl-row::-webkit-scrollbar { display: none; }
+        .bl-card { flex: 0 0 220px; padding: 12px; text-decoration: none; color: inherit; }
+        .bl-top { display: flex; align-items: center; gap: 8px; margin-bottom: 4px; }
+        .bl-top b { font-size: 14.5px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+        .bl-stats { display: flex; gap: 10px; margin-top: 10px; font-size: 11.5px; color: var(--dim); }
+        .bl-stats b { color: var(--deep); font-size: 14px; }
+      `}</style>
+    </div>
+  );
+}
+
 export default function PropertiesList() {
-  const { properties, propError, tenants, ui, setUi } = useOwner();
+  const { properties, propError, tenants, ui, setUi, buildings } = useOwner();
   const [q, setQ] = useState(ui.q || "");
   const [sheet, setSheet] = useState("");
 
@@ -67,7 +119,8 @@ export default function PropertiesList() {
       <TopBar title="My Properties" right={
         <Link to={op("/properties/new")} className="oz-btn oz-btn--primary oz-btn--sm"><Plus size={16} /> Add</Link>
       } />
-      <div className="oz-tabs" role="tablist">
+      <BuildingsStrip buildings={buildings} />
+      <div className="oz-tabs" role="tablist" style={{ marginTop: 10 }}>
         {[["all", "All"], ["occupied", "Occupied"], ["vacant", "Vacant"]].map(([k, label]) => (
           <button key={k} type="button" role="tab" aria-selected={ui.occ === k} className={`oz-tab${ui.occ === k ? " oz-tab--on" : ""}`}
             onClick={() => setUi({ occ: k })}>{label} ({counts[k]})</button>

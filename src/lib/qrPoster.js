@@ -22,7 +22,10 @@ const SIZE = { landscape: [1188, 840], portrait: [840, 1188] };
 const FONT = "Manrope, Inter, system-ui, sans-serif";
 const C = { deep: "#0A3A2A", deep2: "#05241A", acc: "#15803D", gold: "#E4B659", gold2: "#F7E9C6", gold3: "#8A6419", ink: "#13201B", dim: "#56655F", cream: "#F7F5EE" };
 
-export const designOf = (id) => POSTER_DESIGNS.find((d) => d.id === id) || POSTER_DESIGNS[0];
+/** The owner app's poster for one property (owner_buildings.sql): its photo, its name, one big QR. No contact on it. */
+export const BUILDING_POSTER = { id: "building", label: "Property", orientation: "portrait" };
+
+export const designOf = (id) => [...POSTER_DESIGNS, BUILDING_POSTER].find((d) => d.id === id) || POSTER_DESIGNS[0];
 export const posterSize = (id) => SIZE[designOf(id).orientation];
 
 /** An image, loaded; null if it can't be (the poster then draws initials). */
@@ -207,6 +210,98 @@ function drawPremium(ctx, { broker, url, photo, logo, displayUrl }) {
   text(ctx, displayUrl, W / 2, H - 22, { size: 20, weight: 600, color: "rgba(255,255,255,.5)", align: "center" });
 }
 
+/** A cover-cropped image in a rounded box. */
+function drawCover(ctx, img, x, y, w, h, r) {
+  ctx.save();
+  roundRect(ctx, x, y, w, h, r);
+  ctx.clip();
+  const iw = img.naturalWidth || img.width;
+  const ih = img.naturalHeight || img.height;
+  const s = Math.max(w / iw, h / ih);
+  ctx.drawImage(img, x + (w - iw * s) / 2, y + (h - ih * s) / 2, iw * s, ih * s);
+  ctx.restore();
+}
+
+function drawBuilding(ctx, { building, url, photo, logo, displayUrl }) {
+  const [W, H] = SIZE.portrait;
+  ctx.fillStyle = C.cream;
+  ctx.fillRect(0, 0, W, H);
+
+  // The building, full width at the top, under a dark band for the logo.
+  const ph = 360;
+  if (photo) {
+    drawCover(ctx, photo, 0, 0, W, ph, 0);
+  } else {
+    const g = ctx.createLinearGradient(0, 0, W, ph);
+    g.addColorStop(0, "#145C43");
+    g.addColorStop(1, C.deep2);
+    ctx.fillStyle = g;
+    ctx.fillRect(0, 0, W, ph);
+  }
+  const shade = ctx.createLinearGradient(0, 0, 0, ph);
+  shade.addColorStop(0, "rgba(5,36,26,.72)");
+  shade.addColorStop(0.35, "rgba(5,36,26,.05)");
+  shade.addColorStop(0.7, "rgba(5,36,26,.15)");
+  shade.addColorStop(1, "rgba(5,36,26,.85)");
+  ctx.fillStyle = shade;
+  ctx.fillRect(0, 0, W, ph);
+  if (logo) {
+    const lw = (logo.width / logo.height) * 50;
+    ctx.drawImage(logo, 48, 38, lw, 50);
+  }
+  text(ctx, "Homes for rent", W - 48, 72, { size: 26, weight: 800, color: C.gold, align: "right" });
+  text(ctx, building.name || "Our property", 48, ph - 74, { size: 58, weight: 800, color: "#fff", maxWidth: W - 96 });
+  const sub = [building.area, building.landmark].filter(Boolean).join("  ·  ");
+  if (sub) text(ctx, sub, 48, ph - 30, { size: 28, weight: 600, color: "rgba(255,255,255,.85)", maxWidth: W - 96 });
+
+  // The pitch.
+  const avail = Number(building.available) || 0;
+  const pitch = avail > 0 ? `${avail} flat${avail === 1 ? "" : "s"} available${building.rentFrom ? `  ·  from ${building.rentFrom}` : ""}` : "Flats for rent";
+  ctx.font = `800 30px ${FONT}`;
+  const pw = Math.min(W - 96, ctx.measureText(pitch).width + 56);
+  roundRect(ctx, (W - pw) / 2, ph + 34, pw, 58, 29);
+  ctx.fillStyle = C.gold2;
+  ctx.fill();
+  text(ctx, pitch, W / 2, ph + 74, { size: 30, weight: 800, color: C.gold3, align: "center", maxWidth: W - 120 });
+
+  text(ctx, "Scan to see every flat", W / 2, ph + 160, { size: 46, weight: 800, color: C.ink, align: "center" });
+  text(ctx, "& book a visit at your time", W / 2, ph + 210, { size: 34, weight: 600, color: C.dim, align: "center" });
+
+  // The code.
+  const q = 360;
+  const card = q + 60;
+  const cx = (W - card) / 2;
+  const cy = ph + 240;
+  ctx.save();
+  ctx.shadowColor = "rgba(10,40,30,.16)";
+  ctx.shadowBlur = 26;
+  ctx.shadowOffsetY = 8;
+  roundRect(ctx, cx, cy, card, card, 32);
+  ctx.fillStyle = "#fff";
+  ctx.fill();
+  ctx.restore();
+  roundRect(ctx, cx, cy, card, card, 32);
+  ctx.lineWidth = 4;
+  ctx.strokeStyle = C.gold;
+  ctx.stroke();
+  drawQr(ctx, url, cx + 30, cy + 30, q);
+
+  // Three steps, and where it goes.
+  const sy = cy + card + 62;
+  const steps = ["Scan", "Pick a flat", "Book a visit"];
+  const colW = (W - 96) / 3;
+  steps.forEach((s, k) => {
+    const x = 48 + colW * k + colW / 2;
+    ctx.beginPath();
+    ctx.arc(x - 70, sy - 10, 18, 0, Math.PI * 2);
+    ctx.fillStyle = C.deep;
+    ctx.fill();
+    text(ctx, String(k + 1), x - 70, sy - 1, { size: 22, weight: 800, color: C.gold, align: "center" });
+    text(ctx, s, x - 44, sy, { size: 26, weight: 700, color: C.ink });
+  });
+  text(ctx, displayUrl, W / 2, H - 30, { size: 22, weight: 600, color: C.dim, align: "center" });
+}
+
 /**
  * Draw `design` onto `canvas` at `scale` (1 = 1188 px on the long side).
  * `data`: { broker: {name, agency, phone, rating, ratings}, url, displayUrl, photo, logo } — photo/logo loaded images.
@@ -218,7 +313,9 @@ export function drawPoster(canvas, design, data, scale = 1) {
   const ctx = canvas.getContext("2d");
   ctx.setTransform(scale, 0, 0, scale, 0, 0);
   ctx.imageSmoothingQuality = "high";
-  if (designOf(design).id === "premium") drawPremium(ctx, data);
+  const id = designOf(design).id;
+  if (id === "premium") drawPremium(ctx, data);
+  else if (id === "building") drawBuilding(ctx, data);
   else drawProfile(ctx, data);
   return canvas;
 }

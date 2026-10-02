@@ -33,6 +33,8 @@ const RAIL = [
   { to: "/crm/brokers",    code: "BR", label: "Brokers" },
   // Tenants partner brokers brought — theirs, never in Clients.
   { to: "/crm/broker-leads", code: "BL", label: "Broker leads" },
+  // Owners' buildings with a QR: assign the partner, work the visit requests.
+  { to: "/crm/owner-qr", code: "QR", label: "Owner QR" },
   // The owner app's queue: repairs, service bookings, designer calls, owners.
   { to: "/crm/ops",        code: "IO", label: "Inventory Ops" },
   { to: "/crm/visits",     code: "VS", label: "Visits" },

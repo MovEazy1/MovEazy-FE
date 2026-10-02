@@ -1,6 +1,7 @@
 /**
- * Link previews for a broker's pages: /b/<code> (their QR storefront) and
- * /c/<token> (a curated list). Facebook groups and WhatsApp read the page's
+ * Link previews for the QR pages: /b/<code> (a broker's storefront),
+ * /c/<token> (a broker's curated list) and /building/<code> (an owner's
+ * building, owner_buildings.sql). Facebook groups and WhatsApp read the page's
  * tags without running JavaScript, and the SPA's index.html has one set of
  * tags for every route — so this serves that same index.html with the tags
  * for this page. People get the app exactly as before; nothing redirects.
@@ -46,6 +47,19 @@ async function tagsFor(kind, id) {
       title: `${d.broker || "Your broker"} picked ${d.count} home${d.count === 1 ? "" : "s"} for you`,
       description: "Swipe through them on MovEazy and tap ♥ on the ones you like.",
       image: d.cover || FALLBACK_IMAGE,
+    };
+  }
+  if (kind === "building" && /^[A-Za-z0-9]{6}$/.test(id)) {
+    const d = await rpc("building_page", { p_code: id });
+    if (!d) return null;
+    const flats = d.flats || [];
+    const free = flats.filter((f) => f.available);
+    const rents = free.map((f) => Number(f.rent) || 0).filter(Boolean);
+    const first = flats.find((f) => f.cover_image_url || (f.images || [])[0]);
+    return {
+      title: `${d.name}${d.area ? `, ${d.area}` : ""} — ${free.length} flat${free.length === 1 ? "" : "s"} for rent`,
+      description: `${rents.length ? `From ₹${Math.min(...rents).toLocaleString("en-IN")} a month. ` : ""}See every flat floor by floor and book a visit at your time.`,
+      image: (d.photos || [])[0] || first?.cover_image_url || first?.images?.[0] || FALLBACK_IMAGE,
     };
   }
   return null;

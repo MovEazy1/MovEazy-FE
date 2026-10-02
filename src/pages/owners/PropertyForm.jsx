@@ -6,7 +6,7 @@
  * flats stay off moveazy.co.in; vacant ones can go live from Find a Tenant.
  */
 import { useEffect, useMemo, useState } from "react";
-import { useNavigate, useParams } from "react-router-dom";
+import { useNavigate, useParams, useSearchParams } from "react-router-dom";
 import { Camera, ChevronDown, ChevronUp, X } from "lucide-react";
 import { useAuth } from "../../context/AuthContext";
 import { useOwner } from "./OwnerApp";
@@ -20,6 +20,9 @@ import { mediaRejectionReason, uploadInventoryPhotos } from "../../lib/inventory
 import { coverPhoto, orderListingMedia } from "../../lib/listingMedia";
 import { listingMedia, MediaItem } from "../partners/partnerMedia";
 import { createOwnerProperty, friendlyError, op, updateProperty } from "../../lib/owners";
+import { floorLabel, setFlatBuilding } from "../../lib/buildings";
+
+const FLOOR_OPTIONS = [-1, ...Array.from({ length: 31 }, (_, i) => i)];
 
 const TYPES = ["Apartment", "Independent House", "Villa", "Builder Floor"];
 
@@ -53,8 +56,20 @@ export default function PropertyForm() {
 function PropertyFormInner({ existing }) {
   const navigate = useNavigate();
   const { user } = useAuth();
-  const { reloadProperties } = useOwner();
-  const [f, setF] = useState(() => fromProperty(existing));
+  const { reloadProperties, buildings, reloadBuildings } = useOwner();
+  const [params] = useSearchParams();
+  // Which building the flat is in, and on which floor (owner_buildings.sql).
+  const [bld, setBld] = useState(() => existing?.building_id || params.get("building") || "");
+  const [floor, setFloor] = useState(() => existing?.floor_number ?? null);
+  const fromBuilding = !existing && params.get("building") ? (buildings ?? []).find((b) => b.id === params.get("building")) : null;
+  const [f, setF] = useState(() => ({
+    ...fromProperty(existing),
+    // A new flat added from a building starts where the building is.
+    ...(fromBuilding ? {
+      area: fromBuilding.area || "", fullAddress: fromBuilding.full_address || "",
+      latitude: fromBuilding.latitude ?? null, longitude: fromBuilding.longitude ?? null,
+    } : {}),
+  }));
   const [more, setMore] = useState(Boolean(existing));
   const [photos, setPhotos] = useState([]);
   const [kept, setKept] = useState(() => (existing ? listingMedia(existing) : []));
@@ -73,6 +88,7 @@ function PropertyFormInner({ existing }) {
     if (!f.furnishing) e.furnishing = "Pick furnishing";
     if (!f.area.trim()) e.area = "Which locality is it in?";
     if (f.areaSqft && !(Number(f.areaSqft) >= 100 && Number(f.areaSqft) <= 20000)) e.areaSqft = "Between 100 and 20,000 sq ft";
+    if (bld && floor === null) e.floor = "Which floor is it on?";
     setErrors(e);
     return Object.keys(e).length === 0;
   };
@@ -124,9 +140,13 @@ function PropertyFormInner({ existing }) {
           ? { images, cover_image_url: coverPhoto(images) } : {}),
       };
       if (Object.keys(patch).length) await updateProperty(pid, patch);
+      if (bld !== (existing?.building_id || "") || (bld && floor !== (existing?.floor_number ?? null))) {
+        await setFlatBuilding(pid, bld || null, bld ? floor : null);
+        await reloadBuildings();
+      }
       await reloadProperties();
       toast(existing ? "Saved" : "Property added");
-      navigate(op(`/properties/${pid}`), { replace: true });
+      navigate(op(!existing && bld ? `/buildings/${bld}` : `/properties/${pid}`), { replace: true });
     } catch (e) {
       toast(friendlyError(e, "Could not save the property."), "error");
       setSaving("");
@@ -184,6 +204,30 @@ function PropertyFormInner({ existing }) {
               onChange={(e) => set({ fullAddress: e.target.value })} />
           </div>
         </div>
+
+        {(buildings ?? []).length > 0 && (
+          <div className="oz-section">
+            <h2 className="oz-h2">Building & floor</h2>
+            <p className="oz-hint" style={{ margin: "-4px 0 10px" }}>Flats in a building show on its QR page, floor by floor.</p>
+            <div className="oz-grid2">
+              <div className="oz-field" style={{ marginBottom: 0 }}>
+                <label className="oz-label" htmlFor="pf-bld">Building</label>
+                <select id="pf-bld" className="oz-select" value={bld} onChange={(e) => setBld(e.target.value)}>
+                  <option value="">Not in a building</option>
+                  {buildings.map((b) => <option key={b.id} value={b.id}>{b.name}</option>)}
+                </select>
+              </div>
+              <div className="oz-field" style={{ marginBottom: 0 }}>
+                <label className="oz-label" htmlFor="pf-floor">Floor</label>
+                <select id="pf-floor" className="oz-select" value={floor ?? ""} disabled={!bld}
+                  onChange={(e) => setFloor(e.target.value === "" ? null : Number(e.target.value))}>
+                  <option value="">Pick the floor</option>
+                  {FLOOR_OPTIONS.map((n) => <option key={n} value={n}>{floorLabel(n)}</option>)}
+                </select>{err("floor")}
+              </div>
+            </div>
+          </div>
+        )}
 
         {!existing && (
           <div className="oz-section">
