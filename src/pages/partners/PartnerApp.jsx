@@ -238,7 +238,8 @@ function PartnerWorkspace({ me, reloadMe }) {
             <Route path="*" element={<Navigate to={pp("/")} replace />} />
           </Routes>
         </Suspense>
-        {!rel.startsWith("/welcome") && <BottomNav onPlus={() => setPlusOpen(true)} />}
+        {/* Posting a flat is one focused screen with its own Publish bar. */}
+        {!rel.startsWith("/welcome") && !rel.startsWith("/add/") && <BottomNav onPlus={() => setPlusOpen(true)} />}
         {showBar && <JoinPremiumBar />}
         {plusOpen && <CreateSheet onClose={() => setPlusOpen(false)} />}
         <PremiumExplainer what={explaining} onClose={() => setExplaining(null)} />

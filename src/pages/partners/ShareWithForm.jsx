@@ -19,6 +19,15 @@ export function toSharing(v) {
   };
 }
 
+/** Who sees it, in a few words ("All MovEazy brokers · 50% + 2 groups"). */
+export function shareSummary(share, groups = []) {
+  const g = Object.keys(share.groupPct || {});
+  const parts = [];
+  if (share.platformOn) parts.push(`All MovEazy brokers · ${share.platformPct}%`);
+  if (g.length) parts.push(g.length === 1 ? (groups.find((x) => x.id === g[0])?.name || "1 group") : `${g.length} groups`);
+  return parts.length ? parts.join(" + ") : "Only me";
+}
+
 /** partner_listing_sharing() → form state. */
 export function fromSharing(s) {
   return {
