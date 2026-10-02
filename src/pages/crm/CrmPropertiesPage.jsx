@@ -27,7 +27,8 @@ import PropertyModal from "../../components/PropertyModal";
 import { fetchBuildingOptions, fetchInternalMap, pocMessage, sourceLabel } from "../../lib/crmPropertyInternal";
 import { whatsappUrl } from "../../lib/crmSettings";
 import { formatForDisplay } from "../../lib/mobile";
-import { Btn, C, Chip, Empty, ScoreRing, inr, shortDate } from "./crmUi";
+import { Btn, C, Chip, Empty, ScoreRing, Toast, inr, shortDate } from "./crmUi";
+import CrmBuildingPicker from "./CrmBuildingPicker";
 
 /** Platforms we show first, and what the button says. Anything else follows. */
 const PLATFORM_ORDER = ["facebook", "reddit", "instagram", "whatsapp", "linkedin", "twitter"];
@@ -465,7 +466,7 @@ function SocialShare({ listing }) {
 }
 
 export default function CrmPropertiesPage() {
-  const { inventory, requirements, clients, access } = useCrm();
+  const { inventory, requirements, clients, access, reload } = useCrm();
   const navigate = useNavigate();
 
   const canEdit = access.has(SCOPES.PROPERTIES_WRITE);
@@ -493,7 +494,10 @@ export default function CrmPropertiesPage() {
   /** Ticked flats, for "Group into building". */
   const [picked, setPicked] = useState(() => new Set());
   const [buildings, setBuildings] = useState([]);
-  useEffect(() => { fetchBuildingOptions().then(setBuildings, () => {}); }, []);
+  const loadBuildings = () => fetchBuildingOptions().then(setBuildings, () => {});
+  useEffect(() => { loadBuildings(); }, []);
+  const [toast, setToast] = useState(null);
+  const say = (message, tone = "ok") => { setToast({ message, tone }); setTimeout(() => setToast(null), 3200); };
   const buildingById = useMemo(() => new Map(buildings.map((b) => [b.id, b])), [buildings]);
   const togglePick = (pid) => setPicked((cur) => {
     const next = new Set(cur);
@@ -685,6 +689,10 @@ export default function CrmPropertiesPage() {
                           canEdit={canEdit}
                         />
                         <SocialShare listing={l} />
+                        {canEdit && (
+                          <CrmBuildingPicker listing={l} buildings={buildings} onToast={say}
+                            onDone={() => Promise.all([reload?.(), loadBuildings()])} />
+                        )}
                       </div>
                     </td>
                   </tr>
@@ -752,6 +760,7 @@ export default function CrmPropertiesPage() {
           manageHistory={false}
         />
       )}
+      <Toast {...(toast ?? {})} />
     </div>
   );
 }
