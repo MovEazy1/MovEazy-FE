@@ -10,7 +10,8 @@
  *             A1 landscape, for the front of a house: "Street Tape" (huge
  *             type, a band of tape, a rent sticker), "Speed Lane" (deep green
  *             speed streaks, a glowing QR) and "Open Door" (the QR is the
- *             door of a drawn house: "Scan to schedule visit").
+ *             door of a drawn house: "Scan to schedule visit"), and "The
+ *             Key" (a gold key whose bow holds the QR: "Your keys are waiting.").
  *   classic   A4 landscape, white. "Premium 2BHK for Rent" in a serif, one QR
  *             in a green-edged card, "Scan to View Property" — for a building
  *             or a flat, chosen in the CRM next to the photo poster.
@@ -45,6 +46,7 @@ export const PROPERTY_POSTER_STYLES = [
   { id: "street", label: "Street Tape", hint: "A1 landscape · big type, tape" },
   { id: "speed", label: "Speed Lane", hint: "A1 landscape · bold brand" },
   { id: "door", label: "Open Door", hint: "A1 landscape · the house" },
+  { id: "key", label: "The Key", hint: "A1 landscape · the gold key" },
 ];
 
 /** A1 landscape street posters, for the front of the house: seen from across the road. */
@@ -52,6 +54,7 @@ export const STREET_POSTERS = [
   { id: "street", label: "Street Tape", orientation: "landscape", paper: "A1" },
   { id: "speed", label: "Speed Lane", orientation: "landscape", paper: "A1" },
   { id: "door", label: "Open Door", orientation: "landscape", paper: "A1" },
+  { id: "key", label: "The Key", orientation: "landscape", paper: "A1" },
 ];
 
 export const designOf = (id) => [...POSTER_DESIGNS, BUILDING_POSTER, FLAT_POSTER, CLASSIC_POSTER, ...STREET_POSTERS].find((d) => d.id === id) || POSTER_DESIGNS[0];
@@ -371,11 +374,45 @@ function spaced(ctx, s, x, y, { size, weight = 800, color, align = "left", spaci
 
 function goldFill(ctx, x0, y0, x1, y1) {
   const g = ctx.createLinearGradient(x0, y0, x1, y1);
-  g.addColorStop(0, "#E9C27A");
-  g.addColorStop(0.5, "#C8903F");
-  g.addColorStop(1, "#9C6B2C");
+  g.addColorStop(0, P.metal[0]);
+  g.addColorStop(0.5, P.metal[1]);
+  g.addColorStop(1, P.metal[2]);
   return g;
 }
+
+/**
+ * Colour themes for the illustrated street posters (Open Door, The Key,
+ * Golden Hour, The Invitation): the deep ground, its lighter tone, the metal
+ * (gold) and the cream. `P` is the one being drawn — drawPoster sets it.
+ */
+export const POSTER_PALETTES = {
+  emerald: {
+    label: "Emerald & gold", deep: "#0A3A2A", deep2: "#04241A", mid: "#155C42", dim: "#0F3A2A",
+    accent: "#D9A55A", accentDk: "#B07D35", light: "#F3D58C", metal: ["#E9C27A", "#C8903F", "#9C6B2C"],
+    cream: "#F7F2E6", lit: "#F6D27A", horizon: "#7A6A3A", ray: "rgba(201,154,74,.07)", frame: "rgba(217,165,90,.55)",
+  },
+  midnight: {
+    label: "Midnight & gold", deep: "#12264F", deep2: "#070F24", mid: "#1F3D7A", dim: "#182E5E",
+    accent: "#D9A55A", accentDk: "#A9782F", light: "#F3D58C", metal: ["#EFCB86", "#CB9446", "#9A6A2A"],
+    cream: "#F4F1EA", lit: "#F6D27A", horizon: "#6E5A3E", ray: "rgba(31,61,122,.07)", frame: "rgba(217,165,90,.55)",
+  },
+  wine: {
+    label: "Wine & champagne", deep: "#5C1529", deep2: "#2B0812", mid: "#84264A", dim: "#6E1C33",
+    accent: "#E3C28F", accentDk: "#A87A45", light: "#F6E2BE", metal: ["#F6E2BE", "#D9B27C", "#A87A45"],
+    cream: "#FBF3EA", lit: "#F8D99C", horizon: "#8A5A3E", ray: "rgba(132,38,74,.06)", frame: "rgba(227,194,143,.55)",
+  },
+  onyx: {
+    label: "Onyx & gold", deep: "#1C1C1C", deep2: "#060606", mid: "#333333", dim: "#262626",
+    accent: "#D4A84F", accentDk: "#A57A28", light: "#F0D58A", metal: ["#F2D488", "#CFA046", "#94691F"],
+    cream: "#F3EFE6", lit: "#F6D27A", horizon: "#4A3E28", ray: "rgba(0,0,0,.05)", frame: "rgba(212,168,79,.6)",
+  },
+  terracotta: {
+    label: "Terracotta & sand", deep: "#9C4526", deep2: "#4A1D0E", mid: "#BC5D36", dim: "#86391E",
+    accent: "#E0A85A", accentDk: "#9A6424", light: "#F6D59A", metal: ["#F2CC86", "#D19A48", "#9A6424"],
+    cream: "#F8EDE0", lit: "#FFDB8E", horizon: "#B07040", ray: "rgba(188,93,54,.07)", frame: "rgba(224,168,90,.55)",
+  },
+};
+let P = POSTER_PALETTES.emerald;
 
 /** The QR in a viewfinder: white card, four corner brackets. */
 function viewfinder(ctx, url, x, y, card, color) {
@@ -606,7 +643,7 @@ function drawSpeed(ctx, data) {
 function drawDoor(ctx, data) {
   const [W, H] = SIZE.landscape;
   const { type, rent, rentIsFrom } = shout(data);
-  ctx.fillStyle = "#F7F2E6";
+  ctx.fillStyle = P.cream;
   ctx.fillRect(0, 0, W, H);
 
   // The house sits right; the sunburst comes from its door.
@@ -626,7 +663,7 @@ function drawDoor(ctx, data) {
     ctx.lineTo(-70, -1300);
     ctx.lineTo(70, -1300);
     ctx.closePath();
-    ctx.fillStyle = i % 2 ? "rgba(201,154,74,.07)" : "rgba(201,154,74,0)";
+    ctx.fillStyle = i % 2 ? P.ray : "rgba(201,154,74,0)";
     ctx.fill();
   }
   ctx.restore();
@@ -634,19 +671,19 @@ function drawDoor(ctx, data) {
   // Left: the knock, the line, the flat.
   ctx.save();
   ctx.font = `italic 600 ${fitSize(ctx, "Knock knock.", 490, 100, "italic 600", SERIF)}px ${SERIF}`;
-  ctx.fillStyle = GOLD_DK;
+  ctx.fillStyle = P.accentDk;
   ctx.textAlign = "left";
   ctx.fillText("Knock knock.", 60, 200);
   ctx.restore();
-  text(ctx, "Your next home is right here.", 64, 262, { size: 34, weight: 700, color: DEEP, maxWidth: 500 });
+  text(ctx, "Your next home is right here.", 64, 262, { size: 34, weight: 700, color: P.deep, maxWidth: 500 });
   const head = `${type} FOR RENT`;
   const hs = fitSize(ctx, head, 500, 62);
-  spaced(ctx, head, 64, 410, { size: hs, color: DEEP, spacing: -hs * 0.02 });
-  if (rent) text(ctx, `${rentIsFrom ? "from " : ""}${rent} / month`, 64, 462, { size: 34, weight: 700, color: GOLD_DK });
-  spaced(ctx, "SCAN THE DOOR TO SCHEDULE A VISIT  →", 64, 540, { size: 18, color: DEEP, spacing: 1.6 });
+  spaced(ctx, head, 64, 410, { size: hs, color: P.deep, spacing: -hs * 0.02 });
+  if (rent) text(ctx, `${rentIsFrom ? "from " : ""}${rent} / month`, 64, 462, { size: 34, weight: 700, color: P.accentDk });
+  spaced(ctx, "SCAN THE DOOR TO SCHEDULE A VISIT  →", 64, 540, { size: 18, color: P.deep, spacing: 1.6 });
 
   // The house.
-  ctx.fillStyle = DEEP;
+  ctx.fillStyle = P.deep;
   ctx.fillRect(right - 150, 110, 52, 150);
   ctx.save();
   ctx.shadowColor = "rgba(4,36,26,.25)";
@@ -662,8 +699,8 @@ function drawDoor(ctx, data) {
   ctx.lineTo(left - 18, eave);
   ctx.closePath();
   const hg = ctx.createLinearGradient(0, apex, 0, floor);
-  hg.addColorStop(0, "#155C42");
-  hg.addColorStop(1, DEEP2);
+  hg.addColorStop(0, P.mid);
+  hg.addColorStop(1, P.deep2);
   ctx.fillStyle = hg;
   ctx.fill();
   ctx.restore();
@@ -671,7 +708,7 @@ function drawDoor(ctx, data) {
   ctx.moveTo(left - 30, eave + 10);
   ctx.lineTo(mid, apex - 20);
   ctx.lineTo(right + 30, eave + 10);
-  ctx.strokeStyle = GOLD;
+  ctx.strokeStyle = P.accent;
   ctx.lineWidth = 11;
   ctx.lineCap = "round";
   ctx.lineJoin = "round";
@@ -680,9 +717,9 @@ function drawDoor(ctx, data) {
   // Lit windows.
   const win = (x, y) => {
     roundRect(ctx, x, y, 62, 80, 7);
-    ctx.fillStyle = "#F6D27A";
+    ctx.fillStyle = P.lit;
     ctx.fill();
-    ctx.fillStyle = DEEP;
+    ctx.fillStyle = P.deep;
     ctx.fillRect(x + 28, y, 6, 80);
     ctx.fillRect(x, y + 37, 62, 6);
   };
@@ -702,26 +739,157 @@ function drawDoor(ctx, data) {
   ctx.closePath();
   ctx.fillStyle = "#FFFFFF";
   ctx.fill();
-  ctx.strokeStyle = GOLD;
+  ctx.strokeStyle = P.accent;
   ctx.lineWidth = 7;
   ctx.stroke();
-  spaced(ctx, "SCAN TO", mid, dtop + 80, { size: 15, color: GOLD_DK, align: "center", spacing: 3 });
-  spaced(ctx, "SCHEDULE VISIT", mid, dtop + 110, { size: 24, color: DEEP, align: "center", spacing: 1 });
+  spaced(ctx, "SCAN TO", mid, dtop + 80, { size: 15, color: P.accentDk, align: "center", spacing: 3 });
+  spaced(ctx, "SCHEDULE VISIT", mid, dtop + 110, { size: 24, color: P.deep, align: "center", spacing: 1 });
   const q = 272;
   drawQr(ctx, data.url, mid - q / 2, dtop + 132, q);
   ctx.beginPath();
   ctx.arc(dx + dw - 18, dtop + 132 + q / 2 + 30, 7, 0, Math.PI * 2);
-  ctx.fillStyle = GOLD;
+  ctx.fillStyle = P.accent;
   ctx.fill();
 
   // Ground and brand.
-  ctx.fillStyle = GOLD;
+  ctx.fillStyle = P.accent;
   ctx.fillRect(40, floor, W - 80, 6);
   if (data.logo) {
     const lh = 50;
     ctx.drawImage(data.logo, 64, 640, (data.logo.width / data.logo.height) * lh, lh);
   }
-  spaced(ctx, "INDIA’S FIRST SPEED RENTING PLATFORM", W / 2, floor + 50, { size: 17, weight: 800, color: GOLD_DK, align: "center", spacing: 2.6 });
+  spaced(ctx, "INDIA’S FIRST SPEED RENTING PLATFORM", W / 2, floor + 50, { size: 17, weight: 800, color: P.accentDk, align: "center", spacing: 2.6 });
+}
+
+/** A thin gold frame just inside the edge: the premium posters' border. */
+function goldFrame(ctx, W, H, inset = 26) {
+  ctx.save();
+  ctx.strokeStyle = P.frame;
+  ctx.lineWidth = 1.6;
+  ctx.strokeRect(inset, inset, W - inset * 2, H - inset * 2);
+  ctx.strokeRect(inset + 6, inset + 6, W - inset * 2 - 12, H - inset * 2 - 12);
+  ctx.restore();
+}
+
+function serifLine(ctx, s, x, y, size, fill, align = "left") {
+  ctx.save();
+  ctx.font = `italic 600 ${size}px ${SERIF}`;
+  ctx.fillStyle = fill;
+  ctx.textAlign = align;
+  ctx.fillText(s, x, y);
+  ctx.restore();
+}
+
+/** "2BHK FOR RENT" and the rent, for the left column of the premium posters. */
+function factBlock(ctx, data, x, y, { color = "#fff", accent = P.accent, width = 500 } = {}) {
+  const { type, rent, n, rentIsFrom } = shout(data);
+  const head = `${type} FOR RENT`;
+  const hs = fitSize(ctx, head, width, 56);
+  spaced(ctx, head, x, y, { size: hs, color, spacing: -hs * 0.015 });
+  const sub = [rent ? `${rentIsFrom ? "from " : ""}${rent} / month` : "", n > 1 ? `${n} flats available` : ""].filter(Boolean).join("   ·   ");
+  if (sub) text(ctx, sub, x, y + 48, { size: fitSize(ctx, sub, width, 30, 700), weight: 700, color: accent });
+}
+
+/**
+ * 4 · "The Key" — a huge gold key on deep green: its bow holds the QR, its
+ * shaft is engraved "Scan to schedule visit". "Your keys are waiting."
+ */
+function drawKey(ctx, data) {
+  const [W, H] = SIZE.landscape;
+  const bg = ctx.createRadialGradient(W * 0.72, H * 0.5, 60, W * 0.6, H * 0.5, W * 0.8);
+  bg.addColorStop(0, P.mid);
+  bg.addColorStop(1, P.deep2);
+  ctx.fillStyle = bg;
+  ctx.fillRect(0, 0, W, H);
+  goldFrame(ctx, W, H);
+
+  if (data.logoDark) {
+    const lh = 44;
+    ctx.drawImage(data.logoDark, 70, 64, (data.logoDark.width / data.logoDark.height) * lh, lh);
+  }
+  const hs = fitSize(ctx, "are waiting.", 520, 104, "italic 600", SERIF);
+  serifLine(ctx, "Your keys", 66, 210, hs, goldFill(ctx, 66, 120, 560, 330));
+  serifLine(ctx, "are waiting.", 66, 210 + hs * 1.0, hs, goldFill(ctx, 66, 200, 560, 380));
+
+  // The key: bow right, shaft left along y = ky.
+  const bx = 880;
+  const ky = 480;
+  const R = 232;
+  const shaftL = 96;
+  const gold = goldFill(ctx, shaftL, ky - 200, bx + R, ky + 200);
+  ctx.save();
+  ctx.shadowColor = "rgba(0,0,0,.35)";
+  ctx.shadowBlur = 30;
+  ctx.shadowOffsetY = 14;
+  // shaft
+  roundRect(ctx, shaftL, ky - 24, bx - R - shaftL + 30, 48, 14);
+  ctx.fillStyle = gold;
+  ctx.fill();
+  // teeth
+  ctx.beginPath();
+  ctx.moveTo(shaftL + 6, ky + 20);
+  ctx.lineTo(shaftL + 6, ky + 96);
+  ctx.lineTo(shaftL + 54, ky + 96);
+  ctx.lineTo(shaftL + 54, ky + 66);
+  ctx.lineTo(shaftL + 88, ky + 66);
+  ctx.lineTo(shaftL + 88, ky + 104);
+  ctx.lineTo(shaftL + 140, ky + 104);
+  ctx.lineTo(shaftL + 140, ky + 56);
+  ctx.lineTo(shaftL + 176, ky + 56);
+  ctx.lineTo(shaftL + 176, ky + 20);
+  ctx.closePath();
+  ctx.fill();
+  // collar rings
+  roundRect(ctx, bx - R - 70, ky - 42, 26, 84, 8);
+  ctx.fill();
+  roundRect(ctx, bx - R - 34, ky - 50, 26, 100, 8);
+  ctx.fill();
+  // bow
+  ctx.beginPath();
+  ctx.arc(bx, ky, R, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.restore();
+  // studs around the bow
+  for (let i = 0; i < 16; i++) {
+    const a = (i / 16) * Math.PI * 2;
+    ctx.beginPath();
+    ctx.arc(bx + Math.cos(a) * (R - 16), ky + Math.sin(a) * (R - 16), 5, 0, Math.PI * 2);
+    ctx.fillStyle = "rgba(255,240,205,.75)";
+    ctx.fill();
+  }
+  ctx.beginPath();
+  ctx.arc(bx, ky, R - 34, 0, Math.PI * 2);
+  ctx.fillStyle = "#FFFDF6";
+  ctx.fill();
+  const q = 272;
+  drawQr(ctx, data.url, bx - q / 2, ky - q / 2, q);
+  // engraving on the shaft
+  spaced(ctx, "SCAN TO SCHEDULE VISIT", (shaftL + 24 + bx - R - 84) / 2, ky + 7, { size: 17, color: P.deep2, align: "center", spacing: 2.2 });
+
+  // A tag on a string from the bow.
+  ctx.save();
+  ctx.strokeStyle = "rgba(255,240,205,.8)";
+  ctx.lineWidth = 2;
+  ctx.beginPath();
+  ctx.moveTo(bx + R * 0.6, ky - R * 0.8);
+  ctx.quadraticCurveTo(bx + R * 0.95, ky - R * 1.25, 1090, 150);
+  ctx.stroke();
+  ctx.translate(1090, 150);
+  ctx.rotate(0.32);
+  roundRect(ctx, -58, 0, 116, 150, 12);
+  ctx.fillStyle = P.cream;
+  ctx.fill();
+  ctx.beginPath();
+  ctx.arc(0, 18, 7, 0, Math.PI * 2);
+  ctx.fillStyle = P.deep2;
+  ctx.fill();
+  text(ctx, "MovEazy", 0, 68, { size: 18, weight: 800, color: P.deep, align: "center" });
+  text(ctx, "ASSURED", 0, 94, { size: 15, weight: 800, color: P.accentDk, align: "center" });
+  text(ctx, "HOME", 0, 118, { size: 15, weight: 800, color: P.accentDk, align: "center" });
+  ctx.restore();
+
+  factBlock(ctx, data, 70, 680, { width: 470 });
+  spaced(ctx, "INDIA’S FIRST SPEED RENTING PLATFORM", W - 70, H - 56, { size: 15, color: P.accent, align: "right", spacing: 2.4 });
 }
 
 /** "2 BHK" → "2BHK", as the headline writes it. */
@@ -881,11 +1049,13 @@ export function drawPoster(canvas, design, data, scale = 1) {
   ctx.setTransform(scale, 0, 0, scale, 0, 0);
   ctx.imageSmoothingQuality = "high";
   const id = designOf(design).id;
+  P = POSTER_PALETTES[data?.palette] || POSTER_PALETTES.emerald;
   if (id === "premium") drawPremium(ctx, data);
   else if (id === "classic") drawClassic(ctx, data);
   else if (id === "street") drawStreet(ctx, data);
   else if (id === "speed") drawSpeed(ctx, data);
   else if (id === "door") drawDoor(ctx, data);
+  else if (id === "key") drawKey(ctx, data);
   else if (id === "building" || id === "flat") drawBuilding(ctx, data);
   else drawProfile(ctx, data);
   return canvas;
