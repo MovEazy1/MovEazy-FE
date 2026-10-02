@@ -6,6 +6,9 @@
  *             number); the QR on the right. The design on partners.moveazy.co.in.
  *   premium   A4 portrait. "Looking for a Premium Home?" over one big QR, the
  *             broker small at the foot.
+ *   classic   A4 landscape, white. "Premium 2BHK for Rent" in a serif, one QR
+ *             in a green-edged card, "Scan to View Property" — for a building
+ *             or a flat, chosen in the CRM next to the photo poster.
  *
  * Layout is in a fixed 1188 × 840 space (840 × 1188 for portrait) — 4 units a
  * millimetre — and scaled to whatever resolution is asked for.
@@ -20,14 +23,23 @@ export const POSTER_DESIGNS = [
 
 const SIZE = { landscape: [1188, 840], portrait: [840, 1188] };
 const FONT = "Manrope, Inter, system-ui, sans-serif";
+const SERIF = "\"Playfair Display\", Georgia, \"Times New Roman\", serif";
 const C = { deep: "#0A3A2A", deep2: "#05241A", acc: "#15803D", gold: "#E4B659", gold2: "#F7E9C6", gold3: "#8A6419", ink: "#13201B", dim: "#56655F", cream: "#F7F5EE" };
 
 /** The owner app's poster for one property (owner_buildings.sql): its photo, its name, one big QR. No contact on it. */
 export const BUILDING_POSTER = { id: "building", label: "Property", orientation: "portrait" };
 /** One flat's door poster: the same layout, its own words (flat_insights.sql). */
 export const FLAT_POSTER = { id: "flat", label: "Flat", orientation: "portrait" };
+/** The white landscape poster: headline, QR, "Scan to View Property". For a building or a flat. */
+export const CLASSIC_POSTER = { id: "classic", label: "Classic", orientation: "landscape" };
 
-export const designOf = (id) => [...POSTER_DESIGNS, BUILDING_POSTER, FLAT_POSTER].find((d) => d.id === id) || POSTER_DESIGNS[0];
+/** The two looks a building's or flat's poster comes in. */
+export const PROPERTY_POSTER_STYLES = [
+  { id: "photo", label: "Photo poster", hint: "Portrait · cover photo, name, QR" },
+  { id: "classic", label: "Classic", hint: "Landscape · headline & QR" },
+];
+
+export const designOf = (id) => [...POSTER_DESIGNS, BUILDING_POSTER, FLAT_POSTER, CLASSIC_POSTER].find((d) => d.id === id) || POSTER_DESIGNS[0];
 export const posterSize = (id) => SIZE[designOf(id).orientation];
 
 /** An image, loaded; null if it can't be (the poster then draws initials). */
@@ -45,7 +57,7 @@ export function loadImage(src) {
 /** Wait for the poster's font, so the first draw isn't in a fallback face. */
 export async function posterFontsReady() {
   try {
-    await Promise.all(["800 40px Manrope", "700 40px Manrope", "500 40px Manrope"].map((f) => document.fonts?.load(f)));
+    await Promise.all(["800 40px Manrope", "700 40px Manrope", "600 40px Manrope", "500 40px Manrope", "700 40px \"Playfair Display\""].map((f) => document.fonts?.load(f)));
   } catch { /* draw with whatever is there */ }
 }
 
@@ -305,6 +317,151 @@ function drawBuilding(ctx, { building, url, photo, logo, displayUrl }) {
   text(ctx, displayUrl, W / 2, H - 30, { size: 22, weight: 600, color: C.dim, align: "center" });
 }
 
+/** "2 BHK" → "2BHK", as the headline writes it. */
+export const headlineBhk = (t) => String(t || "").replace(/\s+(BHK|RK)\b/i, "$1").trim();
+
+/**
+ * The white landscape poster. `data.headline`: { lead, accent, tail } — e.g.
+ * "Premium", "2BHK", "for Rent"; the accent is set in gold.
+ */
+function drawClassic(ctx, { headline = {}, url, logo }) {
+  const [W, H] = SIZE.landscape;
+  const green = "#0B3D2C";
+  const greenDeep = "#062A1E";
+
+  // A white ground, a breath darker at the edges.
+  const bg = ctx.createRadialGradient(W / 2, H * 0.45, 120, W / 2, H / 2, W * 0.75);
+  bg.addColorStop(0, "#FFFFFF");
+  bg.addColorStop(1, "#F1F2EF");
+  ctx.fillStyle = bg;
+  ctx.fillRect(0, 0, W, H);
+
+  // Bottom-left: overlapping greens and one gold line.
+  ctx.save();
+  const arc = (x, y, r, fill) => { ctx.beginPath(); ctx.arc(x, y, r, 0, Math.PI * 2); ctx.fillStyle = fill; ctx.fill(); };
+  arc(-250, 1010, 560, "rgba(214,222,214,.55)");
+  const g1 = ctx.createLinearGradient(-120, 420, 260, 840);
+  g1.addColorStop(0, "#1C6B4D");
+  g1.addColorStop(1, greenDeep);
+  arc(-330, 1030, 560, g1);
+  arc(-300, 1130, 470, "rgba(120,170,140,.32)");
+  arc(-260, 1230, 400, "rgba(255,255,255,.10)");
+  ctx.beginPath();
+  ctx.arc(-260, 1060, 640, -Math.PI / 2.2, 0.02);
+  ctx.strokeStyle = "rgba(201,154,74,.9)";
+  ctx.lineWidth = 2;
+  ctx.stroke();
+  ctx.restore();
+
+  // The headline, fitted to the width: lead · accent (gold) · tail.
+  const parts = [
+    { t: headline.lead ?? "Premium", gold: false },
+    { t: headline.accent ?? "Homes", gold: true },
+    { t: headline.tail ?? "for Rent", gold: false },
+  ].filter((p) => p.t);
+  let size = 104;
+  const gap = () => size * 0.22;
+  const widthAt = () => {
+    ctx.font = `700 ${size}px ${SERIF}`;
+    if ("letterSpacing" in ctx) ctx.letterSpacing = `${-size * 0.02}px`;
+    return parts.reduce((w, p) => w + ctx.measureText(p.t).width, 0) + gap() * (parts.length - 1);
+  };
+  while (size > 48 && widthAt() > W - 150) size -= 2;
+  let x = (W - widthAt()) / 2;
+  const base = 190;
+  ctx.textAlign = "left";
+  ctx.textBaseline = "alphabetic";
+  for (const p of parts) {
+    ctx.font = `700 ${size}px ${SERIF}`;
+    if ("letterSpacing" in ctx) ctx.letterSpacing = `${-size * 0.02}px`;
+    const w = ctx.measureText(p.t).width;
+    if (p.gold) {
+      const gg = ctx.createLinearGradient(x, base - size, x + w, base);
+      gg.addColorStop(0, "#C08A3E");
+      gg.addColorStop(0.5, "#D9A55A");
+      gg.addColorStop(1, "#9C6B2C");
+      ctx.fillStyle = gg;
+    } else {
+      ctx.fillStyle = greenDeep;
+    }
+    ctx.fillText(p.t, x, base);
+    x += w + gap();
+  }
+  if ("letterSpacing" in ctx) ctx.letterSpacing = "0px";
+
+  // The code, in a white card with a deep green edge.
+  const card = 372;
+  const cx = (W - card) / 2;
+  const cy = 236;
+  ctx.save();
+  ctx.shadowColor = "rgba(6,42,30,.20)";
+  ctx.shadowBlur = 34;
+  ctx.shadowOffsetY = 12;
+  roundRect(ctx, cx, cy, card, card, 30);
+  ctx.fillStyle = green;
+  ctx.fill();
+  ctx.restore();
+  roundRect(ctx, cx + 8, cy + 8, card - 16, card - 16, 23);
+  ctx.fillStyle = "#fff";
+  ctx.fill();
+  drawQr(ctx, url, cx + 36, cy + 36, card - 72);
+
+  // "Scan to View Property ↗" in a deep green pill.
+  const label = "Scan to View Property";
+  ctx.font = `600 30px ${FONT}`;
+  const lw = ctx.measureText(label).width;
+  const pw = lw + 46 + 70;
+  const pxx = (W - pw) / 2;
+  const py = cy + card + 40;
+  const ph = 66;
+  ctx.save();
+  ctx.shadowColor = "rgba(6,42,30,.28)";
+  ctx.shadowBlur = 20;
+  ctx.shadowOffsetY = 8;
+  roundRect(ctx, pxx, py, pw, ph, ph / 2);
+  const pg = ctx.createLinearGradient(pxx, py, pxx, py + ph);
+  pg.addColorStop(0, "#14533C");
+  pg.addColorStop(1, greenDeep);
+  ctx.fillStyle = pg;
+  ctx.fill();
+  ctx.restore();
+  text(ctx, label, pxx + 36, py + ph / 2 + 11, { size: 30, weight: 600, color: "#fff" });
+  // The arrow, drawn so it doesn't depend on a font having it.
+  const ax = pxx + 36 + lw + 26;
+  const ay = py + ph / 2;
+  ctx.save();
+  ctx.strokeStyle = "#fff";
+  ctx.lineWidth = 3.4;
+  ctx.lineCap = "round";
+  ctx.lineJoin = "round";
+  ctx.beginPath();
+  ctx.moveTo(ax, ay + 11);
+  ctx.lineTo(ax + 22, ay - 11);
+  ctx.moveTo(ax + 6, ay - 11);
+  ctx.lineTo(ax + 22, ay - 11);
+  ctx.lineTo(ax + 22, ay + 5);
+  ctx.stroke();
+  ctx.restore();
+
+  // Bottom right: the wordmark, "Assured Property", a gold rule, the line.
+  const rx = W - 210;
+  if (logo) {
+    const lh = 54;
+    const lwid = (logo.width / logo.height) * lh;
+    ctx.drawImage(logo, rx - lwid / 2, 640, lwid, lh);
+  }
+  text(ctx, "Assured Property", rx, 726, { size: 21, weight: 600, color: "#2B3A34", align: "center" });
+  ctx.fillStyle = "rgba(192,138,62,.85)";
+  ctx.fillRect(rx - 175, 744, 350, 1.5);
+  ctx.save();
+  ctx.font = `700 13px ${FONT}`;
+  if ("letterSpacing" in ctx) ctx.letterSpacing = "2px";
+  ctx.fillStyle = "#B07D35";
+  ctx.textAlign = "center";
+  ctx.fillText("INDIA’S FIRST SPEED RENTING PLATFORM", rx, 774);
+  ctx.restore();
+}
+
 /**
  * Draw `design` onto `canvas` at `scale` (1 = 1188 px on the long side).
  * `data`: { broker: {name, agency, phone, rating, ratings}, url, displayUrl, photo, logo } — photo/logo loaded images.
@@ -318,6 +475,7 @@ export function drawPoster(canvas, design, data, scale = 1) {
   ctx.imageSmoothingQuality = "high";
   const id = designOf(design).id;
   if (id === "premium") drawPremium(ctx, data);
+  else if (id === "classic") drawClassic(ctx, data);
   else if (id === "building" || id === "flat") drawBuilding(ctx, data);
   else drawProfile(ctx, data);
   return canvas;
