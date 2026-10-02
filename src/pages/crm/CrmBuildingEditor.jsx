@@ -127,8 +127,12 @@ export default function CrmBuildingEditor() {
     }
     if (!ok.length) return;
     setUploading(kind === "video" ? "Uploading the video…" : `Uploading ${ok.length} photo${ok.length > 1 ? "s" : ""}…`);
-    const urls = await uploadInventoryPhotos(ok, folder, null, (file, msg) => say(`${file.name}: ${msg}`, "error"));
+    const urls = await uploadInventoryPhotos(ok, folder, null, (file, msg) => say(`${file.name}: ${msg}`, "error"), {
+      // Over 50 MB: shrunk to 720p in the browser first, as long as the video runs.
+      onShrink: (_f, p) => setUploading(p >= 100 ? "Uploading the video…" : `Shrinking the video to fit — ${p}% (keep this tab open)`),
+    });
     setUploading("");
+    if (kind === "video" && urls[0]) say("Video added — press Save to keep it");
     if (kind === "video") { if (urls[0]) set({ cover_video: urls[0] }); } else set({ photos: [...(b.photos ?? []), ...urls].slice(0, 30) });
   };
 
@@ -244,6 +248,10 @@ export default function CrmBuildingEditor() {
                 <div style={{ position: "relative" }}>
                   <video src={b.cover_video} controls playsInline style={{ width: "100%", maxHeight: 260, borderRadius: 8, background: "#000" }} />
                   <button type="button" onClick={() => set({ cover_video: "" })} className="crm-btn crm-btn--sm" style={{ position: "absolute", top: 6, right: 6 }}><X size={13} /> Remove</button>
+                </div>
+              ) : uploading.startsWith("Shrinking") || uploading.startsWith("Uploading the video") ? (
+                <div className="crm-btn" style={{ justifyContent: "center", cursor: "default" }} role="status">
+                  <Film size={15} /> {uploading}
                 </div>
               ) : (
                 <label className="crm-btn" style={{ justifyContent: "center", cursor: "pointer" }}>

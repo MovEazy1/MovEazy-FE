@@ -1,6 +1,7 @@
 import { supabase, isSupabaseConfigured } from "./supabase";
 import { coverMedia, coverPhoto, isVideoFile, orderListingMedia } from "./listingMedia";
 import { withParentArea } from "../data/preferenceOptions";
+import { STORAGE_LIMIT_BYTES, VIDEO_TARGET_BYTES, shrinkVideo } from "./videoShrink";
 
 /**
  * Inventory = the supply side. One row per listed home in the Supabase
@@ -12,9 +13,10 @@ import { withParentArea } from "../data/preferenceOptions";
 const CODE_CHARS = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789"; // no ambiguous 0/O/1/I
 const PHOTO_BUCKET = "listings"; // reuse the existing public storage bucket
 
-/** A phone shoots ~7 MB a minute at 1080p; 60 MB is a generous walkthrough and
- *  still inside what Supabase Storage accepts in one upload. */
-export const MAX_VIDEO_BYTES = 60 * 1024 * 1024;
+/** The most a video may be when picked. Anything over ~44 MB is shrunk in the
+ *  browser before upload (lib/videoShrink.js): Supabase's Free plan refuses
+ *  any single upload over 50 MB, and phone walk-throughs are usually bigger. */
+export const MAX_VIDEO_BYTES = 1024 * 1024 * 1024;
 export const MAX_IMAGE_BYTES = 15 * 1024 * 1024;
 
 /** Whether this file can be uploaded, and if not, why — in words a poster can
@@ -23,9 +25,18 @@ export function mediaRejectionReason(file) {
   const video = isVideoFile(file);
   const cap = video ? MAX_VIDEO_BYTES : MAX_IMAGE_BYTES;
   if (file.size > cap) {
-    return `${file.name || (video ? "That video" : "That photo")} is ${(file.size / 1048576).toFixed(0)} MB — the limit is ${cap / 1048576} MB`;
+    return `${file.name || (video ? "That video" : "That photo")} is ${(file.size / 1048576).toFixed(0)} MB — the limit is ${video ? "1 GB" : `${cap / 1048576} MB`}`;
   }
   return "";
+}
+
+/** Storage's "too big" answer, in words a poster can act on. */
+function uploadErrorMessage(error, file) {
+  const msg = String(error?.message || "");
+  if (/maximum allowed size|payload too large|too large|413/i.test(msg) || Number(error?.statusCode) === 413) {
+    return `over the ${STORAGE_LIMIT_BYTES / 1048576} MB upload limit${isVideoFile(file) ? " — trim the video and try again" : ""}`;
+  }
+  return msg || "Upload failed";
 }
 
 /**
@@ -39,12 +50,18 @@ export function mediaRejectionReason(file) {
  * every photo still uploads and the walkthrough just isn't there — a poster who
  * isn't told will believe they published it.
  */
-export async function uploadInventoryPhotos(files = [], propertyId, onProgress, onFileError) {
+export async function uploadInventoryPhotos(files = [], propertyId, onProgress, onFileError, { onShrink } = {}) {
   if (!isSupabaseConfigured || !supabase || !files.length) return [];
   const urls = [];
   let done = 0;
-  for (const file of files) {
+  for (const original of files) {
     try {
+      // A video too big for one upload is shrunk to 720p first; `onShrink(file, percent)` says how far along.
+      let file = original;
+      if (isVideoFile(original) && original.size > VIDEO_TARGET_BYTES) {
+        onShrink?.(original, 0);
+        file = await shrinkVideo(original, { onProgress: (p) => onShrink?.(original, p) });
+      }
       const safeName = String(file.name || "photo").replace(/[^a-z0-9._-]/gi, "-").toLowerCase();
       const path = `inventory/${propertyId}/${Date.now()}-${safeName}`;
       const { data, error } = await supabase.storage
@@ -57,10 +74,10 @@ export async function uploadInventoryPhotos(files = [], propertyId, onProgress, 
         const { data: pub } = supabase.storage.from(PHOTO_BUCKET).getPublicUrl(data.path);
         if (pub?.publicUrl) urls.push(pub.publicUrl);
       } else if (error) {
-        onFileError?.(file, error.message || "Upload failed");
+        onFileError?.(original, uploadErrorMessage(error, original));
       }
     } catch (e) {
-      onFileError?.(file, e?.message || "Upload failed");
+      onFileError?.(original, e?.message || "Upload failed");
     }
     done += 1;
     onProgress?.(done, files.length);

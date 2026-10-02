@@ -159,7 +159,7 @@ function BuildingFormInner({ existing }) {
             </div>
           ) : (
             <label className="oz-btn" style={{ width: "100%", borderStyle: "dashed", cursor: "pointer" }}>
-              {videoBusy ? <><Loader2 size={18} className="bf-spin" /> Uploading the video…</> : <><Camera size={18} /> Add a video</>}
+              {videoBusy ? <><Loader2 size={18} className="bf-spin" /> {typeof videoBusy === "string" ? videoBusy : "Uploading the video…"}</> : <><Camera size={18} /> Add a video</>}
               <input type="file" accept="video/*" hidden disabled={videoBusy} onChange={async (e) => {
                 const file = e.target.files?.[0];
                 e.target.value = "";
@@ -167,7 +167,8 @@ function BuildingFormInner({ existing }) {
                 const why = mediaRejectionReason(file);
                 if (why) { toast(why, "error"); return; }
                 setVideoBusy(true);
-                const [url] = await uploadInventoryPhotos([file], folder, null, (_, msg) => toast(msg || "The video didn't upload", "error"));
+                const [url] = await uploadInventoryPhotos([file], folder, null, (_, msg) => toast(msg || "The video didn't upload", "error"),
+                  { onShrink: (_f, p) => setVideoBusy(p >= 100 ? true : `Shrinking the video — ${p}%`) });
                 setVideoBusy(false);
                 if (url) set({ coverVideo: url });
               }} />
