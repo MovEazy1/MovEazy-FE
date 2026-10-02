@@ -1,14 +1,16 @@
 /**
  * One JPEG, one page, as a PDF — all a printable poster needs, without a PDF
- * library. The image fills the page edge to edge; the page is A4, portrait or
- * landscape, in PDF points (1/72 in).
+ * library. The image fills the page edge to edge; the page is A4 or A1,
+ * portrait or landscape, in PDF points (1/72 in).
  */
 
 export const A4 = { portrait: [595.28, 841.89], landscape: [841.89, 595.28] };
+export const A1 = { portrait: [1683.78, 2383.94], landscape: [2383.94, 1683.78] };
 
-/** PDF bytes for `jpeg` (a Uint8Array of a baseline JPEG, `w` × `h` pixels) on one A4 page. */
-export function jpegToPdf(jpeg, w, h, orientation = "portrait") {
-  const [pw, ph] = A4[orientation] || A4.portrait;
+/** PDF bytes for `jpeg` (a Uint8Array of a baseline JPEG, `w` × `h` pixels) on one page of `paper`. */
+export function jpegToPdf(jpeg, w, h, orientation = "portrait", paper = "A4") {
+  const sizes = paper === "A1" ? A1 : A4;
+  const [pw, ph] = sizes[orientation] || sizes.portrait;
   const enc = new TextEncoder();
   const content = enc.encode(`q ${pw} 0 0 ${ph} 0 0 cm /Im0 Do Q`);
   const objects = [

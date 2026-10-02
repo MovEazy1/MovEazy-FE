@@ -6,6 +6,11 @@
  *             number); the QR on the right. The design on partners.moveazy.co.in.
  *   premium   A4 portrait. "Looking for a Premium Home?" over one big QR, the
  *             broker small at the foot.
+ *   street, speed, door
+ *             A1 landscape, for the front of a house: "Street Tape" (huge
+ *             type, a band of tape, a rent sticker), "Speed Lane" (deep green
+ *             speed streaks, a glowing QR) and "Open Door" (the QR is the
+ *             door of a drawn house).
  *   classic   A4 landscape, white. "Premium 2BHK for Rent" in a serif, one QR
  *             in a green-edged card, "Scan to View Property" — for a building
  *             or a flat, chosen in the CRM next to the photo poster.
@@ -35,11 +40,21 @@ export const CLASSIC_POSTER = { id: "classic", label: "Classic", orientation: "l
 
 /** The two looks a building's or flat's poster comes in. */
 export const PROPERTY_POSTER_STYLES = [
-  { id: "photo", label: "Photo poster", hint: "Portrait · cover photo, name, QR" },
-  { id: "classic", label: "Classic", hint: "Landscape · headline & QR" },
+  { id: "photo", label: "Photo poster", hint: "A4 portrait · photo & QR" },
+  { id: "classic", label: "Classic", hint: "A4 landscape · headline & QR" },
+  { id: "street", label: "Street Tape", hint: "A1 landscape · big type, tape" },
+  { id: "speed", label: "Speed Lane", hint: "A1 landscape · bold brand" },
+  { id: "door", label: "Open Door", hint: "A1 landscape · the house" },
 ];
 
-export const designOf = (id) => [...POSTER_DESIGNS, BUILDING_POSTER, FLAT_POSTER, CLASSIC_POSTER].find((d) => d.id === id) || POSTER_DESIGNS[0];
+/** A1 landscape street posters, for the front of the house: seen from across the road. */
+export const STREET_POSTERS = [
+  { id: "street", label: "Street Tape", orientation: "landscape", paper: "A1" },
+  { id: "speed", label: "Speed Lane", orientation: "landscape", paper: "A1" },
+  { id: "door", label: "Open Door", orientation: "landscape", paper: "A1" },
+];
+
+export const designOf = (id) => [...POSTER_DESIGNS, BUILDING_POSTER, FLAT_POSTER, CLASSIC_POSTER, ...STREET_POSTERS].find((d) => d.id === id) || POSTER_DESIGNS[0];
 export const posterSize = (id) => SIZE[designOf(id).orientation];
 
 /** An image, loaded; null if it can't be (the poster then draws initials). */
@@ -57,7 +72,7 @@ export function loadImage(src) {
 /** Wait for the poster's font, so the first draw isn't in a fallback face. */
 export async function posterFontsReady() {
   try {
-    await Promise.all(["800 40px Manrope", "700 40px Manrope", "600 40px Manrope", "500 40px Manrope", "700 40px \"Playfair Display\""].map((f) => document.fonts?.load(f)));
+    await Promise.all(["800 40px Manrope", "700 40px Manrope", "600 40px Manrope", "500 40px Manrope", "700 40px \"Playfair Display\"", "italic 600 40px \"Playfair Display\""].map((f) => document.fonts?.load(f)));
   } catch { /* draw with whatever is there */ }
 }
 
@@ -317,6 +332,397 @@ function drawBuilding(ctx, { building, url, photo, logo, displayUrl }) {
   text(ctx, displayUrl, W / 2, H - 30, { size: 22, weight: 600, color: C.dim, align: "center" });
 }
 
+/* ── A1 street posters: big enough to read from across the road ──────────── */
+
+const DEEP = "#0A3A2A";
+const DEEP2 = "#04241A";
+const MINT = "#34D399";
+const GOLD = "#D9A55A";
+const GOLD_DK = "#B07D35";
+
+/** The facts the street posters can shout: type, rent, how many. */
+function shout(data) {
+  const type = data.headline?.accent || "Homes";
+  const rent = data.rentFrom || "";
+  const n = Number(data.available) || 0;
+  return { type, rent, n, rentIsFrom: data.rentIsFrom !== false };
+}
+
+function fitSize(ctx, s, maxW, start, weight = 800, family = FONT, min = 20) {
+  let size = start;
+  ctx.font = `${weight} ${size}px ${family}`;
+  while (size > min && ctx.measureText(s).width > maxW) {
+    size -= 2;
+    ctx.font = `${weight} ${size}px ${family}`;
+  }
+  return size;
+}
+
+function spaced(ctx, s, x, y, { size, weight = 800, color, align = "left", spacing = 0, family = FONT }) {
+  ctx.save();
+  ctx.font = `${weight} ${size}px ${family}`;
+  if ("letterSpacing" in ctx) ctx.letterSpacing = `${spacing}px`;
+  ctx.fillStyle = color;
+  ctx.textAlign = align;
+  ctx.textBaseline = "alphabetic";
+  ctx.fillText(s, x, y);
+  ctx.restore();
+}
+
+function goldFill(ctx, x0, y0, x1, y1) {
+  const g = ctx.createLinearGradient(x0, y0, x1, y1);
+  g.addColorStop(0, "#E9C27A");
+  g.addColorStop(0.5, "#C8903F");
+  g.addColorStop(1, "#9C6B2C");
+  return g;
+}
+
+/** The QR in a viewfinder: white card, four corner brackets. */
+function viewfinder(ctx, url, x, y, card, color) {
+  ctx.save();
+  ctx.shadowColor = "rgba(10,58,42,.22)";
+  ctx.shadowBlur = 30;
+  ctx.shadowOffsetY = 10;
+  roundRect(ctx, x, y, card, card, 26);
+  ctx.fillStyle = "#fff";
+  ctx.fill();
+  ctx.restore();
+  drawQr(ctx, url, x + 32, y + 32, card - 64);
+  ctx.save();
+  ctx.strokeStyle = color;
+  ctx.lineWidth = 11;
+  ctx.lineCap = "round";
+  const o = 20;
+  const L = 62;
+  [[x - o, y - o, 1, 1], [x + card + o, y - o, -1, 1], [x - o, y + card + o, 1, -1], [x + card + o, y + card + o, -1, -1]].forEach(([px, py, dx, dy]) => {
+    ctx.beginPath();
+    ctx.moveTo(px, py + dy * L);
+    ctx.lineTo(px, py);
+    ctx.lineTo(px + dx * L, py);
+    ctx.stroke();
+  });
+  ctx.restore();
+}
+
+/** A gold starburst sticker with the rent, at (x, y), tilted. */
+function rentSticker(ctx, x, y, r, { rent, rentIsFrom }) {
+  ctx.save();
+  ctx.translate(x, y);
+  ctx.rotate(0.2);
+  ctx.beginPath();
+  for (let i = 0; i < 28; i++) {
+    const a = (i / 28) * Math.PI * 2;
+    const rr = i % 2 ? r * 0.89 : r;
+    ctx.lineTo(Math.cos(a) * rr, Math.sin(a) * rr);
+  }
+  ctx.closePath();
+  ctx.fillStyle = goldFill(ctx, -r, -r, r, r);
+  ctx.shadowColor = "rgba(0,0,0,.25)";
+  ctx.shadowBlur = 16;
+  ctx.shadowOffsetY = 6;
+  ctx.fill();
+  ctx.shadowColor = "transparent";
+  if (rent) {
+    if (rentIsFrom) text(ctx, "from", 0, -r * 0.3, { size: r * 0.22, weight: 700, color: DEEP2, align: "center" });
+    const rs = fitSize(ctx, rent, r * 1.55, r * 0.46);
+    text(ctx, rent, 0, r * 0.16, { size: rs, weight: 800, color: DEEP2, align: "center" });
+    text(ctx, "/ month", 0, r * 0.47, { size: r * 0.22, weight: 700, color: DEEP2, align: "center" });
+  } else {
+    text(ctx, "MovEazy", 0, -r * 0.04, { size: r * 0.3, weight: 800, color: DEEP2, align: "center" });
+    text(ctx, "ASSURED", 0, r * 0.3, { size: r * 0.25, weight: 800, color: DEEP2, align: "center" });
+  }
+  ctx.restore();
+}
+
+/**
+ * 1 · "Street Tape" — a to-let sign that can't be missed: the flat type in
+ * huge type, FOR RENT in gold, the QR in a viewfinder, a band of tape across
+ * and a gold rent sticker slapped on it.
+ */
+function drawStreet(ctx, data) {
+  const [W, H] = SIZE.landscape;
+  const { type, rent, n, rentIsFrom } = shout(data);
+  ctx.fillStyle = "#F4EEDD";
+  ctx.fillRect(0, 0, W, H);
+
+  // Huge type, left.
+  const colW = 600;
+  const big = fitSize(ctx, type, colW, 290, 800, FONT, 120);
+  spaced(ctx, type, 56, 300, { size: big, color: DEEP, spacing: -big * 0.045 });
+  const fr = fitSize(ctx, "FOR RENT", colW, 140, 800, FONT, 60);
+  ctx.save();
+  ctx.font = `800 ${fr}px ${FONT}`;
+  if ("letterSpacing" in ctx) ctx.letterSpacing = `${-fr * 0.02}px`;
+  ctx.fillStyle = goldFill(ctx, 56, 320, 56 + colW, 440);
+  ctx.fillText("FOR RENT", 56, 300 + fr * 1.02);
+  ctx.restore();
+
+  // The QR, right.
+  const card = 360;
+  const qx = W - card - 92;
+  const qy = 74;
+  viewfinder(ctx, data.url, qx, qy, card, DEEP);
+  text(ctx, "Point your camera here", qx + card / 2, qy + card + 70, { size: 26, weight: 800, color: DEEP, align: "center" });
+
+  // Tape across.
+  ctx.save();
+  ctx.translate(W / 2, 616);
+  ctx.rotate(-0.045);
+  ctx.fillStyle = DEEP;
+  ctx.fillRect(-W, -38, W * 2, 76);
+  ctx.fillStyle = GOLD;
+  ctx.fillRect(-W, -38, W * 2, 5);
+  ctx.fillRect(-W, 33, W * 2, 5);
+  const tape = `SCAN  •  SEE INSIDE  •  BOOK A VISIT  •  ${n > 1 ? `${n} FLATS AVAILABLE  •  ` : ""}`;
+  ctx.font = `800 26px ${FONT}`;
+  if ("letterSpacing" in ctx) ctx.letterSpacing = "3px";
+  ctx.fillStyle = "#fff";
+  ctx.textBaseline = "middle";
+  const tw = ctx.measureText(tape).width;
+  for (let x = -W; x < W; x += tw) ctx.fillText(tape, x, 2);
+  ctx.restore();
+
+  rentSticker(ctx, 150, 600, 92, { rent, rentIsFrom });
+
+  // The brand bar.
+  ctx.fillStyle = DEEP2;
+  ctx.fillRect(0, H - 82, W, 82);
+  if (data.logoDark) {
+    const lh = 42;
+    ctx.drawImage(data.logoDark, 44, H - 82 + (82 - lh) / 2, (data.logoDark.width / data.logoDark.height) * lh, lh);
+  }
+  // The line sits centred in what the logo and the link leave free.
+  const link = data.displayUrl || "moveazy.co.in";
+  ctx.font = `600 18px ${FONT}`;
+  const linkW = ctx.measureText(link).width;
+  spaced(ctx, "INDIA’S FIRST SPEED RENTING PLATFORM", (250 + W - 44 - linkW - 24) / 2, H - 34, { size: 15, weight: 800, color: GOLD, align: "center", spacing: 1.6 });
+  text(ctx, link, W - 44, H - 34, { size: 18, weight: 600, color: "rgba(255,255,255,.7)", align: "right" });
+}
+
+/**
+ * 2 · "Speed Lane" — the brand promise as motion: deep green, mint and gold
+ * speed streaks, the QR glowing at the end of chevrons that point at it.
+ */
+function drawSpeed(ctx, data) {
+  const [W, H] = SIZE.landscape;
+  const { type, rent, n, rentIsFrom } = shout(data);
+  const bg = ctx.createLinearGradient(0, 0, W, H);
+  bg.addColorStop(0, "#0E4A35");
+  bg.addColorStop(1, DEEP2);
+  ctx.fillStyle = bg;
+  ctx.fillRect(0, 0, W, H);
+
+  ctx.save();
+  ctx.translate(W / 2, H / 2);
+  ctx.rotate(-0.36);
+  const streaks = [
+    [-900, -380, 900, 10, MINT, 0.32], [-760, -330, 520, 4, GOLD, 0.7], [-980, -250, 760, 22, MINT, 0.12],
+    [-700, -170, 380, 6, MINT, 0.4], [-1000, 260, 900, 16, MINT, 0.16], [-760, 320, 480, 5, GOLD, 0.7],
+    [-900, 390, 640, 9, MINT, 0.3], [300, -520, 700, 7, MINT, 0.26], [380, 470, 560, 12, GOLD, 0.3],
+    [-1100, 470, 600, 30, MINT, 0.08], [260, 560, 760, 4, MINT, 0.45],
+  ];
+  for (const [x, y, w, h, c, a] of streaks) {
+    ctx.globalAlpha = a;
+    roundRect(ctx, x, y, w, h, h / 2);
+    ctx.fillStyle = c;
+    ctx.fill();
+  }
+  ctx.restore();
+  ctx.globalAlpha = 1;
+
+  if (data.logoDark) {
+    const lh = 48;
+    ctx.drawImage(data.logoDark, 60, 56, (data.logoDark.width / data.logoDark.height) * lh, lh);
+  }
+
+  // Left: the line, the facts, the steps.
+  const colW = 530;
+  const l1 = "Your next home";
+  const l2 = "is one scan away.";
+  const hs = Math.min(fitSize(ctx, l1, colW, 88), fitSize(ctx, l2, colW, 88));
+  spaced(ctx, l1, 60, 250, { size: hs, color: "#fff", spacing: -hs * 0.03 });
+  ctx.save();
+  ctx.font = `800 ${hs}px ${FONT}`;
+  if ("letterSpacing" in ctx) ctx.letterSpacing = `${-hs * 0.03}px`;
+  ctx.fillStyle = goldFill(ctx, 60, 260, 60 + colW, 350);
+  ctx.fillText(l2, 60, 250 + hs * 1.1);
+  ctx.restore();
+  const facts = [type, n > 1 ? `${n} flats available` : "", rent ? `${rentIsFrom ? "from " : ""}${rent}/mo` : ""].filter(Boolean).join("  ·  ");
+  text(ctx, facts, 60, 250 + hs * 1.1 + 66, { size: fitSize(ctx, facts, colW, 30, 700), weight: 700, color: MINT });
+
+  const steps = ["Scan", "Pick a flat", "Book a visit"];
+  const sy = 560;
+  const sw = 600 / 3;
+  steps.forEach((s, k) => {
+    const x = 60 + sw * k;
+    roundRect(ctx, x, sy, sw - 14, 62, 31);
+    ctx.fillStyle = k === 2 ? GOLD : "rgba(255,255,255,.1)";
+    ctx.fill();
+    text(ctx, `${k + 1}  ${s}`, x + (sw - 14) / 2, sy + 41, { size: 23, weight: 800, color: k === 2 ? DEEP2 : "#fff", align: "center", maxWidth: sw - 30 });
+  });
+
+  // Right: the QR, glowing, with chevrons leading in.
+  const card = 420;
+  const cx = W - card - 80;
+  const cy = 150;
+  ctx.save();
+  ctx.shadowColor = "rgba(52,211,153,.55)";
+  ctx.shadowBlur = 70;
+  roundRect(ctx, cx, cy, card, card, 34);
+  ctx.fillStyle = "#fff";
+  ctx.fill();
+  ctx.restore();
+  drawQr(ctx, data.url, cx + 34, cy + 34, card - 68);
+  [0, 1, 2].forEach((k) => {
+    const x = cx - 78 + k * 24;
+    const y = cy + card / 2;
+    ctx.save();
+    ctx.globalAlpha = 0.35 + k * 0.3;
+    ctx.strokeStyle = GOLD;
+    ctx.lineWidth = 9;
+    ctx.lineCap = "round";
+    ctx.lineJoin = "round";
+    ctx.beginPath();
+    ctx.moveTo(x - 15, y - 28);
+    ctx.lineTo(x + 15, y);
+    ctx.lineTo(x - 15, y + 28);
+    ctx.stroke();
+    ctx.restore();
+  });
+  roundRect(ctx, cx + card / 2 - 124, cy - 76, 248, 44, 22);
+  ctx.strokeStyle = GOLD;
+  ctx.lineWidth = 2.5;
+  ctx.stroke();
+  spaced(ctx, "SPEED RENTING", cx + card / 2, cy - 46, { size: 18, weight: 800, color: GOLD, align: "center", spacing: 3 });
+
+  spaced(ctx, "INDIA’S FIRST SPEED RENTING PLATFORM", 60, H - 52, { size: 17, weight: 800, color: GOLD, spacing: 2.4 });
+  text(ctx, data.displayUrl || "moveazy.co.in", W - 80, H - 52, { size: 20, weight: 600, color: "rgba(255,255,255,.6)", align: "right" });
+}
+
+/**
+ * 3 · "Open Door" — the house is the poster: a deep green home under a gold
+ * roofline, lit windows, and the QR is its front door. "Knock knock."
+ */
+function drawDoor(ctx, data) {
+  const [W, H] = SIZE.landscape;
+  const { type, rent, rentIsFrom } = shout(data);
+  ctx.fillStyle = "#F7F2E6";
+  ctx.fillRect(0, 0, W, H);
+
+  // The house sits right; the sunburst comes from its door.
+  const left = 600;
+  const right = W - 64;
+  const mid = (left + right) / 2;
+  const apex = 70;
+  const eave = 300;
+  const floor = 760;
+
+  ctx.save();
+  ctx.translate(mid, 560);
+  for (let i = 0; i < 28; i++) {
+    ctx.rotate((Math.PI * 2) / 28);
+    ctx.beginPath();
+    ctx.moveTo(0, 0);
+    ctx.lineTo(-70, -1300);
+    ctx.lineTo(70, -1300);
+    ctx.closePath();
+    ctx.fillStyle = i % 2 ? "rgba(201,154,74,.07)" : "rgba(201,154,74,0)";
+    ctx.fill();
+  }
+  ctx.restore();
+
+  // Left: the knock, the line, the flat.
+  ctx.save();
+  ctx.font = `italic 600 ${fitSize(ctx, "Knock knock.", 490, 100, "italic 600", SERIF)}px ${SERIF}`;
+  ctx.fillStyle = GOLD_DK;
+  ctx.textAlign = "left";
+  ctx.fillText("Knock knock.", 60, 200);
+  ctx.restore();
+  text(ctx, "Your next home is right here.", 64, 262, { size: 34, weight: 700, color: DEEP, maxWidth: 500 });
+  const head = `${type} FOR RENT`;
+  const hs = fitSize(ctx, head, 500, 62);
+  spaced(ctx, head, 64, 410, { size: hs, color: DEEP, spacing: -hs * 0.02 });
+  if (rent) text(ctx, `${rentIsFrom ? "from " : ""}${rent} / month`, 64, 462, { size: 34, weight: 700, color: GOLD_DK });
+  spaced(ctx, "SCAN THE DOOR TO STEP INSIDE  →", 64, 540, { size: 20, color: DEEP, spacing: 2.2 });
+
+  // The house.
+  ctx.fillStyle = DEEP;
+  ctx.fillRect(right - 150, 110, 52, 150);
+  ctx.save();
+  ctx.shadowColor = "rgba(4,36,26,.25)";
+  ctx.shadowBlur = 30;
+  ctx.shadowOffsetY = 12;
+  ctx.beginPath();
+  ctx.moveTo(mid, apex);
+  ctx.lineTo(right + 18, eave);
+  ctx.lineTo(right, eave);
+  ctx.lineTo(right, floor);
+  ctx.lineTo(left, floor);
+  ctx.lineTo(left, eave);
+  ctx.lineTo(left - 18, eave);
+  ctx.closePath();
+  const hg = ctx.createLinearGradient(0, apex, 0, floor);
+  hg.addColorStop(0, "#155C42");
+  hg.addColorStop(1, DEEP2);
+  ctx.fillStyle = hg;
+  ctx.fill();
+  ctx.restore();
+  ctx.beginPath();
+  ctx.moveTo(left - 30, eave + 10);
+  ctx.lineTo(mid, apex - 20);
+  ctx.lineTo(right + 30, eave + 10);
+  ctx.strokeStyle = GOLD;
+  ctx.lineWidth = 11;
+  ctx.lineCap = "round";
+  ctx.lineJoin = "round";
+  ctx.stroke();
+
+  // Lit windows.
+  const win = (x, y) => {
+    roundRect(ctx, x, y, 62, 80, 7);
+    ctx.fillStyle = "#F6D27A";
+    ctx.fill();
+    ctx.fillStyle = DEEP;
+    ctx.fillRect(x + 28, y, 6, 80);
+    ctx.fillRect(x, y + 37, 62, 6);
+  };
+  win(left + 14, 400);
+  win(right - 14 - 62, 400);
+
+  // The door: an arch, and the QR inside it.
+  const dw = 320;
+  const dx = mid - dw / 2;
+  const dtop = 250;
+  const r = dw / 2;
+  ctx.beginPath();
+  ctx.moveTo(dx, floor);
+  ctx.lineTo(dx, dtop + r);
+  ctx.arc(mid, dtop + r, r, Math.PI, 0);
+  ctx.lineTo(dx + dw, floor);
+  ctx.closePath();
+  ctx.fillStyle = "#FFFFFF";
+  ctx.fill();
+  ctx.strokeStyle = GOLD;
+  ctx.lineWidth = 7;
+  ctx.stroke();
+  spaced(ctx, "SCAN TO STEP INSIDE", mid, dtop + 88, { size: 16, color: DEEP, align: "center", spacing: 1.8 });
+  const q = 272;
+  drawQr(ctx, data.url, mid - q / 2, dtop + 112, q);
+  ctx.beginPath();
+  ctx.arc(dx + dw - 18, dtop + 112 + q / 2 + 30, 7, 0, Math.PI * 2);
+  ctx.fillStyle = GOLD;
+  ctx.fill();
+
+  // Ground and brand.
+  ctx.fillStyle = GOLD;
+  ctx.fillRect(40, floor, W - 80, 6);
+  if (data.logo) {
+    const lh = 50;
+    ctx.drawImage(data.logo, 64, 640, (data.logo.width / data.logo.height) * lh, lh);
+  }
+  spaced(ctx, "INDIA’S FIRST SPEED RENTING PLATFORM", W / 2, floor + 50, { size: 17, weight: 800, color: GOLD_DK, align: "center", spacing: 2.6 });
+}
+
 /** "2 BHK" → "2BHK", as the headline writes it. */
 export const headlineBhk = (t) => String(t || "").replace(/\s+(BHK|RK)\b/i, "$1").trim();
 
@@ -476,16 +882,20 @@ export function drawPoster(canvas, design, data, scale = 1) {
   const id = designOf(design).id;
   if (id === "premium") drawPremium(ctx, data);
   else if (id === "classic") drawClassic(ctx, data);
+  else if (id === "street") drawStreet(ctx, data);
+  else if (id === "speed") drawSpeed(ctx, data);
+  else if (id === "door") drawDoor(ctx, data);
   else if (id === "building" || id === "flat") drawBuilding(ctx, data);
   else drawProfile(ctx, data);
   return canvas;
 }
 
-/** The poster as an A4 PDF Blob, at about 200 dpi. */
+/** The poster as a PDF Blob: A4 at about 200 dpi, A1 at about 145 dpi. */
 export async function posterPdf(design, data) {
-  const canvas = drawPoster(document.createElement("canvas"), design, data, 2);
+  const { paper = "A4" } = designOf(design);
+  const canvas = drawPoster(document.createElement("canvas"), design, data, paper === "A1" ? 4 : 2);
   const blob = await new Promise((resolve, reject) => canvas.toBlob((b) => (b ? resolve(b) : reject(new Error("Could not draw the poster"))), "image/jpeg", 0.92));
   const jpeg = new Uint8Array(await blob.arrayBuffer());
-  const pdf = jpegToPdf(jpeg, canvas.width, canvas.height, designOf(design).orientation);
+  const pdf = jpegToPdf(jpeg, canvas.width, canvas.height, designOf(design).orientation, paper);
   return new Blob([pdf], { type: "application/pdf" });
 }

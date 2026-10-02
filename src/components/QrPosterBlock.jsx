@@ -8,7 +8,7 @@ import QRCode from "qrcode";
 import { Copy, Download, ExternalLink } from "lucide-react";
 import { downloadPoster, flatUrl, posterData } from "../lib/flatInsights";
 import { buildingUrl } from "../lib/buildings";
-import { PROPERTY_POSTER_STYLES, drawPoster } from "../lib/qrPoster";
+import { PROPERTY_POSTER_STYLES, designOf, drawPoster } from "../lib/qrPoster";
 import logoOnDark from "../assets/logo/moveazy-logo-mint-dark.png";
 import logoOnLight from "../assets/logo/moveazy-logo-mint-light.png";
 
@@ -30,6 +30,7 @@ export default function QrPosterBlock({ flat, building, btnClass = "", softClass
   const ref = useRef(null);
   const [busy, setBusy] = useState(false);
   const [style, setStyle] = useState(PROPERTY_POSTER_STYLES[0].id);
+  const design = style === "photo" ? "building" : style;
   const link = building ? buildingUrl(building.code) : flatUrl(flat.property_id);
   const key = useMemo(() => JSON.stringify([flat?.property_id, flat?.rent, flat?.cover_image_url, flat?.flat_type, building?.code, building?.available, building?.bhk, style]), [flat, building, style]);
   const dataFor = () => posterData({ flat, building, logoSrc: logoOnDark, lightLogoSrc: logoOnLight, style });
@@ -45,7 +46,7 @@ export default function QrPosterBlock({ flat, building, btnClass = "", softClass
     setBusy(true);
     try {
       const name = building ? building.name : `${flat.property_id}`;
-      await downloadPoster(await dataFor(), `MovEazy-QR-${String(name).replace(/\W+/g, "-")}${style === "classic" ? "-classic" : ""}.pdf`);
+      await downloadPoster(await dataFor(), `MovEazy-QR-${String(name).replace(/\W+/g, "-")}${style === "photo" ? "" : `-${style}`}.pdf`);
     } catch (e) {
       onToast(e?.message || "Could not make the PDF.", "error");
     } finally {
@@ -58,7 +59,7 @@ export default function QrPosterBlock({ flat, building, btnClass = "", softClass
 
   return (
     <div>
-      <div role="radiogroup" aria-label="Poster design" style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 6, marginBottom: 8 }}>
+      <div role="radiogroup" aria-label="Poster design" style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(118px, 1fr))", gap: 6, marginBottom: 8 }}>
         {PROPERTY_POSTER_STYLES.map((s) => {
           const on = style === s.id;
           return (
@@ -77,7 +78,7 @@ export default function QrPosterBlock({ flat, building, btnClass = "", softClass
         <canvas ref={ref} aria-label="Poster preview" style={{ display: "block", width: `min(100%, ${previewWidth}px)`, height: "auto", borderRadius: 4, boxShadow: "0 8px 24px rgba(0,0,0,.18)", background: "#fff" }} />
       </div>
       <button type="button" className={btnClass} onClick={download} disabled={busy} style={{ width: "100%", marginTop: 10, justifyContent: "center" }}>
-        <Download size={17} /> {busy ? "Making the PDF…" : "Download A4 poster (PDF)"}
+        <Download size={17} /> {busy ? "Making the PDF…" : `Download ${designOf(design).paper || "A4"} poster (PDF)`}
       </button>
       <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8, marginTop: 8 }}>
         <button type="button" className={softClass} onClick={copy} style={{ justifyContent: "center" }}><Copy size={15} /> Copy link</button>

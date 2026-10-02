@@ -9,7 +9,7 @@
 import { supabase, isSupabaseConfigured } from "./supabase";
 import { PUBLIC_ORIGIN } from "./partners";
 import { visitorId } from "./storefront";
-import { BUILDING_POSTER, CLASSIC_POSTER, FLAT_POSTER, headlineBhk, loadImage, posterFontsReady, posterPdf } from "./qrPoster";
+import { BUILDING_POSTER, CLASSIC_POSTER, FLAT_POSTER, STREET_POSTERS, headlineBhk, loadImage, posterFontsReady, posterPdf } from "./qrPoster";
 import { buildingDisplay, buildingUrl } from "./buildings";
 
 async function rpc(fn, args) {
@@ -69,6 +69,23 @@ const rupees = (n) => (Number(n) > 0 ? `₹${Number(n).toLocaleString("en-IN")}`
  * `building`: { code, name, area, landmark, photo, available, rentFrom } to print the building's poster instead.
  */
 export async function posterData({ flat, building, logoSrc, style = "photo", lightLogoSrc }) {
+  if (STREET_POSTERS.some((d) => d.id === style)) {
+    // The A1 street posters: the type, the rent, how many — big.
+    const [logo, logoDark] = await Promise.all([loadImage(lightLogoSrc || logoSrc), loadImage(logoSrc), posterFontsReady()]);
+    const type = headlineBhk(building ? building.bhk : flat?.flat_type || (flat?.bedrooms ? `${flat.bedrooms}BHK` : ""));
+    return {
+      design: style,
+      data: {
+        headline: { accent: type || "Homes" },
+        rentFrom: building ? building.rentFrom || "" : rupees(flat?.rent),
+        rentIsFrom: Boolean(building),
+        available: building ? Number(building.available) || 0 : 0,
+        url: building ? buildingUrl(building.code, { qr: true }) : flatUrl(flat.property_id, { qr: true }),
+        displayUrl: building ? buildingDisplay(building.code) : flatDisplay(flat.property_id),
+        logo, logoDark,
+      },
+    };
+  }
   if (style === "classic") {
     // "Premium 2BHK for Rent": the flat's type, or the building's when all its flats share one.
     const [logo] = await Promise.all([loadImage(lightLogoSrc || logoSrc), posterFontsReady()]);
