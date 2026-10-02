@@ -10,9 +10,9 @@
  * has one owner (who sees it all in the owner app); a society's flats each
  * have their own owner, who sees only theirs.
  */
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Link, useNavigate, useParams, useSearchParams } from "react-router-dom";
-import { ArrowDown, ArrowUp, Camera, Film, Star, Trash2, X } from "lucide-react";
+import { ArrowDown, ArrowUp, Camera, Film, Loader2, Star, Trash2, X } from "lucide-react";
 import { useCrm } from "./CrmShell";
 import { Btn, C, Empty, Toast, inr } from "./crmUi";
 import QrPosterBlock from "../../components/QrPosterBlock";
@@ -23,6 +23,8 @@ import { fetchCrmBuilding, saveCrmBuilding, setBuildingUnits, setCrmFlatBuilding
 import { buildingUrl, floorLabel } from "../../lib/buildings";
 import { SCOPES } from "../../lib/adminScopes";
 import { BUILDING_AMENITIES } from "../owners/BuildingForm";
+
+const MAX_PHOTOS = 30;
 
 const BLANK = {
   name: "", kind: "building", area: "", landmark: "", full_address: "", total_floors: "",
@@ -55,7 +57,10 @@ export default function CrmBuildingEditor() {
   const [initialIds, setInitialIds] = useState([]);
   const [q, setQ] = useState("");
   const [saving, setSaving] = useState(false);
-  const [uploading, setUploading] = useState("");
+  const [videoBusy, setVideoBusy] = useState("");
+  // Photos on their way up, shown as tiles until they land: [{ key, preview }]
+  const [pending, setPending] = useState([]);
+  const uploading = videoBusy || (pending.length ? `Uploading ${pending.length} photo${pending.length > 1 ? "s" : ""}…` : "");
   const [toast, setToast] = useState(null);
   const [folder] = useState(() => `BLD-${Math.random().toString(36).slice(2, 10).toUpperCase()}`);
 
@@ -117,24 +122,68 @@ export default function CrmBuildingEditor() {
       && [l.property_id, l.title, l.area, l.flat_type, l.poster_name, l.full_address].join(" ").toLowerCase().includes(needle)).slice(0, 12);
   }, [q, inventory, flats]);
 
-  const upload = async (files, kind) => {
-    const ok = [];
-    for (const f of files) {
+  // Every landed photo is added to the building as it is *now*, not as it was
+  // when the upload started — so picking more while some are still going up
+  // (one at a time from a phone, say) never drops the earlier ones.
+  const uploadPhotos = async (files) => {
+    const jobs = files.map((file) => ({ key: `${file.name}-${file.size}-${Math.random()}`, file, preview: URL.createObjectURL(file) }));
+    setPending((cur) => [...cur, ...jobs]);
+    let full = false;
+    for (const job of jobs) {
+      const [url] = await uploadInventoryPhotos([job.file], folder, null, (file, msg) => say(`${file.name}: ${msg}`, "error"));
+      setPending((cur) => cur.filter((j) => j.key !== job.key));
+      URL.revokeObjectURL(job.preview);
+      if (url) setB((cur) => {
+        const photos = cur.photos ?? [];
+        if (photos.length >= MAX_PHOTOS) { full = true; return cur; }
+        return { ...cur, photos: [...photos, url] };
+      });
+    }
+    if (full) say(`Up to ${MAX_PHOTOS} photos per building`, "error");
+  };
+
+  const uploadVideo = async (file) => {
+    setVideoBusy("Uploading the video…");
+    const [url] = await uploadInventoryPhotos([file], folder, null, (f, msg) => say(`${f.name}: ${msg}`, "error"), {
+      // Over 50 MB: shrunk to 720p in the browser first, as long as the video runs.
+      onShrink: (_f, p) => setVideoBusy(p >= 100 ? "Uploading the video…" : `Shrinking the video to fit — ${p}% (keep this tab open)`),
+    });
+    setVideoBusy("");
+    if (url) { setB((cur) => ({ ...cur, cover_video: url })); say("Video added — press Save to keep it"); }
+  };
+
+  // One way in for the picker, a drop and a paste: photos join the photos,
+  // a video becomes the cover video.
+  const addMedia = (list) => {
+    const photos = [];
+    let video = null;
+    for (const f of list ?? []) {
       const why = mediaRejectionReason(f);
       if (why) { say(why, "error"); continue; }
-      if (kind === "video" ? !isVideoFile(f) : isVideoFile(f)) { say(kind === "video" ? "Pick a video file" : "Pick photos here — the video goes above", "error"); continue; }
-      ok.push(f);
+      if (isVideoFile(f)) { video = video || f; continue; }
+      if (!String(f.type || "").startsWith("image/") && !/\.(jpe?g|png|webp|heic|heif|gif)$/i.test(f.name || "")) continue;
+      photos.push(f);
     }
-    if (!ok.length) return;
-    setUploading(kind === "video" ? "Uploading the video…" : `Uploading ${ok.length} photo${ok.length > 1 ? "s" : ""}…`);
-    const urls = await uploadInventoryPhotos(ok, folder, null, (file, msg) => say(`${file.name}: ${msg}`, "error"), {
-      // Over 50 MB: shrunk to 720p in the browser first, as long as the video runs.
-      onShrink: (_f, p) => setUploading(p >= 100 ? "Uploading the video…" : `Shrinking the video to fit — ${p}% (keep this tab open)`),
-    });
-    setUploading("");
-    if (kind === "video" && urls[0]) say("Video added — press Save to keep it");
-    if (kind === "video") { if (urls[0]) set({ cover_video: urls[0] }); } else set({ photos: [...(b.photos ?? []), ...urls].slice(0, 30) });
+    if (video) {
+      if (b?.cover_video || videoBusy) say("One cover video per building — remove the current one first", "error");
+      else uploadVideo(video);
+    }
+    const room = MAX_PHOTOS - (b?.photos?.length ?? 0) - pending.length;
+    if (photos.length > room) say(`Up to ${MAX_PHOTOS} photos per building`, "error");
+    if (room > 0 && photos.length) uploadPhotos(photos.slice(0, room));
   };
+  const addMediaRef = useRef(addMedia);
+  addMediaRef.current = addMedia;
+  useEffect(() => {
+    const onPaste = (e) => {
+      const files = [...(e.clipboardData?.files ?? [])];
+      if (!files.length) return;
+      e.preventDefault();
+      addMediaRef.current(files);
+    };
+    window.addEventListener("paste", onPaste);
+    return () => window.removeEventListener("paste", onPaste);
+  }, []);
 
   const save = async () => {
     if (!b.name.trim()) { say("Give the building a name", "error"); return; }
@@ -241,7 +290,9 @@ export default function CrmBuildingEditor() {
               </div>
             </div>
 
-            <div style={{ ...card, borderColor: coverMissing ? C.gold : C.line }}>
+            <div style={{ ...card, borderColor: coverMissing ? C.gold : C.line }}
+              onDragOver={(e) => e.preventDefault()}
+              onDrop={(e) => { e.preventDefault(); addMedia([...(e.dataTransfer?.files ?? [])]); }}>
               <span className="crm-label">Cover video &amp; photos</span>
               {coverMissing && <span style={{ fontSize: 12, color: C.gold, fontWeight: 600 }}>Add a walk-through video and cover photos — the first thing a tenant sees after scanning the QR.</span>}
               {b.cover_video ? (
@@ -249,14 +300,14 @@ export default function CrmBuildingEditor() {
                   <video src={b.cover_video} controls playsInline style={{ width: "100%", maxHeight: 260, borderRadius: 8, background: "#000" }} />
                   <button type="button" onClick={() => set({ cover_video: "" })} className="crm-btn crm-btn--sm" style={{ position: "absolute", top: 6, right: 6 }}><X size={13} /> Remove</button>
                 </div>
-              ) : uploading.startsWith("Shrinking") || uploading.startsWith("Uploading the video") ? (
+              ) : videoBusy ? (
                 <div className="crm-btn" style={{ justifyContent: "center", cursor: "default" }} role="status">
-                  <Film size={15} /> {uploading}
+                  <Film size={15} /> {videoBusy}
                 </div>
               ) : (
                 <label className="crm-btn" style={{ justifyContent: "center", cursor: "pointer" }}>
                   <Film size={15} /> Add the cover video
-                  <input type="file" accept="video/*" hidden onChange={(e) => { upload([...e.target.files], "video"); e.target.value = ""; }} />
+                  <input type="file" accept="video/*" hidden onChange={(e) => { addMedia([...e.target.files]); e.target.value = ""; }} />
                 </label>
               )}
               <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: 6 }}>
@@ -270,11 +321,23 @@ export default function CrmBuildingEditor() {
                       style={{ position: "absolute", right: 4, top: 4, border: 0, borderRadius: 99, background: "rgba(0,0,0,.55)", color: "#fff", width: 20, height: 20, cursor: "pointer", display: "grid", placeItems: "center" }}><X size={12} /></button>
                   </div>
                 ))}
-                <label style={{ aspectRatio: "1", borderRadius: 8, border: `1.5px dashed ${C.line}`, display: "grid", placeItems: "center", cursor: "pointer", color: C.textMute, fontSize: 11, textAlign: "center" }}>
-                  <span><Camera size={18} /><br />Add photos</span>
-                  <input type="file" accept="image/*" multiple hidden onChange={(e) => { upload([...e.target.files], "photos"); e.target.value = ""; }} />
-                </label>
+                {pending.map((p) => (
+                  <div key={p.key} role="status" aria-label="Uploading photo" style={{ position: "relative", aspectRatio: "1", borderRadius: 8, overflow: "hidden", background: C.surface }}>
+                    <img src={p.preview} alt="" style={{ width: "100%", height: "100%", objectFit: "cover", display: "block", opacity: 0.5 }} />
+                    <span style={{ position: "absolute", inset: 0, display: "grid", placeItems: "center" }}><Loader2 size={18} className="crm-spin" /></span>
+                  </div>
+                ))}
+                {(b.photos ?? []).length + pending.length < MAX_PHOTOS && (
+                  <label style={{ aspectRatio: "1", borderRadius: 8, border: `1.5px dashed ${C.line}`, display: "grid", placeItems: "center", cursor: "pointer", color: C.textMute, fontSize: 11, textAlign: "center" }}>
+                    <span><Camera size={18} /><br />Add photos</span>
+                    <input type="file" accept="image/*,video/*" multiple hidden onChange={(e) => { addMedia([...e.target.files]); e.target.value = ""; }} />
+                  </label>
+                )}
               </div>
+              <span className="crm-mute" style={{ fontSize: 11 }}>
+                Select several at once (on a phone, long-press a photo to pick more), keep adding more, drag them in or paste — the first is the cover. {(b.photos ?? []).length}/{MAX_PHOTOS}
+              </span>
+              <style>{".crm-spin{animation:crm-spin 1s linear infinite}@keyframes crm-spin{to{transform:rotate(360deg)}}"}</style>
             </div>
           </div>
 
