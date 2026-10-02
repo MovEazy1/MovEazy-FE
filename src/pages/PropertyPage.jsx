@@ -17,6 +17,7 @@ import AIBroker from "../components/AIBroker";
 import Toast from "../components/Toast";
 import { useLoginModal } from "../context/LoginModalContext";
 import { fetchInventoryByIds, mapInventoryToListing } from "../lib/inventory";
+import { recordFlatView } from "../lib/flatInsights";
 
 const T = { ink: "#04211D", text: "#171412", textDim: "#5c554e" };
 
@@ -99,6 +100,15 @@ export default function PropertyPage() {
   const [listing, setListing] = useState(null);
   const [loading, setLoading] = useState(true);
   const [toast, setToast] = useState("");
+
+  // Counted for the owner's dashboard: a scan of the flat's door QR (?s=qr) is a lead.
+  const counted = useRef(false);
+  useEffect(() => {
+    if (!listing || counted.current) return;
+    counted.current = true;
+    recordFlatView(String(propertyId || "").trim(), new URLSearchParams(location.search).get("s") === "qr" ? "qr" : "link");
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [listing]);
 
   const openVisitForm = useMemo(
     () => new URLSearchParams(location.search).get("visit") === "1",

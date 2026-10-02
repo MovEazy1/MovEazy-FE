@@ -5,11 +5,12 @@
  */
 import { useEffect, useMemo, useState } from "react";
 import { Link } from "react-router-dom";
-import { Bell, CalendarClock, Camera, CheckCircle2, ChevronRight, Home as HomeIcon, IndianRupee, KeyRound, TrendingUp, UserPlus, Wrench } from "lucide-react";
+import { Bell, CalendarClock, Camera, CheckCircle2, ChevronRight, Home as HomeIcon, IndianRupee, KeyRound, QrCode, TrendingUp, UserPlus, Wrench } from "lucide-react";
 import { useOwner } from "./OwnerApp";
 import PropertyRow from "./PropertyRow";
 import { Avatar, Empty, Loading } from "./ownerUi";
 import { fetchActivity, inr, occupancyOf, op, propertyName } from "../../lib/owners";
+import { fetchRentDashboard } from "../../lib/flatInsights";
 import { daysToLeaseEnd, isCurrentTenant } from "../../lib/ownerOccupancy";
 import logo from "../../assets/logo/moveazy-logo-mint-light.png";
 
@@ -23,6 +24,12 @@ function greeting() {
 export default function OwnerHome() {
   const { me, properties, propError, tenants, requests } = useOwner();
   const [unseen, setUnseen] = useState(0);
+  const [rent, setRent] = useState(null);
+  useEffect(() => {
+    fetchRentDashboard().then((rows) => setRent(rows.reduce((t, r) => ({
+      scans: t.scans + (Number(r.stats?.scans) || 0), likes: t.likes + (Number(r.stats?.likes) || 0), visits: t.visits + (Number(r.stats?.visits) || 0),
+    }), { scans: 0, likes: 0, visits: 0 })), () => {});
+  }, []);
 
   useEffect(() => {
     let seen = 0;
@@ -107,6 +114,20 @@ export default function OwnerHome() {
           </div>
         </section>
       </div>
+
+      {properties && list.some((p) => occupancyOf(p, tenants) !== "occupied") && (
+        <div className="oz-pad" style={{ paddingTop: 4, paddingBottom: 4 }}>
+          <Link to={op("/rent-dashboard")} className="oz-card oz-row" style={{ padding: 12, textDecoration: "none", color: "inherit",
+            background: "linear-gradient(135deg, #fff, var(--champ2))", borderColor: "#EADFC6" }}>
+            <span className="oz-avatar" style={{ background: "var(--deep)", color: "var(--champ)", borderRadius: 12 }}><QrCode size={19} /></span>
+            <span style={{ flex: 1, minWidth: 0 }}>
+              <strong style={{ display: "block" }}>QR & leads</strong>
+              <span className="oz-meta">{rent ? `${rent.scans} leads · ${rent.likes} likes · ${rent.visits} visits` : "A QR for every flat on rent"}</span>
+            </span>
+            <ChevronRight size={18} color="#94A09B" />
+          </Link>
+        </div>
+      )}
 
       {properties && list.length > 0 && (
         <div className="oz-pad" style={{ paddingTop: 4 }}>

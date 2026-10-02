@@ -24,8 +24,10 @@ const C = { deep: "#0A3A2A", deep2: "#05241A", acc: "#15803D", gold: "#E4B659", 
 
 /** The owner app's poster for one property (owner_buildings.sql): its photo, its name, one big QR. No contact on it. */
 export const BUILDING_POSTER = { id: "building", label: "Property", orientation: "portrait" };
+/** One flat's door poster: the same layout, its own words (flat_insights.sql). */
+export const FLAT_POSTER = { id: "flat", label: "Flat", orientation: "portrait" };
 
-export const designOf = (id) => [...POSTER_DESIGNS, BUILDING_POSTER].find((d) => d.id === id) || POSTER_DESIGNS[0];
+export const designOf = (id) => [...POSTER_DESIGNS, BUILDING_POSTER, FLAT_POSTER].find((d) => d.id === id) || POSTER_DESIGNS[0];
 export const posterSize = (id) => SIZE[designOf(id).orientation];
 
 /** An image, loaded; null if it can't be (the poster then draws initials). */
@@ -249,14 +251,15 @@ function drawBuilding(ctx, { building, url, photo, logo, displayUrl }) {
     const lw = (logo.width / logo.height) * 50;
     ctx.drawImage(logo, 48, 38, lw, 50);
   }
-  text(ctx, "Homes for rent", W - 48, 72, { size: 26, weight: 800, color: C.gold, align: "right" });
+  text(ctx, building.tag || "Homes for rent", W - 48, 72, { size: 26, weight: 800, color: C.gold, align: "right" });
   text(ctx, building.name || "Our property", 48, ph - 74, { size: 58, weight: 800, color: "#fff", maxWidth: W - 96 });
   const sub = [building.area, building.landmark].filter(Boolean).join("  ·  ");
   if (sub) text(ctx, sub, 48, ph - 30, { size: 28, weight: 600, color: "rgba(255,255,255,.85)", maxWidth: W - 96 });
 
   // The pitch.
   const avail = Number(building.available) || 0;
-  const pitch = avail > 0 ? `${avail} flat${avail === 1 ? "" : "s"} available${building.rentFrom ? `  ·  from ${building.rentFrom}` : ""}` : "Flats for rent";
+  const pitch = building.pitch
+    || (avail > 0 ? `${avail} flat${avail === 1 ? "" : "s"} available${building.rentFrom ? `  ·  from ${building.rentFrom}` : ""}` : "Flats for rent");
   ctx.font = `800 30px ${FONT}`;
   const pw = Math.min(W - 96, ctx.measureText(pitch).width + 56);
   roundRect(ctx, (W - pw) / 2, ph + 34, pw, 58, 29);
@@ -264,8 +267,8 @@ function drawBuilding(ctx, { building, url, photo, logo, displayUrl }) {
   ctx.fill();
   text(ctx, pitch, W / 2, ph + 74, { size: 30, weight: 800, color: C.gold3, align: "center", maxWidth: W - 120 });
 
-  text(ctx, "Scan to see every flat", W / 2, ph + 160, { size: 46, weight: 800, color: C.ink, align: "center" });
-  text(ctx, "& book a visit at your time", W / 2, ph + 210, { size: 34, weight: 600, color: C.dim, align: "center" });
+  text(ctx, building.headline || "Scan to see every flat", W / 2, ph + 160, { size: 46, weight: 800, color: C.ink, align: "center" });
+  text(ctx, building.subline || "& book a visit at your time", W / 2, ph + 210, { size: 34, weight: 600, color: C.dim, align: "center" });
 
   // The code.
   const q = 360;
@@ -288,7 +291,7 @@ function drawBuilding(ctx, { building, url, photo, logo, displayUrl }) {
 
   // Three steps, and where it goes.
   const sy = cy + card + 62;
-  const steps = ["Scan", "Pick a flat", "Book a visit"];
+  const steps = building.steps || ["Scan", "Pick a flat", "Book a visit"];
   const colW = (W - 96) / 3;
   steps.forEach((s, k) => {
     const x = 48 + colW * k + colW / 2;
@@ -315,7 +318,7 @@ export function drawPoster(canvas, design, data, scale = 1) {
   ctx.imageSmoothingQuality = "high";
   const id = designOf(design).id;
   if (id === "premium") drawPremium(ctx, data);
-  else if (id === "building") drawBuilding(ctx, data);
+  else if (id === "building" || id === "flat") drawBuilding(ctx, data);
   else drawProfile(ctx, data);
   return canvas;
 }

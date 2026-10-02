@@ -16,6 +16,8 @@ import {
   REQUEST_STATUS, bhkLabel, fmtDate, friendlyError, inr, occupancyOf, op, ownerListingLink, updateProperty,
 } from "../../lib/owners";
 import { financialYear, isCurrentTenant, occupancyPct, tenancyLength } from "../../lib/ownerOccupancy";
+import { QrImage } from "../../components/QrPosterBlock";
+import { flatUrl } from "../../lib/flatInsights";
 
 export default function PropertyDetail() {
   const { id } = useParams();
@@ -121,6 +123,19 @@ export default function PropertyDetail() {
           {occ === "occupied" && since && <Pill tone="grey"><CalendarDays size={12} /> Occupied since {fmtDate(since, { month: "short", year: "numeric" })}</Pill>}
           {occ !== "occupied" && p.available_from && <Pill tone="grey">Available from {fmtDate(p.available_from, { day: "numeric", month: "short" })}</Pill>}
         </div>
+
+        {occ !== "occupied" && (
+          <Link to={op(`/properties/${id}/leads`)} className="oz-card" style={{ display: "flex", gap: 12, alignItems: "center", padding: 10, marginTop: 14, textDecoration: "none", color: "inherit" }}>
+            <span style={{ padding: 4, borderRadius: 10, border: "2px solid var(--champ)", background: "#fff", flex: "none" }}>
+              <QrImage url={flatUrl(id, { qr: true })} size={60} />
+            </span>
+            <span style={{ flex: 1, minWidth: 0 }}>
+              <strong style={{ display: "block", fontSize: 15 }}>QR & leads</strong>
+              <span className="oz-meta">Poster for the door · leads, likes, visits and what renters say</span>
+            </span>
+            <ChevronRight size={18} color="#94A09B" />
+          </Link>
+        )}
 
         <div className="oz-tiles" style={{ margin: "16px 0" }}>
           {tiles.map((t) => (

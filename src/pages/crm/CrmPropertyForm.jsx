@@ -18,6 +18,7 @@ import PropertyVisitSlots from "../../components/PropertyVisitSlots";
 import { InternalDetails, VisitWindow } from "./CrmPropertyInternalFields";
 import CrmPartnerFields from "./CrmPartnerFields";
 import CrmOwnerFields from "./CrmOwnerFields";
+import CrmFlatQr from "./CrmFlatQr";
 import { fetchPartnerListingMap } from "../../lib/partners";
 import {
   ALL_LOCALITIES, DEFAULT_POSTING_AMENITIES, FLAT_TYPES, FURNISHINGS, LIFESTYLE, MUST_HAVES, OCCUPANT_OPTIONS,
@@ -1087,6 +1088,24 @@ export default function CrmPropertyForm() {
               "next available slot", which lands on you to arrange by hand.
             </p>
             <PropertyVisitSlots propertyId={editId} hideMarkSold />
+          </div>
+        )}
+
+        {/* The QR to paste on the door (or the building), its leads and renters' feedback. */}
+        {isEdit && (
+          <div style={{ padding: "0 16px 24px", maxWidth: 980 }}>
+            <span className="crm-label">QR, leads &amp; feedback</span>
+            <p className="crm-mute" style={{ fontSize: 11.5, margin: "4px 0 10px", lineHeight: 1.5 }}>
+              Print the poster for the door or the building. Feedback saved here shows in the owner's app.
+            </p>
+            <CrmFlatQr
+              flat={{
+                property_id: editId, flat_type: f.flat_type, furnishing: f.furnishing, area: f.area, landmark: f.landmark,
+                rent: f.rent, images: keptImages, cover_image_url: keptImages.find((u) => !isVideoUrl(u)) || "",
+              }}
+              building={links?.building || null}
+              onToast={showToast}
+            />
           </div>
         )}
       </div>
