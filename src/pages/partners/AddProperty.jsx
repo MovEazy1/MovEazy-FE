@@ -16,7 +16,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import {
-  Camera, Check, ChevronDown, ChevronLeft, ClipboardPaste, Link2, MapPin, RotateCcw, Search, Share2, Sparkles, Users, X,
+  Camera, Check, ChevronDown, ChevronLeft, ClipboardPaste, Link2, Lock, MapPin, RotateCcw, Search, Share2, Sparkles, Users, X,
 } from "lucide-react";
 import { useAuth } from "../../context/AuthContext";
 import { usePartner } from "./PartnerApp";
@@ -330,6 +330,9 @@ function PostFlat({ onAnother }) {
           )}
           {linkState === "reading" && <p className="pz-hint">Reading the link…</p>}
           {linkState === "bad" && <p className="pz-err">Couldn't read that link — tap the pin to place it on the map.</p>}
+          <p className="ap-private">
+            <Lock size={12} /> Only you see the exact location. It's shared with a client only after they schedule a visit — and only when you tap Share location.
+          </p>
           {showMap && !pin && (
             <div style={{ marginTop: 10 }}>
               <ListingMapPicker height={220} focusQuery={`${area}, Bengaluru`} markerPosition={pin}
@@ -478,6 +481,8 @@ const CSS = `
 .ap-share-pct .pz-select { width: 92px; }
 .ap-link { display: inline-flex; align-items: center; gap: 6px; margin-top: 10px; border: 0; background: none; color: var(--g, #0B6E4F); font: inherit; font-size: 13.5px; font-weight: 700; cursor: pointer; padding: 0; }
 .ap-pinrow { display: flex; gap: 8px; margin-top: 10px; }
+.ap-private { display: flex; align-items: flex-start; gap: 6px; margin: 8px 2px 0; font-size: 12px; line-height: 1.45; color: var(--dim, #6B7280); }
+.ap-private svg { flex: none; margin-top: 2px; color: var(--gold3, #7A5A12); }
 .ap-pinned { display: flex; align-items: center; gap: 6px; margin: 10px 0 0; font-size: 13.5px; color: var(--g2, #08503A); font-weight: 700; }
 .ap-pinned button { border: 0; background: var(--gl, #E4F2EC); border-radius: 99px; width: 24px; height: 24px; display: grid; place-items: center; cursor: pointer; margin-left: auto; }
 .ap-more { padding: 0; }
