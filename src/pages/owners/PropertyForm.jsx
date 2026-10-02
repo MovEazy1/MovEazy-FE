@@ -5,7 +5,7 @@
  * away. "Is it rented right now?" decides where the flat starts: occupied
  * flats stay off moveazy.co.in; vacant ones can go live from Find a Tenant.
  */
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate, useParams, useSearchParams } from "react-router-dom";
 import { Camera, ChevronDown, ChevronUp, X } from "lucide-react";
 import { useAuth } from "../../context/AuthContext";
@@ -16,8 +16,10 @@ import { ALL_LOCALITIES, FURNISHINGS, withParentArea } from "../../data/preferen
 import { BHK_OPTIONS } from "../../lib/partnerFilters";
 import { bedroomsOf } from "../../lib/partnerMatch";
 import { geocodePlace } from "../../lib/geocode";
-import { mediaRejectionReason, uploadInventoryPhotos } from "../../lib/inventory";
+import { mediaRejectionReason } from "../../lib/inventory";
 import { coverPhoto, orderListingMedia } from "../../lib/listingMedia";
+import { isVideoItem, newItem, orderMediaItems, releaseItems, savedItems, uploadMediaItems } from "../../lib/mediaItems";
+import { moveByKey, useDragReorder } from "../../hooks/useDragReorder";
 import { listingMedia, MediaItem } from "../partners/partnerMedia";
 import { createOwnerProperty, friendlyError, op, updateProperty } from "../../lib/owners";
 import { floorLabel, setFlatBuilding } from "../../lib/buildings";
@@ -71,14 +73,21 @@ function PropertyFormInner({ existing }) {
     } : {}),
   }));
   const [more, setMore] = useState(Boolean(existing));
-  const [photos, setPhotos] = useState([]);
-  const [kept, setKept] = useState(() => (existing ? listingMedia(existing) : []));
+  // Photos already on the listing and ones picked now, in one list in the
+  // order renters will see them — drag either anywhere.
+  const [media, setMedia] = useState(() => savedItems(existing ? listingMedia(existing) : []));
+  const mediaRef = useRef(media);
+  mediaRef.current = media;
+  useEffect(() => () => releaseItems(mediaRef.current), []);
+  const sortMedia = useDragReorder((from, to) => setMedia((cur) => orderMediaItems(moveByKey(cur, from, to, (m) => m.key))));
+  const removeMedia = (key) => setMedia((cur) => {
+    releaseItems(cur.filter((m) => m.key === key));
+    return cur.filter((m) => m.key !== key);
+  });
   const [errors, setErrors] = useState({});
   const [saving, setSaving] = useState("");
   const set = (patch) => setF((cur) => ({ ...cur, ...patch }));
   const pin = useMemo(() => (f.latitude != null ? [Number(f.latitude), Number(f.longitude)] : null), [f.latitude, f.longitude]);
-  const previews = useMemo(() => photos.map((file) => ({ file, url: URL.createObjectURL(file) })), [photos]);
-  useEffect(() => () => previews.forEach((p) => URL.revokeObjectURL(p.url)), [previews]);
 
   const validate = () => {
     const e = {};
@@ -99,7 +108,7 @@ function PropertyFormInner({ existing }) {
       const why = mediaRejectionReason(file);
       if (why) toast(why, "error"); else ok.push(file);
     }
-    setPhotos((cur) => [...cur, ...ok].slice(0, 20));
+    setMedia((cur) => orderMediaItems([...cur, ...ok.slice(0, Math.max(0, 20 - cur.filter((m) => m.file).length)).map(newItem)]));
   };
 
   const save = async () => {
@@ -122,13 +131,10 @@ function PropertyFormInner({ existing }) {
           occupied: f.occupied,
         }, user);
       }
-      let images = kept;
-      if (photos.length) {
-        setSaving(`Uploading photos (0/${photos.length})…`);
-        const urls = await uploadInventoryPhotos(photos, pid, (d, t) => setSaving(`Uploading photos (${d}/${t})…`),
-          (file, msg) => toast(`${file.name}: ${msg}`, "error"));
-        images = orderListingMedia([...kept, ...urls]);
-      }
+      const fresh = media.filter((m) => m.file).length;
+      if (fresh) setSaving(`Uploading photos (0/${fresh})…`);
+      const images = orderListingMedia(await uploadMediaItems(media, pid, (d, t) => setSaving(`Uploading photos (${d}/${t})…`),
+        (file, msg) => toast(`${file.name}: ${msg}`, "error")));
       const patch = {
         ...(existing ? {
           property_type: f.propertyType, flat_type: f.flatType, bedrooms, rent: Number(f.rent), furnishing: f.furnishing,
@@ -136,7 +142,8 @@ function PropertyFormInner({ existing }) {
           latitude, longitude, area_sqft: f.areaSqft || "", deposit: f.deposit || "", available_from: f.availableFrom || "",
           description: f.description, title: existing.title || `${f.flatType} in ${area}`,
         } : {}),
-        ...(photos.length || (existing && kept.length !== listingMedia(existing).length)
+        // Sent when anything changed: a photo added, removed or moved.
+        ...(!existing || images.join("\n") !== listingMedia(existing).join("\n")
           ? { images, cover_image_url: coverPhoto(images) } : {}),
       };
       if (Object.keys(patch).length) await updateProperty(pid, patch);
@@ -244,22 +251,17 @@ function PropertyFormInner({ existing }) {
         )}
 
         <div className="oz-section">
-          <h2 className="oz-h2">Photos <span className="oz-hint">{kept.length + photos.length} added</span></h2>
-          {(kept.length > 0 || previews.length > 0) && (
+          <h2 className="oz-h2">Photos <span className="oz-hint">{media.length} added</span></h2>
+          {media.length > 0 && (
             <div className="oz-grid3" style={{ marginBottom: 10 }}>
-              {kept.map((src) => (
-                <div key={src} className="oz-thumb" style={{ width: "100%", height: 86, position: "relative" }}>
-                  <MediaItem src={src} />
-                  <button type="button" aria-label="Remove photo" onClick={() => setKept((k) => k.filter((x) => x !== src))}
-                    style={{ position: "absolute", top: 4, right: 4, border: 0, borderRadius: 999, background: "rgba(0,0,0,.55)", color: "#fff", width: 24, height: 24, display: "grid", placeItems: "center" }}>
-                    <X size={14} />
-                  </button>
-                </div>
-              ))}
-              {previews.map((p) => (
-                <div key={p.url} className="oz-thumb" style={{ width: "100%", height: 86, position: "relative" }}>
-                  {p.file.type.startsWith("video/") ? <video src={p.url} muted /> : <img src={p.url} alt="" />}
-                  <button type="button" aria-label="Remove photo" onClick={() => setPhotos((cur) => cur.filter((x) => x !== p.file))}
+              {media.map((m, i) => (
+                <div key={m.key} className="oz-thumb" {...sortMedia.bind(m.key)}
+                  style={{ width: "100%", height: 86, position: "relative", ...sortMedia.dragStyle(m.key) }}>
+                  {m.file
+                    ? (isVideoItem(m) ? <video src={m.url} muted style={{ pointerEvents: "none" }} /> : <img src={m.url} alt="" draggable={false} style={{ pointerEvents: "none" }} />)
+                    : <span style={{ display: "contents", pointerEvents: "none" }}><MediaItem src={m.url} /></span>}
+                  {i === 0 && <span style={{ position: "absolute", left: 4, bottom: 4, fontSize: 10, fontWeight: 700, background: "rgba(0,0,0,.6)", color: "#fff", borderRadius: 99, padding: "1px 7px" }}>Cover</span>}
+                  <button type="button" aria-label="Remove photo" onClick={() => removeMedia(m.key)}
                     style={{ position: "absolute", top: 4, right: 4, border: 0, borderRadius: 999, background: "rgba(0,0,0,.55)", color: "#fff", width: 24, height: 24, display: "grid", placeItems: "center" }}>
                     <X size={14} />
                   </button>
@@ -267,6 +269,7 @@ function PropertyFormInner({ existing }) {
               ))}
             </div>
           )}
+          {media.length > 1 && <p className="oz-hint" style={{ margin: "0 0 10px" }}>Drag a photo to change the order — the first one is the cover.</p>}
           <label className="oz-btn" style={{ width: "100%", borderStyle: "dashed" }}>
             <Camera size={18} /> Add photos or a video
             <input type="file" accept="image/*,video/*" multiple hidden onChange={(e) => { onFiles([...e.target.files]); e.target.value = ""; }} />

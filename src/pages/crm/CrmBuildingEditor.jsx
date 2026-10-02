@@ -22,6 +22,7 @@ import { isVideoFile } from "../../lib/listingMedia";
 import { fetchCrmBuilding, saveCrmBuilding, setBuildingUnits, setCrmFlatBuilding } from "../../lib/crmPropertyInternal";
 import { buildingUrl, floorLabel } from "../../lib/buildings";
 import { SCOPES } from "../../lib/adminScopes";
+import { moveByKey, useDragReorder } from "../../hooks/useDragReorder";
 import { BUILDING_AMENITIES } from "../owners/BuildingForm";
 
 const MAX_PHOTOS = 30;
@@ -172,6 +173,7 @@ export default function CrmBuildingEditor() {
     if (photos.length > room) say(`Up to ${MAX_PHOTOS} photos per building`, "error");
     if (room > 0 && photos.length) uploadPhotos(photos.slice(0, room));
   };
+  const sortPhotos = useDragReorder((from, to) => setB((cur) => ({ ...cur, photos: moveByKey(cur.photos ?? [], from, to) })));
   const addMediaRef = useRef(addMedia);
   addMediaRef.current = addMedia;
   useEffect(() => {
@@ -312,8 +314,9 @@ export default function CrmBuildingEditor() {
               )}
               <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: 6 }}>
                 {(b.photos ?? []).map((src, i) => (
-                  <div key={src} style={{ position: "relative", aspectRatio: "1", borderRadius: 8, overflow: "hidden", background: C.surface }}>
-                    <img src={src} alt="" style={{ width: "100%", height: "100%", objectFit: "cover", display: "block" }} />
+                  <div key={src} {...sortPhotos.bind(src)}
+                    style={{ position: "relative", aspectRatio: "1", borderRadius: 8, overflow: "hidden", background: C.surface, ...sortPhotos.dragStyle(src) }}>
+                    <img src={src} alt="" draggable={false} style={{ width: "100%", height: "100%", objectFit: "cover", display: "block", pointerEvents: "none" }} />
                     {i === 0 ? <span style={{ position: "absolute", left: 4, bottom: 4, fontSize: 10, background: C.accent, color: "#fff", borderRadius: 99, padding: "1px 6px" }}>Cover</span>
                       : <button type="button" title="Make cover" onClick={() => set({ photos: [src, ...b.photos.filter((x) => x !== src)] })}
                         style={{ position: "absolute", left: 4, bottom: 4, border: 0, borderRadius: 99, background: "rgba(0,0,0,.55)", color: "#fff", cursor: "pointer", padding: "2px 5px" }}><Star size={11} /></button>}
@@ -335,7 +338,7 @@ export default function CrmBuildingEditor() {
                 )}
               </div>
               <span className="crm-mute" style={{ fontSize: 11 }}>
-                Select several at once (on a phone, long-press a photo to pick more), keep adding more, drag them in or paste — the first is the cover. {(b.photos ?? []).length}/{MAX_PHOTOS}
+                Select several at once (on a phone, long-press a photo to pick more), keep adding more, drag them in or paste. Drag a photo to change the order — the first is the cover. {(b.photos ?? []).length}/{MAX_PHOTOS}
               </span>
               <style>{".crm-spin{animation:crm-spin 1s linear infinite}@keyframes crm-spin{to{transform:rotate(360deg)}}"}</style>
             </div>

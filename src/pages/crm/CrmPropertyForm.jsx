@@ -27,11 +27,11 @@ import {
 import { cleanSourceUrl, detectSource, parseListingText } from "../../lib/listingImport";
 import { geocodePlace } from "../../lib/geocode";
 import {
-  generatePropertyId, isMissingColumn, mediaRejectionReason, uploadInventoryPhotos,
+  generatePropertyId, isMissingColumn, mediaRejectionReason,
   withoutOptionalColumns,
 } from "../../lib/inventory";
 import {
-  coverPhoto, describeMedia, isListingMediaFile, isVideoFile, isVideoUrl, orderListingMedia,
+  coverPhoto, describeMedia, isListingMediaFile, isVideoUrl, orderListingMedia,
 } from "../../lib/listingMedia";
 import { matchListingToRequirements } from "../../lib/inventoryMatch";
 import { supabase, isSupabaseConfigured } from "../../lib/supabase";
@@ -41,6 +41,8 @@ import {
   saveCrmBuilding, saveInternal, setCrmFlatBuilding,
 } from "../../lib/crmPropertyInternal";
 import { DEFAULT_VISIT_RULE, applyVisitRule, rememberVisitRule } from "../../lib/visitSchedule";
+import { isVideoItem, newItem, orderMediaItems, releaseItems, savedItems, uploadMediaItems } from "../../lib/mediaItems";
+import { moveByKey, useDragReorder } from "../../hooks/useDragReorder";
 import { Btn, C, Chip, Empty, Toast, inr } from "./crmUi";
 
 const BLANK = {
@@ -148,10 +150,16 @@ export default function CrmPropertyForm() {
   });
   const [pasteText, setPasteText] = useState("");
   const [importInfo, setImportInfo] = useState(null);
-  const [photos, setPhotos] = useState([]);
-  // Photos already on the listing, by URL. Kept apart from `photos` (new File
-  // objects): these are uploaded, and removing one is a change to the row.
-  const [keptImages, setKeptImages] = useState([]);
+  // Every photo and video, in the order renters will see them: those already
+  // on the listing ({ url }) and those picked just now ({ url: preview, file }),
+  // in one list so either can be dragged anywhere (lib/mediaItems.js).
+  const [media, setMedia] = useState([]);
+  const keptImages = useMemo(() => media.filter((m) => !m.file).map((m) => m.url), [media]);
+  const newCount = media.filter((m) => m.file).length;
+  const mediaRef = useRef(media);
+  mediaRef.current = media;
+  useEffect(() => () => releaseItems(mediaRef.current), []);
+  const replaceMedia = (next) => setMedia((cur) => { releaseItems(cur); return next; });
   const [loaded, setLoaded] = useState(!editId);
   const [loadError, setLoadError] = useState("");
   const [saving, setSaving] = useState(false);
@@ -268,7 +276,7 @@ export default function CrmPropertyForm() {
       const cached = (inventory ?? []).find((l) => l.property_id === editId);
       if (cached) {
         setF(rowToForm(cached));
-        setKeptImages(Array.isArray(cached.images) ? cached.images : []);
+        setMedia(savedItems(cached.images));
         setLoaded(true);
         return;
       }
@@ -284,7 +292,7 @@ export default function CrmPropertyForm() {
         setLoadError(error?.message || `No listing with the id ${editId}.`);
       } else {
         setF(rowToForm(data));
-        setKeptImages(Array.isArray(data.images) ? data.images : []);
+        setMedia(savedItems(data.images));
       }
       setLoaded(true);
     })();
@@ -319,7 +327,7 @@ export default function CrmPropertyForm() {
       const files = [...(e.clipboardData?.files ?? [])].filter(isListingMediaFile);
       if (files.length) {
         e.preventDefault();
-        setPhotos((p) => [...p, ...files].slice(0, 20));
+        setMedia((cur) => [...cur, ...files.slice(0, Math.max(0, 20 - cur.filter((m) => m.file).length)).map(newItem)]);
       }
     };
     window.addEventListener("paste", onPaste);
@@ -338,24 +346,25 @@ export default function CrmPropertyForm() {
     const rejected = picked.map(mediaRejectionReason).filter(Boolean);
     if (rejected.length) showToast(rejected[0], "error");
     const ok = picked.filter((x) => !mediaRejectionReason(x));
-    if (ok.length) setPhotos((p) => [...p, ...ok].slice(0, 20));
+    if (ok.length) setMedia((cur) => [...cur, ...ok.slice(0, Math.max(0, 20 - cur.filter((m) => m.file).length)).map(newItem)]);
   };
 
-  /* ── Ordering the media already on the listing ─────────────────────────── */
+  /* ── Ordering: drag a photo (old or new) anywhere ───────────────────────── */
 
   // Every change is normalised straight away, so the grid an admin is looking
   // at is the order a renter gets — no save-and-see-what-happens.
-  const moveKept = (from, to) =>
-    setKeptImages((cur) => {
-      if (to < 0 || to >= cur.length) return cur;
-      const next = [...cur];
-      const [item] = next.splice(from, 1);
-      next.splice(to, 0, item);
-      return orderListingMedia(next);
-    });
-
-  const previews = useMemo(() => photos.map((p) => ({ file: p, url: URL.createObjectURL(p) })), [photos]);
-  useEffect(() => () => previews.forEach((p) => URL.revokeObjectURL(p.url)), [previews]);
+  const moveMedia = (fromKey, toKey) =>
+    setMedia((cur) => orderMediaItems(moveByKey(cur, fromKey, toKey, (m) => m.key)));
+  const moveMediaBy = (i, d) => {
+    const to = media[i + d];
+    if (to) moveMedia(media[i].key, to.key);
+  };
+  const removeMedia = (key) => setMedia((cur) => {
+    const hit = cur.find((m) => m.key === key);
+    if (hit) releaseItems([hit]);
+    return cur.filter((m) => m.key !== key);
+  });
+  const sort = useDragReorder(moveMedia);
 
   /* ── Publish ───────────────────────────────────────────────────────────── */
 
@@ -399,14 +408,11 @@ export default function CrmPropertyForm() {
     try {
       const propertyId = isEdit ? editId : generatePropertyId();
       const skipped = [];
-      const uploaded = photos.length
-        ? await uploadInventoryPhotos(photos, propertyId, undefined,
-            (file, why) => skipped.push(`${file.name || "A file"}: ${why}`))
-        : [];
+      // In the order on screen: old and new photos together.
+      const uploaded = await uploadMediaItems(media, propertyId, undefined,
+        (file, why) => skipped.push(`${file.name || "A file"}: ${why}`));
       if (skipped.length) showToast(`${skipped.length} file not uploaded — ${skipped[0]}`, "error");
-      // On an edit, the photos kept from before come first — the owner's own
-      // ordering — with anything added this session after them.
-      const images = orderListingMedia(isEdit ? [...keptImages, ...uploaded] : uploaded);
+      const images = orderListingMedia(uploaded);
       const sourceUrl = cleanSourceUrl(f.source_url);
 
       // Resolve a pin from whatever address detail there is, most specific
@@ -539,8 +545,7 @@ export default function CrmPropertyForm() {
             .select().single());
         }
         if (error) throw error;
-        setKeptImages(Array.isArray(data.images) ? data.images : []);
-        setPhotos([]);
+        replaceMedia(savedItems(data.images));
         await writeInternal(editId);
         await applyBuilding(editId);
         reload();
@@ -573,14 +578,14 @@ export default function CrmPropertyForm() {
       const matches = matchListingToRequirements(data, requirements, { min: 60 });
       setPublished({ listing: data, matches, internalResult });
       try { localStorage.removeItem(DRAFT_KEY); } catch { /* ignore */ }
-      setPhotos([]);
+      replaceMedia([]);
       reload();
     } catch (e) {
       showToast(e?.message || (isEdit ? "Could not save" : "Could not publish"), "error");
     } finally {
       setSaving(false);
     }
-  }, [canWrite, missingRequired, f, photos, keptImages, user, requirements, reload, isEdit, editId,
+  }, [canWrite, missingRequired, f, media, user, requirements, reload, isEdit, editId,
       writeInternal, visitRule, internal, building, buildingOptions, links, reloadBuildingOptions]);
 
   useEffect(() => {
@@ -923,100 +928,64 @@ export default function CrmPropertyForm() {
                 onChange={(e) => { addFiles(e.target.files); e.target.value = ""; }} />
             </div>
 
-            {isEdit && keptImages.length > 0 && (
+            {media.length > 0 && (
               <>
                 <span className="crm-mute" style={{ fontSize: 10.5, lineHeight: 1.45 }}>
-                  On the listing · {describeMedia(keptImages)} · drag to reorder, × to remove.
+                  {describeMedia(media.map((m) => (isVideoItem(m) ? "x.mp4" : "x.jpg")))}
+                  {newCount > 0 && ` · ${newCount} new, uploaded when you ${isEdit ? "save" : "publish"}`} · drag to reorder, × to remove.
                   Photos always come first and a video sits after the fourth photo, so a video
                   dragged higher settles back there.
                 </span>
-                <div
-                  style={{ display: "grid", gridTemplateColumns: "repeat(4,1fr)", gap: 6 }}
-                  onDragOver={(e) => e.preventDefault()}
-                >
-                  {keptImages.map((url, i) => {
-                    const video = isVideoUrl(url);
+                <div style={{ display: "grid", gridTemplateColumns: "repeat(4,1fr)", gap: 6 }}>
+                  {media.map((m, i) => {
+                    const video = isVideoItem(m);
                     return (
                       <div
-                        key={url}
-                        draggable
-                        onDragStart={(e) => { e.stopPropagation(); e.dataTransfer.setData("text/plain", String(i)); }}
-                        onDragOver={(e) => { e.preventDefault(); e.stopPropagation(); }}
-                        onDrop={(e) => {
-                          // Reordering must not reach the photo dropzone behind it,
-                          // which would read the drag as a new file.
-                          e.preventDefault();
-                          e.stopPropagation();
-                          const from = Number(e.dataTransfer.getData("text/plain"));
-                          if (Number.isInteger(from)) moveKept(from, i);
-                        }}
+                        key={m.key}
+                        {...sort.bind(m.key)}
                         style={{
                           position: "relative", aspectRatio: "1", borderRadius: 6, overflow: "hidden",
-                          border: `1px solid ${C.line}`, background: C.surface, cursor: "grab",
+                          border: `1px solid ${m.file ? C.accent : C.line}`, background: C.surface,
+                          ...sort.dragStyle(m.key),
                         }}
                       >
                         {video ? (
-                          <video src={url} style={{ width: "100%", height: "100%", objectFit: "cover" }}
+                          <video src={m.url} style={{ width: "100%", height: "100%", objectFit: "cover", pointerEvents: "none" }}
                                  muted playsInline preload="metadata" />
                         ) : (
-                          <img src={url} alt="" style={{ width: "100%", height: "100%", objectFit: "cover" }} />
+                          <img src={m.url} alt="" draggable={false} style={{ width: "100%", height: "100%", objectFit: "cover", pointerEvents: "none" }} />
                         )}
 
                         <span style={{
                           position: "absolute", top: 2, left: 2, padding: "0 4px", borderRadius: 4,
                           background: "rgba(0,0,0,.62)", color: "#fff", fontSize: 9, fontWeight: 700,
                         }}>
-                          {video ? "VIDEO" : url === coverPhoto(keptImages) ? "COVER" : i + 1}
+                          {video ? "VIDEO" : m.key === media.find((x) => !isVideoItem(x))?.key ? "COVER" : i + 1}
+                          {m.file ? " · NEW" : ""}
                         </span>
 
                         <button type="button" title="Remove" aria-label={`Remove item ${i + 1}`}
-                          onClick={() => setKeptImages((cur) => orderListingMedia(cur.filter((_, idx) => idx !== i)))}
+                          onClick={() => removeMedia(m.key)}
                           style={{
                             position: "absolute", top: 2, right: 2, width: 15, height: 15, borderRadius: "50%",
                             border: "none", background: "rgba(0,0,0,.62)", color: "#fff", fontSize: 11,
                             lineHeight: 1, padding: 0, cursor: "pointer",
                           }}>×</button>
 
-                        {/* Keyboard and touch reach the same ordering the drag does. */}
+                        {/* Keyboard reaches the same ordering the drag does. */}
                         <span style={{ position: "absolute", bottom: 2, left: 2, right: 2, display: "flex", gap: 2 }}>
                           <button type="button" aria-label={`Move item ${i + 1} earlier`} disabled={i === 0}
-                            onClick={() => moveKept(i, i - 1)}
+                            onClick={() => moveMediaBy(i, -1)}
                             style={{ flex: 1, background: "rgba(0,0,0,.62)", color: "#fff", border: "none", borderRadius: 3, fontSize: 10, cursor: "pointer", opacity: i === 0 ? 0.35 : 1 }}>←</button>
-                          <button type="button" aria-label={`Move item ${i + 1} later`} disabled={i === keptImages.length - 1}
-                            onClick={() => moveKept(i, i + 1)}
-                            style={{ flex: 1, background: "rgba(0,0,0,.62)", color: "#fff", border: "none", borderRadius: 3, fontSize: 10, cursor: "pointer", opacity: i === keptImages.length - 1 ? 0.35 : 1 }}>→</button>
+                          <button type="button" aria-label={`Move item ${i + 1} later`} disabled={i === media.length - 1}
+                            onClick={() => moveMediaBy(i, 1)}
+                            style={{ flex: 1, background: "rgba(0,0,0,.62)", color: "#fff", border: "none", borderRadius: 3, fontSize: 10, cursor: "pointer", opacity: i === media.length - 1 ? 0.35 : 1 }}>→</button>
                         </span>
                       </div>
                     );
                   })}
                 </div>
               </>
-            )}
-
-            {previews.length > 0 && (
-              <div style={{ display: "grid", gridTemplateColumns: "repeat(4,1fr)", gap: 6 }}>
-                {previews.map((p, i) => (
-                  <button key={p.url} type="button" title="Remove"
-                    onClick={() => setPhotos((cur) => cur.filter((_, idx) => idx !== i))}
-                    style={{
-                      position: "relative", aspectRatio: "1", borderRadius: 6, overflow: "hidden",
-                      border: `1px solid ${C.line}`, padding: 0,
-                    }}>
-                    {isVideoFile(p.file) ? (
-                      <>
-                        <video src={p.url} style={{ width: "100%", height: "100%", objectFit: "cover" }}
-                               muted playsInline preload="metadata" />
-                        <span style={{
-                          position: "absolute", bottom: 2, left: 2, padding: "0 4px", borderRadius: 4,
-                          background: "rgba(0,0,0,.62)", color: "#fff", fontSize: 9, fontWeight: 700,
-                        }}>VIDEO</span>
-                      </>
-                    ) : (
-                      <img src={p.url} alt="" style={{ width: "100%", height: "100%", objectFit: "cover" }} />
-                    )}
-                  </button>
-                ))}
-              </div>
             )}
 
             <Field label="Title">
@@ -1062,7 +1031,7 @@ export default function CrmPropertyForm() {
                 <Btn onClick={() => navigate("/crm/properties")}>Cancel</Btn>
               ) : (
                 <Btn onClick={() => {
-                  setF(BLANK); setPhotos([]); setPasteText(""); setImportInfo(null);
+                  setF(BLANK); replaceMedia([]); setPasteText(""); setImportInfo(null);
                   setInternal({ ...BLANK_INTERNAL }); setVisitRule({ ...DEFAULT_VISIT_RULE }); setBuilding({ id: "" });
                 }}>
                   Clear

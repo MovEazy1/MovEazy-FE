@@ -1,5 +1,6 @@
 import { useState, useEffect, useMemo } from "react";
 import { useNavigate } from "react-router-dom";
+import { useDragReorder } from "../hooks/useDragReorder";
 import { useAuth } from "../context/AuthContext";
 import { useHistorySteps } from "../hooks/useBackClose";
 import { autoTitle, bedroomsForFlatType, flatmatesForFlatType } from "../lib/listingDraft";
@@ -245,6 +246,17 @@ export default function ListMyFlat() {
     setPhotoPreviews((prev) => { URL.revokeObjectURL(prev[i]); return prev.filter((_, idx) => idx !== i); });
     setPhotoFiles((prev) => prev.filter((_, idx) => idx !== i));
   };
+  // Drag to reorder: the files and their previews move together, keyed by the preview.
+  const movePhoto = (fromKey, toKey) => {
+    const from = photoPreviews.indexOf(fromKey);
+    const to = photoPreviews.indexOf(toKey);
+    if (from < 0 || to < 0 || from === to) return;
+    const move = (list) => { const next = [...list]; const [x] = next.splice(from, 1); next.splice(to, 0, x); return next; };
+    setPhotoPreviews(move);
+    setPhotoFiles(move);
+  };
+  const sortPhotos = useDragReorder(movePhoto);
+
 
   // A listing needs at least one piece of media — photo or video, either will
   // do. A video-only listing shows its walkthrough on the card (see coverMedia)
@@ -924,11 +936,12 @@ export default function ListMyFlat() {
                       const firstPhoto = photoFiles.findIndex((f) => !isVideoFile(f));
                       const isCover = i === (firstPhoto === -1 ? 0 : firstPhoto);
                       return (
-                        <div key={i} className="relative aspect-square rounded-lg overflow-hidden border border-gray-200 bg-gray-100">
+                        <div key={src} {...sortPhotos.bind(src)} style={sortPhotos.dragStyle(src)}
+                          className="relative aspect-square rounded-lg overflow-hidden border border-gray-200 bg-gray-100">
                           {video ? (
-                            <video src={src} className="w-full h-full object-cover" muted playsInline preload="metadata" />
+                            <video src={src} className="w-full h-full object-cover pointer-events-none" muted playsInline preload="metadata" />
                           ) : (
-                            <img src={src} alt="" className="w-full h-full object-cover" />
+                            <img src={src} alt="" draggable={false} className="w-full h-full object-cover pointer-events-none" />
                           )}
                           <button type="button" onClick={() => removePhoto(i)}
                             className="absolute top-1 right-1 w-5 h-5 rounded-full bg-black/60 text-white text-[11px] leading-none flex items-center justify-center">×</button>
@@ -941,6 +954,9 @@ export default function ListMyFlat() {
                       );
                     })}
                   </div>
+                )}
+                {photoPreviews.length > 1 && (
+                  <p className="text-[11px] text-gray-500 mt-2">Drag a photo to change the order — the first one is the cover.</p>
                 )}
               </div>
             </Card>

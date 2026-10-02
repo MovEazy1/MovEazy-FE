@@ -14,7 +14,8 @@
  * form's three, so nothing new needs a migration and both layouts stay
  * interchangeable.
  */
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
+import { useDragReorder } from "../hooks/useDragReorder";
 import ListingMapPicker from "./ListingMapPicker";
 import PropertyVisitSlots from "./PropertyVisitSlots";
 import { reverseGeocode, nearbyLandmarks } from "../lib/geocode";
@@ -261,7 +262,9 @@ export default function ListMyFlatMobile({ user, onPublished }) {
     setMaxFlatmates(flatmatesForFlatType(flatType));
   }, [flatType, flatmatesTouched]);
 
-  useEffect(() => () => photoPreviews.forEach((u) => URL.revokeObjectURL(u)), [photoPreviews]);
+  const previewsRef = useRef(photoPreviews);
+  previewsRef.current = photoPreviews;
+  useEffect(() => () => previewsRef.current.forEach((u) => URL.revokeObjectURL(u)), []);
 
   const toggleIn = (setter) => (v) =>
     setter((prev) => (prev.includes(v) ? prev.filter((x) => x !== v) : [...prev, v]));
@@ -302,6 +305,17 @@ export default function ListMyFlatMobile({ user, onPublished }) {
     setPhotoPreviews((p) => { URL.revokeObjectURL(p[i]); return p.filter((_, x) => x !== i); });
     setPhotoFiles((p) => p.filter((_, x) => x !== i));
   };
+  // Drag to reorder: the files and their previews move together, keyed by the preview.
+  const movePhoto = (fromKey, toKey) => {
+    const from = photoPreviews.indexOf(fromKey);
+    const to = photoPreviews.indexOf(toKey);
+    if (from < 0 || to < 0 || from === to) return;
+    const move = (list) => { const next = [...list]; const [x] = next.splice(from, 1); next.splice(to, 0, x); return next; };
+    setPhotoPreviews(move);
+    setPhotoFiles(move);
+  };
+  const sortPhotos = useDragReorder(movePhoto);
+
 
   // Same rules the desktop form enforces, split across the seven steps —
   // plus step 7's own rule: at least one real, saved visit time slot (tracked
@@ -669,11 +683,11 @@ export default function ListMyFlatMobile({ user, onPublished }) {
                     const isCover = i === (firstPhoto === -1 ? 0 : firstPhoto);
                     const badge = video && !isCover ? "VIDEO" : isCover ? "COVER" : "";
                     return (
-                      <div key={src} style={{ position: "relative", aspectRatio: "4/3", borderRadius: 14, overflow: "hidden", border: "1px solid rgba(255,255,255,.13)" }}>
+                      <div key={src} {...sortPhotos.bind(src)} style={{ position: "relative", aspectRatio: "4/3", borderRadius: 14, overflow: "hidden", border: "1px solid rgba(255,255,255,.13)", ...sortPhotos.dragStyle(src) }}>
                         {video ? (
-                          <video src={src} style={{ width: "100%", height: "100%", objectFit: "cover" }} muted playsInline preload="metadata" />
+                          <video src={src} style={{ width: "100%", height: "100%", objectFit: "cover", pointerEvents: "none" }} muted playsInline preload="metadata" />
                         ) : (
-                          <img src={src} alt={`Photo ${i + 1}`} style={{ width: "100%", height: "100%", objectFit: "cover" }} />
+                          <img src={src} alt={`Photo ${i + 1}`} draggable={false} style={{ width: "100%", height: "100%", objectFit: "cover", pointerEvents: "none" }} />
                         )}
                         <button type="button" onClick={() => removePhoto(i)} aria-label={`Remove ${video ? "video" : "photo"} ${i + 1}`}
                           style={{ position: "absolute", top: 6, right: 6, width: 26, height: 26, borderRadius: "50%", border: "none", background: "rgba(4,17,15,.75)", color: "#fff", fontSize: 15, lineHeight: 1, cursor: "pointer" }}>
@@ -699,6 +713,9 @@ export default function ListMyFlatMobile({ user, onPublished }) {
                     <input type="file" accept="image/*,video/*" multiple hidden onChange={(e) => { addPhotos(e.target.files); e.target.value = ""; }} />
                   </label>
                 </div>
+                {photoPreviews.length > 1 && (
+                  <p style={{ color: "#6F8681", fontSize: 12, margin: "10px 0 0" }}>Drag a photo to change the order — the first one is the cover.</p>
+                )}
               </div>
 
               {/* Listing summary — the desktop form's final recap. */}

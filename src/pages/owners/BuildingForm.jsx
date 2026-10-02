@@ -15,6 +15,7 @@ import { mediaRejectionReason, uploadInventoryPhotos } from "../../lib/inventory
 import { geocodePlace } from "../../lib/geocode";
 import { saveBuilding } from "../../lib/buildings";
 import { friendlyError, op } from "../../lib/owners";
+import { moveByKey, useDragReorder } from "../../hooks/useDragReorder";
 
 export const BUILDING_AMENITIES = [
   "Lift", "Power backup", "Car parking", "Bike parking", "24×7 security", "CCTV", "Gated", "Water 24×7",
@@ -54,6 +55,7 @@ function BuildingFormInner({ existing }) {
   const set = (patch) => setF((cur) => ({ ...cur, ...patch }));
   const pin = useMemo(() => (f.latitude != null ? [Number(f.latitude), Number(f.longitude)] : null), [f.latitude, f.longitude]);
   const uploading = photos.some((p) => p.state === "up");
+  const sortPhotos = useDragReorder((from, to) => setPhotos((cur) => moveByKey(cur, from, to, (p) => p.key)));
 
   const upload = async (item) => {
     setPhotos((cur) => cur.map((p) => (p.key === item.key ? { ...p, state: "up" } : p)));
@@ -178,11 +180,11 @@ function BuildingFormInner({ existing }) {
 
         <div className="oz-section">
           <h2 className="oz-h2">Photos <span className="oz-hint" style={{ fontWeight: 500 }}>{photos.length}/30</span></h2>
-          <p className="oz-hint" style={{ margin: "-4px 0 12px" }}>The outside, the entrance, the lobby, the terrace — the first photo leads the QR page and the poster.</p>
+          <p className="oz-hint" style={{ margin: "-4px 0 12px" }}>The outside, the entrance, the lobby, the terrace — the first photo leads the QR page and the poster.{photos.length > 1 ? " Drag a photo to change the order." : ""}</p>
           <div className="bf-photos">
             {photos.map((p, i) => (
-              <div key={p.key} className="bf-photo">
-                <img src={p.preview} alt="" />
+              <div key={p.key} className="bf-photo" {...sortPhotos.bind(p.key)} style={sortPhotos.dragStyle(p.key)}>
+                <img src={p.preview} alt="" draggable={false} style={{ pointerEvents: "none" }} />
                 {i === 0 && <span className="bf-cover">Cover</span>}
                 {p.state === "up" && <span className="bf-state"><Loader2 size={18} className="bf-spin" /></span>}
                 {p.state === "ok" && <span className="bf-state bf-state--ok"><Check size={13} /></span>}
