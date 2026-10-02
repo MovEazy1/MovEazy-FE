@@ -25,7 +25,7 @@ import {
   acceptInvite, fetchLeads, fetchMyGroups, fetchPartnerInventory, fetchPartnerMe, fetchSavedIds, friendlyError,
   hasPremium, pp, registerPartner, toggleSaved,
 } from "../../lib/partners";
-import { fetchPartnerStatus } from "../../lib/partnerPlans";
+import { claimCrmListings, fetchPartnerStatus } from "../../lib/partnerPlans";
 import { JoinPremiumBar, PremiumExplainer } from "./demoMode";
 import { useUnreadCount } from "./PartnerInbox";
 import { MOVEAZY_TEAM_WHATSAPP } from "../../config/contactChannels";
@@ -150,6 +150,8 @@ function PartnerWorkspace({ me, reloadMe }) {
 
   useEffect(() => {
     reloadInventory();
+    // Anything the MovEazy team added for this broker since last time.
+    claimCrmListings().then((n) => { if (n > 0) reloadInventory(); });
     reloadGroups();
     reloadLeads();
     reloadStatus();

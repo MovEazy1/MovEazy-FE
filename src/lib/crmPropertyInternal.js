@@ -35,6 +35,13 @@ export const BLANK_INTERNAL = {
   poc_phone: "",
   poc_email: "",
   poc_note: "",
+  // Asked on every upload (crm_onboarding.sql). null = not answered yet.
+  owner_onboarded: null,
+  multi_unit: null,
+  // The owner's own contact: the flat shows up in their owner app when they
+  // sign in with this email (the mobile only when no email is given).
+  owner_email: "",
+  owner_phone: "",
 };
 
 /**
@@ -168,13 +175,15 @@ export async function touchBroker(id) {
 
 /* ── Per-listing internal details ─────────────────────────────────────────── */
 
+const BASE_COLS = "property_id,source,broker_id,poc_name,poc_phone,poc_email,poc_note,updated_at";
+const OWNER_COLS = "owner_onboarded,multi_unit,owner_email,owner_phone";
+
 export async function fetchInternal(propertyId) {
   if (!propertyId || !isSupabaseConfigured || !supabase) return null;
-  const { data, error } = await supabase
-    .from("inventory_private")
-    .select("property_id,source,broker_id,poc_name,poc_phone,poc_email,poc_note,updated_at")
-    .eq("property_id", propertyId)
-    .maybeSingle();
+  let { data, error } = await supabase
+    .from("inventory_private").select(`${BASE_COLS},${OWNER_COLS}`).eq("property_id", propertyId).maybeSingle();
+  // Before crm_onboarding.sql: the rest still loads.
+  if (error) ({ data, error } = await supabase.from("inventory_private").select(BASE_COLS).eq("property_id", propertyId).maybeSingle());
   if (error) return null;
   return data ?? null;
 }
@@ -220,14 +229,23 @@ export async function saveInternal(propertyId, details, actorEmail = "") {
     poc_phone: clean(details?.poc_phone),
     poc_email: clean(details?.poc_email),
     poc_note: clean(details?.poc_note),
+    owner_onboarded: details?.owner_onboarded === true,
+    multi_unit: details?.multi_unit === true,
+    owner_email: clean(details?.owner_email).toLowerCase(),
+    owner_phone: clean(details?.owner_phone),
     updated_at: new Date().toISOString(),
     created_by: clean(actorEmail),
   };
 
   try {
-    const { error } = await supabase
+    let { error } = await supabase
       .from("inventory_private")
       .upsert(row, { onConflict: "property_id" });
+    // Before crm_onboarding.sql has run, save what the table does have.
+    if (error && /owner_onboarded|multi_unit|owner_email|owner_phone/.test(error.message || "")) {
+      const { owner_onboarded: _a, multi_unit: _b, owner_email: _c, owner_phone: _d, ...rest } = row;
+      ({ error } = await supabase.from("inventory_private").upsert(rest, { onConflict: "property_id" }));
+    }
     if (error) throw error;
     if (row.broker_id) await touchBroker(row.broker_id);
     return { ok: true };
@@ -241,9 +259,28 @@ export function hasInternalDetail(row) {
   if (!row) return false;
   return Boolean(
     clean(row.poc_name) || clean(row.poc_phone) || clean(row.poc_email) ||
-    clean(row.poc_note) || row.broker_id,
+    clean(row.poc_note) || row.broker_id || clean(row.owner_email) || clean(row.owner_phone) ||
+    row.owner_onboarded === true || row.multi_unit === true,
   );
 }
+
+/* ── Owners and buildings (crm_onboarding.sql) ───────────────────────────── */
+
+async function crmRpc(fn, args) {
+  if (!isSupabaseConfigured || !supabase) throw new Error("Supabase is not configured");
+  const { data, error } = await supabase.rpc(fn, args);
+  if (error) throw error;
+  return data;
+}
+/** Every building, for the form's picker. */
+export const fetchBuildingOptions = () => crmRpc("crm_building_options").then((r) => r ?? []);
+/** Create (no id) or update a building, with its owner's contact. Resolves to { id, code }. */
+export const saveCrmBuilding = (patch) => crmRpc("crm_building_save", { p: patch });
+/** Put a flat in a building (or out of it, with null). */
+export const setCrmFlatBuilding = (propertyId, buildingId, floor = null) =>
+  crmRpc("crm_set_flat_building", { p_property: propertyId, p_building: buildingId || null, p_floor: floor });
+/** Who a listing is linked to now: { owner, partner, building }. */
+export const fetchPropertyLinks = (propertyId) => crmRpc("crm_property_links", { p_property: propertyId });
 
 export function sourceLabel(id) {
   return PROPERTY_SOURCES.find((s) => s.id === id)?.label ?? "Owner";

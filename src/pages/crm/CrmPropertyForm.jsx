@@ -17,6 +17,7 @@ import { useCrm } from "./CrmShell";
 import PropertyVisitSlots from "../../components/PropertyVisitSlots";
 import { InternalDetails, VisitWindow } from "./CrmPropertyInternalFields";
 import CrmPartnerFields from "./CrmPartnerFields";
+import CrmOwnerFields from "./CrmOwnerFields";
 import { fetchPartnerListingMap } from "../../lib/partners";
 import {
   ALL_LOCALITIES, DEFAULT_POSTING_AMENITIES, FLAT_TYPES, FURNISHINGS, LIFESTYLE, MUST_HAVES, OCCUPANT_OPTIONS,
@@ -35,7 +36,8 @@ import { matchListingToRequirements } from "../../lib/inventoryMatch";
 import { supabase, isSupabaseConfigured } from "../../lib/supabase";
 import { SCOPES } from "../../lib/adminScopes";
 import {
-  BLANK_INTERNAL, fetchInternal, hasInternalDetail, probeInternalTables, saveInternal,
+  BLANK_INTERNAL, fetchBuildingOptions, fetchInternal, fetchPropertyLinks, hasInternalDetail, probeInternalTables,
+  saveCrmBuilding, saveInternal, setCrmFlatBuilding,
 } from "../../lib/crmPropertyInternal";
 import { DEFAULT_VISIT_RULE, applyVisitRule, rememberVisitRule } from "../../lib/visitSchedule";
 import { Btn, C, Chip, Empty, Toast, inr } from "./crmUi";
@@ -162,6 +164,20 @@ export default function CrmPropertyForm() {
    * business sitting in browser storage after the upload is done.
    */
   const [internal, setInternal] = useState({ ...BLANK_INTERNAL });
+  /** The building this flat is one unit of: { id } an existing one, or { id: "", newName } a new one (crm_onboarding.sql). */
+  const [building, setBuilding] = useState({ id: "" });
+  const [buildingOptions, setBuildingOptions] = useState([]);
+  /** On an edit: who has this flat now — the owner account, the partner, the building. */
+  const [links, setLinks] = useState(null);
+  const reloadBuildingOptions = useCallback(() => fetchBuildingOptions().then(setBuildingOptions, () => {}), []);
+  useEffect(() => { reloadBuildingOptions(); }, [reloadBuildingOptions]);
+  useEffect(() => {
+    if (!isEdit) return;
+    fetchPropertyLinks(editId).then((l) => {
+      setLinks(l);
+      if (l?.building?.id) setBuilding({ id: l.building.id });
+    }, () => setLinks(null));
+  }, [isEdit, editId]);
   /** Set when the flat came from the partner app: who added it, how they shared it. */
   const [partnerInfo, setPartnerInfo] = useState(null);
   useEffect(() => {
@@ -229,6 +245,11 @@ export default function CrmPropertyForm() {
         poc_phone: row.poc_phone || "",
         poc_email: row.poc_email || "",
         poc_note: row.poc_note || "",
+        // An older listing was never asked: "no" is the honest answer for it.
+        owner_onboarded: row.owner_onboarded === true,
+        multi_unit: row.multi_unit === true,
+        owner_email: row.owner_email || "",
+        owner_phone: row.owner_phone || "",
       });
     })();
     return () => { cancelled = true; };
@@ -342,8 +363,12 @@ export default function CrmPropertyForm() {
     if (!f.rent) need.push("Rent");
     if (!f.flat_type) need.push("Flat type");
     if (!f.furnishing) need.push("Furnishing");
+    // Asked on every new upload; an edit of an older listing is never blocked on them.
+    if (!isEdit && internal.owner_onboarded == null) need.push("Owner onboarded?");
+    if (!isEdit && internal.multi_unit == null) need.push("Multiple units?");
+    if (internal.multi_unit === true && !building.id && !String(building.newName || "").trim()) need.push("Building");
     return need;
-  }, [f]);
+  }, [f, internal, building, isEdit]);
 
   /**
    * Write the internal row for a listing that now exists.
@@ -459,6 +484,40 @@ export default function CrmPropertyForm() {
         showToast("Couldn't place this address on the map — add coordinates or it won't show", "error");
       }
 
+      // One unit of a building: put it there (making the building first if it's new).
+      // Never fails the upload — a flat that saved and whose building didn't is one to fix.
+      const applyBuilding = async (pid) => {
+        try {
+          const contact = {
+            owner_email: String(internal.owner_email || "").trim().toLowerCase(),
+            owner_phone: String(internal.owner_phone || "").trim(),
+          };
+          const hasContact = Boolean(contact.owner_email || contact.owner_phone);
+          if (internal.multi_unit === true) {
+            let id = building.id;
+            if (!id && String(building.newName || "").trim()) {
+              const made = await saveCrmBuilding({
+                name: building.newName.trim(), area: f.area, landmark: f.landmark || "", full_address: f.full_address || "",
+                latitude: coords.lat ?? "", longitude: coords.lng ?? "", total_floors: String(f.total_floors ?? ""),
+                ...(hasContact ? contact : {}),
+              });
+              id = made?.id;
+              if (id) setBuilding({ id });
+            } else if (id && hasContact) {
+              const opt = buildingOptions.find((b) => b.id === id);
+              if (opt && !opt.owner_joined && !opt.owner_email && !opt.owner_phone) await saveCrmBuilding({ id, ...contact });
+            }
+            if (id) await setCrmFlatBuilding(pid, id, null);
+          } else if (internal.multi_unit === false && links?.building) {
+            await setCrmFlatBuilding(pid, null, null);
+          }
+          reloadBuildingOptions();
+          fetchPropertyLinks(pid).then(setLinks, () => {});
+        } catch (e) {
+          showToast(`Listing saved, but not its building: ${e?.message || "unknown error"}`, "error");
+        }
+      };
+
       if (isEdit) {
         // The MZ- code identifies the listing and the poster owns it — an edit
         // changes neither, whoever is doing the editing. Everything else in the
@@ -481,6 +540,7 @@ export default function CrmPropertyForm() {
         setKeptImages(Array.isArray(data.images) ? data.images : []);
         setPhotos([]);
         await writeInternal(editId);
+        await applyBuilding(editId);
         reload();
         showToast(`${editId} saved`);
         return;
@@ -496,6 +556,7 @@ export default function CrmPropertyForm() {
       const internalResult = hasInternalDetail(internal) || internal.source !== "owner"
         ? await writeInternal(propertyId, { toast: false })
         : null;
+      await applyBuilding(propertyId);
       if (visitRule.mode !== "none") {
         const { added, failed } = await applyVisitRule(propertyId, visitRule);
         // Remembered so the rolling window keeps topping itself up, exactly as
@@ -518,7 +579,7 @@ export default function CrmPropertyForm() {
       setSaving(false);
     }
   }, [canWrite, missingRequired, f, photos, keptImages, user, requirements, reload, isEdit, editId,
-      writeInternal, visitRule, internal]);
+      writeInternal, visitRule, internal, building, buildingOptions, links, reloadBuildingOptions]);
 
   useEffect(() => {
     const onKey = (e) => {
@@ -605,6 +666,7 @@ export default function CrmPropertyForm() {
             setPublished(null); setF(BLANK); setImportInfo(null); setPasteText("");
             // Otherwise the last flat's POC is saved against the next one.
             setInternal({ ...BLANK_INTERNAL });
+            setBuilding({ id: "" }); setLinks(null);
             setVisitRule({ ...DEFAULT_VISIT_RULE });
           }}>
             Add another
@@ -976,6 +1038,9 @@ export default function CrmPropertyForm() {
               </Field>
             )}
 
+            <CrmOwnerFields value={internal} onChange={setInternal} building={building} onBuilding={setBuilding}
+              options={buildingOptions} links={links} floor={f.floor_number} />
+
             <CrmPartnerFields value={f} onChange={set} partnerInfo={partnerInfo} />
 
             <div style={{ marginTop: 4 }}>
@@ -996,7 +1061,7 @@ export default function CrmPropertyForm() {
               ) : (
                 <Btn onClick={() => {
                   setF(BLANK); setPhotos([]); setPasteText(""); setImportInfo(null);
-                  setInternal({ ...BLANK_INTERNAL }); setVisitRule({ ...DEFAULT_VISIT_RULE });
+                  setInternal({ ...BLANK_INTERNAL }); setVisitRule({ ...DEFAULT_VISIT_RULE }); setBuilding({ id: "" });
                 }}>
                   Clear
                 </Btn>

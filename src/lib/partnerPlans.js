@@ -20,6 +20,19 @@ export const REFERRAL_REWARD = 1500;
 export const fetchPlans = () => rpc("partner_plans_list").then((r) => r ?? []);
 export const fetchPartnerStatus = () => rpc("partner_status");
 export const markCongratsSeen = () => rpc("partner_congrats_seen").catch(() => {});
+/** Flats the MovEazy team uploaded on this broker's behalf become theirs once on a plan (crm_onboarding.sql). */
+export const claimCrmListings = () => rpc("partner_claim_crm_listings").then((n) => Number(n) || 0, () => 0);
+
+/**
+ * TEMPORARY, until Razorpay is live on the partner app: every Pay button opens
+ * a WhatsApp chat with the sales number instead of a payment page. The attempt
+ * is still recorded, so /sales-funnel shows who tried to pay. Set
+ * PAY_ON_WHATSAPP to false to go back to startPlanPayment's online flow.
+ */
+export const PAY_ON_WHATSAPP = true;
+export const SALES_WHATSAPP = "918090911024";
+export const SALES_MESSAGE = "Hey, I'm interested in becoming a partner at MovEazy and want to understand more about the benefits.";
+export const salesWhatsAppUrl = () => `https://wa.me/${SALES_WHATSAPP}?text=${encodeURIComponent(SALES_MESSAGE)}`;
 
 /**
  * Pay for a plan: record the attempt, then send the broker to Razorpay.
@@ -27,6 +40,11 @@ export const markCongratsSeen = () => rpc("partner_congrats_seen").catch(() => {
  * (activated by a super admin) when online payment isn't configured.
  */
 export async function startPlanPayment(planId) {
+  if (PAY_ON_WHATSAPP) {
+    let payment = null;
+    try { payment = await rpc("partner_payment_start", { p_plan: planId }); } catch { /* the chat matters more than the record */ }
+    return { url: salesWhatsAppUrl(), payment, mode: "sales_whatsapp" };
+  }
   const pay = await rpc("partner_payment_start", { p_plan: planId });
   const { data: { session } = {} } = await supabase.auth.getSession();
   let res = null;

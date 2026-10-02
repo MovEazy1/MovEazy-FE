@@ -14,7 +14,7 @@ import { Loading, TopBar, WhatsAppIcon, toast } from "./partnerUi";
 import { MOVEAZY_TEAM_WHATSAPP } from "../../config/contactChannels";
 import { useLandingSettings } from "../../lib/landingSettings";
 import { friendlyError, inr } from "../../lib/partners";
-import { fetchPlans, startPlanPayment } from "../../lib/partnerPlans";
+import { PAY_ON_WHATSAPP, fetchPlans, startPlanPayment } from "../../lib/partnerPlans";
 
 const PERKS = [
   "1000+ MovEazy listings with owner contacts, updated daily",
@@ -47,6 +47,8 @@ export default function PremiumPage() {
     setBusy(true);
     try {
       const r = await startPlanPayment(plan.id);
+      // Temporary: no gateway yet — straight to a WhatsApp chat with the sales team.
+      if (r.mode === "sales_whatsapp") { window.location.assign(r.url); setBusy(false); return; }
       if (r.mode !== "razorpay") { setManual(r); setBusy(false); return; }
       window.location.assign(r.url);
     } catch (e) {
@@ -112,7 +114,7 @@ export default function PremiumPage() {
       {plan && !manual && (
         <div className="jp-foot">
           <button type="button" className="jp-pay" onClick={pay} disabled={busy}>
-            {busy ? "Opening Razorpay…" : `Pay ${inr(plan.price)} · ${plan.label}`}
+            {busy ? (PAY_ON_WHATSAPP ? "Opening WhatsApp…" : "Opening Razorpay…") : `Pay ${inr(plan.price)} · ${plan.label}`}
           </button>
           <a className="jp-help" href={help} target="_blank" rel="noreferrer"><WhatsAppIcon size={15} /> Questions? Talk to us</a>
         </div>
