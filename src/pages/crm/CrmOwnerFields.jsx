@@ -7,6 +7,7 @@
  * building) shows up in that owner's app the moment they sign in. Staff only:
  * it lives in inventory_private, never on the public listing.
  */
+import { Link } from "react-router-dom";
 import { C } from "./crmUi";
 import { buildingUrl } from "../../lib/buildings";
 
@@ -70,7 +71,7 @@ export default function CrmOwnerFields({ value, onChange, building, onBuilding, 
       {value.multi_unit === true && (
         <div style={{ display: "grid", gap: 6 }}>
           <select className="crm-input" value={building.id || (building.newName !== undefined ? "__new" : "")}
-            onChange={(e) => onBuilding(e.target.value === "__new" ? { id: "", newName: "" } : { id: e.target.value })}>
+            onChange={(e) => onBuilding(e.target.value === "__new" ? { id: "", newName: "", unitNo: building.unitNo } : { id: e.target.value, unitNo: building.unitNo })}>
             <option value="">Pick the building…</option>
             <option value="__new">+ New building</option>
             {(options ?? []).map((b) => (
@@ -79,7 +80,14 @@ export default function CrmOwnerFields({ value, onChange, building, onBuilding, 
           </select>
           {!building.id && building.newName !== undefined && (
             <input className="crm-input" placeholder="Building name, e.g. Sunrise Residency" value={building.newName}
-              onChange={(e) => onBuilding({ id: "", newName: e.target.value })} />
+              onChange={(e) => onBuilding({ ...building, id: "", newName: e.target.value })} />
+          )}
+          <input className="crm-input" placeholder="House / flat no., e.g. 302" value={building.unitNo || ""}
+            onChange={(e) => onBuilding({ ...building, unitNo: e.target.value.slice(0, 20) })} aria-label="House number" />
+          {picked && (
+            <Link to={`/crm/buildings/${picked.id}`} style={{ fontSize: 11.5, color: C.accent }}>
+              Manage {picked.name}: cover video &amp; photos, every flat and their order →
+            </Link>
           )}
           <span className="crm-mute" style={{ fontSize: 11 }}>
             {picked ? <>QR page: <a href={buildingUrl(picked.code)} target="_blank" rel="noreferrer" style={{ color: C.accent }}>/building/{picked.code}</a> · </> : null}

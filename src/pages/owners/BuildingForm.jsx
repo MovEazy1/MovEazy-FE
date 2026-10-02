@@ -43,7 +43,9 @@ function BuildingFormInner({ existing }) {
     totalFloors: existing?.total_floors != null ? String(existing.total_floors) : "",
     amenities: existing?.amenities ?? [],
     description: existing?.description || "",
+    coverVideo: existing?.cover_video || "",
   }));
+  const [videoBusy, setVideoBusy] = useState(false);
   // Each photo: { key, url (once uploaded), preview, state: 'up' | 'ok' | 'err', file }
   const [photos, setPhotos] = useState(() => (existing?.photos ?? []).map((url) => ({ key: url, url, preview: url, state: "ok" })));
   const [errors, setErrors] = useState({});
@@ -81,7 +83,7 @@ function BuildingFormInner({ existing }) {
     if (f.totalFloors && !(Number(f.totalFloors) >= 0 && Number(f.totalFloors) <= 80)) e.totalFloors = "Between 0 and 80";
     setErrors(e);
     if (Object.keys(e).length) { window.scrollTo(0, 0); return; }
-    if (uploading) { toast("Hold on — photos are still uploading."); return; }
+    if (uploading || videoBusy) { toast("Hold on — still uploading."); return; }
     setSaving(true);
     try {
       let { latitude, longitude } = f;
@@ -95,6 +97,7 @@ function BuildingFormInner({ existing }) {
         latitude: latitude ?? "", longitude: longitude ?? "", total_floors: f.totalFloors,
         amenities: f.amenities, description: f.description.trim(),
         photos: photos.filter((p) => p.state === "ok" && p.url).map((p) => p.url),
+        cover_video: f.coverVideo,
       });
       await reloadBuildings();
       toast(existing ? "Saved" : "Property added — now add its flats");
@@ -147,6 +150,32 @@ function BuildingFormInner({ existing }) {
         </div>
 
         <div className="oz-section">
+          <h2 className="oz-h2">Cover video</h2>
+          <p className="oz-hint" style={{ margin: "-4px 0 12px" }}>A short walk-through — the first thing a tenant sees after scanning the QR.</p>
+          {f.coverVideo ? (
+            <div style={{ position: "relative" }}>
+              <video src={f.coverVideo} controls playsInline style={{ width: "100%", maxHeight: 260, borderRadius: 12, background: "#000", display: "block" }} />
+              <button type="button" className="oz-btn oz-btn--sm" style={{ position: "absolute", top: 8, right: 8 }} onClick={() => set({ coverVideo: "" })}><X size={14} /> Remove</button>
+            </div>
+          ) : (
+            <label className="oz-btn" style={{ width: "100%", borderStyle: "dashed", cursor: "pointer" }}>
+              {videoBusy ? <><Loader2 size={18} className="bf-spin" /> Uploading the video…</> : <><Camera size={18} /> Add a video</>}
+              <input type="file" accept="video/*" hidden disabled={videoBusy} onChange={async (e) => {
+                const file = e.target.files?.[0];
+                e.target.value = "";
+                if (!file) return;
+                const why = mediaRejectionReason(file);
+                if (why) { toast(why, "error"); return; }
+                setVideoBusy(true);
+                const [url] = await uploadInventoryPhotos([file], folder, null, (_, msg) => toast(msg || "The video didn't upload", "error"));
+                setVideoBusy(false);
+                if (url) set({ coverVideo: url });
+              }} />
+            </label>
+          )}
+        </div>
+
+        <div className="oz-section">
           <h2 className="oz-h2">Photos <span className="oz-hint" style={{ fontWeight: 500 }}>{photos.length}/30</span></h2>
           <p className="oz-hint" style={{ margin: "-4px 0 12px" }}>The outside, the entrance, the lobby, the terrace — the first photo leads the QR page and the poster.</p>
           <div className="bf-photos">
@@ -185,7 +214,7 @@ function BuildingFormInner({ existing }) {
         </div>
 
         <button type="button" className="oz-btn oz-btn--primary oz-btn--block" onClick={save} disabled={saving}>
-          {saving ? "Saving…" : uploading ? "Uploading photos…" : existing ? "Save changes" : "Create property & QR"}
+          {saving ? "Saving…" : uploading || videoBusy ? "Uploading…" : existing ? "Save changes" : "Create property & QR"}
         </button>
       </div>
       <style>{`

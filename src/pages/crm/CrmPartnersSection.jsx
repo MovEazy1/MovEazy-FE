@@ -16,6 +16,7 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { Btn, C, Chip, Empty, Toast, shortDate } from "./crmUi";
 import CrmProgramSettings from "./CrmProgramSettings";
+import CrmBrokerQr from "./CrmBrokerQr";
 import { useLandingSettings } from "../../lib/landingSettings";
 import { SCOPES } from "../../lib/adminScopes";
 import { whatsappUrl } from "../../lib/crmSettings";
@@ -36,6 +37,7 @@ export default function CrmPartnersSection({ access }) {
   const [toast, setToast] = useState(null);
   const [error, setError] = useState("");
   const [pricing, setPricing] = useState(false);
+  const [qrFor, setQrFor] = useState(null);
   const loaded = useLandingSettings();
   const [savedProgram, setSavedProgram] = useState(null);
   const program = savedProgram || loaded;
@@ -179,6 +181,7 @@ export default function CrmPartnersSection({ access }) {
                   </td>
                   <td>
                     <div style={{ display: "flex", gap: 5, flexWrap: "wrap" }}>
+                      {r.status === "approved" && <Btn sm onClick={() => setQrFor(r)}>QR</Btn>}
                       {r.status !== "approved" && (
                         <Btn sm variant="primary" disabled={!canManage || !!busy}
                           onClick={() => act(r.user_id, () => adminSetStatus(r.user_id, "approved"), `${r.name} approved`)}>
@@ -211,6 +214,7 @@ export default function CrmPartnersSection({ access }) {
           </table>
         )}
       </div>
+      {qrFor && <CrmBrokerQr partner={qrFor} onClose={() => setQrFor(null)} onToast={showToast} />}
       <Toast {...(toast ?? {})} />
     </div>
   );

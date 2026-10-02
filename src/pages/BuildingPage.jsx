@@ -8,7 +8,7 @@
  */
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useParams, useSearchParams } from "react-router-dom";
-import { BadgeCheck, Building2, CalendarCheck, Check, ChevronLeft, Clock, Layers, MapPin, Phone, Sparkles, X } from "lucide-react";
+import { BadgeCheck, Building2, CalendarCheck, Check, ChevronLeft, Clock, Film, Images, Layers, MapPin, Phone, Sparkles, X } from "lucide-react";
 import { MediaItem, listingMedia } from "./partners/partnerMedia";
 import { inr } from "../lib/partners";
 import {
@@ -26,6 +26,8 @@ function saveMe(me) {
 }
 
 const bhk = (f) => f.flat_type || (f.bedrooms ? `${f.bedrooms} BHK` : "Flat");
+/** "Flat 302 · 2 BHK" when MovEazy set a house number, else "2 BHK". */
+const flatName = (f) => (f.unit_no ? `Flat ${f.unit_no} · ${bhk(f)}` : bhk(f));
 const dayLabel = (d, i) => (i === 0 ? "Today" : i === 1 ? "Tomorrow" : d.toLocaleDateString("en-IN", { weekday: "short" }));
 
 export default function BuildingPage() {
@@ -56,8 +58,11 @@ export default function BuildingPage() {
   }, [b]);
 
   const flats = useMemo(() => b?.flats ?? [], [b]);
-  const floors = useMemo(() => flatsByFloor(flats), [flats]);
-  const available = flats.filter((f) => f.available);
+  const available = useMemo(() => flats.filter((f) => f.available), [flats]);
+  // Floors that have a free flat, for the filter chips. The list itself stays in MovEazy's order.
+  const floors = useMemo(() => flatsByFloor(available), [available]);
+  const shown = floorOn === "all" ? available : available.filter((f) => String(f.floor_number ?? "null") === floorOn);
+  const occupied = flats.length - available.length;
   const photos = useMemo(() => {
     const own = (b?.photos ?? []).filter(Boolean);
     return own.length ? own : flats.flatMap((f) => listingMedia(f)).slice(0, 8);
@@ -74,8 +79,8 @@ export default function BuildingPage() {
 
   const jump = (key) => {
     setFloorOn(key);
-    const el = document.getElementById(key === "all" ? "bp-flats" : `bp-floor-${key}`);
-    if (el) window.scrollTo({ top: el.getBoundingClientRect().top + window.scrollY - 64, behavior: "smooth" });
+    const el = document.getElementById("bp-flats");
+    if (el && el.getBoundingClientRect().top < 0) window.scrollTo({ top: el.getBoundingClientRect().top + window.scrollY - 64, behavior: "smooth" });
   };
 
   if (b === undefined) return <Shell><div className="bp-skel"><i /><b /><b /><b /></div></Shell>;
@@ -94,7 +99,7 @@ export default function BuildingPage() {
 
   return (
     <Shell>
-      <Gallery photos={photos} name={b.name} />
+      {b.cover_video ? <VideoHero src={b.cover_video} photos={photos} name={b.name} /> : <Gallery photos={photos} name={b.name} />}
 
       <section className="bp-head">
         <div className="bp-verified"><BadgeCheck size={15} /> Listed with MovEazy</div>
@@ -113,28 +118,26 @@ export default function BuildingPage() {
 
       <section id="bp-flats" className="bp-flats">
         <div className="bp-flats-top">
-          <h2><Layers size={18} /> Flats, floor by floor</h2>
-          <span>Tap <b>+</b> to add a flat to your visit</span>
+          <h2><Layers size={18} /> Available flats · {available.length}</h2>
+          <span>Tap <b>+</b> to add flats to your visit — see as many as you like in one trip</span>
         </div>
         {floors.length > 1 && (
           <div className="bp-floortabs" role="tablist">
-            <button type="button" className={floorOn === "all" ? "on" : ""} onClick={() => jump("all")}>All</button>
+            <button type="button" className={floorOn === "all" ? "on" : ""} onClick={() => jump("all")}>All floors</button>
             {floors.map((g) => (
-              <button key={g.label} type="button" className={floorOn === String(g.floor) ? "on" : ""} onClick={() => jump(String(g.floor))}>
+              <button key={g.label} type="button" className={floorOn === String(g.floor ?? "null") ? "on" : ""} onClick={() => jump(String(g.floor ?? "null"))}>
                 {g.floor === null ? "Other" : g.floor === 0 ? "Ground" : floorLabel(g.floor).replace(" floor", "")}
               </button>
             ))}
           </div>
         )}
-        {flats.length === 0 && <div className="bp-note">The owner is adding flats. Ask for a visit and we'll show you what's free.</div>}
-        {floors.map((g) => (
-          <div key={g.label} id={`bp-floor-${g.floor}`} className="bp-floor">
-            <h3>{g.label}<span>{g.flats.filter((f) => f.available).length} available</span></h3>
-            {g.flats.map((f) => (
-              <FlatCard key={f.property_id} flat={f} picked={picked.has(f.property_id)} onToggle={() => toggle(f.property_id)} onOpen={() => setOpen(f)} />
-            ))}
-          </div>
-        ))}
+        {available.length === 0 && <div className="bp-note">Every flat here is taken right now. Ask for a visit and we'll tell you the moment one frees up.</div>}
+        <div className="bp-floor">
+          {shown.map((f) => (
+            <FlatCard key={f.property_id} flat={f} picked={picked.has(f.property_id)} onToggle={() => toggle(f.property_id)} onOpen={() => setOpen(f)} />
+          ))}
+        </div>
+        {occupied > 0 && <div className="bp-occ">{occupied} more flat{occupied === 1 ? " is" : "s are"} occupied</div>}
       </section>
 
       <footer className="bp-foot">
@@ -167,6 +170,29 @@ function Shell({ children }) {
       <style>{CSS}</style>
       <header className="bp-top"><a href="/" aria-label="MovEazy"><img src={logo} alt="MovEazy" /></a></header>
       <main className="bp-col">{children}</main>
+    </div>
+  );
+}
+
+/** The building's walk-through video first, its photos a tap away. */
+function VideoHero({ src, photos, name }) {
+  const [showPhotos, setShowPhotos] = useState(false);
+  if (showPhotos && photos.length) {
+    return (
+      <div className="bp-gwrap">
+        <Gallery photos={photos} name={name} />
+        <button type="button" className="bp-heroswitch" onClick={() => setShowPhotos(false)}><Film size={14} /> Video</button>
+      </div>
+    );
+  }
+  return (
+    <div className="bp-gwrap">
+      <div className="bp-gallery bp-video">
+        <video src={src} autoPlay muted loop playsInline controls preload="metadata" poster={photos[0] || undefined} aria-label={`${name} — video`} />
+      </div>
+      {photos.length > 0 && (
+        <button type="button" className="bp-heroswitch" onClick={() => setShowPhotos(true)}><Images size={14} /> Photos · {photos.length}</button>
+      )}
     </div>
   );
 }
@@ -206,10 +232,11 @@ function FlatCard({ flat, picked, onToggle, onOpen }) {
           <span className={`bp-tag${flat.available ? "" : " bp-tag--off"}`}>{flat.available ? "Available" : "Occupied"}</span>
         </div>
         <div className="bp-card-body">
-          <b className="bp-card-title">{bhk(flat)}{flat.furnishing ? <span> · {flat.furnishing}</span> : null}</b>
+          <b className="bp-card-title">{flatName(flat)}{flat.furnishing && !flat.unit_no ? <span> · {flat.furnishing}</span> : null}</b>
           <div className="bp-card-rent">{flat.rent ? inr(flat.rent) : "Rent on request"}<small> / mo</small></div>
           <div className="bp-card-meta">
-            {[flat.area_sqft ? `${flat.area_sqft} sq ft` : "", flat.bathrooms ? `${flat.bathrooms} bath` : "",
+            {[flat.floor_number != null ? floorLabel(flat.floor_number) : "", flat.unit_no && flat.furnishing ? flat.furnishing : "",
+              flat.area_sqft ? `${flat.area_sqft} sq ft` : "",
               flat.deposit ? `${shortInr(flat.deposit)} deposit` : ""].filter(Boolean).join(" · ") || "Details on visit"}
           </div>
         </div>
@@ -259,7 +286,7 @@ function FlatSheet({ flat, picked, onClose, onToggle, onVisit }) {
     ["Available from", flat.available_from ? new Date(flat.available_from).toLocaleDateString("en-IN", { day: "numeric", month: "short" }) : "Now"],
   ];
   return (
-    <Sheet title={`${bhk(flat)} · ${floorLabel(flat.floor_number)}`} onClose={onClose}>
+    <Sheet title={`${flatName(flat)} · ${floorLabel(flat.floor_number)}`} onClose={onClose}>
       {media.length > 0 && <div className="bp-sgallery">{media.map((src) => <div key={src}><MediaItem src={src} alt="" /></div>)}</div>}
       <div className="bp-pad">
         <div className="bp-kv">{rows.map(([k, v]) => <div key={k}><span>{k}</span><b>{v}</b></div>)}</div>
@@ -363,7 +390,7 @@ function VisitSheet({ code, building, flats, picked, onToggle, onClose }) {
               {avail.map((f) => (
                 <button key={f.property_id} type="button" className={picked.has(f.property_id) ? "on" : ""} onClick={() => onToggle(f.property_id)}>
                   {picked.has(f.property_id) && <Check size={13} />}
-                  {bhk(f)} · {f.floor_number == null ? "" : f.floor_number === 0 ? "G · " : `F${f.floor_number} · `}{f.rent ? inr(f.rent) : ""}
+                  {f.unit_no ? `#${f.unit_no} · ` : ""}{bhk(f)} · {f.unit_no || f.floor_number == null ? "" : f.floor_number === 0 ? "G · " : `F${f.floor_number} · `}{f.rent ? inr(f.rent) : ""}
                 </button>
               ))}
             </div>
@@ -424,6 +451,11 @@ const CSS = `
 .bp-gallery > div { flex: 0 0 100%; scroll-snap-align: start; height: 100%; }
 .bp-gallery img, .bp-gallery video { width: 100%; height: 100% !important; object-fit: cover; display: block; }
 .bp-gallery--none { display: grid; place-items: center; color: var(--mute); }
+.bp-video { aspect-ratio: 4 / 3; background: #000; }
+.bp-video video { width: 100%; height: 100% !important; object-fit: cover; display: block; }
+.bp-heroswitch { position: absolute; left: 12px; top: 12px; z-index: 2; display: inline-flex; align-items: center; gap: 5px; border: 0; border-radius: 99px;
+  background: rgba(0,0,0,.6); color: #fff; font: inherit; font-size: 12px; font-weight: 700; padding: 6px 11px; cursor: pointer; }
+.bp-occ { text-align: center; color: var(--dim); font-size: 12.5px; margin: 4px 0 0; }
 .bp-gcount { position: absolute; right: 12px; top: 12px; background: rgba(0,0,0,.55); color: #fff; font-size: 12px; font-weight: 600;
   border-radius: 99px; padding: 4px 10px; }
 .bp-dots { position: absolute; left: 0; right: 0; bottom: 30px; display: flex; gap: 5px; justify-content: center; }

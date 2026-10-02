@@ -276,9 +276,15 @@ async function crmRpc(fn, args) {
 export const fetchBuildingOptions = () => crmRpc("crm_building_options").then((r) => r ?? []);
 /** Create (no id) or update a building, with its owner's contact. Resolves to { id, code }. */
 export const saveCrmBuilding = (patch) => crmRpc("crm_building_save", { p: patch });
-/** Put a flat in a building (or out of it, with null). */
-export const setCrmFlatBuilding = (propertyId, buildingId, floor = null) =>
-  crmRpc("crm_set_flat_building", { p_property: propertyId, p_building: buildingId || null, p_floor: floor });
+/** Put a flat in a building (or out of it, with null), optionally with its house number. */
+export const setCrmFlatBuilding = (propertyId, buildingId, floor = null, unitNo = null) =>
+  crmRpc("crm_set_flat_building", { p_property: propertyId, p_building: buildingId || null, p_floor: floor, p_unit_no: unitNo });
+/** One building for the editor: its details and every flat in it, in order. */
+export const fetchCrmBuilding = (id) => crmRpc("crm_building_detail", { p_building: id });
+/** Put flats in a building with house number, floor and order: [{ property_id, unit_no, floor_number, unit_order }]. */
+export const setBuildingUnits = (buildingId, units) => crmRpc("crm_building_set_units", { p_building: buildingId, p_units: units });
+/** A partner's storefront QR (only their flats), made on first ask. */
+export const fetchPartnerStorefront = (userId) => crmRpc("crm_partner_storefront", { p_user: userId });
 /** Who a listing is linked to now: { owner, partner, building }. */
 export const fetchPropertyLinks = (propertyId) => crmRpc("crm_property_links", { p_property: propertyId });
 

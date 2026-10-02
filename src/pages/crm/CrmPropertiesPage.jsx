@@ -24,7 +24,7 @@ const EMPTY = new Set();
 import { splitMedia } from "../../lib/listingMedia";
 import { mapInventoryToListing } from "../../lib/inventory";
 import PropertyModal from "../../components/PropertyModal";
-import { fetchInternalMap, pocMessage, sourceLabel } from "../../lib/crmPropertyInternal";
+import { fetchBuildingOptions, fetchInternalMap, pocMessage, sourceLabel } from "../../lib/crmPropertyInternal";
 import { whatsappUrl } from "../../lib/crmSettings";
 import { formatForDisplay } from "../../lib/mobile";
 import { Btn, C, Chip, Empty, ScoreRing, inr, shortDate } from "./crmUi";
@@ -490,6 +490,16 @@ export default function CrmPropertiesPage() {
   const [internalMap, setInternalMap] = useState({});
   /** property_id → the partner who added it and their sharing (partner app listings only). */
   const [partnerMap, setPartnerMap] = useState({});
+  /** Ticked flats, for "Group into building". */
+  const [picked, setPicked] = useState(() => new Set());
+  const [buildings, setBuildings] = useState([]);
+  useEffect(() => { fetchBuildingOptions().then(setBuildings, () => {}); }, []);
+  const buildingById = useMemo(() => new Map(buildings.map((b) => [b.id, b])), [buildings]);
+  const togglePick = (pid) => setPicked((cur) => {
+    const next = new Set(cur);
+    if (next.has(pid)) next.delete(pid); else next.add(pid);
+    return next;
+  });
 
   useEffect(() => {
     const ids = inventory.map((l) => l.property_id);
@@ -556,12 +566,33 @@ export default function CrmPropertiesPage() {
       <div className="crm-col" style={{ flex: 1 }}>
         <div className="crm-colhead">
           <span className="crm-label">Properties · {rows.length}</span>
-          {canEdit && (
-            <Link to="/crm/properties/new" className="crm-btn crm-btn--primary crm-btn--sm" style={{ textDecoration: "none" }}>
-              + Add property
+          <div style={{ display: "flex", gap: 6 }}>
+            <Link to="/crm/owner-qr?tab=buildings" className="crm-btn crm-btn--sm" style={{ textDecoration: "none" }}>
+              Buildings · {buildings.length}
             </Link>
-          )}
+            {canEdit && (
+              <Link to="/crm/properties/new" className="crm-btn crm-btn--primary crm-btn--sm" style={{ textDecoration: "none" }}>
+                + Add property
+              </Link>
+            )}
+          </div>
         </div>
+
+        {/* Ticking flats groups them into a building or society — the editor then asks for its cover video and photos. */}
+        {canEdit && picked.size > 0 && (
+          <div style={{ padding: "8px 12px", display: "flex", gap: 7, alignItems: "center", flexWrap: "wrap", background: C.accentSoft, flex: "none" }}>
+            <strong style={{ fontSize: 12.5 }}>{picked.size} flat{picked.size === 1 ? "" : "s"} ticked</strong>
+            <Btn sm variant="primary" onClick={() => navigate(`/crm/buildings/new?flats=${[...picked].join(",")}`)}>Group into a new building</Btn>
+            {buildings.length > 0 && (
+              <select className="crm-input" style={{ width: 240 }} value="" aria-label="Add to an existing building"
+                onChange={(e) => e.target.value && navigate(`/crm/buildings/${e.target.value}?flats=${[...picked].join(",")}`)}>
+                <option value="">Add to an existing building…</option>
+                {buildings.map((b) => <option key={b.id} value={b.id}>{b.name}{b.area ? ` · ${b.area}` : ""} ({b.flats})</option>)}
+              </select>
+            )}
+            <Btn sm onClick={() => setPicked(new Set())}>Clear</Btn>
+          </div>
+        )}
 
         <div style={{ padding: "9px 12px", display: "flex", gap: 7, alignItems: "center", flexWrap: "wrap", flex: "none" }}>
           <input className="crm-input" style={{ maxWidth: 280 }} placeholder="Search id, area, title, owner…"
@@ -583,6 +614,7 @@ export default function CrmPropertiesPage() {
             <table className="crm-table">
               <thead>
                 <tr>
+                  {canEdit && <th aria-label="Tick to group" />}
                   {COLUMNS.map((col) => <th key={col.key}>{col.label}</th>)}
                   <th />
                 </tr>
@@ -590,6 +622,7 @@ export default function CrmPropertiesPage() {
                     filter belongs under the heading it filters, where the
                     column it applies to cannot be mistaken. */}
                 <tr>
+                  {canEdit && <th style={{ paddingTop: 0 }} />}
                   {COLUMNS.map((col) => (
                     <th key={col.key} style={{ paddingTop: 0, fontWeight: 400 }}>
                       <ColumnFilter
@@ -607,11 +640,23 @@ export default function CrmPropertiesPage() {
               </thead>
               <tbody>
                 {rows.map((l) => (
-                  <tr key={l.property_id}>
+                  <tr key={l.property_id} style={picked.has(l.property_id) ? { background: C.accentSoft } : undefined}>
+                    {canEdit && (
+                      <td><input type="checkbox" checked={picked.has(l.property_id)} onChange={() => togglePick(l.property_id)}
+                        aria-label={`Tick ${l.property_id}`} /></td>
+                    )}
                     <td>
                       <PropertyThumbs listing={l} onOpen={() => setPreviewId(l.property_id)} />
                     </td>
-                    <td>{l.flat_type || "—"}{l.furnishing ? ` · ${l.furnishing}` : ""}</td>
+                    <td>
+                      {l.flat_type || "—"}{l.furnishing ? ` · ${l.furnishing}` : ""}
+                      {l.building_id && (
+                        <Link to={`/crm/buildings/${l.building_id}`} style={{ display: "block", fontSize: 10.5, color: C.gold, marginTop: 2, textDecoration: "none" }}
+                          title="Open the building">
+                          {buildingById.get(l.building_id)?.kind === "society" ? "Society" : "Building"} · {buildingById.get(l.building_id)?.name || "…"}{l.unit_no ? ` · #${l.unit_no}` : ""}
+                        </Link>
+                      )}
+                    </td>
                     <td>{l.area || "—"}</td>
                     <td className="crm-num">{inr(l.rent)}</td>
                     <td className="crm-num">

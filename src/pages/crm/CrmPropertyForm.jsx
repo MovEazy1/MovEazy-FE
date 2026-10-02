@@ -176,9 +176,10 @@ export default function CrmPropertyForm() {
     if (!isEdit) return;
     fetchPropertyLinks(editId).then((l) => {
       setLinks(l);
-      if (l?.building?.id) setBuilding({ id: l.building.id });
+      if (l?.building?.id) setBuilding({ id: l.building.id, unitNo: (inventory ?? []).find((x) => x.property_id === editId)?.unit_no || "" });
     }, () => setLinks(null));
-  }, [isEdit, editId]);
+    // Again after a save reloads the inventory: the house number shown is the saved one.
+  }, [isEdit, editId, inventory]);
   /** Set when the flat came from the partner app: who added it, how they shared it. */
   const [partnerInfo, setPartnerInfo] = useState(null);
   useEffect(() => {
@@ -508,7 +509,7 @@ export default function CrmPropertyForm() {
               const opt = buildingOptions.find((b) => b.id === id);
               if (opt && !opt.owner_joined && !opt.owner_email && !opt.owner_phone) await saveCrmBuilding({ id, ...contact });
             }
-            if (id) await setCrmFlatBuilding(pid, id, null);
+            if (id) await setCrmFlatBuilding(pid, id, null, String(building.unitNo || "").trim());
           } else if (internal.multi_unit === false && links?.building) {
             await setCrmFlatBuilding(pid, null, null);
           }

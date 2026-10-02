@@ -32,7 +32,7 @@ export default function PropertyRow({ property: p, tenants = [], showCta = true 
           <div className="oz-meta" style={{ marginTop: 2 }}>{line}</div>
           {p.building_name && (
             <div className="oz-meta" style={{ marginTop: 2, fontSize: 12, color: "var(--champ3)", fontWeight: 600 }}>
-              {p.building_name}{p.floor_number != null ? ` · ${floorLabel(p.floor_number)}` : ""}
+              {p.building_name}{p.unit_no ? ` · Flat ${p.unit_no}` : ""}{p.floor_number != null ? ` · ${floorLabel(p.floor_number)}` : ""}
             </div>
           )}
           <div className="oz-chips" style={{ marginTop: 6, gap: 6 }}>

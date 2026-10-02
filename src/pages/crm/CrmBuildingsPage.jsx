@@ -5,6 +5,7 @@
  * (crm_buildings / crm_building_assign_broker in owner_buildings.sql).
  */
 import { useCallback, useEffect, useMemo, useState } from "react";
+import { Link, useSearchParams } from "react-router-dom";
 import { Btn, C, Chip, Empty, Loading, relTime } from "./crmUi";
 import {
   VISIT_STATUS, assignBuildingBroker, buildingUrl, fetchCrmBuildings, floorLabel, updateBuildingLead, visitWhen,
@@ -15,7 +16,8 @@ const STATUSES = Object.keys(VISIT_STATUS);
 const TONE = { amber: C.gold, blue: "#3B82F6", green: "#10B981", grey: C.textMute, champ: C.gold };
 
 export default function CrmBuildingsPage() {
-  const [tab, setTab] = useState("visits");
+  const [params] = useSearchParams();
+  const [tab, setTab] = useState(params.get("tab") === "buildings" ? "buildings" : "visits");
   const [data, setData] = useState(null);
   const [err, setErr] = useState("");
   const [only, setOnly] = useState("");
@@ -53,6 +55,7 @@ export default function CrmBuildingsPage() {
         <Chip on={tab === "visits"} onClick={() => setTab("visits")}>Visit requests {data ? `(${data.leads.filter((l) => ["new", "confirmed"].includes(l.status)).length} open)` : ""}</Chip>
         <Chip on={tab === "buildings"} onClick={() => setTab("buildings")}>Buildings {data ? `(${data.buildings.length}${unassigned ? ` · ${unassigned} need a partner` : ""})` : ""}</Chip>
         <Btn sm onClick={load}>Refresh</Btn>
+        <Link to="/crm/buildings/new" className="crm-btn crm-btn--primary crm-btn--sm" style={{ textDecoration: "none" }}>+ New building / society</Link>
       </div>
       {err && <Empty>{err}</Empty>}
       {!data ? (!err && <Loading />) : tab === "buildings" ? (
@@ -69,7 +72,9 @@ export default function CrmBuildingsPage() {
                   return (
                     <tr key={b.id}>
                       <td style={cell}>
-                        <b>{b.name}</b> {b.status === "paused" && <span style={{ color: C.coral }}>(paused)</span>}<br />
+                        <Link to={`/crm/buildings/${b.id}`} style={{ color: C.text, fontWeight: 700 }}>{b.name}</Link>{" "}
+                        <Link to={`/crm/buildings/${b.id}`} style={{ color: C.accent, fontSize: 12 }}>Edit flats, cover &amp; order</Link>
+                        {b.status === "paused" && <span style={{ color: C.coral }}> (paused)</span>}<br />
                         <span style={{ color: C.textMute }}>{[b.area, b.landmark].filter(Boolean).join(" · ")}</span><br />
                         <a href={buildingUrl(b.code)} target="_blank" rel="noreferrer" style={{ color: C.gold }}>/building/{b.code}</a>
                       </td>

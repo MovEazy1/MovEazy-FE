@@ -15,7 +15,7 @@ import { useOwner } from "./OwnerApp";
 import { Avatar, Empty, Loading, Pill, Sheet, TopBar, WhatsAppIcon, toast } from "./ownerUi";
 import { MediaItem, listingMedia } from "../partners/partnerMedia";
 import {
-  VISIT_STATUS, buildingDisplay, buildingUrl, fetchBuildingDetail, flatsByFloor, floorLabel, markFlatBooked, setFlatBuilding,
+  VISIT_STATUS, buildingDisplay, buildingUrl, fetchBuildingDetail, floorLabel, markFlatBooked, setFlatBuilding,
   updateBuildingLead, visitWhen,
 } from "../../lib/buildings";
 import { BUILDING_POSTER, drawPoster, loadImage, posterFontsReady, posterPdf } from "../../lib/qrPoster";
@@ -40,7 +40,6 @@ export default function BuildingDetail() {
   useEffect(() => { load(); }, [load]);
 
   const flats = useMemo(() => d?.flats ?? [], [d]);
-  const floors = useMemo(() => flatsByFloor(flats), [flats]);
   const booked = useMemo(() => new Set(d?.booked ?? []), [d]);
   const flatById = useMemo(() => new Map(flats.map((f) => [f.property_id, f])), [flats]);
   const loose = (properties ?? []).filter((p) => !p.building_id);
@@ -83,7 +82,9 @@ export default function BuildingDetail() {
       } />
       <div className="oz-pad">
         <div className="bd-hero">
-          {cover ? <MediaItem src={cover} alt="" /> : <div className="bd-hero-none"><Layers size={34} /></div>}
+          {d.cover_video
+            ? <video src={d.cover_video} autoPlay muted loop playsInline controls preload="metadata" poster={cover || undefined} />
+            : cover ? <MediaItem src={cover} alt="" /> : <div className="bd-hero-none"><Layers size={34} /></div>}
           <div className="bd-hero-text">
             <b>{d.name}</b>
             <span><MapPin size={13} /> {[d.area, d.landmark].filter(Boolean).join(" · ") || "Bengaluru"}</span>
@@ -107,23 +108,23 @@ export default function BuildingDetail() {
             <button type="button" className="oz-btn oz-btn--soft oz-btn--sm" onClick={() => setSheet({ kind: "add" })}><Plus size={15} /> Add flat</button>
           </h2>
           {flats.length === 0 ? (
-            <Empty>Add the flats in this property — each one shows on the QR page under its floor.</Empty>
-          ) : floors.map((g) => (
-            <div key={g.label} className="bd-floor">
-              <div className="bd-floor-h">{g.label}<span>{g.flats.filter((f) => f.available).length}/{g.flats.length} available</span></div>
-              {g.flats.map((f) => (
+            <Empty>Add the flats in this property — each one shows on the QR page, in the order MovEazy sets.</Empty>
+          ) : (
+            <div className="bd-floor">
+              <div className="bd-floor-h">In the order tenants see them<span>{flats.filter((f) => f.available).length}/{flats.length} available</span></div>
+              {flats.map((f) => (
                 <button key={f.property_id} type="button" className="bd-flat" onClick={() => setSheet({ kind: "flat", item: f })}>
                   <div className="bd-flat-img">{listingMedia(f)[0] ? <MediaItem src={listingMedia(f)[0]} alt="" /> : <KeyRound size={20} />}</div>
                   <div className="bd-flat-body">
-                    <b>{bhk(f)}{f.furnishing ? <span> · {f.furnishing}</span> : null}</b>
-                    <div className="oz-rent">{f.rent ? inr(f.rent) : "—"} <small>/ month</small></div>
+                    <b>{f.unit_no ? `Flat ${f.unit_no} · ` : ""}{bhk(f)}{f.furnishing && !f.unit_no ? <span> · {f.furnishing}</span> : null}</b>
+                    <div className="oz-rent">{f.rent ? inr(f.rent) : "—"} <small>/ month · {floorLabel(f.floor_number)}</small></div>
                   </div>
                   {booked.has(f.property_id) ? <Pill tone="champ">Booked</Pill> : f.available ? <Pill tone="green">Available</Pill> : <Pill tone="grey">Occupied</Pill>}
                   <ChevronRight size={18} color="#94A09B" />
                 </button>
               ))}
             </div>
-          ))}
+          )}
         </div>
 
         <div className="oz-section">

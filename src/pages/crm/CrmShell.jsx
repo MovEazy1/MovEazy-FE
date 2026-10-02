@@ -52,7 +52,7 @@ const RAIL = [
  * reads inventory — not merely hide that one field. Measured on the public
  * map: 54 listings became 0.
  */
-const OPTIONAL_INVENTORY_COLS = ["maintenance", "floor_number", "total_floors"];
+const OPTIONAL_INVENTORY_COLS = ["maintenance", "floor_number", "total_floors", "building_id", "unit_no", "unit_order"];
 
 const isMissingColumn = (error) =>
   error?.code === "42703" ||
@@ -66,7 +66,7 @@ async function fetchInventory() {
     "property_id,posted_by,poster_name,poster_email,phone,city,area,nearby_areas,full_address,landmark," +
     "rent,deposit,maintenance,available_from,flat_type,bedrooms,bathrooms,floor_number,total_floors,furnishing,max_flatmates,gender_pref,occupants_allowed," +
     "amenities,house_rules,lifestyle,title,description,images,cover_image_url,status,is_verified," +
-    "source,source_url,created_at";
+    "source,source_url,created_at,building_id,unit_no,unit_order";
 
   const run = (c) =>
     supabase.from("inventory").select(c).order("created_at", { ascending: false }).limit(3000);

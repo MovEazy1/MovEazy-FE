@@ -62,6 +62,7 @@ const CrmPropertyForm = lazy(() => import("./pages/crm/CrmPropertyForm"));
 const CrmBrokersPage = lazy(() => import("./pages/crm/CrmBrokersPage"));
 const CrmBrokerLeadsPage = lazy(() => import("./pages/crm/CrmBrokerLeadsPage"));
 const CrmBuildingsPage = lazy(() => import("./pages/crm/CrmBuildingsPage"));
+const CrmBuildingEditor = lazy(() => import("./pages/crm/CrmBuildingEditor"));
 const CrmVisitsPage = lazy(() => import("./pages/crm/CrmVisitsPage"));
 const CrmNotificationsPage = lazy(() => import("./pages/crm/CrmNotificationsPage"));
 const CrmTeamPage = lazy(() => import("./pages/crm/CrmTeamPage"));
@@ -235,6 +236,8 @@ function AppRoutes() {
           <Route path="brokers" element={<CrmBrokersPage />} />
           <Route path="broker-leads" element={<CrmBrokerLeadsPage />} />
           <Route path="owner-qr" element={<CrmBuildingsPage />} />
+          <Route path="buildings/new" element={<CrmBuildingEditor />} />
+          <Route path="buildings/:id" element={<CrmBuildingEditor />} />
           <Route path="ops" element={<CrmInventoryOpsPage />} />
           <Route path="visits" element={<CrmVisitsPage />} />
           <Route path="notifications" element={<CrmNotificationsPage />} />
