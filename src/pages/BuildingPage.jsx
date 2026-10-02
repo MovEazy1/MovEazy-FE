@@ -7,7 +7,8 @@
  * MovEazy partner assigned to the property and to MovEazy (owner_buildings.sql).
  */
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { useParams, useSearchParams } from "react-router-dom";
+import { Link, useParams, useSearchParams } from "react-router-dom";
+import { useAuth } from "../context/AuthContext";
 import { BadgeCheck, Building2, CalendarCheck, Check, ChevronLeft, Clock, Film, Images, Layers, MapPin, Phone, Sparkles, X } from "lucide-react";
 import { MediaItem, listingMedia } from "./partners/partnerMedia";
 import { inr } from "../lib/partners";
@@ -18,6 +19,31 @@ import {
 import logo from "../assets/logo/moveazy-logo-mint-light.png";
 
 const ME_KEY = "mz_visitor_contact";
+// A visit being booked when the renter went to Google to sign in: picked up when they come back.
+const PENDING_VISIT_KEY = "mz_building_visit_pending";
+function readPendingVisit(code) {
+  try {
+    const p = JSON.parse(sessionStorage.getItem(PENDING_VISIT_KEY) || "null");
+    return p && p.code === code && Date.now() - (p.savedAt || 0) < 30 * 60 * 1000 ? p : null;
+  } catch { return null; }
+}
+function savePendingVisit(p) {
+  try { sessionStorage.setItem(PENDING_VISIT_KEY, JSON.stringify({ ...p, savedAt: Date.now() })); } catch { /* private tab */ }
+}
+function clearPendingVisit() {
+  try { sessionStorage.removeItem(PENDING_VISIT_KEY); } catch { /* ignore */ }
+}
+
+function GoogleG() {
+  return (
+    <svg width="18" height="18" viewBox="0 0 48 48" aria-hidden>
+      <path fill="#FFC107" d="M43.6 20.5H42V20H24v8h11.3C33.7 32.7 29.2 36 24 36c-6.6 0-12-5.4-12-12s5.4-12 12-12c3 0 5.8 1.1 7.9 3l5.7-5.7C34 6.1 29.3 4 24 4 12.9 4 4 12.9 4 24s8.9 20 20 20 20-8.9 20-20c0-1.3-.1-2.4-.4-3.5z" />
+      <path fill="#FF3D00" d="M6.3 14.7l6.6 4.8C14.7 15.1 19 12 24 12c3 0 5.8 1.1 7.9 3l5.7-5.7C34 6.1 29.3 4 24 4 16.3 4 9.7 8.3 6.3 14.7z" />
+      <path fill="#4CAF50" d="M24 44c5.2 0 9.9-2 13.4-5.2l-6.2-5.2C29.2 35.1 26.7 36 24 36c-5.2 0-9.6-3.3-11.3-8l-6.5 5C9.5 39.6 16.2 44 24 44z" />
+      <path fill="#1976D2" d="M43.6 20.5H42V20H24v8h11.3c-.8 2.2-2.2 4.2-4.1 5.6l6.2 5.2C37 39.2 44 34 44 24c0-1.3-.1-2.4-.4-3.5z" />
+    </svg>
+  );
+}
 function readMe() {
   try { return JSON.parse(localStorage.getItem(ME_KEY) || "null") || {}; } catch { return {}; }
 }
@@ -40,6 +66,21 @@ export default function BuildingPage() {
   const [booking, setBooking] = useState(false);
   const [floorOn, setFloorOn] = useState("all");
   const counted = useRef(false);
+  const { user, loading: authLoading, loginWithGoogle, updateUserProfile } = useAuth();
+  // Back from Google with a visit half-booked: reopen it and finish.
+  const [resume, setResume] = useState(null);
+  useEffect(() => {
+    if (authLoading || !user || !b) return;
+    const p = readPendingVisit(code);
+    if (!p) return;
+    clearPendingVisit();
+    // The number they typed before signing in becomes their account's, so the
+    // site doesn't ask for it a second time.
+    if (p.phone && !String(user.phone || "").trim()) updateUserProfile?.(user.name || p.name, p.phone).catch?.(() => {});
+    setPicked(new Set(p.picked || []));
+    setResume(p);
+    setBooking(true);
+  }, [authLoading, user, b, code, updateUserProfile]);
 
   useEffect(() => {
     let live = true;
@@ -158,7 +199,8 @@ export default function BuildingPage() {
           onVisit={() => { if (!picked.has(open.property_id)) toggle(open.property_id); setOpen(null); setBooking(true); }} />
       )}
       {booking && (
-        <VisitSheet code={code} building={b} flats={flats} picked={picked} onToggle={toggle} onClose={() => setBooking(false)} />
+        <VisitSheet code={code} building={b} flats={flats} picked={picked} onToggle={toggle} onClose={() => { setBooking(false); setResume(null); }}
+          user={user} loginWithGoogle={loginWithGoogle} resume={resume} />
       )}
     </Shell>
   );
@@ -303,15 +345,15 @@ function FlatSheet({ flat, picked, onClose, onToggle, onVisit }) {
   );
 }
 
-function VisitSheet({ code, building, flats, picked, onToggle, onClose }) {
+function VisitSheet({ code, building, flats, picked, onToggle, onClose, user, loginWithGoogle, resume }) {
   const days = useMemo(() => nextDays(14), []);
   const [dayIdx, setDayIdx] = useState(() => (visitTimes(days[0]).length ? 0 : 1));
-  const [at, setAt] = useState(null); // Date, or "call"
-  const [step, setStep] = useState("when"); // when | who | done
+  const [at, setAt] = useState(() => (resume ? (resume.at === "call" ? "call" : new Date(resume.at)) : null)); // Date, or "call"
+  const [step, setStep] = useState(resume ? "who" : "when"); // when | who | done
   const me = useMemo(readMe, []);
-  const [name, setName] = useState(me.name || "");
-  const [phone, setPhone] = useState(me.phone || "");
-  const [note, setNote] = useState("");
+  const [name, setName] = useState(resume?.name || me.name || user?.name || "");
+  const [phone, setPhone] = useState(resume?.phone || me.phone || user?.phone || "");
+  const [note, setNote] = useState(resume?.note || "");
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState("");
   const [done, setDone] = useState(null);
@@ -324,6 +366,18 @@ function VisitSheet({ code, building, flats, picked, onToggle, onClose }) {
     setErr("");
     if (name.trim().length < 2) { setErr("Tell us your name."); return; }
     if (!isMobile(phone)) { setErr("Enter your 10-digit mobile number."); return; }
+    // Visits are booked from a MovEazy account: sign in with Google, then we finish this for you.
+    if (!user) {
+      savePendingVisit({ code, picked: [...picked], at: at instanceof Date ? at.toISOString() : "call", name: name.trim(), phone: cleanMobile(phone), note: note.trim() });
+      setBusy(true);
+      const res = await loginWithGoogle();
+      if (res && res.success === false) {
+        clearPendingVisit();
+        setErr(res.error || "Couldn't open Google sign-in. Please try again.");
+        setBusy(false);
+      }
+      return;
+    }
     setBusy(true);
     try {
       const r = await requestBuildingVisit(code, {
@@ -339,6 +393,15 @@ function VisitSheet({ code, building, flats, picked, onToggle, onClose }) {
     }
   };
 
+  // Back from Google: send the request straight away.
+  const autoSend = useRef(Boolean(resume));
+  useEffect(() => {
+    if (!autoSend.current || !user) return;
+    autoSend.current = false;
+    submit();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [user]);
+
   if (step === "done") {
     return (
       <Sheet title="Visit requested" onClose={onClose}>
@@ -350,6 +413,7 @@ function VisitSheet({ code, building, flats, picked, onToggle, onClose }) {
             {done?.at ? " this time" : " a time that suits you"} and share the exact address.</p>
           <div className="bp-done-what"><Building2 size={15} /> {building.name}{picked.size ? ` · ${picked.size} flat${picked.size === 1 ? "" : "s"}` : ""}</div>
           <button type="button" className="bp-btn bp-btn--primary bp-btn--block" onClick={onClose}>Done</button>
+          <p className="bp-fine">Saved to your MovEazy account{user?.email ? ` (${user.email})` : ""} — <Link to="/visits">see your visits</Link>.</p>
         </div>
       </Sheet>
     );
@@ -371,10 +435,21 @@ function VisitSheet({ code, building, flats, picked, onToggle, onClose }) {
           <label className="bp-label" htmlFor="bp-note">Anything we should know? <span>(optional)</span></label>
           <input id="bp-note" className="bp-input" placeholder="e.g. Moving in with family by 1 Nov" value={note} onChange={(e) => setNote(e.target.value.slice(0, 300))} />
           {err && <div className="bp-err">{err}</div>}
-          <button type="button" className="bp-btn bp-btn--primary bp-btn--block" disabled={busy} onClick={submit} style={{ marginTop: 16 }}>
-            {busy ? "Sending…" : <><Phone size={17} /> Request visit</>}
-          </button>
-          <p className="bp-fine">No spam. Your number goes only to the MovEazy partner arranging this visit.</p>
+          {user ? (
+            <>
+              <button type="button" className="bp-btn bp-btn--primary bp-btn--block" disabled={busy} onClick={submit} style={{ marginTop: 16 }}>
+                {busy ? (resume ? "Confirming your visit…" : "Sending…") : <><Phone size={17} /> Request visit</>}
+              </button>
+              <p className="bp-fine">Booking as {user.email || user.name}. No spam — your number goes only to the MovEazy partner arranging this visit.</p>
+            </>
+          ) : (
+            <>
+              <button type="button" className="bp-btn bp-btn--google bp-btn--block" disabled={busy} onClick={submit} style={{ marginTop: 16 }}>
+                {busy ? "Opening Google…" : <><GoogleG /> Continue with Google to book</>}
+              </button>
+              <p className="bp-fine">Sign in once so your visit is saved to your account — you can see or change it any time. We bring you straight back here.</p>
+            </>
+          )}
         </div>
       </Sheet>
     );
@@ -522,6 +597,8 @@ const CSS = `
 .bp-btn--primary { background: linear-gradient(180deg, #0D7F5D, #0A6B4E); border-color: var(--em); color: #fff;
   box-shadow: 0 8px 20px rgba(10,107,78,.28); }
 .bp-btn--block { width: 100%; min-height: 54px; font-size: 16px; }
+.bp-btn--google { background: #fff; border: 1.5px solid #DADCE0; color: #1F1F1F; box-shadow: 0 2px 8px rgba(0,0,0,.06); }
+.bp-fine a { color: var(--em); font-weight: 700; }
 .bp-sheet-bg { position: fixed; inset: 0; background: rgba(4,31,23,.5); z-index: 60; display: flex; align-items: flex-end; justify-content: center;
   animation: bpfade .15s ease; }
 .bp-sheet { background: #fff; width: 100%; max-width: 560px; border-radius: 24px 24px 0 0; max-height: 92dvh; overflow: auto;
