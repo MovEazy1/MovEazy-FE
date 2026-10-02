@@ -10,7 +10,7 @@
  *             A1 landscape, for the front of a house: "Street Tape" (huge
  *             type, a band of tape, a rent sticker), "Speed Lane" (deep green
  *             speed streaks, a glowing QR) and "Open Door" (the QR is the
- *             door of a drawn house).
+ *             door of a drawn house: "Scan to schedule visit").
  *   classic   A4 landscape, white. "Premium 2BHK for Rent" in a serif, one QR
  *             in a green-edged card, "Scan to View Property" — for a building
  *             or a flat, chosen in the CRM next to the photo poster.
@@ -643,7 +643,7 @@ function drawDoor(ctx, data) {
   const hs = fitSize(ctx, head, 500, 62);
   spaced(ctx, head, 64, 410, { size: hs, color: DEEP, spacing: -hs * 0.02 });
   if (rent) text(ctx, `${rentIsFrom ? "from " : ""}${rent} / month`, 64, 462, { size: 34, weight: 700, color: GOLD_DK });
-  spaced(ctx, "SCAN THE DOOR TO STEP INSIDE  →", 64, 540, { size: 20, color: DEEP, spacing: 2.2 });
+  spaced(ctx, "SCAN THE DOOR TO SCHEDULE A VISIT  →", 64, 540, { size: 18, color: DEEP, spacing: 1.6 });
 
   // The house.
   ctx.fillStyle = DEEP;
@@ -705,11 +705,12 @@ function drawDoor(ctx, data) {
   ctx.strokeStyle = GOLD;
   ctx.lineWidth = 7;
   ctx.stroke();
-  spaced(ctx, "SCAN TO STEP INSIDE", mid, dtop + 88, { size: 16, color: DEEP, align: "center", spacing: 1.8 });
+  spaced(ctx, "SCAN TO", mid, dtop + 80, { size: 15, color: GOLD_DK, align: "center", spacing: 3 });
+  spaced(ctx, "SCHEDULE VISIT", mid, dtop + 110, { size: 24, color: DEEP, align: "center", spacing: 1 });
   const q = 272;
-  drawQr(ctx, data.url, mid - q / 2, dtop + 112, q);
+  drawQr(ctx, data.url, mid - q / 2, dtop + 132, q);
   ctx.beginPath();
-  ctx.arc(dx + dw - 18, dtop + 112 + q / 2 + 30, 7, 0, Math.PI * 2);
+  ctx.arc(dx + dw - 18, dtop + 132 + q / 2 + 30, 7, 0, Math.PI * 2);
   ctx.fillStyle = GOLD;
   ctx.fill();
 
