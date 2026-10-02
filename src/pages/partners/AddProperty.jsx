@@ -6,8 +6,11 @@
  *   The flat     type, rent, furnishing, locality — taps, not typing. 1 BHK and
  *                the last locality used are already selected.
  *   Who sees it  only me / all MovEazy brokers at a share / groups — remembered.
- *   More         deposit, move-in date, floor, the owner's contact, the
- *                WhatsApp message (saved as written) and a name — all optional.
+ *   More         the property's details pasted from WhatsApp (saved as
+ *                written), deposit, move-in date, floor, the owner's contact
+ *                and a name — all optional.
+ *
+ * Photos reorder by dragging (finger or mouse); the first is the cover.
  *
  * One Publish at the bottom, live as soon as type, rent and locality are set.
  * "Post another" keeps the locality, furnishing and sharing: brokers post
@@ -113,6 +116,38 @@ function PostFlat({ onAnother }) {
     setPhotos((cur) => [...cur, ...take]);
     take.forEach(upload);
   };
+  // Drag to reorder: works with a finger or a mouse. A few pixels of movement
+  // starts the drag, so the × and ↻ on a photo stay simple taps.
+  const [dragKey, setDragKey] = useState(null);
+  const drag = useRef(null);
+  const onThumbDown = (e, key) => {
+    if (e.button > 0 || e.target.closest("button")) return;
+    drag.current = { key, x: e.clientX, y: e.clientY, id: e.pointerId, el: e.currentTarget, on: false };
+  };
+  const onThumbMove = (e) => {
+    const d = drag.current;
+    if (!d) return;
+    if (!d.on) {
+      if (Math.hypot(e.clientX - d.x, e.clientY - d.y) < 6) return;
+      d.on = true;
+      setDragKey(d.key);
+      try { d.el.setPointerCapture(d.id); } catch { /* fine without it */ }
+      navigator.vibrate?.(10);
+    }
+    const to = document.elementFromPoint(e.clientX, e.clientY)?.closest("[data-photo]")?.getAttribute("data-photo");
+    if (!to || to === d.key) return;
+    setPhotos((cur) => {
+      const from = cur.findIndex((p) => p.key === d.key);
+      const at = cur.findIndex((p) => p.key === to);
+      if (from < 0 || at < 0) return cur;
+      const next = [...cur];
+      const [moved] = next.splice(from, 1);
+      next.splice(at, 0, moved);
+      return next;
+    });
+  };
+  const onThumbUp = () => { drag.current = null; setDragKey(null); };
+
   const removePhoto = (k) => setPhotos((cur) => {
     const hit = cur.find((p) => p.key === k);
     if (hit) URL.revokeObjectURL(hit.preview);
@@ -237,7 +272,8 @@ function PostFlat({ onAnother }) {
             <>
               <div className="ap-thumbs">
                 {photos.map((p, i) => (
-                  <figure key={p.key} className={`ap-thumb ${p.status}`}>
+                  <figure key={p.key} data-photo={p.key} className={`ap-thumb ap-drag ${p.status}${dragKey === p.key ? " dragging" : ""}`}
+                    onPointerDown={(e) => onThumbDown(e, p.key)} onPointerMove={onThumbMove} onPointerUp={onThumbUp} onPointerCancel={onThumbUp}>
                     {isVideoFile(p.file) ? <video src={p.preview} muted playsInline /> : <img src={p.preview} alt="" />}
                     {i === 0 && <span className="ap-cover">Cover</span>}
                     <span className="ap-state" aria-label={p.status}>
@@ -252,6 +288,7 @@ function PostFlat({ onAnother }) {
                   <button type="button" className="ap-thumb ap-add" onClick={() => fileRef.current?.click()} aria-label="Add more photos"><Camera size={20} /><span>Add</span></button>
                 )}
               </div>
+              {photos.length > 1 && <p className="ap-drag-hint">Drag photos to change the order — the first one is the cover.</p>}
               <p className={`ap-photo-state${photos.some((p) => p.status === "failed") ? " bad" : ""}`}>
                 {uploading ? <><i className="ap-spin" /> Uploading {uploaded}/{photos.length}…</>
                   : photos.some((p) => p.status === "failed") ? "Some didn't upload — tap ↻ to retry, or remove them."
@@ -366,11 +403,16 @@ function PostFlat({ onAnother }) {
         {/* More, optional */}
         <section className="ap-sec ap-more">
           <button type="button" className="ap-more-h" onClick={() => setMore((m) => !m)} aria-expanded={more}>
-            <span><Sparkles size={15} /> More details <small>deposit, move-in, floor, owner, WhatsApp text</small></span>
+            <span><Sparkles size={15} /> More details <small>property details from WhatsApp, deposit, move-in, floor, owner</small></span>
             <ChevronDown size={18} style={{ transform: more ? "rotate(180deg)" : "none", transition: "transform .2s" }} />
           </button>
           {more && (
             <div className="ap-more-b">
+              <label className="ap-details"><span style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>Add details
+                <button type="button" className="pz-btn pz-btn--sm" onClick={pasteWhatsApp}><ClipboardPaste size={14} /> Paste</button></span>
+                <textarea className="pz-textarea" rows={5} value={x.description} onChange={(e) => setMoreField({ description: e.target.value.slice(0, 2000) })}
+                  placeholder="Paste the content of the property from WhatsApp — this increases the chances of shortlists." />
+                <small>{x.description.length ? `${x.description.length}/2000 · saved as you wrote it` : "Amenities, rules, nearby places — everything you'd tell a client."}</small></label>
               <div className="ap-two">
                 <label><span>Deposit (₹)</span>
                   <input className="pz-input" inputMode="numeric" placeholder="60,000" value={x.deposit ? Number(x.deposit).toLocaleString("en-IN") : ""}
@@ -392,10 +434,6 @@ function PostFlat({ onAnother }) {
                   <input className="pz-input" placeholder="Name" value={x.ownerName} onChange={(e) => setMoreField({ ownerName: e.target.value })} />
                   <input className="pz-input" inputMode="tel" placeholder="Mobile" value={x.ownerPhone} onChange={(e) => setMoreField({ ownerPhone: e.target.value })} />
                 </div></label>
-              <label><span style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>WhatsApp message
-                <button type="button" className="pz-btn pz-btn--sm" onClick={pasteWhatsApp}><ClipboardPaste size={14} /> Paste</button></span>
-                <textarea className="pz-textarea" rows={4} value={x.description} onChange={(e) => setMoreField({ description: e.target.value.slice(0, 2000) })}
-                  placeholder="Paste the message you send clients — saved as you wrote it." /></label>
               <label><span>Name <small>optional</small></span>
                 <input className="pz-input" placeholder={`${typeLabel(type)} in ${area}`} value={x.title} onChange={(e) => setMoreField({ title: e.target.value.slice(0, 160) })} /></label>
             </div>
@@ -449,6 +487,10 @@ const CSS = `
 .ap-thumb { position: relative; margin: 0; aspect-ratio: 1; border-radius: 10px; overflow: hidden; background: #E5E7EB; }
 .ap-thumb img, .ap-thumb video { width: 100%; height: 100% !important; object-fit: cover; display: block; }
 .ap-thumb.uploading img, .ap-thumb.uploading video { opacity: .55; }
+.ap-drag { touch-action: none; cursor: grab; user-select: none; -webkit-user-select: none; transition: transform .15s ease, box-shadow .15s ease; }
+.ap-drag img, .ap-drag video { pointer-events: none; -webkit-user-drag: none; }
+.ap-drag.dragging { cursor: grabbing; transform: scale(1.08); box-shadow: 0 10px 24px rgba(0,0,0,.28); z-index: 3; outline: 2px solid var(--gold, #D4A437); }
+.ap-drag-hint { margin: 8px 0 0; font-size: 12px; color: var(--dim, #6B7280); }
 .ap-thumb.failed { outline: 2px solid var(--red, #B42318); }
 .ap-add { border: 1.5px dashed var(--gold, #D4A437); background: #FFFBEF; color: var(--gold3, #7A5A12); display: grid; place-items: center; align-content: center; gap: 2px;
   font: inherit; font-size: 11px; font-weight: 700; cursor: pointer; }
@@ -494,6 +536,9 @@ const CSS = `
 .ap-more-b label { display: grid; gap: 6px; }
 .ap-more-b label > span { font-size: 13px; font-weight: 700; }
 .ap-more-b label small { font-weight: 500; color: var(--dim, #6B7280); }
+.ap-details { background: #FFFBEF; border: 1px solid #F1E2B8; border-radius: 12px; padding: 10px; }
+.ap-details .pz-textarea { background: #fff; }
+.ap-details > small { font-size: 11.5px; }
 .ap-two { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
 .ap-foot { position: sticky; bottom: 0; z-index: 5; background: #fff; border-top: 1px solid var(--line, #E7E3DA); padding: 10px 12px calc(10px + env(safe-area-inset-bottom));
   display: flex; align-items: center; gap: 10px; box-shadow: 0 -6px 18px rgba(0,0,0,.06); }
