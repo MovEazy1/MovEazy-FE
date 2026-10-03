@@ -14,6 +14,7 @@
 import { supabase, isSupabaseConfigured } from "./supabase";
 import { sessionTracker } from "./sessionTracking";
 import { readUtm } from "./shareAttribution";
+import { currentApp } from "./appAnalytics";
 
 const ANON_KEY = "moveazy_anon_id";
 /** Sessions shorter than this are a bounce or a redirect — not worth a row. */
@@ -24,6 +25,8 @@ let rowId = null;
 let timer = null;
 let started = false;
 let current = { userId: null, email: "" };
+// Once a session has been in the partner or owner app, it stays that app's.
+let sessionApp = "";
 
 /**
  * A stable id for this browser, created on first need.
@@ -64,6 +67,9 @@ function snapshot() {
     })),
     device: data.deviceInfo?.type || "",
     os: data.deviceInfo?.os || "",
+    // Which app the session was in (the CRM's App analytics), and the id its taps are filed under.
+    app: (sessionApp = sessionApp || currentApp()),
+    session_key: sessionTracker.sessionId,
   };
 }
 

@@ -39,6 +39,8 @@ const RAIL = [
   { to: "/crm/ops",        code: "IO", label: "Inventory Ops" },
   { to: "/crm/visits",     code: "VS", label: "Visits" },
   { to: "/crm/payments",   code: "PY", label: "Payments" },
+  // Partners and owners in their apps: time spent, last sign-in, every button pressed.
+  { to: "/crm/app-analytics", code: "AN", label: "App analytics", scope: SCOPES.ANALYTICS_READ },
   { to: "/crm/team",       code: "TM", label: "Team", scope: SCOPES.ROLES_WRITE },
   { to: "/crm/settings",   code: "ST", label: "Settings" },
 ];

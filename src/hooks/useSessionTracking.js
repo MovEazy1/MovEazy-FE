@@ -6,6 +6,7 @@ import { recordShareOpenFromUrl } from "../lib/shareAttribution";
 import { recordMarketingClickFromUrl } from "../lib/marketingClicks";
 import { captureAttribution } from "../lib/attribution";
 import { useAuth } from "../context/AuthContext";
+import { startAppAnalytics, trackScreen } from "../lib/appAnalytics";
 
 export function useSessionTracking() {
   const location = useLocation();
@@ -14,7 +15,12 @@ export function useSessionTracking() {
   useEffect(() => {
     // Track page change
     sessionTracker.trackPageChange(location.pathname);
+    // In the partner and owner apps, each screen opened is part of the session's timeline.
+    trackScreen(location.pathname);
   }, [location]);
+
+  // Partner and owner apps: every button pressed, for the CRM's App analytics.
+  useEffect(() => startAppAnalytics(), []);
 
   useEffect(() => {
     // Update user info when they login

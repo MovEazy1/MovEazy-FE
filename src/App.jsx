@@ -55,6 +55,7 @@ const MarketingIndex = lazy(() =>
 );
 const MarketingChannel = lazy(() => import("./pages/marketing/MarketingChannel"));
 const CrmShell = lazy(() => import("./pages/crm/CrmShell"));
+const CrmAppAnalyticsPage = lazy(() => import("./pages/crm/CrmAppAnalyticsPage"));
 const CrmClientsPage = lazy(() => import("./pages/crm/CrmClientsPage"));
 const CrmPipelinePage = lazy(() => import("./pages/crm/CrmPipelinePage"));
 const CrmPropertiesPage = lazy(() => import("./pages/crm/CrmPropertiesPage"));
@@ -242,6 +243,7 @@ function AppRoutes() {
           <Route path="visits" element={<CrmVisitsPage />} />
           <Route path="notifications" element={<CrmNotificationsPage />} />
           <Route path="payments" element={<CrmPaymentsPage />} />
+          <Route path="app-analytics" element={<CrmAppAnalyticsPage />} />
           <Route path="team" element={<CrmTeamPage />} />
           <Route path="settings" element={<CrmSettingsPage />} />
         </Route>
