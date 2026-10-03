@@ -3,12 +3,14 @@
  * partner broker MovEazy assigns to it, its funnel, and every visit request
  * its QR brought in — with the tenant's number, which the owner never sees
  * (crm_buildings / crm_building_assign_broker in owner_buildings.sql).
+ * Instant visit: whether the owner turned it on and the POC who shows the
+ * flats; staff can set it up for an owner who isn't in the app.
  */
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { Link, useSearchParams } from "react-router-dom";
 import { Btn, C, Chip, Empty, Loading, relTime } from "./crmUi";
 import {
-  VISIT_STATUS, assignBuildingBroker, buildingUrl, fetchCrmBuildings, floorLabel, updateBuildingLead, visitWhen,
+  VISIT_STATUS, assignBuildingBroker, buildingUrl, fetchCrmBuildings, floorLabel, isInstant, setInstantVisit, updateBuildingLead, visitWhen,
 } from "../../lib/buildings";
 import { inr, waLink } from "../../lib/partners";
 
@@ -32,13 +34,22 @@ export default function CrmBuildingsPage() {
 
   const byId = useMemo(() => new Map((data?.buildings ?? []).map((b) => [b.id, b])), [data]);
   const unassigned = (data?.buildings ?? []).filter((b) => !b.broker_id).length;
+  const instantOn = (data?.buildings ?? []).filter((b) => b.instant_visit).length;
   const visits = (data?.leads ?? []).filter((l) => (!only || l.building_id === only)
-    && (status === "all" || (status === "open" ? ["new", "confirmed"].includes(l.status) : l.status === status))
+    && (status === "all" || (status === "open" ? ["new", "confirmed"].includes(l.status) : status === "instant" ? isInstant(l) : l.status === status))
     && (!q.trim() || `${l.name} ${l.phone} ${byId.get(l.building_id)?.name}`.toLowerCase().includes(q.trim().toLowerCase())));
 
   const run = async (key, fn) => {
     setSaving(key);
     try { await fn(); await load(); } catch (e) { window.alert(e?.message || "Could not save that."); } finally { setSaving(""); }
+  };
+  // For an owner who isn't in the app yet: staff set the POC on their behalf.
+  const setUpInstant = (b) => {
+    const name = window.prompt(`Instant visit at ${b.name}\n\nWho shows the flats? (name)`, b.instant_poc_name || "");
+    if (name === null) return;
+    const phone = window.prompt(`${name.trim()}'s 10-digit mobile`, b.instant_poc_phone || "");
+    if (phone === null) return;
+    run(`iv-${b.id}`, () => setInstantVisit(b.id, { on: true, name: name.trim(), phone: phone.replace(/\D/g, "").slice(-10) }));
   };
 
   const cell = { padding: "10px 8px", borderBottom: `1px solid ${C.lineSoft}`, verticalAlign: "top", fontSize: 13 };
@@ -53,7 +64,7 @@ export default function CrmBuildingsPage() {
       </p>
       <div style={{ display: "flex", gap: 8, marginBottom: 12, flexWrap: "wrap" }}>
         <Chip on={tab === "visits"} onClick={() => setTab("visits")}>Visit requests {data ? `(${data.leads.filter((l) => ["new", "confirmed"].includes(l.status)).length} open)` : ""}</Chip>
-        <Chip on={tab === "buildings"} onClick={() => setTab("buildings")}>Buildings {data ? `(${data.buildings.length}${unassigned ? ` · ${unassigned} need a partner` : ""})` : ""}</Chip>
+        <Chip on={tab === "buildings"} onClick={() => setTab("buildings")}>Buildings {data ? `(${data.buildings.length}${unassigned ? ` · ${unassigned} need a partner` : ""}${instantOn ? ` · ⚡ ${instantOn} instant` : ""})` : ""}</Chip>
         <Btn sm onClick={load}>Refresh</Btn>
         <Link to="/crm/buildings/new" className="crm-btn crm-btn--primary crm-btn--sm" style={{ textDecoration: "none" }}>+ New building / society</Link>
       </div>
@@ -63,7 +74,7 @@ export default function CrmBuildingsPage() {
           <div style={{ overflowX: "auto", border: `1px solid ${C.line}`, borderRadius: 10 }}>
             <table style={{ width: "100%", borderCollapse: "collapse" }}>
               <thead><tr>
-                <th style={th}>Building</th><th style={th}>Owner</th><th style={th}>Partner</th><th style={th}>Flats</th>
+                <th style={th}>Building</th><th style={th}>Owner</th><th style={th}>Partner</th><th style={th}>Instant visit</th><th style={th}>Flats</th>
                 <th style={th}>Scans → mobiles → visits → done → booked</th><th style={th}>Added</th>
               </tr></thead>
               <tbody>
@@ -88,6 +99,27 @@ export default function CrmBuildingsPage() {
                         </select>
                         {!b.broker_id && <div style={{ color: C.coral, fontSize: 12, marginTop: 4 }}>Requests wait here until assigned</div>}
                       </td>
+                      <td style={{ ...cell, minWidth: 170 }}>
+                        {b.instant_visit ? (
+                          <>
+                            <span style={{ color: C.gold, fontWeight: 700 }}>⚡ On</span>
+                            <span style={{ color: C.textMute, fontSize: 11.5 }}> · set by {b.instant_updated_by === "staff" ? "MovEazy" : "the owner"}{b.instant_updated_at ? ` ${relTime(b.instant_updated_at)}` : ""}</span><br />
+                            POC: <b>{b.instant_poc_name}</b><br />
+                            <a href={waLink(b.instant_poc_phone, "")} target="_blank" rel="noreferrer" style={{ color: C.wa }}>{b.instant_poc_phone}</a>
+                            {Number(b.stats?.instant) > 0 && <span style={{ color: C.textMute }}> · {b.stats.instant} instant visit{Number(b.stats.instant) === 1 ? "" : "s"}</span>}
+                            <div style={{ display: "flex", gap: 6, marginTop: 4 }}>
+                              <button type="button" className="crm-btn crm-btn--sm" disabled={saving === `iv-${b.id}`} onClick={() => setUpInstant(b)}>Change POC</button>
+                              <button type="button" className="crm-btn crm-btn--sm" disabled={saving === `iv-${b.id}`}
+                                onClick={() => window.confirm(`Turn off instant visit at ${b.name}?`) && run(`iv-${b.id}`, () => setInstantVisit(b.id, { on: false }))}>Turn off</button>
+                            </div>
+                          </>
+                        ) : (
+                          <>
+                            <span style={{ color: C.textMute }}>Off{b.instant_poc_name ? ` · last POC ${b.instant_poc_name}` : ""}</span><br />
+                            <button type="button" className="crm-btn crm-btn--sm" style={{ marginTop: 4 }} disabled={saving === `iv-${b.id}`} onClick={() => setUpInstant(b)}>Set up</button>
+                          </>
+                        )}
+                      </td>
                       <td style={cell}>{(b.flats ?? []).filter((f) => f.available).length} free / {(b.flats ?? []).length}</td>
                       <td style={cell}><b>{s.scans ?? 0}</b> → <b>{s.numbers ?? 0}</b> → <b>{s.scheduled ?? 0}</b> → <b>{s.visited ?? 0}</b> → <b style={{ color: C.gold }}>{s.booked ?? 0}</b>
                         <br /><span style={{ color: C.textMute }}>{s.visitors ?? 0} opened · {s.upcoming ?? 0} upcoming</span></td>
@@ -109,6 +141,7 @@ export default function CrmBuildingsPage() {
             <select className="crm-input" value={status} onChange={(e) => setStatus(e.target.value)} aria-label="Status">
               <option value="open">Open (new + confirmed)</option>
               <option value="all">Everything</option>
+              <option value="instant">⚡ Instant visits</option>
               {STATUSES.map((k) => <option key={k} value={k}>{VISIT_STATUS[k].label}</option>)}
             </select>
             <input className="crm-input" placeholder="Search name, mobile, building" value={q} onChange={(e) => setQ(e.target.value)} style={{ minWidth: 240 }} />
@@ -126,11 +159,14 @@ export default function CrmBuildingsPage() {
                     const st = VISIT_STATUS[l.status] || VISIT_STATUS.new;
                     return (
                       <tr key={l.id}>
-                        <td style={cell}><b>{l.name}</b><br /><a href={waLink(l.phone, "")} target="_blank" rel="noreferrer" style={{ color: C.wa }}>{l.phone}</a>
+                        <td style={cell}><b>{l.name}</b>
+                          {isInstant(l) && <span style={{ marginLeft: 6, fontSize: 11, fontWeight: 700, color: C.gold }}>⚡ Instant visit</span>}
+                          <br /><a href={waLink(l.phone, "")} target="_blank" rel="noreferrer" style={{ color: C.wa }}>{l.phone}</a>
                           {l.note && <><br /><i style={{ color: C.textDim }}>“{l.note}”</i></>}</td>
                         <td style={cell}>{b?.name || "—"}<br /><span style={{ color: C.textMute }}>
                           {flats.length ? flats.map((f) => `${f.flat_type || "Flat"} ${floorLabel(f.floor_number).replace(" floor", "")} ${f.rent ? inr(f.rent) : ""}`).join(", ") : "Any flat"}</span></td>
-                        <td style={cell}>{visitWhen(l.visit_at)}
+                        <td style={cell}>{isInstant(l) ? `Arriving by ${visitWhen(l.visit_at)}` : visitWhen(l.visit_at)}
+                          {isInstant(l) && b?.instant_poc_name && <><br /><span style={{ color: C.textMute }}>POC {b.instant_poc_name} · {b.instant_poc_phone}</span></>}
                           <br /><input type="datetime-local" className="crm-input" style={{ marginTop: 4, fontSize: 12 }} aria-label="Set visit time"
                             onChange={(e) => e.target.value && run(l.id, () => updateBuildingLead(l.id, { status: "confirmed", visit_at: new Date(e.target.value).toISOString() }))} /></td>
                         <td style={cell}>{b?.broker?.name || <span style={{ color: C.coral }}>Unassigned</span>}<br /><span style={{ color: C.textMute }}>{b?.broker?.phone}</span></td>

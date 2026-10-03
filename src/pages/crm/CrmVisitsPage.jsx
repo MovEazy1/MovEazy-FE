@@ -291,6 +291,9 @@ export default function CrmVisitsPage() {
             {dayLabel(dayKey(b.slot_at)).split(" · ")[0]}, {timeOf(b.slot_at)}
           </span>
         )}
+        {b.kind === "instant" && (
+          <span title="Walked in through the building QR's instant visit" style={{ fontSize: 11, fontWeight: 700, color: C.gold }}>⚡ Instant visit</span>
+        )}
         <span style={{ flex: 1 }} />
         <DueTag state={r.state} booking={b} />
 

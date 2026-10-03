@@ -113,6 +113,7 @@ export default function BuildingLeads() {
                   <div className="pz-row" style={{ alignItems: "flex-start" }}>
                     <div style={{ flex: 1, minWidth: 0 }}>
                       <b style={{ fontSize: 15.5 }}>{l.name}</b>
+                      {l.kind === "instant" && <span className="bl2-instant">⚡ Instant visit — on the way</span>}
                       <div className="pz-meta">{l.phone.replace(/(\d{5})(\d{5})/, "$1 $2")} · {b?.name}</div>
                     </div>
                     <StatusPill status={l.status} />
@@ -147,6 +148,8 @@ export default function BuildingLeads() {
         .bl2-stats b { color: var(--ink); font-size: 14px; }
         .bl2-when { display: inline-flex; align-items: center; gap: 6px; margin-top: 10px; background: var(--gold2); color: var(--gold3); font-weight: 700;
           font-size: 13px; border-radius: 99px; padding: 5px 11px; }
+        .bl2-instant { display: inline-block; margin-top: 4px; background: var(--noir); color: var(--gold); font-size: 11.5px; font-weight: 800;
+          border-radius: 99px; padding: 3px 9px; }
         .bl2-actions { display: grid; grid-template-columns: 1fr 1.3fr 1fr; gap: 8px; margin-top: 12px; }
         .bl2-pick { width: 100%; display: flex; align-items: center; gap: 10px; padding: 10px 12px; border: 1.5px solid var(--line); border-radius: 12px; background: #fff;
           font: inherit; color: inherit; cursor: pointer; text-align: left; margin-bottom: 8px; }

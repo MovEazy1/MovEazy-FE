@@ -4,19 +4,22 @@
  * floor, and every visit. Renters appear by first name and initial — their
  * numbers go to the MovEazy partner and the CRM, never here
  * (owner_building_detail in owner_buildings.sql).
+ *
+ * Instant visit: the owner can let tenants who scan walk in right away, with
+ * a POC who shows the flats. Tenants get the POC only after signing in.
  */
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Link, useNavigate, useParams } from "react-router-dom";
 import {
   BadgeCheck, CalendarCheck, Check, ChevronRight, Copy, Download, ExternalLink, Eye, KeyRound, Layers, MapPin, Pencil, Phone,
-  Plus, QrCode, ScanLine, ShieldCheck, Smartphone, UserCheck, X,
+  Plus, QrCode, ScanLine, ShieldCheck, Smartphone, UserCheck, X, Zap,
 } from "lucide-react";
 import { useOwner } from "./OwnerApp";
 import { Avatar, Empty, Loading, Pill, Sheet, TopBar, WhatsAppIcon, toast } from "./ownerUi";
 import { MediaItem, listingMedia } from "../partners/partnerMedia";
 import {
-  VISIT_STATUS, buildingDisplay, buildingUrl, fetchBuildingDetail, floorLabel, markFlatBooked, setFlatBuilding,
-  updateBuildingLead, visitWhen,
+  VISIT_STATUS, buildingDisplay, buildingUrl, fetchBuildingDetail, floorLabel, isInstant, markFlatBooked, setFlatBuilding,
+  setInstantVisit, updateBuildingLead, visitWhen,
 } from "../../lib/buildings";
 import { BUILDING_POSTER, drawPoster, loadImage, posterFontsReady, posterPdf } from "../../lib/qrPoster";
 import { friendlyError, inr, op } from "../../lib/owners";
@@ -98,6 +101,8 @@ export default function BuildingDetail() {
             : "MovEazy is assigning a partner to this property. Requests already reach our team."}
         </div>
 
+        <InstantCard d={d} onSaved={load} />
+
         <Funnel s={s} byDay={d.by_day ?? []} />
 
         <PosterCard d={d} available={flats.filter((f) => f.available).length} flats={flats} />
@@ -144,7 +149,8 @@ export default function BuildingDetail() {
                 <Avatar name={l.name} />
                 <div style={{ flex: 1, minWidth: 0, textAlign: "left" }}>
                   <b>{l.name || "A tenant"}</b>
-                  <div className="oz-meta">{visitWhen(l.visit_at)}</div>
+                  {isInstant(l) && <span className="bd-inst"><Zap size={11} /> Instant visit</span>}
+                  <div className="oz-meta">{isInstant(l) ? `There by ${visitWhen(l.visit_at)}` : visitWhen(l.visit_at)}</div>
                   {(l.property_ids ?? []).length > 0 && (
                     <div className="oz-meta" style={{ fontSize: 12 }}>
                       {(l.property_ids ?? []).map((pid) => flatById.get(pid)).filter(Boolean).map((f) => `${bhk(f)} ${f.floor_number != null ? `(${floorLabel(f.floor_number).replace(" floor", "")})` : ""}`).join(", ")}
@@ -177,6 +183,82 @@ export default function BuildingDetail() {
       )}
       <style>{CSS}</style>
     </>
+  );
+}
+
+/** Instant visit: on or off, and who shows the flats. Tenants see the POC only after they sign in to come. */
+function InstantCard({ d, onSaved }) {
+  const on = Boolean(d.instant_visit);
+  const [editing, setEditing] = useState(false);
+  const [name, setName] = useState(d.instant_poc_name || "");
+  const [phone, setPhone] = useState(d.instant_poc_phone || "");
+  const [busy, setBusy] = useState(false);
+  const count = Number(d.stats?.instant) || 0;
+
+  const save = async (next) => {
+    setBusy(true);
+    try {
+      await setInstantVisit(d.id, { on: next, name: name.trim(), phone: phone.replace(/\D/g, "").slice(-10) });
+      await onSaved();
+      setEditing(false);
+      toast(next ? "Instant visit is on — tenants can walk in now" : "Instant visit is off");
+    } catch (e) {
+      toast(friendlyError(e, "Could not save that."), "error");
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  return (
+    <div className={`bd-instant${on ? " on" : ""}`}>
+      <div className="oz-between">
+        <span className="bd-instant-h"><span className="ic"><Zap size={16} /></span> Instant visit</span>
+        <Pill tone={on ? "green" : "grey"}>{on ? "On" : "Off"}</Pill>
+      </div>
+      {editing ? (
+        <>
+          <label className="oz-label" htmlFor="iv-name" style={{ marginTop: 12 }}>Who shows the flats?</label>
+          <input id="iv-name" className="oz-input" placeholder="e.g. Raju (caretaker)" value={name} autoComplete="off"
+            onChange={(e) => setName(e.target.value.slice(0, 80))} />
+          <label className="oz-label" htmlFor="iv-phone" style={{ marginTop: 10 }}>Their mobile number</label>
+          <input id="iv-phone" className="oz-input" inputMode="tel" placeholder="98765 43210" value={phone} autoComplete="off"
+            onChange={(e) => setPhone(e.target.value.replace(/[^\d+ ]/g, "").slice(0, 16))} />
+          <p className="oz-hint" style={{ margin: "8px 0 12px" }}>Tenants get this name and number only after they sign in to come — never on the poster or the page.</p>
+          <div className="oz-grid2">
+            <button type="button" className="oz-btn" disabled={busy} onClick={() => { setEditing(false); setName(d.instant_poc_name || ""); setPhone(d.instant_poc_phone || ""); }}>Cancel</button>
+            <button type="button" className="oz-btn oz-btn--primary" disabled={busy} onClick={() => save(true)}>{busy ? "Saving…" : on ? "Save" : "Turn on"}</button>
+          </div>
+        </>
+      ) : on ? (
+        <>
+          <div className="bd-instant-poc">
+            <Avatar name={d.instant_poc_name} />
+            <span style={{ flex: 1, minWidth: 0 }}><b>{d.instant_poc_name}</b><span className="oz-meta">
+              {String(d.instant_poc_phone || "").replace(/(\d{5})(\d{5})/, "$1 $2")} · shows the flats</span></span>
+          </div>
+          <p className="oz-hint" style={{ margin: "8px 0 10px" }}>
+            Tenants who scan see “Instant visit available” and can walk in now. {count ? `${count} instant visit${count === 1 ? "" : "s"} so far.` : ""}
+          </p>
+          <div className="oz-grid2">
+            <button type="button" className="oz-btn" disabled={busy} onClick={() => setEditing(true)}><Pencil size={15} /> Change POC</button>
+            <button type="button" className="oz-btn oz-btn--danger" disabled={busy} onClick={() => save(false)}>{busy ? "Saving…" : "Turn off"}</button>
+          </div>
+        </>
+      ) : (
+        <>
+          <p className="oz-hint" style={{ margin: "8px 0 12px" }}>
+            Let tenants who scan your QR come and see the flats right away — no appointment. Add the person at the property who shows them around.
+          </p>
+          <button type="button" className="oz-btn oz-btn--primary oz-btn--block" disabled={busy}
+            onClick={() => (d.instant_poc_phone ? save(true) : setEditing(true))}>
+            <Zap size={17} /> {d.instant_poc_phone ? `Turn on with ${d.instant_poc_name}` : "Set up instant visit"}
+          </button>
+          {d.instant_poc_phone && (
+            <button type="button" className="oz-btn oz-btn--ghost oz-btn--block" style={{ marginTop: 6 }} onClick={() => setEditing(true)}>Use someone else</button>
+          )}
+        </>
+      )}
+    </div>
   );
 }
 
@@ -416,6 +498,15 @@ const CSS = `
 .bd-partner svg { flex: none; margin-top: 1px; color: var(--em); }
 .bd-partner--wait { background: var(--champ2); color: var(--champ3); }
 .bd-partner--wait svg { color: var(--champ3); }
+.bd-instant { background: #fff; border: 1.5px solid var(--line2); border-radius: 18px; padding: 14px; margin-bottom: 12px; }
+.bd-instant.on { border-color: var(--champ); box-shadow: 0 6px 18px rgba(138,106,47,.12); }
+.bd-instant-h { display: inline-flex; align-items: center; gap: 8px; font-weight: 800; font-size: 15.5px; }
+.bd-instant-h .ic { width: 28px; height: 28px; border-radius: 9px; display: grid; place-items: center; background: var(--champ2); color: var(--champ3); }
+.bd-instant.on .bd-instant-h .ic { background: linear-gradient(135deg, #E9C27A, #B07D35); color: #fff; }
+.bd-instant-poc { display: flex; align-items: center; gap: 10px; margin-top: 12px; background: var(--cream); border-radius: 14px; padding: 10px; }
+.bd-instant-poc b { display: block; font-size: 14.5px; }
+.bd-inst { display: inline-flex; align-items: center; gap: 3px; margin-left: 6px; font-size: 11px; font-weight: 800; color: var(--champ3);
+  background: var(--champ2); border-radius: 99px; padding: 1px 7px; vertical-align: 1px; }
 .bd-funnel { background: radial-gradient(120% 140% at 100% 0%, #0E6A4F 0%, #063B2D 55%, #04291F 100%); color: #fff; border-radius: 20px; padding: 16px;
   margin-bottom: 12px; box-shadow: 0 12px 30px rgba(6,59,45,.22); }
 .bd-funnel-h { display: flex; justify-content: space-between; align-items: baseline; gap: 8px; flex-wrap: wrap; }

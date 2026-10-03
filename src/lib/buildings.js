@@ -37,6 +37,19 @@ export const requestBuildingVisit = (code, { name, phone, propertyIds = [], visi
     p_visit_at: visitAt ? visitAt.toISOString() : null, p_note: note,
   });
 
+/**
+ * An instant visit: the signed-in renter is heading there now. Back come the
+ * POC's name and number, the address and when they're expected
+ * (building_instant_visit). No flats picked means every free flat.
+ */
+export const startInstantVisit = (code, { name, phone, propertyIds = [] }) =>
+  rpc("building_instant_visit", {
+    p_code: code, p_visitor: visitorId() || "", p_name: name, p_phone: phone, p_properties: propertyIds,
+  });
+
+/** A visit of kind 'instant' — on the way now, not booked for later. */
+export const isInstant = (lead) => lead?.kind === "instant";
+
 /* ── The owner's side ────────────────────────────────────────────────────── */
 
 export const fetchMyBuildings = () => rpc("owner_buildings_list").then((r) => r ?? []);
@@ -45,6 +58,9 @@ export const saveBuilding = (patch) => rpc("owner_building_save", { p: patch });
 export const setFlatBuilding = (propertyId, buildingId, floor = null) =>
   rpc("owner_building_set_flat", { p_property: propertyId, p_building: buildingId, p_floor: floor === "" ? null : floor });
 export const markFlatBooked = (propertyId, on) => rpc("owner_building_mark_booked", { p_property: propertyId, p_on: Boolean(on) });
+/** Instant visit on (with who shows the flats) or off — the building's owner, or CRM staff. */
+export const setInstantVisit = (buildingId, { on, name = "", phone = "" }) =>
+  rpc("building_set_instant_visit", { p_building: buildingId, p_on: Boolean(on), p_name: name, p_phone: phone });
 
 /* ── Working a visit: partner, CRM, owner ────────────────────────────────── */
 

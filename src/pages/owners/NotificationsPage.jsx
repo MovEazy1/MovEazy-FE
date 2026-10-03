@@ -5,13 +5,13 @@
  */
 import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
-import { Bell, CalendarClock, Heart, Wrench } from "lucide-react";
+import { Bell, CalendarClock, Heart, Wrench, Zap } from "lucide-react";
 import { useOwner } from "./OwnerApp";
 import { Empty, Loading, TopBar } from "./ownerUi";
 import { fetchActivity, fmtDateTime, friendlyError, op, propertyName, relTime } from "../../lib/owners";
 
 const SEEN_KEY = "mz_owner_seen_at";
-const ICON = { visit_booked: CalendarClock, visit_requested: CalendarClock, liked: Heart, request_update: Wrench };
+const ICON = { visit_booked: CalendarClock, visit_requested: CalendarClock, building_visit: CalendarClock, instant_visit: Zap, liked: Heart, request_update: Wrench };
 
 export default function NotificationsPage() {
   const { byId } = useOwner();
@@ -28,11 +28,15 @@ export default function NotificationsPage() {
     switch (a.kind) {
       case "visit_booked": return [`${a.who} booked a visit`, `${where}${a.slot_at ? ` · ${fmtDateTime(a.slot_at)}` : ""}`];
       case "visit_requested": return [`${a.who} asked to visit`, `${where} · MovEazy will confirm a time`];
+      // Through a building's QR: the building's name comes as the message.
+      case "instant_visit": return [`${a.who} is coming for an instant visit`, `${a.message}${a.slot_at ? ` · there by ${fmtDateTime(a.slot_at)}` : ""}`];
+      case "building_visit": return [`${a.who} asked to visit`, `${a.message} · ${a.slot_at ? fmtDateTime(a.slot_at) : "the partner will fix a time"}`];
       case "liked": return [`${a.who} liked your flat`, where];
       default: return [a.message, where];
     }
   };
-  const to = (a) => (a.request_id ? op(`/repairs/${a.request_id}`) : op(`/properties/${a.property_id}/find-tenant`));
+  const to = (a) => (a.request_id ? op(`/repairs/${a.request_id}`)
+    : a.building_id ? op(`/buildings/${a.building_id}`) : op(`/properties/${a.property_id}/find-tenant`));
 
   return (
     <>
@@ -47,7 +51,9 @@ export default function NotificationsPage() {
               const [title, sub] = text(a);
               return (
                 <Link key={`${a.at}-${i}`} to={to(a)} className="oz-menurow">
-                  <span className="oz-avatar" style={{ background: a.kind === "request_update" ? "var(--bluebg)" : "var(--emt)", color: a.kind === "request_update" ? "var(--blue)" : "var(--em)" }}>
+                  <span className="oz-avatar" style={{
+                    background: a.kind === "request_update" ? "var(--bluebg)" : a.kind === "instant_visit" ? "var(--champ2)" : "var(--emt)",
+                    color: a.kind === "request_update" ? "var(--blue)" : a.kind === "instant_visit" ? "var(--champ3)" : "var(--em)" }}>
                     <Icon size={17} />
                   </span>
                   <span style={{ flex: 1, minWidth: 0 }}><strong style={{ fontWeight: 600 }}>{title}</strong><span className="oz-sub">{sub}</span></span>
