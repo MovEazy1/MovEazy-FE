@@ -29,6 +29,9 @@ import { whatsappUrl } from "../../lib/crmSettings";
 import { formatForDisplay } from "../../lib/mobile";
 import { Btn, C, Chip, Empty, ScoreRing, Toast, inr, shortDate } from "./crmUi";
 import CrmBuildingPicker from "./CrmBuildingPicker";
+import {
+  bySoldOutDesc, markSoldOut, relistProperty, soldOutDate, soldOutMonth, soldOutMonths, todayInIndia,
+} from "../../lib/soldOut";
 
 /** Platforms we show first, and what the button says. Anything else follows. */
 const PLATFORM_ORDER = ["facebook", "reddit", "instagram", "whatsapp", "linkedin", "twitter"];
@@ -352,6 +355,97 @@ function PocMessage({ listing, internal, canEdit }) {
   );
 }
 
+/**
+ * Sold out, straight from the list: the day it went (today unless somebody
+ * says otherwise — flats are often let days before anyone tells us), and the
+ * way back if it falls through. The date is what "sold out in October" is
+ * counted by, so it is asked for here rather than left to the edit form.
+ */
+function SoldOut({ listing, canEdit, onDone, onToast }) {
+  const [open, setOpen] = useState(false);
+  const [day, setDay] = useState("");
+  const [busy, setBusy] = useState(false);
+  const today = todayInIndia();
+  const yearAgo = todayInIndia(new Date(Date.now() - 365 * 864e5));
+
+  if (listing.status === "rented") {
+    const when = soldOutDate(listing.sold_out_at);
+    const relist = async () => {
+      if (!window.confirm(`Put ${listing.property_id} back on the market? It will show on the site again.`)) return;
+      setBusy(true);
+      try {
+        await relistProperty(listing.property_id);
+        onToast(`${listing.property_id} is back on the market.`);
+        onDone({ status: "published", sold_out_at: null, sold_out_by: "" });
+      } catch (e) {
+        onToast(e.message || "Couldn't relist it.", "error");
+      } finally {
+        setBusy(false);
+      }
+    };
+    return (
+      <>
+        <span className="crm-chip" style={{ pointerEvents: "none", borderColor: C.gold, color: C.gold, fontWeight: 600 }}
+          title={listing.sold_out_by ? `Marked by ${listing.sold_out_by}` : "Sold out before dates were recorded"}>
+          Sold out · {when || "date not recorded"}
+        </span>
+        {canEdit && <Btn sm onClick={relist} disabled={busy}>{busy ? "…" : "Relist"}</Btn>}
+      </>
+    );
+  }
+  if (!canEdit) return null;
+
+  const confirm = async () => {
+    setBusy(true);
+    try {
+      const r = await markSoldOut(listing.property_id, day || today);
+      setOpen(false);
+      onDone({ status: "rented", sold_out_at: r?.sold_out_at ?? new Date().toISOString(), sold_out_by: r?.sold_out_by ?? "" });
+      onToast(`${listing.property_id} marked sold out${day && day !== today ? ` on ${soldOutDate(`${day}T12:00:00+05:30`)}` : " today"}.`);
+    } catch (e) {
+      onToast(e.message || "Couldn't mark it sold out.", "error");
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  return (
+    <span style={{ position: "relative" }}>
+      <Btn sm onClick={() => { setDay(today); setOpen((o) => !o); }} title="Mark this listing sold out (let) — takes it off the site">
+        Mark sold out
+      </Btn>
+      {open && (
+        <>
+          <span onClick={() => !busy && setOpen(false)} style={{ position: "fixed", inset: 0, zIndex: 40 }} />
+          <span
+            role="dialog"
+            aria-label={`Mark ${listing.property_id} sold out`}
+            style={{
+              position: "absolute", top: "calc(100% + 4px)", right: 0, zIndex: 41, width: 230,
+              background: C.bg, border: `1px solid ${C.line}`, borderRadius: 10, padding: 10,
+              display: "flex", flexDirection: "column", gap: 8, boxShadow: "0 12px 30px rgba(4,33,29,0.14)",
+            }}
+          >
+            <strong style={{ fontSize: 12.5 }}>Mark {listing.property_id} sold out</strong>
+            <label style={{ display: "flex", flexDirection: "column", gap: 4, fontSize: 11.5 }}>
+              <span className="crm-mute">Sold out on</span>
+              <input type="date" className="crm-input" value={day} min={yearAgo} max={today}
+                onChange={(e) => setDay(e.target.value)} />
+            </label>
+            <span className="crm-mute" style={{ fontSize: 10.5, lineHeight: 1.4 }}>
+              It comes off the site. Relist it any time — the sale stays on record.
+            </span>
+            <span style={{ display: "flex", gap: 6 }}>
+              <Btn sm variant="primary" onClick={confirm} disabled={busy || !day}>{busy ? "Saving…" : "Mark sold out"}</Btn>
+              <Btn sm onClick={() => setOpen(false)} disabled={busy}>Cancel</Btn>
+            </span>
+          </span>
+        </>
+      )}
+    </span>
+  );
+}
+
 function SocialShare({ listing }) {
   const { marketingChannels } = useCrm();
   const [openPlatform, setOpenPlatform] = useState("");
@@ -466,13 +560,15 @@ function SocialShare({ listing }) {
 }
 
 export default function CrmPropertiesPage() {
-  const { inventory, requirements, clients, access, reload } = useCrm();
+  const { inventory, requirements, clients, access, reload, setData } = useCrm();
   const navigate = useNavigate();
 
   const canEdit = access.has(SCOPES.PROPERTIES_WRITE);
 
   const [q, setQ] = useState("");
   const [status, setStatus] = useState("published");
+  /** Sold out only: "2026-10", "none" (undated) or "" for every month. */
+  const [month, setMonth] = useState("");
   const [openId, setOpenId] = useState("");
   // The full property card, opened from a thumbnail. Rendered here rather than
   // sending the agent to a new tab: they are working down a list, and a tab
@@ -499,6 +595,10 @@ export default function CrmPropertiesPage() {
   const [toast, setToast] = useState(null);
   const say = (message, tone = "ok") => { setToast({ message, tone }); setTimeout(() => setToast(null), 3200); };
   const buildingById = useMemo(() => new Map(buildings.map((b) => [b.id, b])), [buildings]);
+  // One row changed — patched in place rather than refetching the whole CRM.
+  const patchListing = (pid, patch) => setData((d) => (d
+    ? { ...d, inventory: d.inventory.map((l) => (l.property_id === pid ? { ...l, ...patch } : l)) }
+    : d));
   const togglePick = (pid) => setPicked((cur) => {
     const next = new Set(cur);
     if (next.has(pid)) next.delete(pid); else next.add(pid);
@@ -528,11 +628,16 @@ export default function CrmPropertiesPage() {
     // pasted a link wants that flat, and a rented or dormant one hidden behind
     // "published" would read as missing from the CRM altogether.
     const byId = Boolean(listingIdIn(q));
-    return inventory.filter((l) => {
+    const left = inventory.filter((l) => {
       if (status && !byId && l.status !== status) return false;
+      if (status === "rented" && month && !byId && soldOutMonth(l) !== month) return false;
       return matchesSearch(l, q);
     });
-  }, [inventory, q, status]);
+    // Sold out reads as a timeline: the latest sale first.
+    return status === "rented" ? [...left].sort(bySoldOutDesc) : left;
+  }, [inventory, q, status, month]);
+
+  const months = useMemo(() => soldOutMonths(inventory), [inventory]);
 
   const options = useMemo(() => optionsFor(base), [base]);
 
@@ -605,10 +710,17 @@ export default function CrmPropertiesPage() {
               for it those listings would be reachable only under "All", which
               is where a flat goes to be forgotten a second time. */}
           {["published", "paused", "rented", "dormant", ""].map((s) => (
-            <Chip key={s || "all"} on={status === s} onClick={() => setStatus(s)}>
-              {s || "All"}
+            <Chip key={s || "all"} on={status === s} onClick={() => { setStatus(s); setMonth(""); }}>
+              {s === "rented" ? "sold out" : s || "All"}
             </Chip>
           ))}
+          {status === "rented" && (
+            <select className="crm-input" style={{ width: 210 }} value={month} aria-label="Sold out in which month"
+              onChange={(e) => setMonth(e.target.value)}>
+              <option value="">Every month · {months.reduce((n, m) => n + m.count, 0)}</option>
+              {months.map((m) => <option key={m.key} value={m.key}>{m.label} · {m.count}</option>)}
+            </select>
+          )}
         </div>
 
         <div className="crm-scroll" style={{ flex: 1 }}>
@@ -676,6 +788,7 @@ export default function CrmPropertiesPage() {
                     <td className="crm-mute crm-num">{shortDate(l.created_at)}</td>
                     <td>
                       <div style={{ display: "flex", gap: 5, flexWrap: "wrap" }}>
+                        <SoldOut listing={l} canEdit={canEdit} onToast={say} onDone={(patch) => patchListing(l.property_id, patch)} />
                         <Btn sm onClick={() => setOpenId(l.property_id)}>Who fits</Btn>
                         {canEdit && (
                           <Link to={`/crm/properties/${l.property_id}/edit`}
