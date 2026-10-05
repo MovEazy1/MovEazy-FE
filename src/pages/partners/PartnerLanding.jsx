@@ -8,7 +8,9 @@
  *   - shares and stats come from the CRM (useLandingSettings); no plan price is
  *     shown signed out — plans are presented inside the app, after sign-up;
  *   - every call to action is "Become Partner": mobile number first
- *     (BecomePartnerSheet), then Google;
+ *     (BecomePartnerSheet), then Google — or, for a broker who came on a
+ *     partner's referral link, "Join now": the number, then WhatsApp to
+ *     MovEazy's partner desk, who take them through joining (no plans shown);
  *   - the matching demo runs the app's own matching engine, so counts are live;
  *   - features that aren't live yet (MovEazy clients) are marked "Coming soon";
  *   - no testimonials until there are real ones to show.
@@ -24,7 +26,7 @@ import { Avatar, Chip, PropertyCard, TopBar, WhatsAppIcon } from "./partnerUi";
 import { SmartListingImage } from "./partnerMedia";
 import QrFeature from "./QrFeature";
 import BecomePartnerSheet from "./BecomePartnerSheet";
-import { captureSource } from "../../lib/partnerSignup";
+import { cameByReferral, captureSource } from "../../lib/partnerSignup";
 import { requirementLine } from "./leadBits";
 import { matchesForLead } from "../../lib/partnerMatch";
 import { customerMessage, displayLink } from "../../lib/partners";
@@ -339,8 +341,10 @@ export default function PartnerLanding() {
   const appTrack = useRef(null);
   useScrollSlide(appPin, appTrack);
   const [joining, setJoining] = useState(false);
-  const signup = useMemo(() => ({ label: "Become Partner", start: () => setJoining(true) }), []);
-  useEffect(() => { captureSource(); }, []);
+  // Captured before the first render, so a referral link's buttons never flash "Become Partner".
+  const [referred] = useState(() => { captureSource(); return cameByReferral(); });
+  const cta = referred ? "Join now" : "Become Partner";
+  const signup = useMemo(() => ({ label: cta, start: () => setJoining(true) }), [cta]);
 
   const stats = [[s.statBrokers, "Brokers"], [s.statProperties, "Verified properties"], [s.statRating, "Rating"]];
 
@@ -421,7 +425,7 @@ export default function PartnerLanding() {
       <section className="lp-sec lp-sec--dark lp-final">
         <div className="lp-wrap">
           <h2 className="lp-h2">Your next deal is <span className="hl">on MovEazy.</span></h2>
-          <div className="lp-ctas" style={{ justifyContent: "center", marginTop: 24 }}><SignupButton>Become Partner <ArrowRight size={18} /></SignupButton></div>
+          <div className="lp-ctas" style={{ justifyContent: "center", marginTop: 24 }}><SignupButton>{cta} <ArrowRight size={18} /></SignupButton></div>
         </div>
       </section>
 
@@ -430,7 +434,7 @@ export default function PartnerLanding() {
         other={["https://owners.moveazy.co.in/", "For owners"]} />
 
       <StickyCta title="MovEazy Partners" sub="Verified inventory · AI matching" ctaClass="lp-btn lp-btn--gold" />
-      <BecomePartnerSheet open={joining} onClose={() => setJoining(false)} />
+      <BecomePartnerSheet open={joining} onClose={() => setJoining(false)} referral={referred} />
     </div>
     </SignupProvider>
   );

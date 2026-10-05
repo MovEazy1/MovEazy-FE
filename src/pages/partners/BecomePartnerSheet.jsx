@@ -2,12 +2,17 @@
  * "Become Partner" — the number first, then Google (lib/partnerSignup.js).
  * A sheet on phones, a centred card on wider screens; dismissible, since the
  * visitor owes us nothing yet.
+ *
+ * `referral`: a broker who came on a partner's referral link. "Join now" — the
+ * number, then WhatsApp to MovEazy's partner desk, which walks them through
+ * joining. No Google, no plans.
  */
 import { useEffect, useRef, useState } from "react";
 import { ShieldCheck, X } from "lucide-react";
 import { useAuth } from "../../context/AuthContext";
 import { formatForDisplay, normalizeIndianMobile } from "../../lib/mobile";
-import { startPartnerSignup } from "../../lib/partnerSignup";
+import { startPartnerSignup, startReferralJoin } from "../../lib/partnerSignup";
+import { WhatsAppIcon } from "./partnerUi";
 
 const GoogleG = () => (
   <svg width="18" height="18" viewBox="0 0 48 48" aria-hidden style={{ background: "#fff", borderRadius: 999, padding: 1, flex: "none" }}>
@@ -26,7 +31,7 @@ function digitsOf(v) {
   return d.slice(0, 10);
 }
 
-export default function BecomePartnerSheet({ open, onClose }) {
+export default function BecomePartnerSheet({ open, onClose, referral = false }) {
   const { loginWithGoogle } = useAuth();
   const [value, setValue] = useState("");
   const [busy, setBusy] = useState(false);
@@ -51,8 +56,18 @@ export default function BecomePartnerSheet({ open, onClose }) {
   const submit = async (e) => {
     e.preventDefault();
     if (!ready) { setErr("Enter a valid 10-digit mobile number."); return; }
-    setBusy(true);
     setErr("");
+    if (referral) {
+      try {
+        const url = startReferralJoin(value);
+        // Inside the tap, so it isn't blocked; the same tab if it is anyway.
+        if (!window.open(url, "_blank", "noopener")) window.location.assign(url);
+      } catch (ex) {
+        setErr(ex?.message || "Something went wrong. Please try again.");
+      }
+      return;
+    }
+    setBusy(true);
     try {
       await startPartnerSignup(value);
       const res = await loginWithGoogle();
@@ -69,8 +84,12 @@ export default function BecomePartnerSheet({ open, onClose }) {
       <form className="bp" role="dialog" aria-modal="true" aria-labelledby="bp-title" onClick={(e) => e.stopPropagation()} onSubmit={submit} noValidate>
         <button type="button" className="bp-x" aria-label="Close" onClick={onClose}><X size={20} /></button>
         <span className="bp-kicker">MovEazy Partners</span>
-        <h2 id="bp-title">Become a Partner</h2>
-        <p className="bp-sub">Start with your mobile number — it’s how tenants and MovEazy reach you.</p>
+        <h2 id="bp-title">{referral ? "Join MovEazy Partners" : "Become a Partner"}</h2>
+        <p className="bp-sub">
+          {referral
+            ? "Your mobile number, then a WhatsApp to our partner team — they’ll take you through the steps."
+            : "Start with your mobile number — it’s how tenants and MovEazy reach you."}
+        </p>
         <label className="bp-label" htmlFor="bp-phone">Mobile number</label>
         <div className={`bp-field${err ? " bad" : ""}`}>
           <span>+91</span>
@@ -79,10 +98,19 @@ export default function BecomePartnerSheet({ open, onClose }) {
           {ready && <ShieldCheck size={18} className="bp-ok" aria-label="Valid number" />}
         </div>
         {err && <p className="bp-err" role="alert">{err}</p>}
-        <button type="submit" className="bp-go" disabled={busy}>
-          <GoogleG /> {busy ? "Opening Google…" : "Verify & continue with Google"}
-        </button>
-        <p className="bp-terms">Next you’ll sign in with Google. By continuing you agree to MovEazy’s <a href="https://www.moveazy.co.in/terms" target="_blank" rel="noreferrer">terms</a>.</p>
+        {referral ? (
+          <button type="submit" className="bp-go bp-go--wa">
+            <WhatsAppIcon size={18} /> Continue on WhatsApp
+          </button>
+        ) : (
+          <button type="submit" className="bp-go" disabled={busy}>
+            <GoogleG /> {busy ? "Opening Google…" : "Verify & continue with Google"}
+          </button>
+        )}
+        <p className="bp-terms">
+          {referral ? "Opens WhatsApp with your message to MovEazy. " : "Next you’ll sign in with Google. "}
+          By continuing you agree to MovEazy’s <a href="https://www.moveazy.co.in/terms" target="_blank" rel="noreferrer">terms</a>.
+        </p>
       </form>
     </div>
   );
@@ -109,6 +137,7 @@ const CSS = `
 .bp-go { margin-top: 16px; width: 100%; min-height: 54px; border: 0; border-radius: 14px; cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 10px;
   background: linear-gradient(180deg, #F2CD7A, #E4B659); color: #1F1605; font: inherit; font-size: 16px; font-weight: 800; box-shadow: 0 12px 26px rgba(228,182,89,.35); }
 .bp-go:disabled { opacity: .7; cursor: default; }
+.bp-go--wa { background: linear-gradient(180deg, #2BD46B, #1FAE55); color: #fff; box-shadow: 0 12px 26px rgba(31,174,85,.35); }
 .bp-terms { margin: 12px 0 0; font-size: 12px; color: rgba(255,255,255,.6); text-align: center; }
 .bp-terms a { color: #E4B659; font-weight: 700; }
 @media (max-width: 560px) {

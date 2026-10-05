@@ -76,3 +76,37 @@ export async function stampPartnerSignup() {
   const src = signupSource();
   await supabase.rpc("partner_signup_meta", { p_channel: src.channel, p_ref: src.ref, p_utm: src.utm }).then(() => {}, () => {});
 }
+
+/* ── Joining through a referral link ─────────────────────────────────────── */
+
+/** MovEazy's partner desk: a referred broker joins by talking to it, not by picking a plan. */
+export const JOIN_DESK = "8090911024";
+
+/** Did this visitor first arrive on a partner's referral link (?ref=CODE)? */
+export const cameByReferral = () => Boolean(signupSource().ref);
+
+/** The WhatsApp a referred broker sends the partner desk. */
+export function joinMessage(phone, ref = "") {
+  return [
+    "Hi, I want to join as a MovEazy partner, help me understand the steps.",
+    phone ? `My number: ${phone}` : "",
+    ref ? `Referral code: ${ref}` : "",
+  ].filter(Boolean).join("\n");
+}
+
+/**
+ * Step one for a referred broker: validate the number, record it against the
+ * referral (the funnel's "number filled", credited to the referrer), and hand
+ * back the WhatsApp link to the partner desk. Throws a message a person can act on.
+ */
+export function startReferralJoin(rawPhone) {
+  const phone = normalizeIndianMobile(rawPhone);
+  if (!phone) throw new Error("Enter a valid 10-digit mobile number.");
+  const src = signupSource();
+  if (isSupabaseConfigured && supabase) {
+    // Not awaited: WhatsApp must open inside the tap, or the browser blocks it.
+    supabase.rpc("partner_prospect", { p_phone: phone, p_channel: src.channel || "referral", p_ref: src.ref, p_utm: src.utm })
+      .then(() => {}, () => {});
+  }
+  return `https://wa.me/91${JOIN_DESK}?text=${encodeURIComponent(joinMessage(phone, src.ref))}`;
+}
