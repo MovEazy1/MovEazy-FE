@@ -6,7 +6,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { Link, useNavigate, useParams, useSearchParams } from "react-router-dom";
 import {
-  Archive, Calendar, ChevronRight, ClipboardList, Crown, ExternalLink, Heart, Lock, MapPin, MoreVertical, Pencil, Phone, Share2, Users,
+  Archive, Calendar, Check, ChevronRight, ClipboardList, Crown, ExternalLink, Heart, Lock, MapPin, MoreVertical, Pencil, Phone, Share2, Users, X,
 } from "lucide-react";
 import { usePartner } from "./PartnerApp";
 import ShareSheet from "./ShareSheet";
@@ -16,10 +16,47 @@ import { MediaItem, listingMedia } from "./partnerMedia";
 import { Avatar, BrokeragePill, Empty, Loading, Sheet, TopBar, WhatsAppIcon, sourceLabel, toast } from "./partnerUi";
 import {
   bhkLabel, customerMessage, fetchPropertyContacts, friendlyError, inr, partnerPropertyLink, patchLead, pp,
-  setListingStatus, waLink,
+  setListingStatus, telLink, waLink,
 } from "../../lib/partners";
+import {
+  contactMessage, decideLocation, fetchLocationRequests, locationHidden, requestLocation, slotLabel,
+} from "../../lib/partnerContact";
+import { fetchSlotsForProperty } from "../../lib/visits";
 import { leadsForListing } from "../../lib/partnerMatch";
 import { MOVEAZY_TEAM_WHATSAPP } from "../../config/contactChannels";
+
+/**
+ * Another broker's flat: the area, and a request for the rest. The listing
+ * broker decides who gets the exact address and map pin; until then the
+ * partner can still call them.
+ */
+function PlaceRequest({ l, state, onAsk, busy }) {
+  const who = l.lister_name ? String(l.lister_name).split(" ")[0] : "the listing broker";
+  return (
+    <div className="pz-section">
+      <div className="pz-row" style={{ alignItems: "flex-start" }}>
+        <MapPin size={20} color="var(--g)" style={{ flex: "none", marginTop: 2 }} />
+        <span style={{ flex: 1 }}>
+          <span style={{ display: "block", fontWeight: 600 }}>{l.area || "Bengaluru"}{l.city && l.city !== l.area ? `, ${l.city}` : ""}</span>
+          <span className="pz-meta">
+            {state === "pending"
+              ? `Exact location requested — waiting for ${who} to approve.`
+              : state === "rejected"
+                ? `${who} didn't share the exact location. Call them, or ask again.`
+                : `Broad area only. ${who} shares the exact address and map pin when they approve your request.`}
+          </span>
+        </span>
+      </div>
+      {state === "pending" ? (
+        <span className="pz-pill pz-pill--grey" style={{ marginTop: 10 }}>Requested</span>
+      ) : (
+        <button type="button" className="pz-btn pz-btn--primary" style={{ width: "100%", marginTop: 10 }} onClick={onAsk} disabled={busy}>
+          <MapPin size={16} /> {busy ? "Sending…" : state === "rejected" ? "Ask again" : "Request exact location"}
+        </button>
+      )}
+    </div>
+  );
+}
 
 function mapsUrl(l) {
   if (Number.isFinite(Number(l.latitude)) && Number.isFinite(Number(l.longitude)) && l.latitude != null) {
@@ -41,6 +78,13 @@ export default function PropertyDetail() {
   const [details, setDetails] = useState(() => params.get("details") === "1");
   const [closing, setClosing] = useState(false);
   const [soldOut, setSoldOut] = useState(false);
+  // Location requests: this partner's latest on this flat, or (on their own
+  // listing) everyone asking them.
+  const [requests, setRequests] = useState({ incoming: [], outgoing: [] });
+  const [asking, setAsking] = useState(false);
+  // The owner's open visit times, and the one this partner wants.
+  const [slots, setSlots] = useState([]);
+  const [visitAt, setVisitAt] = useState("");
   const flagSoldOut = async () => {
     setSoldOut(false);
     try {
@@ -70,6 +114,18 @@ export default function PropertyDetail() {
     fetchPropertyContacts(id).then(setContacts, () => setContacts([]));
   }, [id, l]);
 
+  const asksAbout = l && !demo && (l.source === "mine" || l.source === "broker");
+  const loadRequests = () => fetchLocationRequests().then(setRequests, () => {});
+  useEffect(() => {
+    if (asksAbout) loadRequests();
+  }, [id, asksAbout]);
+
+  useEffect(() => {
+    if (!l || l.locked || l.source === "mine" || demo) { setSlots([]); return; }
+    fetchSlotsForProperty(id)
+      .then((all) => setSlots(all.filter((s) => new Date(s.slot_at) > new Date()).slice(0, 12)), () => setSlots([]));
+  }, [id, l, demo]);
+
   const matching = useMemo(() => (l ? leadsForListing(l, leads).slice(0, 5) : []), [l, leads]);
   const media = l ? listingMedia(l) : [];
 
@@ -88,6 +144,34 @@ export default function PropertyDetail() {
   const mine = l.source === "mine";
   const groupNames = groups.filter((g) => l.group_ids.includes(g.id)).map((g) => g.name);
   const primary = contacts?.[0];
+  const hidden = locationHidden(l);
+  const myAsk = requests.outgoing.find((r) => r.property_id === id)?.status || "";
+  const asked = mine ? requests.incoming.filter((r) => r.property_id === id) : [];
+  const fromMe = { partnerName: me?.partner?.name || "", agency: me?.partner?.agency || "", visitAt };
+
+  const askForPlace = async () => {
+    if (demo) { explain("location"); return; }
+    setAsking(true);
+    try {
+      const r = await requestLocation(id);
+      await loadRequests();
+      if (r?.status === "approved") { await reloadInventory(); toast("Already shared — the exact location is on the listing"); }
+      else toast(`Asked ${l.lister_name ? String(l.lister_name).split(" ")[0] : "the listing broker"} — you'll get a notification when they answer`);
+    } catch (e) {
+      toast(friendlyError(e, "Could not send the request."), "error");
+    } finally {
+      setAsking(false);
+    }
+  };
+  const answer = async (req, approve) => {
+    try {
+      await decideLocation(req.id, approve);
+      await loadRequests();
+      toast(approve ? `Location shared with ${req.name || "the broker"}` : "Declined");
+    } catch (e) {
+      toast(friendlyError(e), "error");
+    }
+  };
 
   const changeStatus = async (status) => {
     setMenu(false);
@@ -175,6 +259,8 @@ export default function PropertyDetail() {
             <span style={{ flex: 1 }}><strong>Address and owner contact are locked.</strong><br />Go Premium to unlock 1000+ listings and keep {me?.property_share ?? 50}% of the brokerage.</span>
             <ChevronRight size={18} />
           </Link>
+        ) : hidden ? (
+          <PlaceRequest l={l} state={myAsk} onAsk={askForPlace} busy={asking} />
         ) : (
           <a className="pz-section pz-row" href={mapsUrl(l)} target="_blank" rel="noreferrer" style={{ textDecoration: "none", color: "inherit" }}>
             <MapPin size={20} color="var(--g)" />
@@ -186,8 +272,36 @@ export default function PropertyDetail() {
           </a>
         )}
 
+        {mine && asked.length > 0 && (
+          <div className="pz-section">
+            <h2>Location requests <span className="pz-meta">{asked.filter((r) => r.status === "pending").length} waiting</span></h2>
+            {asked.map((r) => (
+              <div key={r.id} className="pz-row" style={{ padding: "8px 0", borderTop: "1px solid var(--line)", alignItems: "flex-start" }}>
+                <Avatar name={r.name} />
+                <span style={{ flex: 1, minWidth: 0 }}>
+                  <strong style={{ display: "block" }}>{r.name || "A broker"}</strong>
+                  <span className="pz-meta">{[r.agency, r.phone].filter(Boolean).join(" · ")}</span>
+                  {r.note && <span className="pz-meta" style={{ display: "block" }}>“{r.note}”</span>}
+                  {r.status !== "pending" && (
+                    <span className="pz-meta" style={{ display: "block", fontWeight: 600 }}>{r.status === "approved" ? "Shared" : "Declined"}</span>
+                  )}
+                </span>
+                {r.status === "pending" && (
+                  <span className="pz-row" style={{ gap: 6 }}>
+                    <button type="button" className="pz-btn pz-btn--primary" onClick={() => answer(r, true)} aria-label={`Share the location with ${r.name}`}>
+                      <Check size={16} /> Share
+                    </button>
+                    <button type="button" className="pz-iconbtn" onClick={() => answer(r, false)} aria-label={`Decline ${r.name}`}><X size={18} /></button>
+                  </span>
+                )}
+              </div>
+            ))}
+            <p className="pz-hint" style={{ margin: "8px 0 0" }}>Sharing shows them the exact address and map pin of this flat.</p>
+          </div>
+        )}
+
         <div className="pz-section">
-          <h2>Contacts
+          <h2>{mine ? "Contacts" : "Contact lister"}
             {!l.locked && <Link to={pp(`/property/${id}/contacts`)} className="pz-btn pz-btn--ghost">View all</Link>}
           </h2>
           {l.locked ? (
@@ -195,16 +309,41 @@ export default function PropertyDetail() {
           ) : contacts === null ? (
             <span className="pz-meta">Loading…</span>
           ) : primary ? (
-            <div className="pz-row">
-              <Avatar name={primary.name} />
-              <span style={{ flex: 1, minWidth: 0 }}>
-                <strong style={{ display: "block" }}>{primary.name || primary.label}</strong>
-                <span className="pz-meta">{primary.label}{primary.phone ? ` · ${primary.phone}` : ""}</span>
-              </span>
-              {primary.phone && <a className="pz-iconbtn" href={`tel:${primary.phone}`} aria-label="Call"><Phone size={19} color="var(--g)" /></a>}
-              {primary.phone && <a className="pz-iconbtn" href={waLink(primary.phone, `Hi, about ${bhkLabel(l)} in ${l.area} (${l.property_id}) on MovEazy — is it still available?`)}
-                target="_blank" rel="noreferrer" aria-label="WhatsApp"><WhatsAppIcon color="#16A34A" size={20} /></a>}
-            </div>
+            <>
+              <div className="pz-row">
+                <Avatar name={primary.name} />
+                <span style={{ flex: 1, minWidth: 0 }}>
+                  <strong style={{ display: "block" }}>{primary.name || primary.label}</strong>
+                  <span className="pz-meta">{primary.label}{primary.phone ? ` · ${primary.phone}` : ""}</span>
+                </span>
+              </div>
+              {primary.role === "moveazy" && (
+                <p className="pz-meta" style={{ margin: "8px 0 0" }}>
+                  The owner takes visits through MovEazy. Your message reaches them with this flat and the visit time you pick.
+                </p>
+              )}
+              {!mine && slots.length > 0 && (
+                <div style={{ marginTop: 10 }}>
+                  <span className="pz-meta" style={{ display: "block", marginBottom: 6 }}>Owner's visit times — pick one for your client</span>
+                  <div className="pz-chips">
+                    {slots.map((s) => (
+                      <button key={s.id} type="button" className={`pz-chip${visitAt === s.slot_at ? " pz-chip--on" : ""}`}
+                        onClick={() => setVisitAt(visitAt === s.slot_at ? "" : s.slot_at)}>
+                        {slotLabel(s.slot_at)}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              )}
+              {primary.phone && !mine && (
+                <div className="pz-actions">
+                  <a className="pz-btn pz-btn--soft" href={telLink(primary.phone)}><Phone size={17} /> Call</a>
+                  <a className="pz-btn pz-wa" href={waLink(primary.phone, contactMessage(l, primary, fromMe))} target="_blank" rel="noreferrer">
+                    <WhatsAppIcon /> WhatsApp
+                  </a>
+                </div>
+              )}
+            </>
           ) : (
             <span className="pz-meta">No contact on file for this listing.</span>
           )}

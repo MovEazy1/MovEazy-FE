@@ -4,13 +4,14 @@ import { Link, useParams } from "react-router-dom";
 import { Crown, Info, Phone } from "lucide-react";
 import { usePartner } from "./PartnerApp";
 import { Avatar, Empty, Loading, TopBar, WhatsAppIcon, formatPhone } from "./partnerUi";
-import { bhkLabel, fetchPropertyContacts, pp, telLink, waLink } from "../../lib/partners";
+import { fetchPropertyContacts, pp, telLink, waLink } from "../../lib/partners";
+import { contactMessage } from "../../lib/partnerContact";
 
-const HEADINGS = { broker: "Primary Broker", owner: "Owner", tenant: "Tenant" };
+const HEADINGS = { broker: "Listing broker", owner: "Owner", tenant: "Tenant", moveazy: "MovEazy visits desk" };
 
 export default function PropertyContacts() {
   const { id } = useParams();
-  const { byId, inventory } = usePartner();
+  const { byId, inventory, me } = usePartner();
   const l = byId.get(id);
   const [contacts, setContacts] = useState(null);
 
@@ -31,7 +32,7 @@ export default function PropertyContacts() {
     );
   }
 
-  const context = `Hi, about the ${bhkLabel(l)} in ${l.area} (${l.property_id}) on MovEazy — `;
+  const fromMe = { partnerName: me?.partner?.name || "", agency: me?.partner?.agency || "" };
   return (
     <>
       <TopBar title="Contacts" back />
@@ -51,7 +52,7 @@ export default function PropertyContacts() {
             {c.phone ? (
               <div className="pz-actions">
                 <a className="pz-btn pz-btn--soft" href={telLink(c.phone)}><Phone size={17} /> Call</a>
-                <a className="pz-btn pz-wa" href={waLink(c.phone, `${context}${c.role === "tenant" ? "when can we visit?" : "is it still available?"}`)}
+                <a className="pz-btn pz-wa" href={waLink(c.phone, contactMessage(l, c, fromMe))}
                   target="_blank" rel="noreferrer"><WhatsAppIcon /> WhatsApp</a>
               </div>
             ) : (

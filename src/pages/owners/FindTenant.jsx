@@ -4,13 +4,15 @@
  *   1. Listing: live on moveazy.co.in and the broker partner app, or not.
  *   2. Visit times: the same hourly slots the site books against
  *      (lib/visitSchedule.js), set as "every day / weekdays / weekends, from–to".
- *   3. Interested renters: booked, asked, liked, or sent by the MovEazy team —
+ *   3. Broker calls: Premium partner brokers call or WhatsApp the owner
+ *      directly, or — switched off — MovEazy's visits desk takes them.
+ *   4. Interested renters: booked, asked, liked, or sent by the MovEazy team —
  *      first name and initial with what they want. MovEazy coordinates, so no
  *      contact details reach the owner (owner_property_candidates()).
  */
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { Link, useParams } from "react-router-dom";
-import { CalendarClock, Check, Circle, Clock, ExternalLink, Info, Share2, Users } from "lucide-react";
+import { CalendarClock, Check, Circle, Clock, ExternalLink, Info, Phone, Share2, Users } from "lucide-react";
 import { useOwner } from "./OwnerApp";
 import { Avatar, Chip, Confirm, Empty, Loading, Pill, TopBar, WhatsAppIcon, toast } from "./ownerUi";
 import {
@@ -18,11 +20,65 @@ import {
   propertyName, teamWa, updateProperty, waLink,
 } from "../../lib/owners";
 import { fetchSlotsForProperty, deleteVisitSlot } from "../../lib/visits";
+import { VISITS_DESK, fetchBrokerContact, setBrokerContact } from "../../lib/partnerContact";
 import { DEFAULT_VISIT_RULE, VISIT_MODES, applyVisitRule, readVisitRule, rememberVisitRule } from "../../lib/visitSchedule";
 
 const HOURS = Array.from({ length: 16 }, (_, i) => `${String(i + 6).padStart(2, "0")}:00`);
 const hourLabel = (h) => new Date(`2000-01-01T${h}`).toLocaleTimeString("en-IN", { hour: "numeric", hour12: true });
 const BADGE_TONE = { visit_booked: "green", visited: "blue", visit_requested: "amber", shortlisted: "champ", liked: "grey" };
+
+/**
+ * Whether MovEazy's partner brokers may call or WhatsApp the owner about this
+ * flat. On, they reach the owner and see the visit times above; off, every
+ * call and message goes to MovEazy's visits desk, which passes the flat and
+ * the visit wanted on.
+ */
+function BrokerCalls({ propertyId }) {
+  const [on, setOn] = useState(null);
+  const [busy, setBusy] = useState(false);
+  useEffect(() => { fetchBrokerContact(propertyId).then(setOn, () => setOn(true)); }, [propertyId]);
+
+  const flip = async () => {
+    const next = !on;
+    setBusy(true);
+    try {
+      await setBrokerContact(propertyId, next);
+      setOn(next);
+      toast(next ? "Brokers can call and WhatsApp you" : "Brokers' calls go to MovEazy now");
+    } catch (e) {
+      toast(friendlyError(e, "Could not change it."), "error");
+    } finally {
+      setBusy(false);
+    }
+  };
+  const desk = VISITS_DESK.replace(/(\d{5})(\d{5})/, "$1 $2");
+
+  return (
+    <div className="oz-section">
+      <div className="oz-between" style={{ alignItems: "flex-start", gap: 12 }}>
+        <span style={{ flex: 1 }}>
+          <h2 className="oz-h2" style={{ margin: 0 }}><span className="oz-row" style={{ gap: 6 }}><Phone size={17} /> Calls from brokers</span></h2>
+          <p className="oz-meta" style={{ margin: "6px 0 0", lineHeight: 1.55 }}>
+            {on === null ? "Loading…" : on
+              ? "MovEazy partner brokers can call or WhatsApp you directly to fix a visit, at the times above."
+              : `Brokers' calls and messages go to MovEazy (${desk}) with the flat and the visit they want. We pass it on to you.`}
+          </p>
+        </span>
+        <button type="button" role="switch" aria-checked={Boolean(on)} aria-label="Let brokers call or WhatsApp me"
+          onClick={flip} disabled={busy || on === null}
+          style={{
+            flex: "none", width: 50, height: 30, borderRadius: 99, border: "none", padding: 3, cursor: "pointer",
+            background: on ? "var(--em)" : "#CBD5E1", transition: "background .2s", marginTop: 2,
+          }}>
+          <span style={{
+            display: "block", width: 24, height: 24, borderRadius: 99, background: "#fff", boxShadow: "0 1px 3px rgba(0,0,0,.25)",
+            transform: on ? "translateX(20px)" : "none", transition: "transform .2s",
+          }} />
+        </button>
+      </div>
+    </div>
+  );
+}
 
 function VisitTimes({ propertyId }) {
   const [rule, setRule] = useState(() => {
@@ -218,6 +274,7 @@ export default function FindTenant() {
         </div>
 
         <VisitTimes propertyId={id} />
+        <BrokerCalls propertyId={id} />
 
         <div className="oz-section">
           <h2 className="oz-h2"><span className="oz-row" style={{ gap: 6 }}><Users size={17} /> Interested renters</span>

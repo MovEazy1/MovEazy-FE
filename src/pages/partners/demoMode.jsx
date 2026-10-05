@@ -151,6 +151,7 @@ export const EXPLAIN = {
   lead_whatsapp: ["Message your tenant", "Opens WhatsApp with your tenant and logs when you last contacted them."],
   create_group: ["Create a group", "Start a private group for your association and invite brokers with a WhatsApp link."],
   insights: ["Leads dashboard", "Your QR scans by area, how many clients opened your lists, which homes they like most, and every like and skip as it happens."],
+  location: ["Exact location on request", "Ask the listing broker for a flat's exact address and map pin. They approve in one tap, and it appears on the listing."],
   sold_out: ["Mark sold out", "Tell your group a flat is taken. MovEazy and the listing broker are notified, so nobody wastes a call."],
 };
 
