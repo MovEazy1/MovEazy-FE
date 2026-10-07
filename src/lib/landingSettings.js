@@ -34,7 +34,13 @@ export const LANDING_DEFAULTS = {
   videoOwner: "",
 };
 
+// The last answer is kept on the device (it is public: shares, stats, video
+// links), so a returning visitor's page draws with the real numbers at once
+// instead of the defaults followed by a jump.
+const SAVED_KEY = "mz_landing_settings_v1";
 let cached = null;
+let saved = null;
+try { saved = JSON.parse(localStorage.getItem(SAVED_KEY) || "null"); } catch { saved = null; }
 
 const merge = (data) => ({ ...LANDING_DEFAULTS, ...Object.fromEntries(Object.entries(data).filter(([, v]) => v !== null && v !== "")) });
 
@@ -45,6 +51,7 @@ export async function fetchLandingSettings({ fresh = false } = {}) {
     const { data, error } = await supabase.rpc("landing_settings");
     if (error || !data || typeof data !== "object") return cached || LANDING_DEFAULTS;
     cached = merge(data);
+    try { localStorage.setItem(SAVED_KEY, JSON.stringify(cached)); } catch { /* ignore */ }
     return cached;
   } catch {
     return cached || LANDING_DEFAULTS;
@@ -61,7 +68,7 @@ export async function adminSaveProgramSettings(patch) {
 }
 
 export function useLandingSettings() {
-  const [s, setS] = useState(cached || LANDING_DEFAULTS);
+  const [s, setS] = useState(cached || (saved ? { ...LANDING_DEFAULTS, ...saved } : LANDING_DEFAULTS));
   useEffect(() => {
     let alive = true;
     fetchLandingSettings().then((v) => { if (alive) setS(v); });

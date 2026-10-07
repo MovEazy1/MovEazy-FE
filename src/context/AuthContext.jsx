@@ -18,7 +18,8 @@ import { attributionToken } from "../lib/attribution";
 import { claimLead, leadSnapshot } from "../lib/leadIntake";
 import { fetchUserRequirement, saveUserRequirement } from "../lib/userRequirements";
 import { isEmailAdminAllowed, getEnvAdminEmails } from "../lib/adminAccess";
-import { supabase, isSupabaseConfigured, normalizeSupabaseError, getSupabaseAuthSettings } from "../lib/supabase";
+import { supabase, isSupabaseConfigured, normalizeSupabaseError, getSupabaseAuthSettings, storedSessionUid } from "../lib/supabase";
+import { clearCacheExcept, DAY_MS } from "../lib/localCache";
 
 const AuthContext = createContext(null);
 const ADMIN_EMAILS = getEnvAdminEmails();
@@ -50,13 +51,26 @@ function buildUserFromSupabase(sbUser) {
   };
 }
 
+/**
+ * The signed-in user as last read, kept on the device for 30 days so any tab —
+ * a new one, the partner or owner app opened from the home screen — draws as
+ * that person at once instead of behind "Loading…" while the profile is read
+ * again. It was per tab (sessionStorage), so every new tab waited.
+ *
+ * Only trusted while Supabase's own saved session is for the same account; the
+ * session handler re-reads the profile in the background either way.
+ */
+const USER_KEY = "moveasy_user_v2";
+const USER_MAX_AGE = 30 * DAY_MS;
+
 function cacheSessionUser(u) {
-  if (!u) {
-    sessionStorage.removeItem("moveasy_session_user");
-    return;
-  }
   try {
-    sessionStorage.setItem("moveasy_session_user", JSON.stringify(u));
+    sessionStorage.removeItem("moveasy_session_user"); // the old per-tab copy
+    if (!u) {
+      localStorage.removeItem(USER_KEY);
+      return;
+    }
+    localStorage.setItem(USER_KEY, JSON.stringify({ u, at: Date.now() }));
   } catch {
     /* ignore quota errors */
   }
@@ -64,11 +78,26 @@ function cacheSessionUser(u) {
 
 function getCachedSessionUser() {
   try {
-    const cached = sessionStorage.getItem("moveasy_session_user");
-    return cached ? JSON.parse(cached) : null;
+    const raw = JSON.parse(localStorage.getItem(USER_KEY) || "null");
+    const uid = storedSessionUid();
+    if (!raw?.u || !uid || raw.u.uid !== uid || !(Date.now() - raw.at < USER_MAX_AGE)) return null;
+    return raw.u;
   } catch {
-    sessionStorage.removeItem("moveasy_session_user");
     return null;
+  }
+}
+
+/** Saved data on this device, from apps that open on it (lib/localCache.js), is someone's: drop it on sign-out. */
+function forgetDeviceData(keepUid) {
+  clearCacheExcept(keepUid);
+  if (keepUid) return;
+  try {
+    for (let i = localStorage.length - 1; i >= 0; i--) {
+      const k = localStorage.key(i) || "";
+      if (k.startsWith("mz_crm_role_v1:")) localStorage.removeItem(k);
+    }
+  } catch {
+    /* ignore */
   }
 }
 
@@ -158,9 +187,10 @@ function buildUserFromProfile(sbUser, profile) {
 
 export function AuthProvider({ children }) {
   const [user, setUser] = useState(() => getCachedSessionUser());
-  const [loading, setLoading] = useState(() => isSupabaseConfigured);
+  // Known on this device already: draw now, confirm in the background.
+  const [loading, setLoading] = useState(() => isSupabaseConfigured && !getCachedSessionUser());
   const [supabaseSession, setSupabaseSession] = useState(null);
-  const [adminAllowed, setAdminAllowed] = useState(false);
+  const [adminAllowed, setAdminAllowed] = useState(() => getCachedSessionUser()?.role === "admin");
   const [pendingSellerBadgeApplications, setPendingSellerBadgeApplications] = useState([]);
 
   const loadPendingSellerBadgeApplications = async () => {
@@ -190,8 +220,11 @@ export function AuthProvider({ children }) {
       setUser(null);
       setAdminAllowed(false);
       cacheSessionUser(null);
+      forgetDeviceData(null);
       return;
     }
+    // Somebody else's saved data never outlives a switch of account.
+    forgetDeviceData(sbUser.id);
     // Best-effort repair/attribution steps — must never be able to block or
     // corrupt the real profile read below. They used to share handleSession's
     // one try/catch with getProfileForUser, so any transient failure here (a

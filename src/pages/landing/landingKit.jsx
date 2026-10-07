@@ -14,6 +14,7 @@ import logoOnLight from "../../assets/logo/moveazy-logo-mint-light.png";
 import logoOnDark from "../../assets/logo/moveazy-logo-mint-dark.png";
 import { useAuth } from "../../context/AuthContext";
 import { fetchPublishedInventory } from "../../lib/inventory";
+import { DAY_MS, PUBLIC, readCache, writeCache } from "../../lib/localCache";
 import { isVideoUrl } from "../../lib/listingMedia";
 
 /** px below the viewport top a pinned strip sits at: clear of the nav. */
@@ -454,11 +455,23 @@ export function Shot({ title, sub, children }) {
 }
 
 /** MovEazy's published inventory (public columns only). */
+/**
+ * The published listings, as any visitor may see them. The last copy is kept
+ * on the device for 30 days (public data, nobody's account), so a returning
+ * visitor's page fills in at once and updates when the fresh copy lands.
+ */
 export function useInventory(limit = 500) {
   const [rows, setRows] = useState(null);
   useEffect(() => {
     let alive = true;
-    fetchPublishedInventory({ limit }).then((r) => { if (alive) setRows(r); }, () => { if (alive) setRows([]); });
+    let got = false;
+    readCache(PUBLIC, `inventory:${limit}`, 30 * DAY_MS).then((r) => { if (alive && !got && r) setRows(r); });
+    fetchPublishedInventory({ limit }).then((r) => {
+      got = true;
+      if (!alive) return;
+      setRows(r);
+      writeCache(PUBLIC, `inventory:${limit}`, r);
+    }, () => { got = true; if (alive) setRows((cur) => cur ?? []); });
     return () => { alive = false; };
   }, [limit]);
   return rows;

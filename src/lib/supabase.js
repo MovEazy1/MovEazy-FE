@@ -76,3 +76,18 @@ export function hasStoredSession() {
   }
   return false;
 }
+
+/** The account id in Supabase's saved session on this device, or "" — read without starting Supabase. */
+export function storedSessionUid() {
+  try {
+    for (let i = 0; i < localStorage.length; i++) {
+      const k = localStorage.key(i);
+      if (!/^sb-.+-auth-token$/.test(k || "")) continue;
+      const v = JSON.parse(localStorage.getItem(k) || "null");
+      return String(v?.user?.id || v?.currentSession?.user?.id || "");
+    }
+  } catch {
+    /* storage blocked or not JSON */
+  }
+  return "";
+}

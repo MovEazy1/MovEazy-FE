@@ -33,6 +33,12 @@ import { clearPendingSignup, pendingSignupPhone, stampPartnerSignup } from "../.
 import { BottomNav, CreateSheet, Loading, PartnerStyles, ToastHost, WhatsAppIcon, toast } from "./partnerUi";
 import { hasStoredSession } from "../../lib/supabase";
 import { prefetchWhenIdle } from "../../lib/prefetch";
+import { DAY_MS, readCache, writeCache } from "../../lib/localCache";
+import TopProgress from "../../components/TopProgress";
+
+// What the broker saw last time stays on the device for 30 days, so the app
+// opens on it at once and refreshes underneath (lib/localCache.js).
+const SAVED_FOR = 30 * DAY_MS;
 
 // The signed-out landing page is the bulk of this file's weight, and a signed-in
 // partner never sees it. Loaded on demand — and straight away when nobody is
@@ -145,9 +151,12 @@ function PartnerWorkspace({ me, reloadMe }) {
     });
   }, []);
 
+  // Which lists have their fresh copy already — a saved copy never overwrites those.
+  const fresh = useRef(new Set());
   const reloadInventory = useCallback(async () => {
     try {
       setInventory(await fetchPartnerInventory());
+      fresh.current.add("inventory");
       setInvError("");
     } catch (e) {
       setInvError(friendlyError(e, "Could not load inventory."));
@@ -155,21 +164,50 @@ function PartnerWorkspace({ me, reloadMe }) {
     }
   }, []);
   const reloadGroups = useCallback(async () => {
-    try { setGroups(await fetchMyGroups()); } catch { /* keep what we had */ }
+    try { setGroups(await fetchMyGroups()); fresh.current.add("groups"); } catch { /* keep what we had */ }
   }, []);
   const reloadLeads = useCallback(async () => {
-    try { setLeads(await fetchLeads()); } catch { /* keep what we had */ }
+    try { setLeads(await fetchLeads()); fresh.current.add("leads"); } catch { /* keep what we had */ }
   }, []);
 
+  const { user } = useAuth();
+  const uid = user?.uid;
+  const [refreshing, setRefreshing] = useState(false);
+  const [settled, setSettled] = useState(false);
   useEffect(() => {
-    reloadInventory();
-    // Anything the MovEazy team added for this broker since last time.
-    claimCrmListings().then((n) => { if (n > 0) reloadInventory(); });
-    reloadGroups();
-    reloadLeads();
-    reloadStatus();
-    fetchSavedIds().then(setSaved);
-  }, [reloadInventory, reloadGroups, reloadLeads, reloadStatus]);
+    let alive = true;
+    readCache(uid, "partner:data", SAVED_FOR).then((d) => {
+      if (!alive || !d || fresh.current.size >= 5) return;
+      const f = fresh.current;
+      if (!f.has("inventory")) setInventory(d.inventory ?? null);
+      if (!f.has("groups")) setGroups(d.groups ?? []);
+      if (!f.has("leads")) setLeads(d.leads ?? []);
+      if (!f.has("status")) setStatus(d.status ?? null);
+      if (!f.has("saved")) setSaved(new Set(d.saved ?? []));
+      setRefreshing(true);
+    });
+    Promise.allSettled([
+      reloadInventory(),
+      // Anything the MovEazy team added for this broker since last time.
+      claimCrmListings().then((n) => (n > 0 ? reloadInventory() : null)),
+      reloadGroups(),
+      reloadLeads(),
+      reloadStatus().then(() => fresh.current.add("status")),
+      fetchSavedIds().then((ids) => { setSaved(ids); fresh.current.add("saved"); }),
+    ]).then(() => {
+      if (!alive) return;
+      setRefreshing(false);
+      setSettled(true);
+    });
+    return () => { alive = false; };
+  }, [uid, reloadInventory, reloadGroups, reloadLeads, reloadStatus]);
+
+  // Keep the saved copy current with whatever the broker does, a moment after they do it.
+  useEffect(() => {
+    if (!settled || !uid || inventory == null) return undefined;
+    const t = setTimeout(() => writeCache(uid, "partner:data", { inventory, groups, leads, status, saved: [...saved] }), 800);
+    return () => clearTimeout(t);
+  }, [settled, uid, inventory, groups, leads, status, saved]);
 
   // A plan just started: the congratulations page, once.
   const rel = pathname.slice(pp("/").replace(/\/$/, "").length) || "/";
@@ -221,6 +259,7 @@ function PartnerWorkspace({ me, reloadMe }) {
 
   return (
     <PartnerContext.Provider value={value}>
+      <TopProgress active={refreshing} color="#E4B659" />
       <div className="pz-col" style={showBar ? { paddingBottom: "calc(140px + env(safe-area-inset-bottom))" } : undefined}>
         <Suspense fallback={<Loading />}>
           <Routes>
@@ -284,6 +323,18 @@ function Gate() {
     });
   }, [loading, user?.uid, user?.name, hasPhone, updateUserProfile]);
 
+  // Known on this device: open on the saved account straight away; load() below confirms it.
+  useEffect(() => {
+    if (!user?.uid) return undefined;
+    let alive = true;
+    readCache(user.uid, "partner:me", SAVED_FOR).then((m) => {
+      if (!alive || !m?.partner) return;
+      setMe((cur) => cur ?? m);
+      setState((s) => (s === "idle" || s === "loading" ? "ready" : s));
+    });
+    return () => { alive = false; };
+  }, [user?.uid]);
+
   const load = useCallback(async () => {
     setState((s) => (s === "ready" ? s : "loading"));
     try {
@@ -298,6 +349,7 @@ function Gate() {
         stampPartnerSignup();
       }
       setMe(m);
+      writeCache(user?.uid, "partner:me", m);
       setState("ready");
     } catch (e) {
       if (e?.code === "22023" && /mobile/i.test(e?.message || "")) {
@@ -307,7 +359,7 @@ function Gate() {
       setError(friendlyError(e, "Could not open the partner app."));
       setState("error");
     }
-  }, [user?.name]);
+  }, [user?.name, user?.uid]);
 
   useEffect(() => {
     if (!loading && user?.uid && hasPhone) load();

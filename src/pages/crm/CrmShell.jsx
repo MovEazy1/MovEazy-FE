@@ -4,8 +4,16 @@
  * Clients, requirements, inventory, engagement and shortlists are loaded once
  * here and passed down, because all four screens read the same rows and a
  * per-screen fetch would mean the list flickering every time you switch tabs.
+ *
+ * How it opens fast:
+ *   - the screen you opened shows as soon as the data IT reads is in
+ *     (NEEDS below) — Team or Settings don't wait for 3,000 listings; the rest
+ *     loads right after, so switching tabs stays instant;
+ *   - the last copy is kept on this device for 7 days (lib/localCache.js): a
+ *     returning agent sees it at once, under a thin progress line, while the
+ *     fresh copy loads. Dropped on sign-out and when access is taken away.
  */
-import { createContext, useCallback, useContext, useEffect, useMemo, useState } from "react";
+import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from "react";
 import { Link, NavLink, Navigate, Outlet, useLocation } from "react-router-dom";
 import { useAuth } from "../../context/AuthContext";
 import { useCrmAccess } from "../../hooks/useCrmAccess";
@@ -14,11 +22,14 @@ import {
   fetchClients, fetchClientRequirements, fetchEngagement, fetchShortlists, fetchLastTouch, fetchLeadActivity,
   fetchClientOwnAnswers,
 } from "../../lib/crmClients";
-import { fetchCrmSettings } from "../../lib/crmSettings";
+import { DEFAULT_CRM_SETTINGS, fetchCrmSettings } from "../../lib/crmSettings";
 import { fetchPropertyInterest } from "../../lib/crmPropertyInterest";
 import { fetchShareChannels } from "../../lib/marketing";
 import { supabase, isSupabaseConfigured } from "../../lib/supabase";
 import { C, CrmStyles, Empty, Loading } from "./crmUi";
+import TopProgress from "../../components/TopProgress";
+import { DAY_MS, dropCache, readCache, writeCache } from "../../lib/localCache";
+import { prefetchWhenIdle } from "../../lib/prefetch";
 
 const CrmContext = createContext(null);
 export const useCrm = () => useContext(CrmContext);
@@ -156,66 +167,148 @@ function Rail({ access }) {
   );
 }
 
+/** Everything the shell loads, and how. */
+const LOADERS = {
+  clients: fetchClients,
+  requirements: fetchClientRequirements,
+  inventory: fetchInventory,
+  engagement: fetchEngagement,
+  shortlists: fetchShortlists,
+  touches: fetchLastTouch,
+  settings: fetchCrmSettings,
+  // May legitimately come back empty: [] on a project without the marketing
+  // migration, and the share menu then degrades to the plain per-platform link.
+  marketingChannels: fetchShareChannels,
+  ownAnswers: fetchClientOwnAnswers,
+  // [] until crm_client_property_interest.sql is run.
+  interest: fetchPropertyInterest,
+  leads: fetchLeadActivity,
+};
+const ALL = Object.keys(LOADERS);
+
+/**
+ * What each screen reads from the shared data — it opens once these are in.
+ * A screen not listed waits for everything (the safe default for a new one).
+ */
+const NEEDS = {
+  clients: ALL,
+  pipeline: ["clients", "requirements", "engagement", "touches"],
+  properties: ["inventory", "requirements", "clients", "marketingChannels"],
+  brokers: ["inventory", "clients", "requirements"],
+  "broker-leads": [],
+  "owner-qr": [],
+  buildings: ["inventory"],
+  ops: ["inventory"],
+  visits: ["clients", "inventory", "requirements", "settings"],
+  notifications: ["inventory", "clients"],
+  payments: ["clients"],
+  "app-analytics": [],
+  team: [],
+  settings: ["settings", "clients", "requirements", "inventory"],
+};
+export function needsFor(pathname) {
+  const seg = String(pathname || "").split("/")[2] || "clients";
+  return NEEDS[seg] ?? ALL;
+}
+
+/** What a screen sees for data still on its way: empty, never undefined. */
+const PENDING = Object.fromEntries(ALL.map((k) => [k, k === "settings" ? { ...DEFAULT_CRM_SETTINGS } : []]));
+
+const CACHE_NAME = "crm";
+const CACHE_MAX_AGE = 7 * DAY_MS;
+
 export default function CrmShell() {
   const access = useCrmAccess();
   const { user } = useAuth();
+  const { pathname } = useLocation();
 
-  const [data, setData] = useState(null);
-  const [loading, setLoading] = useState(true);
+  /** key -> rows. A key is absent until its first answer (or the saved copy) is in. */
+  const [data, setData] = useState({});
   const [error, setError] = useState("");
+  /** Showing the saved copy while the fresh one loads. */
+  const [refreshing, setRefreshing] = useState(false);
+  const round = useRef(0);
 
-  const load = useCallback(async () => {
+  const load = useCallback(async ({ first = [] } = {}) => {
+    const mine = ++round.current;
+    const fetchKey = async (k) => {
+      try {
+        const rows = await LOADERS[k]();
+        if (round.current === mine) setData((d) => ({ ...d, [k]: rows }));
+        return [k, rows];
+      } catch (e) {
+        if (round.current === mine) setError(e?.message || "Could not load the CRM.");
+        throw e;
+      }
+    };
     try {
-      // marketingChannels is the one that may legitimately come back empty: it
-      // resolves to [] on a project without the marketing migration, and the
-      // share menu then degrades to the plain per-platform link rather than
-      // leaving an agent with no way to post at all.
-      // interest is the other: [] until crm_client_property_interest.sql is
-      // run, which leaves clients reading exactly as they did before.
-      const [clients, requirements, inventory, engagement, shortlists, touches, settings, marketingChannels, ownAnswers,
-        interest, leads] =
-        await Promise.all([
-          fetchClients(), fetchClientRequirements(), fetchInventory(),
-          fetchEngagement(), fetchShortlists(), fetchLastTouch(), fetchCrmSettings(),
-          fetchShareChannels(), fetchClientOwnAnswers(), fetchPropertyInterest(), fetchLeadActivity(),
-        ]);
-      setData({
-        clients, requirements, inventory, engagement, shortlists, touches, settings, marketingChannels, ownAnswers,
-        interest, leads,
-      });
+      // The open screen's data first; the rest once it is in, so it doesn't
+      // compete for the connection with what is on screen.
+      const head = first.filter((k) => LOADERS[k]);
+      const tail = ALL.filter((k) => !head.includes(k));
+      const got = await Promise.all(head.map(fetchKey));
+      got.push(...(await Promise.all(tail.map(fetchKey))));
+      if (round.current !== mine) return;
       setError("");
-    } catch (e) {
-      setError(e?.message || "Could not load the CRM.");
+      writeCache(user?.uid, CACHE_NAME, Object.fromEntries(got));
+    } catch {
+      /* error already set */
     } finally {
-      setLoading(false);
+      if (round.current === mine) setRefreshing(false);
     }
-  }, []);
+  }, [user?.uid]);
 
+  // Open: the saved copy if there is one, then the fresh data either way.
+  const opened = useRef(false);
   useEffect(() => {
-    if (!access.loading && access.isStaff) load();
-  }, [access.loading, access.isStaff, load]);
+    if (access.loading || !access.isStaff || opened.current) return;
+    opened.current = true;
+    (async () => {
+      const saved = await readCache(user?.uid, CACHE_NAME, CACHE_MAX_AGE);
+      if (saved && ALL.every((k) => k in saved)) {
+        setData((d) => ({ ...saved, ...d }));
+        setRefreshing(true);
+      }
+      load({ first: needsFor(window.location.pathname) });
+    })();
+  }, [access.loading, access.isStaff, load, user?.uid]);
+
+  // No longer staff: nothing of the CRM stays on this device.
+  useEffect(() => {
+    if (!access.loading && !access.isStaff && user?.uid) dropCache(user.uid, CACHE_NAME);
+  }, [access.loading, access.isStaff, user?.uid]);
+
+  // The CRM screens agents move between, fetched while the browser is idle.
+  useEffect(() => prefetchWhenIdle([
+    () => import("./CrmClientsPage"), () => import("./CrmPropertiesPage"), () => import("./CrmPipelinePage"),
+    () => import("./CrmVisitsPage"), () => import("./CrmNotificationsPage"),
+  ], { delay: 4000 }), []);
 
   /** Patch one client in place — avoids refetching 4000 rows after a chip tap. */
   const patchClient = useCallback((updated) => {
     setData((d) =>
-      d ? { ...d, clients: d.clients.map((c) => (c.id === updated.id ? { ...c, ...updated } : c)) } : d,
+      d.clients ? { ...d, clients: d.clients.map((c) => (c.id === updated.id ? { ...c, ...updated } : c)) } : d,
     );
   }, []);
 
+  const reload = useCallback(() => load(), [load]);
+  const ready = needsFor(pathname).every((k) => k in data);
+
   const value = useMemo(
-    () => ({ ...data, access, user, reload: load, patchClient, setData }),
-    [data, access, user, load, patchClient],
+    () => ({ ...PENDING, ...data, access, user, reload, patchClient, setData }),
+    [data, access, user, reload, patchClient],
   );
 
   return (
     <Gate>
       <div className="crm" style={{ display: "flex", height: "100vh", overflow: "hidden" }}>
         <CrmStyles />
+        <TopProgress active={refreshing} color={C.accent} />
         <Rail access={access} />
         <main style={{ flex: 1, minWidth: 0, display: "flex", flexDirection: "column" }}>
-          {loading && <Loading label="Loading the workspace…" />}
-          {!loading && error && <Empty>{error}</Empty>}
-          {!loading && !error && data && (
+          {!ready && !error && <Loading label="Loading the workspace…" />}
+          {!ready && error && <Empty>{error}</Empty>}
+          {ready && (
             <CrmContext.Provider value={value}>
               <Outlet />
             </CrmContext.Provider>

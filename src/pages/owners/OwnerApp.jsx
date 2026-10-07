@@ -13,7 +13,7 @@
  *   pending / suspended → a holding screen
  *   approved            → the app
  */
-import { createContext, lazy, Suspense, useCallback, useContext, useEffect, useMemo, useState } from "react";
+import { createContext, lazy, Suspense, useCallback, useContext, useEffect, useMemo, useRef, useState } from "react";
 import { Navigate, Route, Routes } from "react-router-dom";
 import { Clock, ShieldOff } from "lucide-react";
 import { useAuth } from "../../context/AuthContext";
@@ -25,6 +25,12 @@ import { fetchMyBuildings } from "../../lib/buildings";
 import { BottomNav, Loading, OwnerStyles, ToastHost, WhatsAppIcon } from "./ownerUi";
 import { hasStoredSession } from "../../lib/supabase";
 import { prefetchWhenIdle } from "../../lib/prefetch";
+import { DAY_MS, readCache, writeCache } from "../../lib/localCache";
+import TopProgress from "../../components/TopProgress";
+
+// What the owner saw last time stays on the device for 30 days, so the app
+// opens on it at once and refreshes underneath (lib/localCache.js).
+const SAVED_FOR = 30 * DAY_MS;
 
 // The signed-out landing page is the bulk of this file's weight, and a signed-in
 // owner never sees it. Loaded on demand — and straight away when nobody is
@@ -98,9 +104,12 @@ function OwnerWorkspace({ me, reloadMe }) {
     });
   }, []);
 
+  // Which lists have their fresh copy already — a saved copy never overwrites those.
+  const fresh = useRef(new Set());
   const reloadProperties = useCallback(async () => {
     try {
       setProperties(await fetchOwnerProperties());
+      fresh.current.add("properties");
       setPropError("");
     } catch (e) {
       setPropError(friendlyError(e, "Could not load your properties."));
@@ -108,22 +117,48 @@ function OwnerWorkspace({ me, reloadMe }) {
     }
   }, []);
   const reloadTenants = useCallback(async () => {
-    try { setTenants(await fetchOwnerTenants()); } catch { /* keep */ }
+    try { setTenants(await fetchOwnerTenants()); fresh.current.add("tenants"); } catch { /* keep */ }
   }, []);
   const reloadRequests = useCallback(async () => {
-    try { setRequests(await fetchRequests()); } catch { /* keep */ }
+    try { setRequests(await fetchRequests()); fresh.current.add("requests"); } catch { /* keep */ }
   }, []);
   const reloadBuildings = useCallback(async () => {
-    try { setBuildings(await fetchMyBuildings()); } catch { setBuildings((cur) => cur ?? []); }
+    try { setBuildings(await fetchMyBuildings()); fresh.current.add("buildings"); } catch { setBuildings((cur) => cur ?? []); }
   }, []);
 
+  const { user } = useAuth();
+  const uid = user?.uid;
+  const [refreshing, setRefreshing] = useState(false);
+  const [settled, setSettled] = useState(false);
   useEffect(() => {
-    reloadProperties();
-    reloadTenants();
-    reloadRequests();
-    reloadBuildings();
-    fetchRatings().then(setRatings);
-  }, [reloadProperties, reloadTenants, reloadRequests, reloadBuildings]);
+    let alive = true;
+    readCache(uid, "owner:data", SAVED_FOR).then((d) => {
+      if (!alive || !d || fresh.current.size >= 5) return;
+      const f = fresh.current;
+      if (!f.has("properties")) setProperties(d.properties ?? null);
+      if (!f.has("tenants")) setTenants(d.tenants ?? []);
+      if (!f.has("requests")) setRequests(d.requests ?? []);
+      if (!f.has("buildings")) setBuildings(d.buildings ?? null);
+      if (!f.has("ratings")) setRatings(d.ratings ?? {});
+      setRefreshing(true);
+    });
+    Promise.allSettled([
+      reloadProperties(), reloadTenants(), reloadRequests(), reloadBuildings(),
+      fetchRatings().then((r) => { setRatings(r); fresh.current.add("ratings"); }),
+    ]).then(() => {
+      if (!alive) return;
+      setRefreshing(false);
+      setSettled(true);
+    });
+    return () => { alive = false; };
+  }, [uid, reloadProperties, reloadTenants, reloadRequests, reloadBuildings]);
+
+  // Keep the saved copy current with whatever the owner does, a moment after they do it.
+  useEffect(() => {
+    if (!settled || !uid || properties == null) return undefined;
+    const t = setTimeout(() => writeCache(uid, "owner:data", { properties, tenants, ratings, requests, buildings }), 800);
+    return () => clearTimeout(t);
+  }, [settled, uid, properties, tenants, ratings, requests, buildings]);
 
   const byId = useMemo(() => new Map((properties ?? []).map((p) => [p.property_id, p])), [properties]);
 
@@ -135,6 +170,7 @@ function OwnerWorkspace({ me, reloadMe }) {
 
   return (
     <OwnerContext.Provider value={value}>
+      <TopProgress active={refreshing} color="#0A6B4E" />
       <div className="oz-col">
         <Suspense fallback={<Loading />}>
           <Routes>
@@ -178,11 +214,25 @@ function Gate() {
   const [error, setError] = useState("");
   const hasPhone = Boolean(String(user?.phone || "").trim());
 
+  // Known on this device: open on the saved account straight away; load() below confirms it.
+  useEffect(() => {
+    if (!user?.uid) return undefined;
+    let alive = true;
+    readCache(user.uid, "owner:me", SAVED_FOR).then((m) => {
+      if (!alive || !m) return;
+      setMe((cur) => cur ?? m);
+      setState((s) => (s === "idle" || s === "loading" ? "ready" : s));
+    });
+    return () => { alive = false; };
+  }, [user?.uid]);
+
   const load = useCallback(async () => {
     setState((s) => (s === "ready" ? s : "loading"));
     try {
       await registerOwner(user?.name);
-      setMe(await fetchOwnerMe());
+      const m = await fetchOwnerMe();
+      setMe(m);
+      writeCache(user?.uid, "owner:me", m);
       setState("ready");
     } catch (e) {
       if (e?.code === "22023" && /mobile/i.test(e?.message || "")) {
@@ -192,7 +242,7 @@ function Gate() {
       setError(friendlyError(e, "Could not open the owner app."));
       setState("error");
     }
-  }, [user?.name]);
+  }, [user?.name, user?.uid]);
 
   useEffect(() => {
     if (!loading && user?.uid && hasPhone) load();
