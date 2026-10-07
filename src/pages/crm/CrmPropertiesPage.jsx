@@ -29,6 +29,7 @@ import { whatsappUrl } from "../../lib/crmSettings";
 import { formatForDisplay } from "../../lib/mobile";
 import { Btn, C, Chip, Empty, ScoreRing, Toast, inr, shortDate } from "./crmUi";
 import CrmBuildingPicker from "./CrmBuildingPicker";
+import ThumbImg from "../../components/ThumbImg";
 import {
   bySoldOutDesc, markSoldOut, relistProperty, soldOutDate, soldOutMonth, soldOutMonths, todayInIndia,
 } from "../../lib/soldOut";
@@ -259,11 +260,10 @@ function PropertyThumbs({ listing, onOpen }) {
           }}
         >
           {shown.map((src, i) => (
-            <img
+            <ThumbImg
               key={src}
               src={src}
               alt=""
-              loading="lazy"
               style={{
                 width: "100%", height: "100%", objectFit: "cover", display: "block",
                 background: C.surfaceAlt,

@@ -5,7 +5,7 @@
  * on the team. Preview renders against a real client from the list rather than
  * dummy text — a template reads differently when the variables are filled.
  */
-import { useEffect, useMemo, useState } from "react";
+import { lazy, Suspense, useEffect, useMemo, useState } from "react";
 import { useCrm } from "./CrmShell";
 import {
   DEFAULT_CLOSED_OUTSIDE_REASONS, TEMPLATE_VARIABLES, buildTemplateVars,
@@ -13,6 +13,9 @@ import {
 } from "../../lib/crmSettings";
 import { SCOPES } from "../../lib/adminScopes";
 import { Btn, C, Chip, Empty, Toast } from "./crmUi";
+
+// The one-off photo shrink: super admins only, so its code loads only for them.
+const CrmPhotoOptimizer = lazy(() => import("./CrmPhotoOptimizer"));
 
 export default function CrmSettingsPage() {
   const crm = useCrm();
@@ -194,6 +197,10 @@ export default function CrmSettingsPage() {
           />
           <span className="crm-mute" style={{ fontSize: 10.5 }}>One per line.</span>
         </div>
+
+        {access.role === "super_admin" && (
+          <Suspense fallback={null}><CrmPhotoOptimizer /></Suspense>
+        )}
       </div>
       <Toast {...(toast ?? {})} />
     </div>

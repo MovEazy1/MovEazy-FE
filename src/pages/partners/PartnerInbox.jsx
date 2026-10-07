@@ -139,7 +139,7 @@ export function CuratedListPage() {
             const a = acts[pid]?.action;
             return (
               <Link key={pid} to={pp(`/property/${pid}`)} className="pz-row" style={{ padding: 12, borderTop: i ? "1px solid var(--line)" : 0, color: "inherit", textDecoration: "none" }}>
-                <div className="pz-prop-img" style={{ width: 64, height: 50, borderRadius: 8, overflow: "hidden", flex: "none", aspectRatio: "auto" }}>{l && <SmartListingImage listing={l} />}</div>
+                <div className="pz-prop-img" style={{ width: 64, height: 50, borderRadius: 8, overflow: "hidden", flex: "none", aspectRatio: "auto" }}>{l && <SmartListingImage listing={l} thumb />}</div>
                 <span style={{ flex: 1, minWidth: 0 }}>
                   <strong style={{ display: "block", fontSize: 14.5 }}>{l ? `${bhkLabel(l)} • ${l.area}` : pid}</strong>
                   <span className="pz-meta">{l ? `${inr(l.rent)} / month` : "No longer in your inventory"}</span>

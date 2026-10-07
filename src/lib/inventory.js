@@ -2,6 +2,7 @@ import { supabase, isSupabaseConfigured } from "./supabase";
 import { coverMedia, coverPhoto, isVideoFile, orderListingMedia } from "./listingMedia";
 import { withParentArea } from "../data/preferenceOptions";
 import { STORAGE_LIMIT_BYTES, VIDEO_TARGET_BYTES, shrinkVideo } from "./videoShrink";
+import { MAIN_MAX, THUMB_MAX, jpegName, shrinkImage, thumbPath } from "./imageShrink";
 
 /**
  * Inventory = the supply side. One row per listed home in the Supabase
@@ -58,21 +59,36 @@ export async function uploadInventoryPhotos(files = [], propertyId, onProgress, 
     try {
       // A video too big for one upload is shrunk to 720p first; `onShrink(file, percent)` says how far along.
       let file = original;
+      let name = file.name || "photo";
+      let thumb = null;
       if (isVideoFile(original) && original.size > VIDEO_TARGET_BYTES) {
         onShrink?.(original, 0);
         file = await shrinkVideo(original, { onProgress: (p) => onShrink?.(original, p) });
+      } else if (!isVideoFile(original)) {
+        // Photos at the size they are looked at (lib/imageShrink.js), plus the
+        // small copy cards and lists show. A photo this browser can't open is
+        // uploaded as it came.
+        const main = await shrinkImage(original, MAIN_MAX);
+        if (main && main !== original) { file = main; name = jpegName(name); }
+        thumb = main ? await shrinkImage(main, THUMB_MAX) : null;
       }
-      const safeName = String(file.name || "photo").replace(/[^a-z0-9._-]/gi, "-").toLowerCase();
+      const safeName = String(name).replace(/[^a-z0-9._-]/gi, "-").toLowerCase();
       const path = `inventory/${propertyId}/${Date.now()}-${safeName}`;
       const { data, error } = await supabase.storage
         .from(PHOTO_BUCKET)
         .upload(path, file, {
           upsert: false,
-          contentType: file.type || (isVideoFile(file) ? "video/mp4" : "image/jpeg"),
+          contentType: file.type || (isVideoFile(original) ? "video/mp4" : "image/jpeg"),
         });
       if (!error && data) {
         const { data: pub } = supabase.storage.from(PHOTO_BUCKET).getPublicUrl(data.path);
         if (pub?.publicUrl) urls.push(pub.publicUrl);
+        if (thumb) {
+          // Best effort: without it, cards just show the full photo.
+          await supabase.storage.from(PHOTO_BUCKET)
+            .upload(thumbPath(data.path), thumb, { upsert: true, contentType: "image/jpeg" })
+            .catch(() => {});
+        }
       } else if (error) {
         onFileError?.(original, uploadErrorMessage(error, original));
       }

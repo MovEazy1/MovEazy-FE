@@ -84,7 +84,7 @@ export default function Insights() {
           {(d.top_liked || []).length === 0 ? <p className="pz-meta" style={{ padding: "0 14px 14px", margin: 0 }}>Send curated lists from the AI Property Matcher — likes show up here.</p>
             : d.top_liked.map((h) => (
               <Link key={h.property_id} to={pp(`/property/${h.property_id}`)} className="pz-row ins-home">
-                <div className="th"><SmartListingImage listing={h} /></div>
+                <div className="th"><SmartListingImage listing={h} thumb /></div>
                 <span style={{ flex: 1, minWidth: 0 }}>
                   <strong style={{ display: "block", fontSize: 14.5 }}>{[h.flat_type, h.area].filter(Boolean).join(" · ")}</strong>
                   <span className="pz-meta">{inr(h.rent)} / month</span>

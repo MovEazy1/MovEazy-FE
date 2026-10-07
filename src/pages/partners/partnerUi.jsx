@@ -294,7 +294,7 @@ export function PropertyCard({ listing: l, saved, onToggleSave, onWhatsApp, extr
     <article className="pz-card pz-prop">
       <div className="pz-prop-row">
         <div className="pz-prop-img" onClick={open} role="link" tabIndex={-1} style={{ cursor: "pointer" }}>
-          <SmartListingImage listing={l} />
+          <SmartListingImage listing={l} thumb />
           <span className="pz-prop-badge">
             {l.rent_flag === "potentially_rented"
               ? <span className="pz-pill" style={{ background: "#FFEDD5", color: "#9A3412" }}>Potentially rented</span>

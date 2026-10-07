@@ -275,7 +275,7 @@ export default function AiMatcher() {
               </div>
               {r.top.length > 0 && (
                 <div className="aim-thumbs">
-                  {r.top.slice(0, 5).map((m) => <div key={m.listing.property_id} className="aim-th"><SmartListingImage listing={m.listing} /><i>{m.score}</i></div>)}
+                  {r.top.slice(0, 5).map((m) => <div key={m.listing.property_id} className="aim-th"><SmartListingImage listing={m.listing} thumb /><i>{m.score}</i></div>)}
                   {r.top.length > 5 && <div className="aim-more">+{r.top.length - 5}</div>}
                 </div>
               )}
