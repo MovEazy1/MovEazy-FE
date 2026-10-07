@@ -4,13 +4,14 @@
  * The site is a static SPA — one index.html with one set of OG tags, served for
  * every route — so WhatsApp showed the same logo card for every property. Its
  * crawler doesn't run JavaScript, so no amount of client-side work can fix that.
- * This returns real per-property tags, then sends humans on to the map.
+ * This returns real per-property tags, then sends humans on to the property.
  *
  * Query parameters are carried through verbatim, which matters: the CRM's
  * `mz_s` share token and the UTM parameters have to survive the hop or the open
  * never gets attributed.
  */
 import { fetchListing, listingTitle, listingDescription, esc } from "./_listing.js";
+import { isPreviewRobot } from "./_bots.js";
 
 export const config = { runtime: "edge" };
 
@@ -24,17 +25,26 @@ const FEED_SOURCES = new Set(["facebook", "reddit", "twitter", "linkedin", "inst
 export default async function handler(req) {
   const url = new URL(req.url);
   const listingId = String(url.searchParams.get("listingId") || "").trim().toUpperCase();
-
-  const listing = await fetchListing(listingId);
   const origin = url.origin;
 
   // Everything except our own routing parameter goes on to the app.
   const tracking = new URLSearchParams(url.searchParams);
   tracking.delete("listingId");
 
-  const onward = new URLSearchParams(tracking);
-  if (listingId) onward.set("listingId", listingId);
-  const target = `${origin}/map?${onward.toString()}`;
+  // Humans go to the property's own page. It used to be the map with
+  // ?listingId=, which is a browsing surface we no longer run; the tracking
+  // parameters are what have to survive, and they do either way.
+  const onward = tracking.toString();
+  const target = listingId
+    ? `${origin}/property/${encodeURIComponent(listingId)}${onward ? `?${onward}` : ""}`
+    : `${origin}/matches${onward ? `?${onward}` : ""}`;
+
+  // A person, not a preview robot: straight on, without looking the flat up —
+  // only the preview card needs it. Never cached, so a robot can't be handed it.
+  if (!isPreviewRobot(req.headers.get("user-agent"))) {
+    return new Response(null, { status: 302, headers: { location: target, "cache-control": "private, no-store" } });
+  }
+  const listing = await fetchListing(listingId);
 
   /**
    * This page's own address, which is what og:url has to say.

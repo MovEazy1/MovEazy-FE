@@ -9,6 +9,8 @@
  * Reads only side-effect-free functions (a preview must not count as an
  * open). Any failure serves the page untouched.
  */
+import { isPreviewRobot } from "./_bots.js";
+
 export const config = { runtime: "edge" };
 
 const SUPABASE_URL = (process.env.VITE_SUPABASE_URL || "").trim();
@@ -87,6 +89,11 @@ export default async function handler(req) {
   const id = url.searchParams.get("id") || "";
   const page = await fetch(`${url.origin}/index.html`);
   let html = await page.text();
+  // A person (a QR scan, a tap on a shared link) gets the app at once; the
+  // lookup below only writes the preview card robots read.
+  if (!isPreviewRobot(req.headers.get("user-agent"))) {
+    return new Response(html, { status: 200, headers: { "content-type": "text/html; charset=utf-8", "cache-control": "private, no-store" } });
+  }
   try {
     const t = await tagsFor(kind, id);
     if (t) html = inject(html, t, `https://www.moveazy.co.in/${kind}/${id}`);

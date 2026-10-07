@@ -3,7 +3,7 @@
  *
  * A Facebook post showed the site-wide marketing card instead of the flat, even
  * though /p/:id was serving the listing's own tags: og:url pointed at the
- * onward /map URL, Facebook took that as the object's canonical address,
+ * onward property URL, Facebook took that as the object's canonical address,
  * re-scraped it, and got the SPA's index.html. WhatsApp reads the tags it was
  * handed and never re-resolves, so the same link previewed correctly there —
  * which is how this survived until the first Facebook share.
@@ -45,7 +45,7 @@ const scrape = async (url = SHARE) => {
 describe("the page a crawler gets for a shared flat", () => {
   it("points og:url at itself, not at the page it forwards humans to", async () => {
     const { tag } = await scrape();
-    // The whole bug in one assertion: an og:url on /map sends Facebook to the
+    // The whole bug in one assertion: an og:url on the onward page sends Facebook to the
     // SPA, where every listing has the same generic card.
     expect(new URL(tag("og:url")).pathname).toBe("/p/MZ-ABC123");
   });
@@ -64,11 +64,10 @@ describe("the page a crawler gets for a shared flat", () => {
     expect(canonical).toBe(tag("og:url"));
   });
 
-  it("still sends a human on to the map, listing and token intact", async () => {
+  it("still sends a human on to the property, listing and token intact", async () => {
     const { html } = await scrape(`${SHARE}&mz_s=mzdeadbeef01`);
     const target = new URL(html.match(/window\.location\.replace\("([^"]*)"\)/)[1]);
-    expect(target.pathname).toBe("/map");
-    expect(target.searchParams.get("listingId")).toBe("MZ-ABC123");
+    expect(target.pathname).toBe("/property/MZ-ABC123");
     expect(target.searchParams.get("mz_s")).toBe("mzdeadbeef01");
     expect(target.searchParams.get("utm_source")).toBe("facebook");
   });
