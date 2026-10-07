@@ -1,9 +1,35 @@
 {
   "rewrites": [
-    { "source": "/p/:listingId", "destination": "/api/p?listingId=:listingId" },
-    { "source": "/b/:code", "destination": "/api/share?kind=b&id=:code" },
-    { "source": "/c/:token", "destination": "/api/share?kind=c&id=:token" },
-    { "source": "/building/:code", "destination": "/api/share?kind=building&id=:code" },
-    { "source": "/((?!api/).*)", "destination": "/index.html" }
+    {
+      "source": "/p/:listingId",
+      "destination": "/api/p?listingId=:listingId"
+    },
+    {
+      "source": "/b/:code",
+      "destination": "/api/share?kind=b&id=:code"
+    },
+    {
+      "source": "/c/:token",
+      "destination": "/api/share?kind=c&id=:token"
+    },
+    {
+      "source": "/building/:code",
+      "destination": "/api/share?kind=building&id=:code"
+    },
+    {
+      "source": "/((?!api/).*)",
+      "destination": "/index.html"
+    }
+  ],
+  "headers": [
+    {
+      "source": "/assets/(.*)",
+      "headers": [
+        {
+          "key": "Cache-Control",
+          "value": "public, max-age=31536000, immutable"
+        }
+      ]
+    }
   ]
 }

@@ -28,6 +28,7 @@ import { fetchUserRequirement } from "../lib/userRequirements";
 import { hasLeadPhone } from "../lib/leadIntake";
 import { useLandingSettings } from "../lib/landingSettings";
 import { LandingStyles } from "./landing/landingKit";
+import { prefetchWhenIdle } from "../lib/prefetch";
 import { HighlightScene, Phone, SITE_CSS, SiteFooter, clamp, ease, reduced, useScrollScene } from "./home/homeKit";
 import { PerfectHomeScreen, SwipeScreen, useSteps } from "./home/homeScreens";
 import logoOnDark from "../assets/logo/moveazy-logo-mint-dark.png";
@@ -134,6 +135,8 @@ export default function ForkHome({ tenantEntry = false }) {
   const [pendingMatchCheck, setPendingMatchCheck] = useState(false);
   const settings = useLandingSettings();
   const { steps, matches } = useSteps();
+  // Where a visitor goes next: a home's page, or their top matches.
+  useEffect(() => prefetchWhenIdle([() => import("./PropertyPage"), () => import("./TopMatches")]), []);
 
   // Signed in, the home is the tenant's own: their card, their profile score,
   // Find / List / Profile. Owners (anyone who has listed a flat as an owner)

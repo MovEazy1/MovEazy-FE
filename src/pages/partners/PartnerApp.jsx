@@ -31,7 +31,15 @@ import { useUnreadCount } from "./PartnerInbox";
 import { MOVEAZY_TEAM_WHATSAPP } from "../../config/contactChannels";
 import { clearPendingSignup, pendingSignupPhone, stampPartnerSignup } from "../../lib/partnerSignup";
 import { BottomNav, CreateSheet, Loading, PartnerStyles, ToastHost, WhatsAppIcon, toast } from "./partnerUi";
-import PartnerLanding from "./PartnerLanding";
+import { hasStoredSession } from "../../lib/supabase";
+import { prefetchWhenIdle } from "../../lib/prefetch";
+
+// The signed-out landing page is the bulk of this file's weight, and a signed-in
+// partner never sees it. Loaded on demand — and straight away when nobody is
+// signed in on this device, so a visitor doesn't wait for it.
+const loadPartnerLanding = () => import("./PartnerLanding");
+const PartnerLanding = lazy(loadPartnerLanding);
+if (typeof window !== "undefined" && !hasStoredSession()) loadPartnerLanding().catch(() => {});
 
 const InventoryHome = lazy(() => import("./InventoryHome"));
 const PropertyDetail = lazy(() => import("./PropertyDetail"));
@@ -95,6 +103,11 @@ function teamWa(text) {
 const NO_BAR = /^\/(premium|welcome|referrals|add|leads\/new|leads\/[^/]+\/edit|property\/[^/]+\/(sharing|contacts))/;
 
 function PartnerWorkspace({ me, reloadMe }) {
+  // The screens a broker opens next, fetched while the phone is idle.
+  useEffect(() => prefetchWhenIdle([
+    () => import("./InventoryHome"), () => import("./PropertyDetail"), () => import("./LeadsList"),
+    () => import("./AddProperty"), () => import("./MorePage"),
+  ]), []);
   const navigate = useNavigate();
   const { pathname } = useLocation();
   const [status, setStatus] = useState(null);
@@ -281,7 +294,8 @@ function Gate() {
       }
       if (!stamped.current) {
         stamped.current = true;
-        await stampPartnerSignup();
+        // Bookkeeping only (where they came from): never worth a wait.
+        stampPartnerSignup();
       }
       setMe(m);
       setState("ready");
@@ -301,7 +315,7 @@ function Gate() {
 
   if (loading) return <Loading label="Opening MovEazy Partners…" />;
   // Signed-out visitors get the landing page; its sign-up returns here.
-  if (!user) return <PartnerLanding />;
+  if (!user) return <Suspense fallback={<Loading />}><PartnerLanding /></Suspense>;
   if (!hasPhone || state === "need_phone") {
     // RequirePhoneModal (mounted app-wide) is open over this.
     return <Holding icon={<Clock size={28} />} title="Verify your mobile number">One step left — add the number clients and brokers reach you on.</Holding>;

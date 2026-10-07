@@ -3,7 +3,7 @@ import { StrictMode, Component } from "react";
 import { createRoot } from "react-dom/client";
 import "./index.css";
 import "./styles/home-marketing.css";
-import "leaflet/dist/leaflet.css";
+// Leaflet's CSS comes with the components that draw a map, not with every page.
 import App from "./App.jsx";
 
 /** Old links used HashRouter (#/checkout). Convert once so BrowserRouter sees the path. */

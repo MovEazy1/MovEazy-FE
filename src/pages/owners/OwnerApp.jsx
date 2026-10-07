@@ -23,7 +23,15 @@ import {
 } from "../../lib/owners";
 import { fetchMyBuildings } from "../../lib/buildings";
 import { BottomNav, Loading, OwnerStyles, ToastHost, WhatsAppIcon } from "./ownerUi";
-import OwnerLanding from "./OwnerLanding";
+import { hasStoredSession } from "../../lib/supabase";
+import { prefetchWhenIdle } from "../../lib/prefetch";
+
+// The signed-out landing page is the bulk of this file's weight, and a signed-in
+// owner never sees it. Loaded on demand — and straight away when nobody is
+// signed in on this device, so a visitor doesn't wait for it.
+const loadOwnerLanding = () => import("./OwnerLanding");
+const OwnerLanding = lazy(loadOwnerLanding);
+if (typeof window !== "undefined" && !hasStoredSession()) loadOwnerLanding().catch(() => {});
 
 const OwnerHome = lazy(() => import("./OwnerHome"));
 const PropertiesList = lazy(() => import("./PropertiesList"));
@@ -69,6 +77,11 @@ function Holding({ icon, title, children }) {
 }
 
 function OwnerWorkspace({ me, reloadMe }) {
+  // The screens an owner opens next, fetched while the phone is idle.
+  useEffect(() => prefetchWhenIdle([
+    () => import("./OwnerHome"), () => import("./PropertiesList"), () => import("./PropertyDetail"),
+    () => import("./FindTenant"), () => import("./MorePage"),
+  ]), []);
   const [properties, setProperties] = useState(null);
   const [propError, setPropError] = useState("");
   const [tenants, setTenants] = useState([]);
@@ -187,7 +200,7 @@ function Gate() {
 
   if (loading) return <Loading label="Opening MovEazy Owners…" />;
   // Signed-out visitors get the landing page; its sign-up returns here.
-  if (!user) return <OwnerLanding />;
+  if (!user) return <Suspense fallback={<Loading />}><OwnerLanding /></Suspense>;
   if (!hasPhone || state === "need_phone") {
     return <Holding icon={<Clock size={28} />} title="Verify your mobile number">One step left — add the number MovEazy can reach you on.</Holding>;
   }

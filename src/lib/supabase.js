@@ -58,3 +58,21 @@ export function normalizeSupabaseError(error) {
     return "Network error — check your internet connection and try again.";
   return error?.message || "Authentication failed. Please try again.";
 }
+
+/**
+ * Is somebody probably signed in on this device? Read straight from the saved
+ * session, before Supabase has started — so a page can begin downloading the
+ * signed-out screen (a landing page) only when it is likely to be shown.
+ * A guess: the real answer still comes from AuthContext.
+ */
+export function hasStoredSession() {
+  try {
+    for (let i = 0; i < localStorage.length; i++) {
+      const k = localStorage.key(i);
+      if (/^sb-.+-auth-token$/.test(k || "")) return true;
+    }
+  } catch {
+    /* storage blocked */
+  }
+  return false;
+}
