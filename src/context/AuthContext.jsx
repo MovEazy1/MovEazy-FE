@@ -1,4 +1,4 @@
-import { createContext, useContext, useState, useEffect } from "react";
+import { createContext, useContext, useState, useEffect, useRef } from "react";
 import { gmailSignupErrorMessage, isGmailAddress } from "../lib/emailPolicy";
 import { triggerVerifiedOnboardingEmails } from "../lib/emailService";
 import {
@@ -168,8 +168,23 @@ export function AuthProvider({ children }) {
     setPendingSellerBadgeApplications(await getPendingSellerBadgeApplicationsRemote());
   };
 
-  const handleSession = async (session) => {
+  // The account the session handler last ran for, and that run. Supabase
+  // reports the same session more than once as a page opens (getSession, then
+  // the listener's own start-up event) and again on every token refresh; each
+  // used to run the whole chain below, so every app opened with its profile
+  // fetched eight times over before anything could render.
+  const handled = useRef({ uid: undefined, run: null });
+
+  const handleSession = (session) => {
     setSupabaseSession(session);
+    const uid = session?.user?.id ?? null;
+    if (handled.current.uid === uid && handled.current.run) return handled.current.run;
+    const run = runSession(session);
+    handled.current = { uid, run };
+    return run;
+  };
+
+  const runSession = async (session) => {
     const sbUser = session?.user || null;
     if (!sbUser || !isSessionAllowed(sbUser)) {
       setUser(null);
@@ -184,30 +199,42 @@ export function AuthProvider({ children }) {
     // the real read entirely and fell into the phone-less fallback further
     // down — which then got cached, so someone who'd already saved a phone
     // number was asked for it again on the next page load.
-    try { await ensureUserProfileDocuments(sbUser); } catch { /* best-effort */ }
-    try {
-      // Google sign-in never passes through signup(), so this is the only place
-      // an OAuth account can be credited to the post that produced it. Ignores
-      // anyone whose account is not minutes old, and never overwrites a source.
-      // (Already self-protecting internally — wrapped again here too, so a
-      // change to that function can't reopen the bug above.)
-      await recordSignupAttribution(sbUser);
-    } catch { /* best-effort */ }
+    //
+    // They run beside the profile read now, not in front of it: they are a
+    // returning user's no-ops, and waiting on them held every app on its
+    // loading screen for several round trips.
+    const repairs = (async () => {
+      try { await ensureUserProfileDocuments(sbUser); } catch { /* best-effort */ }
+      try {
+        // Google sign-in never passes through signup(), so this is the only place
+        // an OAuth account can be credited to the post that produced it. Ignores
+        // anyone whose account is not minutes old, and never overwrites a source.
+        // (Already self-protecting internally — wrapped again here too, so a
+        // change to that function can't reopen the bug above.)
+        await recordSignupAttribution(sbUser);
+      } catch { /* best-effort */ }
+      try {
+        // Everything they told us before signing up now belongs to this account.
+        // It happens here rather than in the login modal because Google sign-in
+        // redirects the browser away: by the time they are back, anything
+        // holding a callback is long gone, and this handler is the only thing
+        // that survives the trip.
+        //
+        // Wrapped like its neighbours — an unclaimed lead is a nuisance, being
+        // dropped into the phone-less fallback is a bug the visitor sees.
+        await adoptLeadIntake(sbUser);
+      } catch { /* best-effort */ }
+    })();
 
     try {
-      // Everything they told us before signing up now belongs to this account.
-      // It happens here rather than in the login modal because Google sign-in
-      // redirects the browser away: by the time they are back, anything
-      // holding a callback is long gone, and this handler is the only thing
-      // that survives the trip.
-      //
-      // Wrapped like its neighbours — an unclaimed lead is a nuisance, being
-      // dropped into the phone-less fallback is a bug the visitor sees.
-      await adoptLeadIntake(sbUser);
-    } catch { /* best-effort */ }
-
-    try {
-      const profile = await getProfileForUser(sbUser);
+      let profile = await getProfileForUser(sbUser);
+      if (!String(profile.phone || "").trim()) {
+        // A new account's number arrives with the repairs (the lead it gave
+        // before signing up is claimed onto it) — wait for them and read again,
+        // or the phone gate would ask for a number we already have.
+        await repairs;
+        profile = await getProfileForUser(sbUser);
+      }
       const allowed = await isEmailAdminAllowed(profile.email);
       setAdminAllowed(allowed);
       const effectiveRole = allowed ? "admin" : (profile.role === "admin" ? "customer" : profile.role);
@@ -236,7 +263,12 @@ export function AuthProvider({ children }) {
       if (!active) return;
       handleSession(data?.session ?? null).finally(() => setLoading(false));
     });
-    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
+      // A refreshed token is the same person: keep the session current, but
+      // don't re-read the profile and re-run the sign-in steps for it.
+      if (event === "TOKEN_REFRESHED") { setSupabaseSession(session); return; }
+      // A changed account (their email, say) is read again from scratch.
+      if (event === "USER_UPDATED") handled.current = { uid: undefined, run: null };
       handleSession(session);
     });
     return () => {

@@ -183,17 +183,28 @@ export async function ensureUserProfileDocuments(sbUser) {
   const existing = await fetchProfileRow(sbUser.id);
 
   if (await isEmailAdminAllowed(email)) {
+    // Nothing to repair: this ran on every page load and rewrote the row each
+    // time — and when the read above came back empty (a token mid-refresh
+    // hides the row), it rewrote the saved phone number as "".
+    if (existing?.role === "admin") return;
+    if (existing) {
+      await supabase.from("user_profiles")
+        .update({ role: "admin", seller_badge_status: null, updated_at: new Date().toISOString() })
+        .eq("id", sbUser.id);
+      return;
+    }
+    // Only a row that isn't there is created; one that is is never overwritten.
     await supabase.from("user_profiles").upsert(
       {
         id: sbUser.id,
         email,
-        name: existing?.name || resolveName(sbUser, email),
-        phone: existing?.phone || "",
+        name: resolveName(sbUser, email),
+        phone: sbUser?.phone || "",
         role: "admin",
         seller_badge_status: null,
         updated_at: new Date().toISOString(),
       },
-      { onConflict: "id" }
+      { onConflict: "id", ignoreDuplicates: true }
     );
     return;
   }

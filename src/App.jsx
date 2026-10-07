@@ -3,12 +3,15 @@ import { BrowserRouter, Routes, Route, Navigate, useLocation } from "react-route
 import { AuthProvider, useAuth } from "./context/AuthContext";
 import { LoginModalProvider } from "./context/LoginModalContext";
 import { VisitCartProvider } from "./context/VisitCartContext";
-import ForkHome from "./pages/ForkHome";
 import ErrorBoundary from "./components/ErrorBoundary";
 import RequirePhoneModal from "./components/RequirePhoneModal";
 import RequirePhoneForListing from "./components/RequirePhoneForListing";
 import { useSessionTracking } from "./hooks/useSessionTracking";
 
+// Lazy like every page: the tenant home pulls in the map, the swipe deck and
+// the landing kit, and the CRM, owner and partner apps were downloading all of
+// it before their own code could even start.
+const ForkHome = lazy(() => import("./pages/ForkHome"));
 const Profile = lazy(() => import("./pages/Profile"));
 const SupabaseLogin = lazy(() => import("./pages/SupabaseLogin"));
 /**
@@ -75,6 +78,36 @@ const PartnerApp = lazy(() => import("./pages/partners/PartnerApp"));
 // The owner app: /owners here, the root of owners.moveazy.co.in.
 const OwnerApp = lazy(() => import("./pages/owners/OwnerApp"));
 const CrmInventoryOpsPage = lazy(() => import("./pages/crm/CrmInventoryOpsPage"));
+/**
+ * The CRM page being opened, fetched at start-up beside sign-in and the CRM's
+ * data. As a lazy route it only began downloading once the workspace had
+ * finished loading — one more wait, every time the CRM was opened. The same
+ * import() as the lazy page above, so the same file, fetched once.
+ */
+function prefetchCrmPage(path) {
+  const [, , seg = "", rest = ""] = path.split("/");
+  const page = {
+    "": () => import("./pages/crm/CrmClientsPage"),
+    clients: () => import("./pages/crm/CrmClientsPage"),
+    pipeline: () => import("./pages/crm/CrmPipelinePage"),
+    properties: () => (rest ? import("./pages/crm/CrmPropertyForm") : import("./pages/crm/CrmPropertiesPage")),
+    brokers: () => import("./pages/crm/CrmBrokersPage"),
+    "broker-leads": () => import("./pages/crm/CrmBrokerLeadsPage"),
+    "owner-qr": () => import("./pages/crm/CrmBuildingsPage"),
+    buildings: () => import("./pages/crm/CrmBuildingEditor"),
+    ops: () => import("./pages/crm/CrmInventoryOpsPage"),
+    visits: () => import("./pages/crm/CrmVisitsPage"),
+    notifications: () => import("./pages/crm/CrmNotificationsPage"),
+    payments: () => import("./pages/crm/CrmPaymentsPage"),
+    "app-analytics": () => import("./pages/crm/CrmAppAnalyticsPage"),
+    team: () => import("./pages/crm/CrmTeamPage"),
+    settings: () => import("./pages/crm/CrmSettingsPage"),
+  }[seg];
+  import("./pages/crm/CrmShell").catch(() => {});
+  page?.().catch(() => {});
+}
+if (typeof window !== "undefined" && /^\/crm(\/|$)/.test(window.location.pathname)) prefetchCrmPage(window.location.pathname);
+
 const IS_OWNER_HOST = typeof window !== "undefined" && /^owners?\./i.test(window.location.hostname);
 const IS_PARTNER_HOST = typeof window !== "undefined" && /^partners\./i.test(window.location.hostname);
 // tenant.moveazy.co.in: the whole site, but its front door is the tenant app.
