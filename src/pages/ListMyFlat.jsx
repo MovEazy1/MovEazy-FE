@@ -633,9 +633,9 @@ export default function ListMyFlat() {
               )}
 
               <div className="flex gap-3">
-                <button type="button" onClick={() => navigate("/map")}
+                <button type="button" onClick={() => navigate("/my-properties")}
                   className="flex-1 py-3.5 rounded-2xl text-[14px] font-bold text-gray-700 border border-gray-200 bg-white">
-                  View on map
+                  View my listings
                 </button>
                 <button type="button" onClick={() => window.location.reload()}
                   className="flex-1 py-3.5 rounded-2xl text-[14px] font-bold text-gray-700 border border-gray-200 bg-white">

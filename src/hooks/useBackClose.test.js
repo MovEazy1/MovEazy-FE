@@ -9,7 +9,7 @@
  */
 import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
-import { markerPlan } from "./useBackClose";
+import { acquirePlan, markerPlan } from "./useBackClose";
 
 const source = readFileSync("src/hooks/useBackClose.js", "utf8");
 
@@ -46,5 +46,26 @@ describe("the effect that broke", () => {
     // The listener effect must have an empty dependency array.
     const listenerEffect = source.slice(source.indexOf("export function useHistorySteps"));
     expect(listenerEffect).toMatch(/window\.addEventListener\("popstate", onPop\);[\s\S]*?\}, \[\]\);/);
+  });
+});
+
+describe("a remount claiming the marker back, rather than stacking another", () => {
+  it("adopts the entry a queued teardown has not removed yet", () => {
+    // StrictMode mounts, unmounts and mounts again in one commit. The unmount's
+    // history.back() is asynchronous, so a second pushState here would land the
+    // back on the entry the remount just made \u2014 which reads as the user
+    // pressing back and shut the property view the instant it opened.
+    expect(acquirePlan({ pending: 7 })).toBe("adopt");
+  });
+
+  it("pushes a fresh entry when nothing is down", () => {
+    expect(acquirePlan(undefined)).toBe("push");
+    expect(acquirePlan(null)).toBe("push");
+  });
+
+  it("pushes a fresh entry when the marker is live, not being torn down", () => {
+    // A live marker with no teardown queued belongs to an overlay that is still
+    // open; this is a different overlay opening on top and needs its own entry.
+    expect(acquirePlan({ pending: null })).toBe("push");
   });
 });

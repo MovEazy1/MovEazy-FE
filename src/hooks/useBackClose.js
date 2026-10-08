@@ -23,6 +23,77 @@
  */
 import { useEffect, useRef } from "react";
 
+/**
+ * Markers that are currently down, by key.
+ *
+ * Module-level on purpose. React's development StrictMode mounts every effect,
+ * tears it down and mounts it again, and the teardown here is a history.back()
+ * — an asynchronous navigation that then lands on whatever the remount just
+ * pushed. That read as the user pressing back, so an overlay closed in the same
+ * frame it opened: in development, tapping a home on the swipe deck flashed the
+ * listing up and dropped you straight back on the deck.
+ *
+ * Surviving that means the marker has to outlive the component that asked for
+ * it, so a remount can pick the existing one back up instead of stacking a
+ * second entry on top of a teardown that is still in flight.
+ */
+const markers = new Map();
+
+/**
+ * What a mount should do about a marker already registered under this key.
+ *
+ * "adopt" is the StrictMode remount: a teardown is queued but has not run, so
+ * the entry is still on the stack and this mount simply takes it over.
+ * Pure, so the race is testable without a browser.
+ *
+ * @returns {"adopt" | "push"}
+ */
+export function acquirePlan(existing) {
+  return existing && existing.pending != null ? "adopt" : "push";
+}
+
+function acquireMarker(key, closeRef) {
+  const existing = markers.get(key);
+  if (acquirePlan(existing) === "adopt") {
+    clearTimeout(existing.pending);
+    existing.pending = null;
+    existing.closeRef = closeRef;
+    return existing;
+  }
+
+  // Same URL, extra entry: back has somewhere to land that isn't the page the
+  // user is reading. The router's own state rides along rather than being
+  // replaced — overwriting it made React Router read the entry as a different
+  // location and remount the route underneath the overlay.
+  const marker = { key, closeRef, pending: null, popped: false, onPop: null };
+  marker.onPop = () => {
+    marker.popped = true;
+    markers.delete(key);
+    window.removeEventListener("popstate", marker.onPop);
+    marker.closeRef.current?.();
+  };
+  window.history.pushState({ ...window.history.state, mzOverlay: key }, "", window.location.href);
+  window.addEventListener("popstate", marker.onPop);
+  markers.set(key, marker);
+  return marker;
+}
+
+/**
+ * Give the marker up — after a tick, so a remount in the same commit can claim
+ * it back. A real unmount means the overlay was closed from the UI rather than
+ * by going back, and the marker is still on the stack: leaving it there would
+ * cost the user a wasted back press.
+ */
+function releaseMarker(marker) {
+  if (marker.popped) return;
+  marker.pending = setTimeout(() => {
+    if (markers.get(marker.key) !== marker) return;
+    markers.delete(marker.key);
+    window.removeEventListener("popstate", marker.onPop);
+    window.history.back();
+  }, 0);
+}
+
 export function useBackClose(open, onClose, key = "overlay") {
   // Kept in a ref so a caller passing an inline arrow doesn't tear the entry
   // down and rebuild it on every render — that would spam history.
@@ -31,26 +102,8 @@ export function useBackClose(open, onClose, key = "overlay") {
 
   useEffect(() => {
     if (!open || typeof window === "undefined") return undefined;
-
-    // Same URL, extra entry: back has somewhere to land that isn't the page
-    // the user is reading.
-    let ours = true;
-    window.history.pushState({ mzOverlay: key }, "", window.location.href);
-
-    const onPop = () => {
-      // Our entry is already gone by the time this fires — don't try to
-      // remove it again in the cleanup below.
-      ours = false;
-      closeRef.current?.();
-    };
-    window.addEventListener("popstate", onPop);
-
-    return () => {
-      window.removeEventListener("popstate", onPop);
-      // Closed from the UI rather than by going back. The marker is still on
-      // the stack, and leaving it there costs the user a wasted back press.
-      if (ours) window.history.back();
-    };
+    const marker = acquireMarker(key, closeRef);
+    return () => releaseMarker(marker);
     // `key` is deliberately NOT a dependency. It is a label, and re-running on
     // a change to it tears the entry down and rebuilds it — the teardown's
     // history.back() then lands, asynchronously, on the listener the rebuild

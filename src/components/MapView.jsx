@@ -1079,13 +1079,6 @@ export default function MapView() {
 
   const listingIdFromUrl = useMemo(() => new URLSearchParams(location.search).get("listingId") || "", [location.search]);
   const openVisitFormFromUrl = useMemo(() => new URLSearchParams(location.search).get("visit") === "1", [location.search]);
-  // Captured once, from the very first render — a fresh page load, not an
-  // in-app navigation. location.key stays "default" only for that entry; the
-  // history-seeding effect below then navigates past it, so reading
-  // location.key fresh on a later render would say "no" for the same visitor.
-  // Someone who has just signed up off a shared link has seen exactly one
-  // home — that's who gets the extra "explore more" way out of the modal.
-  const [isDeepLinkEntry] = useState(() => !!listingIdFromUrl && location.key === "default");
 
   /** Hero / deep link: always derive filters from URL (avoids stale BHK/rent from a previous session). */
   useEffect(() => {
@@ -3018,8 +3011,8 @@ export default function MapView() {
           onSavedChange={() => setSavedRevision((v) => v + 1)}
           onClose={closeProperty}
           initialShowVisitForm={openVisitFormFromUrl}
+          manageHistory={false}
           onVisitBooked={onVisitBooked}
-          onExploreMore={isDeepLinkEntry ? () => navigate("/?search=1") : undefined}
         />
       )}
 

@@ -16,6 +16,7 @@ import { useAuth } from "../context/AuthContext";
 import { isSuperAdminEmail } from "../lib/adminAccess";
 import MovEazyNav from "../components/layout/MovEazyNav";
 import MarketingAccessPanel from "../components/admin/MarketingAccessPanel";
+import DashboardAccessPanel from "../components/admin/DashboardAccessPanel";
 import {
   fetchProfiles, fetchSearchProfiles, fetchRequirements, fetchBookings,
   fetchActions, fetchInventoryAll,
@@ -33,6 +34,7 @@ const TABS = [
   { id: "owners",  label: "Owners" },
   { id: "brokers", label: "Brokers" },
   { id: "marketing", label: "Marketing" },
+  { id: "dashboard", label: "Dashboard access" },
 ];
 
 function Pill({ active, onClick, children, count }) {
@@ -186,10 +188,13 @@ export default function SuperAdminPanel() {
           {TABS.map((t) => <Pill key={t.id} active={tab === t.id} onClick={() => setTab(t.id)}>{t.label}</Pill>)}
         </div>
 
-        {/* Marketing reads marketing_* through its own queries, so it neither
-            waits on the lead aggregation nor uses the filter bar below. */}
+        {/* Marketing and Dashboard access read their own tables through their own
+            queries, so neither waits on the lead aggregation nor uses the filter
+            bar below. */}
         {tab === "marketing" ? (
           <MarketingAccessPanel adminEmail={user?.email || ""} />
+        ) : tab === "dashboard" ? (
+          <DashboardAccessPanel adminEmail={user?.email || ""} />
         ) : loading ? (
           <p className="text-[13px] text-gray-500">Loading…</p>
         ) : (
