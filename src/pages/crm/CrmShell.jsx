@@ -81,8 +81,10 @@ async function fetchInventory() {
     "amenities,house_rules,lifestyle,title,description,images,cover_image_url,status,is_verified," +
     "source,source_url,created_at,building_id,unit_no,unit_order,sold_out_at,sold_out_by";
 
+  // Through inventory_full(): the poster's contact columns aren't readable off
+  // the table by a signed-in account, staff included (lib/inventory.js).
   const run = (c) =>
-    supabase.from("inventory").select(c).order("created_at", { ascending: false }).limit(3000);
+    supabase.rpc("inventory_full").select(c).order("created_at", { ascending: false }).limit(3000);
 
   let { data, error } = await run(cols);
   if (error && isMissingColumn(error)) {

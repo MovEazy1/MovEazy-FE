@@ -15,7 +15,8 @@ import { supabase, isSupabaseConfigured } from "./supabase";
 async function safeSelect(table, columns = "*", shape = (q) => q) {
   if (!isSupabaseConfigured || !supabase) return [];
   try {
-    const { data, error } = await shape(supabase.from(table).select(columns));
+    const base = table === "inventory_full" ? supabase.rpc("inventory_full") : supabase.from(table);
+    const { data, error } = await shape(base.select(columns));
     if (error) {
       console.warn(`[admin] ${table}: ${error.message}`);
       return [];
@@ -48,8 +49,9 @@ export const fetchActions = () =>
   safeSelect("user_actions", "id,user_id,email,action,property_id,created_at", (q) =>
     q.order("created_at", { ascending: false }).limit(6000));
 
+// inventory_full(): the poster's contact columns aren't readable off the table.
 export const fetchInventoryAll = () =>
-  safeSelect("inventory",
+  safeSelect("inventory_full",
     "property_id,posted_by,poster_id,poster_name,poster_email,phone,city,area,rent,deposit,flat_type,status,is_verified,view_count,title,images,created_at",
     (q) => q.order("created_at", { ascending: false }).limit(2000));
 

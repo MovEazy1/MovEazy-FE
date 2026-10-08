@@ -28,7 +28,7 @@ import { cleanSourceUrl, detectSource, parseListingText } from "../../lib/listin
 import { geocodePlace } from "../../lib/geocode";
 import {
   generatePropertyId, isMissingColumn, mediaRejectionReason,
-  withoutOptionalColumns,
+  PUBLIC_INVENTORY_COLS, withoutOptionalColumns,
 } from "../../lib/inventory";
 import {
   coverPhoto, describeMedia, isListingMediaFile, isVideoUrl, orderListingMedia,
@@ -286,7 +286,7 @@ export default function CrmPropertyForm() {
         return;
       }
       const { data, error } = await supabase
-        .from("inventory").select("*").eq("property_id", editId).maybeSingle();
+        .rpc("inventory_full").select("*").eq("property_id", editId).maybeSingle();
       if (cancelled) return;
       if (error || !data) {
         setLoadError(error?.message || `No listing with the id ${editId}.`);
@@ -534,15 +534,17 @@ export default function CrmPropertyForm() {
         delete changes.property_id;
         delete changes.poster_id;
         delete changes.poster_email;
+        // Only what the form needs back: `returning *` would ask for the
+        // poster's contact columns, which the table no longer hands out.
         let { data, error } = await supabase
-          .from("inventory").update(changes).eq("property_id", editId).select().single();
+          .from("inventory").update(changes).eq("property_id", editId).select("property_id,images").single();
         // A column a pending migration hasn't added must not block an edit to
         // the fifteen fields that do exist.
         if (error && isMissingColumn(error)) {
           console.warn(`[crm] update: ${error.message} — saving without it. Run the pending migration.`);
           ({ data, error } = await supabase
             .from("inventory").update(withoutOptionalColumns(changes)).eq("property_id", editId)
-            .select().single());
+            .select("property_id,images").single());
         }
         if (error) throw error;
         replaceMedia(savedItems(data.images));
@@ -553,7 +555,7 @@ export default function CrmPropertyForm() {
         return;
       }
 
-      const { data, error } = await supabase.from("inventory").insert(row).select().single();
+      const { data, error } = await supabase.from("inventory").insert(row).select(PUBLIC_INVENTORY_COLS).single();
       if (error) throw error;
 
       // Both of these key on a property_id that did not exist a moment ago,

@@ -189,7 +189,9 @@ export async function createInventoryItem(draft, poster) {
   if (!isSupabaseConfigured || !supabase) throw new Error("Supabase is not configured");
   let row = buildInventoryRow(draft, poster);
   for (let attempt = 0; attempt < 3; attempt++) {
-    const { data, error } = await supabase.from("inventory").insert(row).select().single();
+    // Public columns back, not `*`: a signed-in account may read only those off
+    // the table (the poster's contact columns come through inventory_full()).
+    const { data, error } = await supabase.from("inventory").insert(row).select(PUBLIC_INVENTORY_COLS).single();
     if (!error) return data;
     if (error.code === "23505") {
       row = { ...row, property_id: generatePropertyId() };
@@ -281,13 +283,24 @@ async function selectTolerantly(table, cols, shape = (q) => q) {
   return attempt(trimmed);
 }
 
-const PUBLIC_INVENTORY_COLS =
+export const PUBLIC_INVENTORY_COLS =
   "property_id, posted_by, city, area, nearby_areas, full_address, landmark, " +
   "latitude, longitude, rent, deposit, available_from, flat_type, bedrooms, " +
   "bathrooms, furnishing, max_flatmates, gender_pref, occupants_allowed, maintenance, " +
   "floor_number, total_floors, " +
   "amenities, lifestyle, house_rules, title, description, images, " +
   "cover_image_url, status, is_verified, view_count, created_at, updated_at, rent_flag";
+
+/**
+ * Whole listing rows, poster contact included — only the caller's own
+ * listings, or every listing for CRM staff and allowlisted admins
+ * (inventory_full(), MovEazy-BE/supabase/inventory_private_read.sql). The table
+ * itself gives a signed-in account the public columns only, the same as a
+ * signed-out visitor: every tenant used to be able to read every poster's
+ * phone, email and account id off it. Pick columns, filter and order on the
+ * result exactly as on the table.
+ */
+export const fullInventory = (columns = "*", options) => supabase.rpc("inventory_full", undefined, options).select(columns);
 
 /** All published inventory (for matching / listings) — public, no poster PII. */
 export async function fetchPublishedInventory({ limit = 500 } = {}) {
@@ -311,9 +324,7 @@ export async function fetchPublishedInventory({ limit = 500 } = {}) {
  */
 export async function fetchMyInventory(uid) {
   if (!isSupabaseConfigured || !supabase || !uid) return [];
-  const { data, error } = await supabase
-    .from("inventory")
-    .select("*")
+  const { data, error } = await fullInventory("*")
     .eq("poster_id", uid)
     .order("created_at", { ascending: false });
   if (error) return [];
@@ -344,8 +355,7 @@ export async function fetchInventoryByIds(propertyIds = []) {
 export async function countMyInventory(uid) {
   if (!isSupabaseConfigured || !supabase || !uid) return 0;
   const { count, error } = await supabase
-    .from("inventory")
-    .select("property_id", { count: "exact", head: true })
+    .rpc("inventory_full", undefined, { count: "exact", head: true })
     .eq("poster_id", uid);
   if (error) return 0;
   return count || 0;
@@ -358,8 +368,7 @@ export async function countMyInventory(uid) {
 export async function hasOwnerListing(uid) {
   if (!isSupabaseConfigured || !supabase || !uid) return false;
   const { count, error } = await supabase
-    .from("inventory")
-    .select("property_id", { count: "exact", head: true })
+    .rpc("inventory_full", undefined, { count: "exact", head: true })
     .eq("poster_id", uid)
     .eq("posted_by", "owner");
   if (error) return false;

@@ -42,8 +42,9 @@ export async function fetchDueForFollowUp({ limit = 300, now = Date.now() } = {}
   const staleBefore = new Date(now - STALE_AFTER_DAYS * DAY_MS).toISOString();
   const recheckBefore = new Date(now - RECHECK_AFTER_DAYS * DAY_MS).toISOString();
   try {
+    // inventory_full(): poster_name and phone aren't readable off the table.
     const { data, error } = await supabase
-      .from("inventory")
+      .rpc("inventory_full")
       .select(
         "property_id,title,area,rent,flat_type,furnishing,poster_name,phone," +
           "cover_image_url,images,status,created_at,availability_checked_at,availability_note",
