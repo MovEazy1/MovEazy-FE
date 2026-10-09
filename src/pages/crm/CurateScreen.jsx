@@ -18,7 +18,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { ArrowLeft, ChevronDown, ChevronUp, X } from "lucide-react";
 import {
-  curationFeed, fittingFromList, preselect, recentLists, turnedDown,
+  canPreselect, curationFeed, fittingFromList, preselect, recentLists, turnedDown,
 } from "../../lib/curation";
 import { coordsOf } from "../../lib/commute";
 import { fetchClientPasses, logActivity, passFlat, unpassFlat, upsertShortlist } from "../../lib/crmClients";
@@ -120,8 +120,11 @@ function Card({ match, inList, passed, canWrite, onAdd, onPass, onUndoPass, onOp
 
 export default function CurateScreen({
   client, requirement, onRequirementChange, office, inventory, shortlists, reactions, access, settings,
-  actorEmail, agentName, onShortlistsChanged, onPatchListing, onToast, onClose,
+  actorEmail, agentName, onShortlistsChanged, onPatchListing, onToast, onClose, rankBy = null, inferredBasis = "",
 }) {
+  // What the flats are ranked and pre-selected by: their requirement, or — with
+  // nothing stated — what the flats they opened imply, same as Matches.
+  const rank = rankBy || requirement;
   const canWrite = access.has(SCOPES.CLIENTS_WRITE);
   const canEditReq = access.has(SCOPES.REQUIREMENTS_WRITE);
   const [tray, setTray] = useState([]);
@@ -150,8 +153,8 @@ export default function CurateScreen({
   const officeAt = coordsOf(office) ? office : null;
   const recent = useMemo(() => recentLists(lists, client.id), [lists, client.id]);
   const ctx = useMemo(
-    () => ({ inventoryById, req: requirement, office: officeAt, radiusKm, down }),
-    [inventoryById, requirement, officeAt, radiusKm, down],
+    () => ({ inventoryById, req: rank, office: officeAt, radiusKm, down }),
+    [inventoryById, rank, officeAt, radiusKm, down],
   );
 
   // First: their saved draft if there is one, else what fits from recent lists.
@@ -172,6 +175,10 @@ export default function CurateScreen({
   useEffect(() => {
     if (!loaded || seeded.current || draft) return;
     seeded.current = true;
+    if (!canPreselect(ctx.req, ctx.office)) {
+      if (recent.length) setOrigin("Add the areas they want (Modify requirements) to pre-select from recent lists.");
+      return;
+    }
     const ids = preselect(recent, ctx);
     if (ids.length) {
       setTray(ids);
@@ -181,8 +188,8 @@ export default function CurateScreen({
   }, [loaded, draft, recent, ctx, client.name]);
 
   const feed = useMemo(
-    () => curationFeed({ inventory, req: requirement, down, keep }),
-    [inventory, requirement, down, keep],
+    () => curationFeed({ inventory, req: rank, down, keep }),
+    [inventory, rank, down, keep],
   );
   const inTray = useMemo(() => new Set(tray), [tray]);
 
@@ -247,7 +254,7 @@ export default function CurateScreen({
       const saved = await save();
       const share = await markCuratedSent(saved.id);
       const picked = tray.map((id) => inventoryById.get(id)).filter(Boolean)
-        .map((l) => ({ listing: l, score: scoreMatch(l, requirement).score }));
+        .map((l) => ({ listing: l, score: scoreMatch(l, rank).score }));
       const template = (settings?.templates ?? []).find((t) => t.id === "share_curated")
         ?? (settings?.templates ?? []).find((t) => t.id === "share_matches");
       const vars = buildTemplateVars({ client, requirement, agentName, matches: picked, curatedLink: share.link });
@@ -294,7 +301,14 @@ export default function CurateScreen({
       <div className="cs-scroll">
         <section className="cs-req">
           <div style={{ display: "flex", gap: 8, alignItems: "flex-start" }}>
-            <p style={{ margin: 0, flex: 1, fontSize: 12.5, lineHeight: 1.5 }}>{reqLine(requirement)}</p>
+            <p style={{ margin: 0, flex: 1, fontSize: 12.5, lineHeight: 1.5 }}>
+              {reqLine(rank)}
+              {inferredBasis && (
+                <span style={{ display: "block", fontSize: 11, color: C.gold }}>
+                  Nothing stated yet — going by the flat they opened ({inferredBasis}).
+                </span>
+              )}
+            </p>
             <Btn sm onClick={() => setEditing((v) => !v)}>
               {editing ? <><ChevronUp size={13} /> Done</> : <><ChevronDown size={13} /> Modify requirements</>}
             </Btn>

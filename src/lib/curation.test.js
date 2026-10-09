@@ -110,6 +110,10 @@ describe("pre-selection from recent lists", () => {
     const down = { disliked: new Set(["A"]), passed: new Set(["C"]) };
     expect(preselect(recentLists(lists, "ME", { now }), { ...ctx, down })).toEqual([]);
   });
+  it("nothing to go on — no locality, no office — pre-selects nothing", () => {
+    expect(preselect(recentLists(lists, "ME", { now }), { ...ctx, req: { flat_types: ["2 BHK"] } })).toEqual([]);
+    expect(preselect(recentLists(lists, "ME", { now }), { ...ctx, req: { flat_types: ["2 BHK"] }, office: { lat: 12.9116, lng: 77.6474 } })).toEqual(["C", "A"]);
+  });
   it("without a budget, the budget rule is skipped", () => {
     const pricey = new Map([...inventoryById, ["A", flat("A", { rent: 90000 })]]);
     expect(fittingFromList(lists[0], { ...ctx, inventoryById: pricey, req: { ...req, budget_max: null } })).toEqual(["A", "C"]);

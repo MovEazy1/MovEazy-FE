@@ -14,7 +14,8 @@
  *                       their area: a locality they named (or one inside it, or
  *                       a flat listing it as nearby), or within a straight line
  *                       of N km (8 by default) of the office they gave us.
- *                       Without a budget, the budget rule is skipped.
+ *                       Without a budget, the budget rule is skipped;
+ *                       without a locality or an office, nothing is.
  *
  * Pure; tested in curation.test.js.
  */
@@ -111,8 +112,17 @@ export function recentLists(lists = [], clientId, { days = RECENT_DAYS, now = Da
     .sort((a, b) => new Date(b.created_at) - new Date(a.created_at));
 }
 
+/**
+ * Whether there's anything to pre-select by: a locality or an office. Without
+ * either, every flat on every list "fits", and the tray fills with all of them.
+ */
+export function canPreselect(req, office) {
+  return (req?.localities ?? []).length > 0 || Boolean(coordsOf(office));
+}
+
 /** Everything that fits, across the recent lists, each flat once, newest list first. */
 export function preselect(lists, ctx) {
+  if (!canPreselect(ctx.req, ctx.office)) return [];
   const out = [];
   const seen = new Set();
   for (const list of lists) {

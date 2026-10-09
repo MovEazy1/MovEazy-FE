@@ -768,6 +768,8 @@ export default function CrmClientsPage() {
         key={selected.id}
         client={selected}
         requirement={requirement}
+        rankBy={matchRequirement}
+        inferredBasis={matchRequirement !== requirement ? basisLabel(selectedInferred) : ""}
         onRequirementChange={handleRequirementChange}
         office={ownAnswersByUser.get(selected.user_id)?.office || null}
         inventory={inventory}
