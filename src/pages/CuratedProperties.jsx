@@ -129,7 +129,8 @@ export default function CuratedProperties() {
         setShare(res);
         setReactions(res?.reactions || {});
       })
-      .catch(() => { if (alive) setShare(null); });
+      // Nothing to hydrate after a failure, so the spinner has to stop here.
+      .catch(() => { if (alive) { setShare(null); setListings([]); setLoading(false); } });
     return () => { alive = false; };
   }, [routeToken, authLoading, user?.uid]);
 
@@ -288,11 +289,16 @@ export default function CuratedProperties() {
             </h1>
             <p style={{ color: T.textDim, fontSize: 14.5, lineHeight: 1.55, margin: "0 0 24px" }}>
               {liked.length
-                ? `You shortlisted ${liked.length} of them. Schedule your visits whenever you're ready — we'll take it from here.`
+                ? `You shortlisted ${liked.length} of them. ${user ? "Schedule your visits whenever you're ready" : "Pick a time to see them"} — we'll take it from here.`
                 : "I don't like the options that you have shared, please share some more crazy options."}
             </p>
             <div style={{ display: "flex", flexDirection: "column", gap: 10, alignItems: "stretch" }}>
-              {liked.length > 0 && (
+              {/* Signed in, their likes are saved: Shortlists has every visit
+                  slot. Signed out (most people, from a WhatsApp link) nothing
+                  was saved to an account, and sending them there dropped them
+                  on a sign-in page with the list gone — so the homes they
+                  liked are listed here, each booking straight from this page. */}
+              {liked.length > 0 && user && (
                 <button
                   type="button"
                   onClick={() => navigate("/shortlists")}
@@ -300,6 +306,39 @@ export default function CuratedProperties() {
                 >
                   Schedule visits for the {liked.length} you liked
                 </button>
+              )}
+              {liked.length > 0 && !user && (
+                <div style={{ display: "flex", flexDirection: "column", gap: 8, textAlign: "left" }}>
+                  {liked.map((l) => (
+                    <div key={l.id} style={{ display: "flex", alignItems: "center", gap: 10, padding: 8, border: `1px solid ${T.line}`, borderRadius: 14 }}>
+                      <button
+                        type="button"
+                        onClick={() => setViewing({ listing: l, openVisitForm: false })}
+                        aria-label={`See ${l.title}`}
+                        style={{ width: 58, height: 58, borderRadius: 10, overflow: "hidden", border: "none", padding: 0, background: "#efe7dc", flexShrink: 0, cursor: "pointer" }}
+                      >
+                        {l.image ? <img src={l.image} alt="" style={{ width: "100%", height: "100%", objectFit: "cover", display: "block" }} /> : null}
+                      </button>
+                      <div style={{ minWidth: 0, flex: 1 }}>
+                        <div style={{ fontWeight: 800, fontSize: 14, color: T.text }}>
+                          {l.monthlyRent ? `₹${Number(l.monthlyRent).toLocaleString("en-IN")}/mo` : ""}
+                        </div>
+                        <div style={{ fontSize: 12, color: T.textDim, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{l.title}</div>
+                      </div>
+                      {reactions[l.id] === "visit_scheduled" ? (
+                        <span style={{ fontSize: 12, fontWeight: 700, color: T.teal, flexShrink: 0 }}>Visit booked</span>
+                      ) : (
+                        <button
+                          type="button"
+                          onClick={() => setViewing({ listing: l, openVisitForm: true })}
+                          style={{ padding: "9px 14px", borderRadius: 999, border: "none", background: T.ink, color: "#fff", fontWeight: 700, fontSize: 12.5, cursor: "pointer", flexShrink: 0 }}
+                        >
+                          Schedule visit
+                        </button>
+                      )}
+                    </div>
+                  ))}
+                </div>
               )}
               {(liked.length === 0 || hasBookedVisit) && (
                 <button

@@ -64,12 +64,63 @@ export async function createCuratedShare({
   return { ...data, link: curatedLink(token) };
 }
 
+/**
+ * The "Curate list" screen's tray, kept on the client before it's sent: one
+ * draft per client, updated in place as the agent works. → the row, with link.
+ */
+export async function saveCuratedDraft({ id = "", clientId, propertyIds = [], sharedBy = "", agentName = "" }) {
+  if (!isSupabaseConfigured || !supabase) throw new Error("Supabase is not configured.");
+  const ids = [...new Set(propertyIds.map((x) => String(x || "").trim()).filter(Boolean))];
+  if (!clientId || ids.length === 0) throw new Error("Add at least one flat first.");
+  const q = id
+    ? supabase.from("crm_curated_shares")
+      .update({ property_ids: ids, shared_by: sharedBy, agent_name: agentName, updated_at: new Date().toISOString() })
+      .eq("id", id).eq("status", "draft")
+    : supabase.from("crm_curated_shares").insert({
+      client_id: clientId, token: generateShareToken(), property_ids: ids,
+      shared_by: sharedBy, agent_name: agentName, status: "draft",
+    });
+  const { data, error } = await q.select().single();
+  if (error) throw error;
+  return { ...data, link: curatedLink(data.token) };
+}
+
+/** A draft goes out: from now on its link is the one the client has. */
+export async function markCuratedSent(id) {
+  if (!isSupabaseConfigured || !supabase) throw new Error("Supabase is not configured.");
+  const now = new Date().toISOString();
+  const { data, error } = await supabase.from("crm_curated_shares")
+    .update({ status: "sent", sent_at: now, updated_at: now }).eq("id", id).select().single();
+  if (error) throw error;
+  return { ...data, link: curatedLink(data.token) };
+}
+
+/**
+ * Lists made for anyone in the last `days` days — sent or draft — with the
+ * client's name, for pre-selecting a new client's list. Never throws.
+ */
+export async function fetchRecentCuratedShares(days = 30) {
+  if (!isSupabaseConfigured || !supabase) return [];
+  const since = new Date(Date.now() - days * 864e5).toISOString();
+  const { data, error } = await supabase
+    .from("crm_curated_shares")
+    .select("id,client_id,property_ids,shared_by,agent_name,created_at,status,crm_clients(name)")
+    .gte("created_at", since)
+    .order("created_at", { ascending: false })
+    .limit(300);
+  if (error) {
+    console.warn(`[crm] recent curated shares: ${error.message}`);
+    return [];
+  }
+  return (data ?? []).map(({ crm_clients: c, ...row }) => ({ ...row, client_name: c?.name || "" }));
+}
+
 /** Every curated batch sent to one client, newest first. Never throws. */
 export async function fetchCuratedShares(clientId) {
   if (!isSupabaseConfigured || !supabase || !clientId) return [];
   const { data, error } = await supabase
     .from("crm_curated_shares")
-    .select("id,client_id,token,property_ids,shared_by,agent_name,created_at,opened_at,last_opened_at,open_count")
+    .select("id,client_id,token,property_ids,shared_by,agent_name,created_at,opened_at,last_opened_at,open_count,status,sent_at")
     .eq("client_id", clientId)
     .order("created_at", { ascending: false })
     .limit(50);

@@ -372,6 +372,7 @@ export async function saveClientRequirement(clientId, req, { actorEmail = "" } =
     occupants: req.occupants ?? [],
     move_in: req.move_in ?? "",
     min_score: req.min_score ?? 60,
+    office_radius_km: req.office_radius_km ?? 8,
     updated_by: actorEmail,
     updated_at: new Date().toISOString(),
   };
@@ -425,6 +426,25 @@ export async function upsertShortlist(clientId, propertyId, patch = {}) {
     .single();
   if (error) throw error;
   return data;
+}
+
+/* ── Passes: an agent's "not for them" while curating (lib/curation.js) ──── */
+
+export const fetchClientPasses = (clientId) =>
+  safeSelect("crm_client_passes", "property_id,passed_by,passed_at", (q) => q.eq("client_id", clientId));
+
+export async function passFlat(clientId, propertyId, { actorEmail = "" } = {}) {
+  requireDb();
+  const { error } = await supabase.from("crm_client_passes")
+    .upsert({ client_id: clientId, property_id: propertyId, passed_by: actorEmail, passed_at: new Date().toISOString() },
+      { onConflict: "client_id,property_id" });
+  if (error) throw error;
+}
+
+export async function unpassFlat(clientId, propertyId) {
+  requireDb();
+  const { error } = await supabase.from("crm_client_passes").delete().eq("client_id", clientId).eq("property_id", propertyId);
+  if (error) throw error;
 }
 
 export async function removeShortlist(clientId, propertyId) {

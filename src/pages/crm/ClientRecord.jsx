@@ -7,10 +7,7 @@
  */
 import { useEffect, useMemo, useRef, useState } from "react";
 import {
-  ALL_LOCALITIES, DEALBREAKERS, FLAT_TYPES, FURNISHINGS, MUST_HAVES, OCCUPANTS,
-} from "../../data/preferenceOptions";
-import {
-  STATUSES, TEMPERATURES, CLOSED_STATUSES, fetchActivities, fetchClientListingReactions, logActivity,
+  STATUSES, TEMPERATURES, CLOSED_STATUSES, fetchActivities, logActivity,
   setClientNote, setClientStatus, setClientTemperature,
 } from "../../lib/crmClients";
 import { buildTemplateVars, renderTemplate, whatsappUrl } from "../../lib/crmSettings";
@@ -19,6 +16,8 @@ import { formatDuration } from "../../lib/sessionSync";
 import { SCOPES } from "../../lib/adminScopes";
 import { SIGNAL_LABEL, basisLabel, effectiveFacts, rentSeenLabel } from "../../lib/crmPropertyInterest";
 import { Btn, C, Chip, Empty, TempDot, deadlineLabel, inr, relTime } from "./crmUi";
+import RequirementFields from "./RequirementFields";
+import PropertyQuickView from "./PropertyQuickView";
 
 /* ── Small pieces ─────────────────────────────────────────────────────────── */
 
@@ -30,19 +29,6 @@ function Section({ label, action, children }) {
         {action}
       </div>
       {children}
-    </div>
-  );
-}
-
-function ChipRow({ options, selected, onToggle, disabled }) {
-  const set = new Set(selected ?? []);
-  return (
-    <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
-      {options.map((o) => (
-        <Chip key={o} on={set.has(o)} disabled={disabled} onClick={() => onToggle(o)}>
-          {o}
-        </Chip>
-      ))}
     </div>
   );
 }
@@ -299,18 +285,10 @@ const REACTION_STATUS = { like: "liked", dislike: "disliked" };
  * matches, a curated shortlist, or a link an agent sent — merged from
  * listing_reactions (their own swipes) and crm_shortlists (what an agent
  * sent and however they answered it) so one property never shows up twice
- * with two different verdicts. Loaded only for whichever client is open,
- * same as the activity timeline below.
+ * with two different verdicts. Tap one to look at it here.
  */
-function PropertiesShown({ client, shortlists, inventory }) {
-  const [reactions, setReactions] = useState([]);
-
-  useEffect(() => {
-    let alive = true;
-    if (!client.user_id) { setReactions([]); return undefined; }
-    fetchClientListingReactions(client.user_id).then((rows) => alive && setReactions(rows));
-    return () => { alive = false; };
-  }, [client.id, client.user_id]);
+function PropertiesShown({ client, shortlists, inventory, reactions = [], canEdit, onPatchListing, onToast }) {
+  const [preview, setPreview] = useState(null);
 
   const inventoryById = useMemo(() => {
     const m = new Map();
@@ -348,7 +326,8 @@ function PropertiesShown({ client, shortlists, inventory }) {
           const color = ["liked", "visit_scheduled", "visited"].includes(r.status) ? C.accent
             : r.status === "disliked" || r.status === "rejected" ? C.coral : C.textDim;
           return (
-            <div key={r.propertyId} style={{ display: "flex", gap: 10, padding: "8px 0", borderBottom: `1px solid ${C.lineSoft}` }}>
+            <button key={r.propertyId} type="button" className="crm-shown" disabled={!r.listing}
+              onClick={() => setPreview(r)} title={r.listing ? "Look at this flat" : "No longer in inventory"}>
               <div style={{
                 flex: "none", width: 36, height: 36, borderRadius: 7, overflow: "hidden",
                 background: C.surfaceAlt, border: `1px solid ${C.line}`, display: "grid", placeItems: "center",
@@ -374,10 +353,17 @@ function PropertiesShown({ client, shortlists, inventory }) {
               }}>
                 {label}{r.at ? ` · ${relTime(r.at)}` : ""}
               </span>
-            </div>
+            </button>
           );
         })}
       </div>
+      {preview && (
+        <PropertyQuickView
+          listing={inventoryById.get(preview.propertyId) || preview.listing}
+          note={CURATED_STATUS_LABEL[preview.status] || ""}
+          canEdit={canEdit} onPatch={onPatchListing} onToast={onToast} onClose={() => setPreview(null)}
+        />
+      )}
     </Section>
   );
 }
@@ -423,15 +409,9 @@ function RequirementSummary({ req }) {
  * for changing a requirement and the wrong one for reading it, so reading is now
  * the default and editing is a click.
  */
-function RequirementCard({ req, isOverride, canEdit, onChange, onReset, inferred }) {
+function RequirementCard({ req, isOverride, canEdit, onChange, onReset, inferred, office }) {
   const [editing, setEditing] = useState(false);
   const known = hasRequirement(req);
-
-  const set = (patch) => onChange({ ...req, ...patch });
-  const toggle = (key, value) => {
-    const cur = req[key] ?? [];
-    set({ [key]: cur.includes(value) ? cur.filter((v) => v !== value) : [...cur, value] });
-  };
 
   return (
     <div className="crm-card" style={{ display: "flex", flexDirection: "column", gap: 12 }}>
@@ -500,91 +480,7 @@ function RequirementCard({ req, isOverride, canEdit, onChange, onReset, inferred
         </div>
       )}
 
-      {editing && (
-        <>
-          <div>
-            <span className="crm-label">Localities</span>
-            <div style={{ marginTop: 5 }}>
-              <ChipRow options={ALL_LOCALITIES} selected={req.localities} disabled={!canEdit}
-                onToggle={(v) => toggle("localities", v)} />
-            </div>
-          </div>
-
-          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8 }}>
-            <label style={{ display: "flex", flexDirection: "column", gap: 4 }}>
-              <span className="crm-label">Budget min</span>
-              <input className="crm-input crm-num" type="number" inputMode="numeric" disabled={!canEdit}
-                value={req.budget_min ?? ""} placeholder="30000"
-                onChange={(e) => set({ budget_min: e.target.value === "" ? null : Number(e.target.value) })} />
-            </label>
-            <label style={{ display: "flex", flexDirection: "column", gap: 4 }}>
-              <span className="crm-label">Budget max</span>
-              <input className="crm-input crm-num" type="number" inputMode="numeric" disabled={!canEdit}
-                value={req.budget_max ?? ""} placeholder="50000"
-                onChange={(e) => set({ budget_max: e.target.value === "" ? null : Number(e.target.value) })} />
-            </label>
-          </div>
-
-          <div>
-            <span className="crm-label">Flat type</span>
-            <div style={{ marginTop: 5 }}>
-              <ChipRow options={FLAT_TYPES} selected={req.flat_types} disabled={!canEdit}
-                onToggle={(v) => toggle("flat_types", v)} />
-            </div>
-          </div>
-
-          <div>
-            <span className="crm-label">Furnishing</span>
-            <div style={{ marginTop: 5, display: "flex", gap: 6, flexWrap: "wrap" }}>
-              {FURNISHINGS.map((f) => (
-                <Chip key={f} on={req.furnishing === f} disabled={!canEdit}
-                  onClick={() => set({ furnishing: req.furnishing === f ? "" : f })}>
-                  {f}
-                </Chip>
-              ))}
-            </div>
-          </div>
-
-          <div>
-            <span className="crm-label">Must haves</span>
-            <div style={{ marginTop: 5 }}>
-              <ChipRow options={MUST_HAVES} selected={req.must_haves} disabled={!canEdit}
-                onToggle={(v) => toggle("must_haves", v)} />
-            </div>
-          </div>
-
-          <div>
-            <span className="crm-label">Deal breakers</span>
-            <div style={{ marginTop: 5 }}>
-              <ChipRow options={DEALBREAKERS} selected={req.deal_breakers} disabled={!canEdit}
-                onToggle={(v) => toggle("deal_breakers", v)} />
-            </div>
-          </div>
-
-          <div>
-            <span className="crm-label">Occupants</span>
-            <div style={{ marginTop: 5 }}>
-              <ChipRow options={OCCUPANTS} selected={req.occupants} disabled={!canEdit}
-                onToggle={(v) => toggle("occupants", v)} />
-            </div>
-          </div>
-
-          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8 }}>
-            <label style={{ display: "flex", flexDirection: "column", gap: 4 }}>
-              <span className="crm-label">Move in</span>
-              <input className="crm-input" disabled={!canEdit} value={req.move_in ?? ""}
-                placeholder="15 Oct 2026, or ASAP"
-                onChange={(e) => set({ move_in: e.target.value })} />
-            </label>
-            <label style={{ display: "flex", flexDirection: "column", gap: 4 }}>
-              <span className="crm-label">Show matches above</span>
-              <input className="crm-input crm-num" type="number" min="0" max="100" disabled={!canEdit}
-                value={req.min_score ?? 60}
-                onChange={(e) => set({ min_score: Math.max(0, Math.min(100, Number(e.target.value) || 0)) })} />
-            </label>
-          </div>
-        </>
-      )}
+      {editing && <RequirementFields req={req} canEdit={canEdit} onChange={onChange} office={office} />}
     </div>
   );
 }
@@ -666,6 +562,7 @@ export default function ClientRecord({
   client, requirement, isOverride, engagement, settings, access, actorEmail, agentName,
   onPatch, onRequirementChange, onRequirementReset, onToast, ownAnswers, shortlists, inventory,
   inferred = null, isFreshLead = false, onContactLogged = () => {}, onMarkContacted = null,
+  reactions = [], onCurate = null, onPatchListing = () => {},
 }) {
   const [activities, setActivities] = useState([]);
   const [pendingClose, setPendingClose] = useState(null);
@@ -771,7 +668,7 @@ export default function ClientRecord({
     <div className="crm-col crm-scroll" style={{ flex: 1 }}>
       <div style={{ padding: "14px 16px", display: "flex", flexDirection: "column", gap: 14 }}>
         {/* identity + the two things you actually do */}
-        <div style={{ display: "flex", alignItems: "center", gap: 11 }}>
+        <div style={{ display: "flex", alignItems: "center", gap: 11, flexWrap: "wrap" }}>
           <span
             style={{
               width: 38, height: 38, borderRadius: 10, display: "grid", placeItems: "center",
@@ -780,7 +677,7 @@ export default function ClientRecord({
           >
             {initials}
           </span>
-          <div style={{ flex: 1, minWidth: 0 }}>
+          <div style={{ flex: "1 1 160px", minWidth: 0 }}>
             <div style={{ fontSize: 15, fontWeight: 700 }}>{client.name || "Unnamed"}</div>
             <div className="crm-mute crm-num" style={{ fontSize: 11, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
               {client.phone || "no phone"} · {client.email || "no email"}
@@ -800,6 +697,12 @@ export default function ClientRecord({
             {copied ? "Copied" : "Call"}
           </Btn>
         </div>
+
+        {onCurate && canWrite && (
+          <Btn variant="primary" onClick={onCurate} style={{ alignSelf: "stretch", justifyContent: "center", padding: "10px 14px", fontSize: 13.5 }}>
+            Curate a list for {client.name?.split(" ")[0] || "them"}
+          </Btn>
+        )}
 
         <HeaderFacts req={requirement} ownAnswers={ownAnswers} inferred={inferred} />
         {client.phone && (
@@ -865,11 +768,12 @@ export default function ClientRecord({
         </div>
 
         <RequirementCard req={requirement} isOverride={isOverride} canEdit={canEditReq}
-          onChange={onRequirementChange} onReset={onRequirementReset} inferred={inferred} />
+          onChange={onRequirementChange} onReset={onRequirementReset} inferred={inferred} office={ownAnswers?.office} />
 
         <WhatTheyToldUs ownAnswers={ownAnswers} />
 
-        <PropertiesShown client={client} shortlists={shortlists} inventory={inventory} />
+        <PropertiesShown client={client} shortlists={shortlists} inventory={inventory} reactions={reactions}
+          canEdit={canWrite} onPatchListing={onPatchListing} onToast={onToast} />
 
         {/* engagement */}
         <div className="crm-card">

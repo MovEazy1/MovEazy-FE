@@ -169,8 +169,8 @@ function SwipeCard({ listing, index, top, onSwiped, onOpenDetails, position, off
 
         <div style={{ flex: 1, minWidth: 0, padding: "14px 16px", display: "flex", flexDirection: "column", gap: 5, overflow: "hidden" }}>
           <div style={{ display: "flex", alignItems: "baseline", justifyContent: "space-between", gap: 8 }}>
-            <div style={{ fontWeight: 800, fontSize: 21, color: T.text, letterSpacing: "-0.01em" }}>{rentLabel(listing)}</div>
-            <div style={{ fontSize: 12.5, fontWeight: 700, color: T.textDim, whiteSpace: "nowrap" }}>
+            <div style={{ fontWeight: 800, fontSize: 21, color: T.text, letterSpacing: "-0.01em", flexShrink: 0 }}>{rentLabel(listing)}</div>
+            <div style={{ fontSize: 12.5, fontWeight: 700, color: T.textDim, whiteSpace: "nowrap", minWidth: 0, overflow: "hidden", textOverflow: "ellipsis" }}>
               {listing.bhk || (bedrooms ? `${bedrooms} BHK` : "Home")}{listing.furnishing ? ` · ${listing.furnishing}` : ""}
             </div>
           </div>
@@ -334,7 +334,10 @@ export default function SwipeDeck({
           buttons below the fold, so the deck's two main actions needed a scroll
           to reach. */}
       <div style={{ position: "relative", width: "100%", maxWidth: 380, height: "clamp(330px, 54vh, 460px)" }}>
-        <AnimatePresence>
+        {/* No entrance for the first hand: every card fading in at once left
+            the front one see-through, with the ones behind showing their
+            prices and dates through it. Cards dealt in later still animate. */}
+        <AnimatePresence initial={false}>
           {stack.map((listing, i) => (
             <SwipeCard
               key={listing.id}

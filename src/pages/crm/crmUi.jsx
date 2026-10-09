@@ -116,6 +116,12 @@ textarea.crm-input { resize:vertical; line-height:1.55; }
 .crm .crm-lead:hover { background:${C.surface}; }
 .crm .crm-lead--on { background:${C.accentSoft}; box-shadow:inset 2px 0 0 ${C.accent}; }
 
+/* A flat in a client's "Properties shown": the whole row opens it. */
+.crm .crm-shown { width:100%; display:flex; gap:10px; padding:8px 4px; border:0; border-bottom:1px solid ${C.lineSoft};
+  background:none; text-align:left; font:inherit; color:inherit; cursor:pointer; border-radius:6px; }
+.crm .crm-shown:hover:not(:disabled) { background:${C.surface}; }
+.crm .crm-shown:disabled { cursor:default; opacity:.7; }
+
 .crm .crm-rail-item { width:38px; height:38px; border-radius:9px; display:grid; place-items:center;
   font-size:10px; font-weight:700; letter-spacing:.04em; color:${C.textMute}; }
 .crm .crm-rail-item:hover { background:${C.surfaceAlt}; color:${C.text}; }
@@ -231,7 +237,7 @@ export function Toast({ message, tone = "ok" }) {
         position: "fixed", bottom: 18, left: "50%", transform: "translateX(-50%)",
         background: C.text, border: `1px solid ${C.text}`, color: "#fff",
         padding: "9px 16px", borderRadius: 9, fontSize: 12.5, fontWeight: 600,
-        zIndex: 90, maxWidth: "90vw", boxShadow: "0 10px 30px rgba(16,34,30,.22)",
+        zIndex: 1300, maxWidth: "90vw", boxShadow: "0 10px 30px rgba(16,34,30,.22)",
         borderLeft: `3px solid ${color}`,
       }}
     >

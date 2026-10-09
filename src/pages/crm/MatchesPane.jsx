@@ -5,15 +5,22 @@
  * The scoring is lib/inventoryMatch.js — the same engine the public site uses,
  * so a score here means what it means everywhere else. This pane only exposes
  * it and puts three actions next to each result.
+ *
+ * Never listed: anything this client turned down (their own dislike, an agent's
+ * "Dislike", a rejected row), a flat with fewer bedrooms than they asked for,
+ * or one more than 20% over their budget (lib/curation.js). Open shows the flat
+ * here (PropertyQuickView), and Open and Sold out work while picking a set too.
  */
 import { useMemo, useState } from "react";
 import { matchRequirementToListings } from "../../lib/inventoryMatch";
 import {
-  buildTemplateVars, generateShareToken, propertyLink, renderTemplate, whatsappUrl,
+  buildTemplateVars, generateShareToken, renderTemplate, whatsappUrl,
 } from "../../lib/crmSettings";
 import { logActivity, recordClientReaction, upsertShortlist } from "../../lib/crmClients";
 import { CURATED_STATUS_LABEL, createCuratedShare } from "../../lib/curatedShares";
 import { SCOPES } from "../../lib/adminScopes";
+import { filterMatches, turnedDown } from "../../lib/curation";
+import PropertyQuickView, { QuickSoldOut } from "./PropertyQuickView";
 import { Btn, C, Chip, Empty, ScoreRing, inr, relTime } from "./crmUi";
 
 /** How the client's own answer reads, and in what colour. */
@@ -36,7 +43,9 @@ function coverOf(listing) {
   return listing?.cover_image_url || (listing?.images ?? [])[0] || "";
 }
 
-function MatchCard({ match, shortlist, canWrite, onSend, onShortlist, onReact, busy, selecting, checked, onToggle }) {
+function MatchCard({
+  match, shortlist, canWrite, onSend, onShortlist, onReact, busy, selecting, checked, onToggle, onOpen, onPatch, onToast,
+}) {
   const { listing, score, reasons, blockers } = match;
   const sent = shortlist?.shared_at;
   const cover = coverOf(listing);
@@ -103,20 +112,21 @@ function MatchCard({ match, shortlist, canWrite, onSend, onShortlist, onReact, b
           ))}
         </div>
 
-        {canWrite && !selecting && (
-          <div style={{ display: "flex", gap: 5, marginTop: 2, flexWrap: "wrap" }}>
-            <Btn sm variant={sent ? undefined : "wa"} disabled={busy} onClick={() => onSend(match)}>
-              {sent ? `Sent ${relTime(shortlist.shared_at)}` : "Send"}
-            </Btn>
-            <Btn sm disabled={busy} onClick={() => onShortlist(match)}>
-              {shortlist ? "Shortlisted" : "Shortlist"}
-            </Btn>
-            <a className="crm-btn crm-btn--sm" href={propertyLink(listing.property_id)}
-               target="_blank" rel="noopener noreferrer" style={{ textDecoration: "none" }}>
-              Open
-            </a>
-          </div>
-        )}
+        <div style={{ display: "flex", gap: 5, marginTop: 2, flexWrap: "wrap" }}>
+          {canWrite && !selecting && (
+            <>
+              <Btn sm variant={sent ? undefined : "wa"} disabled={busy} onClick={() => onSend(match)}>
+                {sent ? `Sent ${relTime(shortlist.shared_at)}` : "Send"}
+              </Btn>
+              <Btn sm disabled={busy} onClick={() => onShortlist(match)}>
+                {shortlist ? "Shortlisted" : "Shortlist"}
+              </Btn>
+            </>
+          )}
+          {/* Both work while picking a set, without ticking the card. */}
+          <Btn sm onClick={(e) => { e.stopPropagation(); onOpen(listing); }}>Open</Btn>
+          <QuickSoldOut listing={listing} canEdit={canWrite} onPatch={onPatch} onToast={onToast} stop />
+        </div>
 
         {sent && (
           <span
@@ -171,8 +181,10 @@ function MatchCard({ match, shortlist, canWrite, onSend, onShortlist, onReact, b
 
 export default function MatchesPane({
   client, requirement, inventory, shortlists, settings, access, actorEmail, agentName,
-  onShortlistsChanged, onToast, inferredBasis = "",
+  onShortlistsChanged, onToast, inferredBasis = "", reactions = [], onCurate = null, onPatchListing = () => {},
+  wide = false,
 }) {
+  const [preview, setPreview] = useState(null);
   const [availableOnly, setAvailableOnly] = useState(true);
   const [busy, setBusy] = useState(false);
   const [selecting, setSelecting] = useState(false);
@@ -196,9 +208,10 @@ export default function MatchesPane({
     [inventory, availableOnly],
   );
 
+  const down = useMemo(() => turnedDown(client.id, shortlists, reactions), [client.id, shortlists, reactions]);
   const matches = useMemo(
-    () => matchRequirementToListings(requirement, pool, { min: minScore }),
-    [requirement, pool, minScore],
+    () => filterMatches(matchRequirementToListings(requirement, pool, { min: minScore }), requirement, down),
+    [requirement, pool, minScore, down],
   );
 
   const byProperty = useMemo(() => {
@@ -347,7 +360,7 @@ export default function MatchesPane({
   };
 
   return (
-    <div className="crm-col" style={{ width: 300, flex: "none" }}>
+    <div className="crm-col" style={wide ? { flex: 1, minWidth: 0 } : { width: 300, flex: "none" }}>
       <div className="crm-colhead">
         <span className="crm-label">
           {selecting ? `Selected · ${picked.size}` : `Matches · ${matches.length}`}
@@ -367,7 +380,10 @@ export default function MatchesPane({
               <Btn sm onClick={cancelSelecting}>Cancel</Btn>
             </div>
           ) : (
-            <Btn sm onClick={() => setSelecting(true)}>Send shortlist</Btn>
+            <div style={{ display: "flex", gap: 6 }}>
+              {onCurate && <Btn sm variant="primary" onClick={onCurate}>Curate list</Btn>}
+              <Btn sm onClick={() => setSelecting(true)}>Send shortlist</Btn>
+            </div>
           )
         )}
       </div>
@@ -418,10 +434,20 @@ export default function MatchesPane({
               selecting={selecting}
               checked={picked.has(m.listing.property_id)}
               onToggle={togglePicked}
+              onOpen={setPreview}
+              onPatch={onPatchListing}
+              onToast={onToast}
             />
           ))
         )}
       </div>
+      {preview && (
+        <PropertyQuickView
+          listing={inventory.find((l) => l.property_id === preview.property_id) || preview}
+          note={ANSWER_PILL[byProperty.get(preview.property_id)?.status]?.label || ""}
+          canEdit={canWrite} onPatch={onPatchListing} onToast={onToast} onClose={() => setPreview(null)}
+        />
+      )}
     </div>
   );
 }

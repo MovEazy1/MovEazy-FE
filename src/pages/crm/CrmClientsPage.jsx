@@ -5,11 +5,15 @@
  * page. On a phone the three become swipeable tabs, because this gets used
  * standing outside a building.
  */
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { Suspense, lazy, useCallback, useEffect, useMemo, useState } from "react";
 import { useSearchParams } from "react-router-dom";
 import { useCrm } from "./CrmShell";
 import ClientRecord from "./ClientRecord";
 import MatchesPane from "./MatchesPane";
+import { useClientReactions } from "./PropertyQuickView";
+
+// The curate screen is a page of its own; loaded when someone opens it.
+const CurateScreen = lazy(() => import("./CurateScreen"));
 import {
   TEMPERATURES, createClient, fetchShortlists, markContacted,
   saveClientRequirement, resetClientRequirement, statusLabel, tempColor, syncClientsFromSignups,
@@ -28,7 +32,7 @@ import { Btn, C, Chip, Empty, TempDot, Toast, deadlineLabel, shortDate } from ".
 
 const EMPTY_REQ = {
   localities: [], budget_min: null, budget_max: null, flat_types: [], furnishing: "",
-  must_haves: [], deal_breakers: [], occupants: [], move_in: "", min_score: 60,
+  must_haves: [], deal_breakers: [], occupants: [], move_in: "", min_score: 60, office_radius_km: 8,
 };
 
 function NewClientForm({ actorEmail, onCreated, onCancel, onToast }) {
@@ -371,6 +375,15 @@ export default function CrmClientsPage() {
   }, [reqDraft, storedReq, selected?.id]);
 
   useEffect(() => setReqDraft(null), [selected?.id]);
+
+  // Their own swipes: the record lists them, Matches and curating leave out what they disliked.
+  const reactions = useClientReactions(selected?.user_id);
+  const [curating, setCurating] = useState(false);
+  useEffect(() => setCurating(false), [selected?.id]);
+  /** One flat changed (sold out, relisted) — patched in place, as on Properties. */
+  const patchListing = useCallback((pid, patch) => crm.setData((d) => (d?.inventory
+    ? { ...d, inventory: d.inventory.map((l) => (l.property_id === pid ? { ...l, ...patch } : l)) }
+    : d)), [crm]);
 
   /**
    * Edits re-rank the matches immediately and save behind that — waiting on a
@@ -718,6 +731,9 @@ export default function CrmClientsPage() {
       onRequirementChange={handleRequirementChange}
       onRequirementReset={handleRequirementReset}
       onToast={showToast}
+      reactions={reactions}
+      onCurate={() => setCurating(true)}
+      onPatchListing={patchListing}
     />
   );
 
@@ -739,7 +755,34 @@ export default function CrmClientsPage() {
       agentName={agentName}
       onShortlistsChanged={refreshShortlists}
       onToast={showToast}
+      reactions={reactions}
+      onCurate={() => setCurating(true)}
+      onPatchListing={patchListing}
+      wide={isNarrow}
     />
+  );
+
+  const curateScreen = curating && (
+    <Suspense fallback={null}>
+      <CurateScreen
+        key={selected.id}
+        client={selected}
+        requirement={requirement}
+        onRequirementChange={handleRequirementChange}
+        office={ownAnswersByUser.get(selected.user_id)?.office || null}
+        inventory={inventory}
+        shortlists={localShortlists}
+        reactions={reactions}
+        access={access}
+        settings={settings}
+        actorEmail={actorEmail}
+        agentName={agentName}
+        onShortlistsChanged={refreshShortlists}
+        onPatchListing={patchListing}
+        onToast={showToast}
+        onClose={() => setCurating(false)}
+      />
+    </Suspense>
   );
 
   if (isNarrow) {
@@ -755,6 +798,7 @@ export default function CrmClientsPage() {
           {mobileTab === "record" && recordPane}
           {mobileTab === "matches" && matchesPane}
         </div>
+        {curateScreen}
         <Toast {...(toast ?? {})} />
       </div>
     );
@@ -767,6 +811,7 @@ export default function CrmClientsPage() {
         {recordPane}
         {matchesPane}
       </div>
+      {curateScreen}
       <Toast {...(toast ?? {})} />
     </div>
   );
