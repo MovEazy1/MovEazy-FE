@@ -3,14 +3,15 @@
  *
  * Required: type, BHK, rent, furnishing, locality. Everything else is folded
  * away. "Is it rented right now?" decides where the flat starts: occupied
- * flats stay off moveazy.co.in; vacant ones can go live from Find a Tenant.
+ * flats stay off moveazy.co.in; vacant ones go live on their first photo
+ * unless the owner turns "List on MovEazy" off.
  */
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate, useParams, useSearchParams } from "react-router-dom";
 import { Camera, ChevronDown, ChevronUp, X } from "lucide-react";
 import { useAuth } from "../../context/AuthContext";
 import { useOwner } from "./OwnerApp";
-import { Chip, Empty, Loading, TopBar, toast } from "./ownerUi";
+import { Chip, Empty, Loading, Switch, TopBar, toast } from "./ownerUi";
 import ListingMapPicker from "../../components/ListingMapPicker";
 import { ALL_LOCALITIES, FURNISHINGS, withParentArea } from "../../data/preferenceOptions";
 import { BHK_OPTIONS } from "../../lib/partnerFilters";
@@ -24,7 +25,7 @@ import { initialCoverFor, keptCover, photosChanged, savedCoverUrl } from "../../
 import { autoDepositHint } from "../../lib/deposit";
 import { moveByKey, useDragReorder } from "../../hooks/useDragReorder";
 import { listingMedia, MediaItem } from "../partners/partnerMedia";
-import { createOwnerProperty, friendlyError, op, updateProperty } from "../../lib/owners";
+import { createOwnerProperty, friendlyError, listWhenReady, op, updateProperty } from "../../lib/owners";
 import { floorLabel, setFlatBuilding } from "../../lib/buildings";
 
 const FLOOR_OPTIONS = [-1, ...Array.from({ length: 31 }, (_, i) => i)];
@@ -36,7 +37,7 @@ function fromProperty(p) {
     propertyType: p?.property_type || "Apartment",
     flatType: p?.flat_type || "2 BHK",
     rent: p?.rent ? String(Math.round(p.rent)) : "",
-    furnishing: p?.furnishing || "Fully Furnished",
+    furnishing: p?.furnishing || "Semi Furnished",
     area: p?.area || "",
     fullAddress: p?.full_address || "",
     latitude: p?.latitude ?? null,
@@ -46,6 +47,7 @@ function fromProperty(p) {
     availableFrom: p?.available_from ? String(p.available_from).slice(0, 10) : "",
     description: p?.description || "",
     occupied: false,
+    list: true,
   };
 }
 
@@ -147,6 +149,8 @@ function PropertyFormInner({ existing }) {
           availableFrom: f.availableFrom || null, description: f.description, title: `${f.flatType} in ${area}`,
           occupied: f.occupied,
         }, user);
+        // Before the photos: their upload is what takes it live.
+        if (f.list && !f.occupied) await listWhenReady(pid, true).catch(() => null);
       }
       const fresh = media.filter((m) => m.file).length;
       if (fresh) setSaving(`Uploading photos (0/${fresh})…`);
@@ -178,8 +182,12 @@ function PropertyFormInner({ existing }) {
         await setFlatBuilding(pid, bld || null, bld ? floor : null);
         await reloadBuildings();
       }
-      await reloadProperties();
-      toast(existing ? "Saved" : "Property added");
+      const now = await reloadProperties();
+      const live = (now ?? []).find((x) => x.property_id === pid)?.status === "published";
+      toast(existing ? "Saved"
+        : f.occupied || !f.list ? "Property added"
+          : live ? "Property added — it's live on MovEazy"
+            : "Property added — it goes live on MovEazy once it has a photo");
       navigate(op(!existing && bld ? `/buildings/${bld}` : `/properties/${pid}`), { replace: true });
     } catch (e) {
       toast(friendlyError(e, "Could not save the property."), "error");
@@ -274,6 +282,19 @@ function PropertyFormInner({ existing }) {
                 No, it's vacant<span className="oz-hint" style={{ fontWeight: 400 }}>Find a tenant next</span>
               </button>
             </div>
+            {!f.occupied && (
+              <div className="oz-between" style={{ alignItems: "flex-start", gap: 12, marginTop: 14 }}>
+                <span style={{ flex: 1 }}>
+                  <strong style={{ fontSize: 15 }}>List on MovEazy</strong>
+                  <p className="oz-meta" style={{ margin: "4px 0 0", lineHeight: 1.5 }}>
+                    {f.list
+                      ? "Goes live on moveazy.co.in and to MovEazy's broker network as soon as it has a photo."
+                      : "Stays off MovEazy. You can list it any time from Find a tenant."}
+                  </p>
+                </span>
+                <Switch on={f.list} label="List on MovEazy" onChange={(list) => set({ list })} />
+              </div>
+            )}
           </div>
         )}
 

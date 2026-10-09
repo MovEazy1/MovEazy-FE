@@ -413,3 +413,17 @@ html { scrollbar-gutter: stable; }
 .leaflet-pane.leaflet-popup-pane {
   z-index: 1010 !important;
 }
+
+/* A row of full-width photos that swipe and snap (hooks/useSnapTrack.js). */
+.mz-snap {
+  display: flex;
+  overflow-x: auto;
+  overflow-y: hidden;
+  scroll-snap-type: x mandatory;
+  overscroll-behavior-x: contain;
+  scrollbar-width: none;
+  -webkit-overflow-scrolling: touch;
+}
+.mz-snap::-webkit-scrollbar { display: none; }
+.mz-snap > * { flex: 0 0 100%; min-width: 0; scroll-snap-align: start; scroll-snap-stop: always; }
+.mz-snap img { -webkit-user-drag: none; user-select: none; }

@@ -13,6 +13,8 @@ import ShareSheet from "./ShareSheet";
 import PropertyDetailsSheet from "./PropertyDetailsSheet";
 import { decideSoldOut, markSoldOut } from "../../lib/partnerCurated";
 import { MediaItem, listingMedia } from "./partnerMedia";
+import { useSnapTrack } from "../../hooks/useSnapTrack";
+import { usePhotoViewer } from "../../hooks/usePhotoViewer";
 import { Avatar, BrokeragePill, Empty, Loading, Sheet, TopBar, WhatsAppIcon, sourceLabel, toast } from "./partnerUi";
 import {
   bhkLabel, customerMessage, fetchPropertyContacts, friendlyError, inr, partnerPropertyLink, patchLead, pp,
@@ -73,7 +75,6 @@ export default function PropertyDetail() {
   const [share, setShare] = useState(false);
   const [menu, setMenu] = useState(false);
   const [contacts, setContacts] = useState(null);
-  const [slide, setSlide] = useState(0);
   const [params, setParams] = useSearchParams();
   const [details, setDetails] = useState(() => params.get("details") === "1");
   const [closing, setClosing] = useState(false);
@@ -127,7 +128,9 @@ export default function PropertyDetail() {
   }, [id, l, demo]);
 
   const matching = useMemo(() => (l ? leadsForListing(l, leads).slice(0, 5) : []), [l, leads]);
-  const media = l ? listingMedia(l) : [];
+  const media = useMemo(() => (l ? listingMedia(l) : []), [l]);
+  const { index: slide, trackProps } = useSnapTrack();
+  const photos = usePhotoViewer(media, l?.title || "");
 
   if (!inventory) return <Loading />;
   if (!l) {
@@ -207,8 +210,12 @@ export default function PropertyDetail() {
 
       <div style={{ position: "relative" }}>
         {media.length ? (
-          <div className="pz-gallery" onScroll={(e) => setSlide(Math.round(e.currentTarget.scrollLeft / e.currentTarget.clientWidth))}>
-            {media.map((src) => <div key={src} className="pz-prop-img" style={{ aspectRatio: "auto" }}><MediaItem src={src} /></div>)}
+          <div className="pz-gallery" {...trackProps}>
+            {media.map((src, i) => (
+              <div key={src} className="pz-prop-img" style={{ aspectRatio: "auto", cursor: "zoom-in" }} onClick={() => photos.open(i)}>
+                <MediaItem src={src} />
+              </div>
+            ))}
           </div>
         ) : (
           <div className="pz-gallery" style={{ display: "grid", placeItems: "center", color: "#9CA3AF" }}>No photos yet</div>
@@ -218,6 +225,7 @@ export default function PropertyDetail() {
             {slide + 1}/{media.length}
           </span>
         )}
+        {photos.viewer}
       </div>
 
       <div className="pz-pad">

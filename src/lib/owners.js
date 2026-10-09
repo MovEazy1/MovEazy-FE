@@ -133,9 +133,23 @@ export const registerOwner = (name = null) => rpc("owner_register", { p_name: na
 /* ── Properties ──────────────────────────────────────────────────────────── */
 
 export async function fetchOwnerProperties() {
-  const rows = await rpc("owner_properties");
-  return (rows ?? []).map((p) => ({ ...p, images: p.images ?? [], amenities: p.amenities ?? [] }));
+  const [rows, waiting] = await Promise.all([
+    rpc("owner_properties"),
+    // Before owner_auto_list.sql nothing waits; the flats still load.
+    rpc("owner_waiting_to_list").catch(() => []),
+  ]);
+  const wait = new Set(waiting ?? []);
+  return (rows ?? []).map((p) => ({
+    ...p, images: p.images ?? [], amenities: p.amenities ?? [], list_when_ready: wait.has(p.property_id),
+  }));
 }
+
+/**
+ * "List on MovEazy": a vacant flat goes live as soon as it has a photo — at
+ * once if it already has one. Off stops that. → the flat's status after it.
+ */
+export const listWhenReady = (propertyId, on) =>
+  rpc("owner_list_when_ready", { p_property: propertyId, p_on: Boolean(on) });
 
 export const updateProperty = (propertyId, patch) =>
   rpc("owner_update_property", { p_property: propertyId, p_patch: patch });
@@ -144,7 +158,8 @@ export const updateProperty = (propertyId, patch) =>
  * A new flat, added in the app. An ordinary inventory row the owner posts (so
  * the same public page and broker network apply to it), claimed as theirs.
  * Occupied flats start as 'rented' — off the public site — and vacant ones as
- * 'paused' until the owner chooses to find a tenant.
+ * 'paused'; the form's "List on MovEazy" switch (listWhenReady) then takes a
+ * vacant one live on its first photo.
  */
 export async function createOwnerProperty(draft, user) {
   need();

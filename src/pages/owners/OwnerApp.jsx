@@ -108,9 +108,11 @@ function OwnerWorkspace({ me, reloadMe }) {
   const fresh = useRef(new Set());
   const reloadProperties = useCallback(async () => {
     try {
-      setProperties(await fetchOwnerProperties());
+      const rows = await fetchOwnerProperties();
+      setProperties(rows);
       fresh.current.add("properties");
       setPropError("");
+      return rows;
     } catch (e) {
       setPropError(friendlyError(e, "Could not load your properties."));
       setProperties((cur) => cur ?? []);

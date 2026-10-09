@@ -1,16 +1,17 @@
-import { useState, useEffect, useRef, useMemo } from "react";
+import { lazy, Suspense, useState, useEffect, useRef, useMemo } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { coverPhoto, isVideoUrl, orderListingMedia } from "../lib/listingMedia";
 import { formatPostedAgo } from "../lib/formatTime";
 import { propertyLink, shareVia } from "../lib/crmSettings";
 import { useAuth } from "../context/AuthContext";
 import { useBackClose } from "../hooks/useBackClose";
+import { useSnapTrack } from "../hooks/useSnapTrack";
 import { getListingPrivateData, isListingPubliclyVisible } from "../lib/firestoreStore";
 import { canReadListingPrivatePhones } from "../lib/accessControl";
 import { isSupabaseConfigured } from "../lib/supabase";
 import {
   ArrowLeft, Share2, Heart, BedDouble, Users, Home as HomeIcon, CalendarDays,
-  MapPin, ChevronRight, CalendarCheck, Images,
+  MapPin, ChevronRight, CalendarCheck, Images, Maximize2,
 } from "lucide-react";
 import logoMint from "../assets/logo/moveazy-logo-mint-dark.png";
 import { useLoginModal } from "../context/LoginModalContext";
@@ -20,6 +21,9 @@ import { isListingSaved, toggleSavedListing } from "../lib/userActivity";
 import { logSavedListingChange } from "../lib/crmSync";
 import { buildBrokerWhatsAppUrl, logBrokerWhatsAppContact } from "../lib/brokerWhatsApp";
 import { autoDeposit } from "../lib/deposit";
+
+// Full screen, loaded on the first tap of a photo.
+const PhotoViewer = lazy(() => import("./PhotoViewer"));
 
 /**
  * The listing view's palette — MovEazy's emerald, not the slate-and-red mix this
@@ -329,8 +333,10 @@ export default function PropertyModal({
 
   const [isSaved, setIsSaved] = useState(false);
   const [shareText, setShareText] = useState("↗ Share");
-  const [activeMediaIndex, setActiveMediaIndex] = useState(0);
-  const [touchStartX, setTouchStartX] = useState(null);
+  // The photos swipe like a post (hooks/useSnapTrack.js); a tap opens them full screen.
+  const photoTrack = useSnapTrack();
+  const { index: activeMediaIndex, goTo: goToPhoto } = photoTrack;
+  const [viewerAt, setViewerAt] = useState(null);
   /**
    * "3 days ago" — how fresh a listing is, from created_at. Computed in an
    * effect rather than during render: reading the clock while rendering is
@@ -401,12 +407,13 @@ export default function PropertyModal({
 
   useEffect(() => {
     if (!property?.id) return;
-    setActiveMediaIndex(0);
+    goToPhoto(0, false);
+    setViewerAt(null);
     // Opened on the booking panel? Then this would scroll away from the very
     // thing they asked for, and its smooth animation would win the race.
     if (initialShowVisitForm) return;
     scrollRef.current?.scrollTo({ top: 0, behavior: "smooth" });
-  }, [property?.id, initialShowVisitForm]);
+  }, [property?.id, initialShowVisitForm, goToPhoto]);
 
   useEffect(() => {
     if (!property?.id) return;
@@ -723,8 +730,9 @@ export default function PropertyModal({
 
   const activeMedia = images[activeMediaIndex] || images[0];
   const isActiveVideo = isVideoUrl(activeMedia);
-  const goPrevMedia = () => setActiveMediaIndex((prev) => (prev - 1 + images.length) % images.length);
-  const goNextMedia = () => setActiveMediaIndex((prev) => (prev + 1) % images.length);
+  const goPrevMedia = () => photoTrack.goTo((activeMediaIndex - 1 + images.length) % images.length);
+  const goNextMedia = () => photoTrack.goTo((activeMediaIndex + 1) % images.length);
+  const hasPhotos = ordered.length > 0;
 
   const scrollTo = (id) => {
     const el = document.getElementById(id);
@@ -896,7 +904,23 @@ export default function PropertyModal({
                   borderRadius: "14px",
                 }}
               >
-                <MediaElement src={images[activeMediaIndex]} alt={property.title} firstImage={firstImageUrl} style={{ width: "100%", height: "100%", objectFit: "contain" }} />
+                <div className="mz-snap" {...photoTrack.trackProps} style={{ position: "absolute", inset: 0 }}>
+                  {images.map((src, idx) => {
+                    const video = isVideoUrl(src);
+                    return (
+                      <div
+                        key={`${src}-${idx}`}
+                        style={{ height: "100%", cursor: video || !hasPhotos ? "default" : "zoom-in" }}
+                        onClick={video || !hasPhotos ? undefined : () => setViewerAt(idx)}
+                      >
+                        {/* The one showing and its neighbours; the rest load as they come near. */}
+                        {Math.abs(idx - activeMediaIndex) <= 1 && (
+                          <MediaElement src={src} alt={idx === 0 ? property.title : ""} firstImage={firstImageUrl} style={{ width: "100%", height: "100%", objectFit: "contain" }} />
+                        )}
+                      </div>
+                    );
+                  })}
+                </div>
 
                 {/* Navigation lives on the photo, as the design has it — which
                     is also what lets the header shrink to just the logo. */}
@@ -928,7 +952,7 @@ export default function PropertyModal({
 
                 <div
                   style={{
-                    position: "absolute", left: "12px", bottom: "12px", zIndex: 3,
+                    position: "absolute", left: "12px", bottom: "12px", zIndex: 3, pointerEvents: "none",
                     display: "flex", alignItems: "center", gap: "6px",
                     background: "rgba(4,33,29,0.72)", color: "#fff",
                     borderRadius: "8px", padding: "5px 10px",
@@ -939,26 +963,24 @@ export default function PropertyModal({
                   {activeMediaIndex + 1} / {images.length}
                 </div>
 
+                {hasPhotos && !isActiveVideo && (
+                  <button
+                    type="button"
+                    aria-label="See photos full screen"
+                    onClick={() => setViewerAt(activeMediaIndex)}
+                    style={{
+                      position: "absolute", right: "12px", bottom: "12px", zIndex: 3,
+                      width: "34px", height: "34px", borderRadius: "8px", border: "none",
+                      background: "rgba(4,33,29,0.72)", color: "#fff", display: "grid", placeItems: "center", cursor: "pointer",
+                    }}
+                  >
+                    <Maximize2 size={16} strokeWidth={2.2} />
+                  </button>
+                )}
                 {isActiveVideo && (
-                  <div style={{ position: "absolute", top: "10px", left: "10px", zIndex: 2, background: "rgba(4,33,29,0.78)", color: "white", fontSize: "11px", fontWeight: 700, borderRadius: "999px", padding: "5px 9px" }}>
+                  <div style={{ position: "absolute", top: "10px", left: "10px", zIndex: 2, pointerEvents: "none", background: "rgba(4,33,29,0.78)", color: "white", fontSize: "11px", fontWeight: 700, borderRadius: "999px", padding: "5px 9px" }}>
                     VIDEO
                   </div>
-                )}
-                {images.length > 1 && (
-                  <div
-                    style={{ position: "absolute", inset: 0 }}
-                    onTouchStart={(e) => setTouchStartX(e.changedTouches?.[0]?.clientX ?? null)}
-                    onTouchEnd={(e) => {
-                      if (touchStartX == null) return;
-                      const endX = e.changedTouches?.[0]?.clientX ?? touchStartX;
-                      const delta = endX - touchStartX;
-                      if (Math.abs(delta) >= 40) {
-                        if (delta < 0) goNextMedia();
-                        else goPrevMedia();
-                      }
-                      setTouchStartX(null);
-                    }}
-                  />
                 )}
                 {images.length > 1 && (
                   <>
@@ -982,26 +1004,6 @@ export default function PropertyModal({
                 )}
               </div>
               {images.length > 1 && (
-                <div style={{ display: "flex", justifyContent: "center", alignItems: "center", gap: "8px", flexWrap: "wrap" }}>
-                  {images.map((_, idx) => (
-                    <button
-                      key={idx}
-                      type="button"
-                      onClick={() => setActiveMediaIndex(idx)}
-                      style={{
-                        width: idx === activeMediaIndex ? "22px" : "8px",
-                        height: "8px",
-                        borderRadius: "999px",
-                        border: "none",
-                        background: idx === activeMediaIndex ? T.textDim : T.line,
-                        transition: "all 0.2s ease",
-                      }}
-                      aria-label={`Go to media ${idx + 1}`}
-                    />
-                  ))}
-                </div>
-              )}
-              {images.length > 1 && (
                 <div style={{ display: "flex", gap: "8px", overflowX: "auto", paddingBottom: "4px", WebkitOverflowScrolling: "touch" }}>
                   {images.map((src, idx) => {
                     const isVideoThumb = isVideoUrl(src);
@@ -1009,7 +1011,7 @@ export default function PropertyModal({
                       <button
                         key={`${src}-${idx}`}
                         type="button"
-                        onClick={() => setActiveMediaIndex(idx)}
+                        onClick={() => photoTrack.goTo(idx)}
                         style={{
                           border: idx === activeMediaIndex ? `2px solid ${T.teal}` : `1px solid ${T.line}`,
                           borderRadius: "10px",
@@ -1056,6 +1058,12 @@ export default function PropertyModal({
                 </div>
               )}
             </div>
+
+            {viewerAt != null && (
+              <Suspense fallback={null}>
+                <PhotoViewer media={images} start={viewerAt} title={property.title} onClose={() => setViewerAt(null)} />
+              </Suspense>
+            )}
 
             {/* Content Area */}
             <div style={{ display: "flex", flexWrap: "wrap", padding: isMobile ? "14px" : "32px", gap: isMobile ? "18px" : "40px", maxWidth: "1000px", margin: "0 auto", width: "100%", boxSizing: "border-box" }}>

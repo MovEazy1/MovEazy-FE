@@ -12,8 +12,10 @@ import {
 import { useOwner } from "./OwnerApp";
 import { Avatar, Confirm, Empty, Loading, OCCUPANCY_PILL, Pill, Sheet, TopBar, toast } from "./ownerUi";
 import { MediaItem, listingMedia } from "../partners/partnerMedia";
+import { useSnapTrack } from "../../hooks/useSnapTrack";
+import { usePhotoViewer } from "../../hooks/usePhotoViewer";
 import {
-  REQUEST_STATUS, bhkLabel, fmtDate, friendlyError, inr, occupancyOf, op, ownerListingLink, updateProperty,
+  REQUEST_STATUS, bhkLabel, fmtDate, friendlyError, inr, occupancyOf, op, ownerListingLink, propertyName, updateProperty,
 } from "../../lib/owners";
 import { financialYear, isCurrentTenant, occupancyPct, tenancyLength } from "../../lib/ownerOccupancy";
 import { QrImage } from "../../components/QrPosterBlock";
@@ -24,7 +26,9 @@ export default function PropertyDetail() {
   const navigate = useNavigate();
   const { byId, properties, tenants, requests, reloadProperties } = useOwner();
   const p = byId.get(id);
-  const [slide, setSlide] = useState(0);
+  const media = useMemo(() => (p ? listingMedia(p) : []), [p]);
+  const { index: slide, trackProps } = useSnapTrack();
+  const photos = usePhotoViewer(media, p ? propertyName(p) : "");
   const [menu, setMenu] = useState(false);
   const [confirm, setConfirm] = useState(null);
   const [busy, setBusy] = useState(false);
@@ -46,7 +50,6 @@ export default function PropertyDetail() {
     );
   }
 
-  const media = listingMedia(p);
   const occ = occupancyOf(p, tenants);
   const pct = occupancyPct(mine);
   const fy = financialYear();
@@ -87,8 +90,8 @@ export default function PropertyDetail() {
       <div className="oz-pad" style={{ paddingTop: 0 }}>
         <div style={{ position: "relative" }}>
           {media.length ? (
-            <div className="oz-gallery" onScroll={(e) => setSlide(Math.round(e.currentTarget.scrollLeft / e.currentTarget.clientWidth))}>
-              {media.map((src) => <div key={src}><MediaItem src={src} /></div>)}
+            <div className="oz-gallery" {...trackProps}>
+              {media.map((src, i) => <div key={src} style={{ cursor: "zoom-in" }} onClick={() => photos.open(i)}><MediaItem src={src} /></div>)}
             </div>
           ) : (
             <Link to={op(`/properties/${id}/edit`)} className="oz-gallery" style={{ display: "grid", placeItems: "center", color: "var(--dim)", textDecoration: "none" }}>

@@ -210,7 +210,7 @@ export default function ListMyFlatMobile({ user, onPublished }) {
   // mean "didn't say".
   const [floorNumber, setFloorNumber] = useState("");
   const [totalFloors, setTotalFloors] = useState("");
-  const [furnishing, setFurnishing] = useState("Fully Furnished");
+  const [furnishing, setFurnishing] = useState("Semi Furnished");
   const [maxFlatmates, setMaxFlatmates] = useState(0);
   const [flatmatesTouched, setFlatmatesTouched] = useState(false);
   const [genderPref, setGenderPref] = useState("any");

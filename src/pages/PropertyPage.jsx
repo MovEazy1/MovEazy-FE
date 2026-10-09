@@ -75,6 +75,10 @@ export default function PropertyPage() {
 
     const onPop = () => {
       if (!armed) return;
+      // Landing back on a guard entry means something stacked above it was
+      // popped — an overlay closing (the photos full screen, the wizard), by
+      // back or by its own ×. Only a pop past the guard is the person leaving.
+      if (window.history.state?.mzExitGuard) return;
       if (backsLeft.current > 0) {
         backsLeft.current -= 1;
         // A sign-in sheet would otherwise sit on top of the questionnaire we

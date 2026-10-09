@@ -1,7 +1,8 @@
 /**
  * Find a Tenant, for one vacant flat.
  *
- *   1. Listing: live on moveazy.co.in and the broker partner app, or not.
+ *   1. Listing: live on moveazy.co.in and the broker partner app, or not —
+ *      or waiting for its first photo to go live by itself (listWhenReady).
  *   2. Visit times: the same hourly slots the site books against
  *      (lib/visitSchedule.js), set as "every day / weekdays / weekends, from–to".
  *   3. Broker calls: Premium partner brokers call or WhatsApp the owner
@@ -14,10 +15,10 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import { Link, useParams } from "react-router-dom";
 import { CalendarClock, Check, Circle, Clock, ExternalLink, Info, Phone, Share2, Users } from "lucide-react";
 import { useOwner } from "./OwnerApp";
-import { Avatar, Chip, Confirm, Empty, Loading, Pill, TopBar, WhatsAppIcon, toast } from "./ownerUi";
+import { Avatar, Chip, Confirm, Empty, Loading, Pill, Switch, TopBar, WhatsAppIcon, toast } from "./ownerUi";
 import {
-  CANDIDATE_LABEL, bhkLabel, fetchCandidates, fmtDateTime, friendlyError, inrShort, occupancyOf, op, ownerListingLink,
-  propertyName, teamWa, updateProperty, waLink,
+  CANDIDATE_LABEL, bhkLabel, fetchCandidates, fmtDateTime, friendlyError, inrShort, listWhenReady, occupancyOf, op,
+  ownerListingLink, propertyName, teamWa, updateProperty, waLink,
 } from "../../lib/owners";
 import { fetchSlotsForProperty, deleteVisitSlot } from "../../lib/visits";
 import { VISITS_DESK, fetchBrokerContact, setBrokerContact } from "../../lib/partnerContact";
@@ -64,17 +65,7 @@ function BrokerCalls({ propertyId }) {
               : `Brokers' calls and messages go to MovEazy (${desk}) with the flat and the visit they want. We pass it on to you.`}
           </p>
         </span>
-        <button type="button" role="switch" aria-checked={Boolean(on)} aria-label="Let brokers call or WhatsApp me"
-          onClick={flip} disabled={busy || on === null}
-          style={{
-            flex: "none", width: 50, height: 30, borderRadius: 99, border: "none", padding: 3, cursor: "pointer",
-            background: on ? "var(--em)" : "#CBD5E1", transition: "background .2s", marginTop: 2,
-          }}>
-          <span style={{
-            display: "block", width: 24, height: 24, borderRadius: 99, background: "#fff", boxShadow: "0 1px 3px rgba(0,0,0,.25)",
-            transform: on ? "translateX(20px)" : "none", transition: "transform .2s",
-          }} />
-        </button>
+        <Switch on={on} onChange={flip} label="Let brokers call or WhatsApp me" disabled={busy} />
       </div>
     </div>
   );
@@ -213,6 +204,19 @@ export default function FindTenant() {
     { ok: Boolean((p.description || "").trim()), label: "A short description" },
   ];
 
+  const setWaiting = async (on) => {
+    setBusy(true);
+    try {
+      await listWhenReady(id, on);
+      await reloadProperties();
+      toast(on ? "It goes live as soon as it has a photo" : "It stays off MovEazy until you list it");
+    } catch (e) {
+      toast(friendlyError(e), "error");
+    } finally {
+      setBusy(false);
+    }
+  };
+
   const setListed = async (on) => {
     setBusy(true);
     try {
@@ -253,9 +257,12 @@ export default function FindTenant() {
             </>
           ) : (
             <>
-              <h2 className="oz-h2">{occ === "occupied" ? "This flat is marked occupied" : "Not listed yet"}</h2>
+              <h2 className="oz-h2">{occ === "occupied" ? "This flat is marked occupied" : p.list_when_ready ? "Goes live with its first photo" : "Not listed yet"}</h2>
               <p className="oz-meta" style={{ margin: "0 0 12px", lineHeight: 1.55 }}>
-                List it and it goes live on moveazy.co.in and to MovEazy's broker network. You don't take calls — MovEazy screens renters and books visits in your times.
+                {p.list_when_ready
+                  ? "Add a photo and it goes live on moveazy.co.in and to MovEazy's broker network by itself — or list it now without one."
+                  : "List it and it goes live on moveazy.co.in and to MovEazy's broker network."}
+                {" "}You don't take calls — MovEazy screens renters and books visits in your times.
               </p>
               <div style={{ marginBottom: 12 }}>
                 {checklist.map((c) => (
@@ -267,8 +274,14 @@ export default function FindTenant() {
                 {checklist.some((c) => !c.ok) && <Link to={op(`/properties/${id}/edit`)} className="oz-btn oz-btn--ghost" style={{ paddingLeft: 0 }}>Complete the listing</Link>}
               </div>
               <button type="button" className="oz-btn oz-btn--primary oz-btn--block" onClick={() => setListed(true)} disabled={busy}>
-                {busy ? "Listing…" : occ === "occupied" ? "Mark vacant & list it" : "List on MovEazy"}
+                {busy ? "Listing…" : occ === "occupied" ? "Mark vacant & list it" : p.list_when_ready ? "List it now" : "List on MovEazy"}
               </button>
+              {occ !== "occupied" && (
+                <div className="oz-between" style={{ alignItems: "flex-start", gap: 12, marginTop: 14 }}>
+                  <span className="oz-meta" style={{ flex: 1, lineHeight: 1.5 }}>Go live by itself once it has a photo</span>
+                  <Switch on={Boolean(p.list_when_ready)} onChange={setWaiting} label="Go live once it has a photo" disabled={busy} />
+                </div>
+              )}
             </>
           )}
         </div>

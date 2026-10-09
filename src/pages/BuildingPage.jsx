@@ -15,6 +15,8 @@ import { Link, useParams, useSearchParams } from "react-router-dom";
 import { useAuth } from "../context/AuthContext";
 import { BadgeCheck, Building2, CalendarCheck, Check, ChevronLeft, Clock, Film, Images, Layers, MapPin, Navigation, Phone, Sparkles, X, Zap } from "lucide-react";
 import { MediaItem, listingCover, listingMedia } from "./partners/partnerMedia";
+import { useSnapTrack } from "../hooks/useSnapTrack";
+import { usePhotoViewer } from "../hooks/usePhotoViewer";
 import { inr } from "../lib/partners";
 import {
   cleanMobile, fetchBuildingPage, flatsByFloor, floorLabel, isMobile, nextDays, recordBuildingView, requestBuildingVisit,
@@ -257,20 +259,19 @@ function VideoHero({ src, photos, name }) {
 }
 
 function Gallery({ photos, name }) {
-  const [i, setI] = useState(0);
-  const ref = useRef(null);
-  const onScroll = () => {
-    const el = ref.current;
-    if (el) setI(Math.round(el.scrollLeft / Math.max(1, el.clientWidth)));
-  };
+  const { index: i, trackProps } = useSnapTrack();
+  const full = usePhotoViewer(photos, name);
   if (!photos.length) {
     return <div className="bp-gallery bp-gallery--none"><Building2 size={44} /></div>;
   }
   return (
     <div className="bp-gwrap">
-      <div className="bp-gallery" ref={ref} onScroll={onScroll}>
-        {photos.map((src, k) => <div key={src + k}><MediaItem src={src} alt={k === 0 ? name : ""} /></div>)}
+      <div className="bp-gallery" {...trackProps}>
+        {photos.map((src, k) => (
+          <div key={src + k} style={{ cursor: "zoom-in" }} onClick={() => full.open(k)}><MediaItem src={src} alt={k === 0 ? name : ""} /></div>
+        ))}
       </div>
+      {full.viewer}
       {photos.length > 1 && (
         <>
           <span className="bp-gcount">{i + 1} / {photos.length}</span>
@@ -334,7 +335,8 @@ function Sheet({ title, onClose, children, back }) {
 }
 
 function FlatSheet({ flat, picked, onClose, onToggle, onVisit }) {
-  const media = listingMedia(flat);
+  const media = useMemo(() => listingMedia(flat), [flat]);
+  const full = usePhotoViewer(media, flatName(flat));
   const rows = [
     ["Floor", floorLabel(flat.floor_number)],
     ["Rent", flat.rent ? `${inr(flat.rent)} / month` : "On request"],
@@ -346,7 +348,12 @@ function FlatSheet({ flat, picked, onClose, onToggle, onVisit }) {
   ];
   return (
     <Sheet title={`${flatName(flat)} · ${floorLabel(flat.floor_number)}`} onClose={onClose}>
-      {media.length > 0 && <div className="bp-sgallery">{media.map((src) => <div key={src}><MediaItem src={src} alt="" /></div>)}</div>}
+      {media.length > 0 && (
+        <div className="bp-sgallery">
+          {media.map((src, k) => <div key={src} style={{ cursor: "zoom-in" }} onClick={() => full.open(k)}><MediaItem src={src} alt="" /></div>)}
+        </div>
+      )}
+      {full.viewer}
       <div className="bp-pad">
         <div className="bp-kv">{rows.map(([k, v]) => <div key={k}><span>{k}</span><b>{v}</b></div>)}</div>
         {(flat.amenities ?? []).length > 0 && <div className="bp-amen" style={{ marginTop: 12 }}>{flat.amenities.map((a) => <span key={a}><Check size={13} /> {a}</span>)}</div>}

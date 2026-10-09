@@ -147,7 +147,7 @@ export default function ListMyFlat() {
   // "" rather than 0 — the ground floor is a real answer.
   const [floorNumber, setFloorNumber] = useState("");
   const [totalFloors, setTotalFloors] = useState("");
-  const [furnishing, setFurnishing] = useState("Fully Furnished");
+  const [furnishing, setFurnishing] = useState("Semi Furnished");
   const [rent, setRent] = useState("");
   const [deposit, setDeposit] = useState("");
   /** Left blank means "not stated" — the listing then shows no maintenance. */

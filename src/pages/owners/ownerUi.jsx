@@ -225,6 +225,23 @@ export function Chip({ on, children, ...rest }) {
   return <button type="button" className={`oz-chip${on ? " oz-chip--on" : ""}`} aria-pressed={!!on} {...rest}>{children}</button>;
 }
 
+/** An on/off switch. `on === null` shows it disabled while the value loads. */
+export function Switch({ on, onChange, label, disabled }) {
+  return (
+    <button type="button" role="switch" aria-checked={Boolean(on)} aria-label={label}
+      onClick={() => onChange(!on)} disabled={disabled || on === null}
+      style={{
+        flex: "none", width: 50, height: 30, borderRadius: 99, border: "none", padding: 3, cursor: "pointer",
+        background: on ? "var(--em)" : "#CBD5E1", transition: "background .2s", marginTop: 2,
+      }}>
+      <span style={{
+        display: "block", width: 24, height: 24, borderRadius: 99, background: "#fff", boxShadow: "0 1px 3px rgba(0,0,0,.25)",
+        transform: on ? "translateX(20px)" : "none", transition: "transform .2s",
+      }} />
+    </button>
+  );
+}
+
 export function Pill({ tone = "grey", children, style }) {
   return <span className={`oz-pill oz-pill--${tone}`} style={style}>{children}</span>;
 }
