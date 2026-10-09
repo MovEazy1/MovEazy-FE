@@ -41,7 +41,10 @@ import {
   saveCrmBuilding, saveInternal, setCrmFlatBuilding,
 } from "../../lib/crmPropertyInternal";
 import { DEFAULT_VISIT_RULE, applyVisitRule, rememberVisitRule } from "../../lib/visitSchedule";
-import { isVideoItem, newItem, orderMediaItems, releaseItems, savedItems, uploadMediaItems } from "../../lib/mediaItems";
+import { isVideoItem, newItem, orderMediaItems, releaseItems, savedItems, uploadMediaItemsKeyed } from "../../lib/mediaItems";
+import PhotoReview from "../../components/PhotoReview";
+import { initialCoverFor, keptCover, photosChanged, savedCoverUrl } from "../../lib/photoReview";
+import { autoDepositHint } from "../../lib/deposit";
 import { moveByKey, useDragReorder } from "../../hooks/useDragReorder";
 import { Btn, C, Chip, Empty, Toast, inr } from "./crmUi";
 
@@ -80,7 +83,9 @@ function rowToForm(row) {
     latitude: row.latitude ?? "",
     longitude: row.longitude ?? "",
     rent: row.rent ?? "",
-    deposit: row.deposit ?? "",
+    // An automatic deposit (3.5 × rent) shows as blank, with the figure as
+    // its placeholder: left blank it keeps following the rent.
+    deposit: row.deposit_auto ? "" : (row.deposit ?? ""),
     maintenance: row.maintenance ?? "",
     available_from: String(row.available_from ?? "").slice(0, 10),
     flat_type: row.flat_type ?? "",
@@ -154,6 +159,10 @@ export default function CrmPropertyForm() {
   // on the listing ({ url }) and those picked just now ({ url: preview, file }),
   // in one list so either can be dragged anywhere (lib/mediaItems.js).
   const [media, setMedia] = useState([]);
+  // The photos and cover as saved, to tell whether the poster changed them
+  // (the review screen opens only then) and to keep a framed cover.
+  const saved = useRef({ images: [], cover: "" });
+  const [reviewing, setReviewing] = useState(false);
   const keptImages = useMemo(() => media.filter((m) => !m.file).map((m) => m.url), [media]);
   const newCount = media.filter((m) => m.file).length;
   const mediaRef = useRef(media);
@@ -277,6 +286,7 @@ export default function CrmPropertyForm() {
       if (cached) {
         setF(rowToForm(cached));
         setMedia(savedItems(cached.images));
+        saved.current = { images: cached.images ?? [], cover: cached.cover_image_url || "" };
         setLoaded(true);
         return;
       }
@@ -293,6 +303,7 @@ export default function CrmPropertyForm() {
       } else {
         setF(rowToForm(data));
         setMedia(savedItems(data.images));
+        saved.current = { images: data.images ?? [], cover: data.cover_image_url || "" };
       }
       setLoaded(true);
     })();
@@ -399,7 +410,8 @@ export default function CrmPropertyForm() {
     return res;
   }, [internal, user]);
 
-  const publish = useCallback(async () => {
+  // `rev`: what the review screen settled — the order and the framed cover.
+  const publish = useCallback(async (rev) => {
     if (!canWrite) return;
     if (missingRequired.length) return showToast(`Still needed: ${missingRequired.join(", ")}`, "error");
     if (!isSupabaseConfigured || !supabase) return showToast("Supabase is not configured", "error");
@@ -408,11 +420,19 @@ export default function CrmPropertyForm() {
     try {
       const propertyId = isEdit ? editId : generatePropertyId();
       const skipped = [];
-      // In the order on screen: old and new photos together.
-      const uploaded = await uploadMediaItems(media, propertyId, undefined,
+      // In the order on screen (or as arranged on the review screen): old and new photos together.
+      const list = rev ? rev.order.map((k) => media.find((m) => m.key === k)).filter(Boolean) : media;
+      const keyed = await uploadMediaItemsKeyed(list, propertyId, undefined,
         (file, why) => skipped.push(`${file.name || "A file"}: ${why}`));
       if (skipped.length) showToast(`${skipped.length} file not uploaded — ${skipped[0]}`, "error");
-      const images = orderListingMedia(uploaded);
+      const images = orderListingMedia(keyed.map((x) => x.url));
+      const chosen = rev?.cover ? list.find((m) => m.key === rev.cover.key) : null;
+      const coverUrl = chosen
+        ? (await savedCoverUrl({
+          cover: rev.cover, source: chosen.file || chosen.url, folder: propertyId,
+          finalUrl: keyed.find((x) => x.key === chosen.key)?.url, existingCoverUrl: saved.current.cover,
+        })) || coverPhoto(images)
+        : keptCover(saved.current.cover, images);
       const sourceUrl = cleanSourceUrl(f.source_url);
 
       // Resolve a pin from whatever address detail there is, most specific
@@ -476,7 +496,7 @@ export default function CrmPropertyForm() {
         title: f.title || `${f.flat_type} in ${f.area}`,
         description: f.description || "",
         images,
-        cover_image_url: coverPhoto(images),
+        cover_image_url: coverUrl,
         status: isEdit ? (f.status || "published") : "published",
         source: sourceUrl ? detectSource(sourceUrl) : "crm",
         source_url: sourceUrl,
@@ -548,6 +568,7 @@ export default function CrmPropertyForm() {
         }
         if (error) throw error;
         replaceMedia(savedItems(data.images));
+        saved.current = { images: data.images ?? [], cover: coverUrl };
         await writeInternal(editId);
         await applyBuilding(editId);
         reload();
@@ -590,13 +611,34 @@ export default function CrmPropertyForm() {
   }, [canWrite, missingRequired, f, media, user, requirements, reload, isEdit, editId,
       writeInternal, visitRule, internal, building, buildingOptions, links, reloadBuildingOptions]);
 
+  const reviewItems = useMemo(
+    () => media.map((m) => ({ key: m.key, src: m.url, isVideo: isVideoItem(m), file: m.file })),
+    [media],
+  );
+  const coverKey = useMemo(
+    () => initialCoverFor(reviewItems, saved.current.cover)?.key ?? reviewItems.find((m) => !m.isVideo)?.key,
+    [reviewItems],
+  );
+  /**
+   * Publish, by way of the review screen when there are photos the poster
+   * hasn't arranged yet: a new listing's, or an edit that added, removed or
+   * reordered any. A text-only edit saves straight away.
+   */
+  const requestPublish = useCallback(() => {
+    if (!canWrite) return;
+    if (missingRequired.length) return showToast(`Still needed: ${missingRequired.join(", ")}`, "error");
+    const hasPhotos = reviewItems.some((m) => !m.isVideo);
+    if (hasPhotos && photosChanged(reviewItems, saved.current.images)) setReviewing(true);
+    else publish();
+  }, [canWrite, missingRequired, reviewItems, publish]);
+
   useEffect(() => {
     const onKey = (e) => {
-      if ((e.metaKey || e.ctrlKey) && e.key === "Enter") { e.preventDefault(); publish(); }
+      if ((e.metaKey || e.ctrlKey) && e.key === "Enter" && !reviewing) { e.preventDefault(); requestPublish(); }
     };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
-  }, [publish]);
+  }, [requestPublish, reviewing]);
 
   if (!canWrite) {
     return <Empty>You don't have permission to add or change listings.</Empty>;
@@ -695,7 +737,7 @@ export default function CrmPropertyForm() {
             <span className="crm-mute" style={{ fontSize: 11 }}>Needs: {missingRequired.join(", ")}</span>
           )}
           {isEdit && <Btn onClick={() => navigate("/crm/properties")}>Back to properties</Btn>}
-          <Btn variant="primary" onClick={publish} disabled={saving}>
+          <Btn variant="primary" onClick={requestPublish} disabled={saving}>
             {saving ? (isEdit ? "Saving…" : "Publishing…") : (isEdit ? "Save changes" : "Publish")}
           </Btn>
         </div>
@@ -793,7 +835,7 @@ export default function CrmPropertyForm() {
               </Field>
               <Field label="Deposit">
                 <input className="crm-input crm-num" type="number" inputMode="numeric" value={f.deposit}
-                  onChange={(e) => set({ deposit: e.target.value })} placeholder="200000" />
+                  onChange={(e) => set({ deposit: e.target.value })} placeholder={autoDepositHint(f.rent)} />
               </Field>
               <Field label="Maintenance" hint="Blank if the owner didn't quote one.">
                 <input className="crm-input crm-num" type="number" inputMode="numeric" value={f.maintenance}
@@ -962,7 +1004,7 @@ export default function CrmPropertyForm() {
                           position: "absolute", top: 2, left: 2, padding: "0 4px", borderRadius: 4,
                           background: "rgba(0,0,0,.62)", color: "#fff", fontSize: 9, fontWeight: 700,
                         }}>
-                          {video ? "VIDEO" : m.key === media.find((x) => !isVideoItem(x))?.key ? "COVER" : i + 1}
+                          {video ? "VIDEO" : m.key === coverKey ? "COVER" : i + 1}
                           {m.file ? " · NEW" : ""}
                         </span>
 
@@ -1026,7 +1068,7 @@ export default function CrmPropertyForm() {
             </div>
 
             <div style={{ display: "flex", gap: 7 }}>
-              <Btn variant="primary" onClick={publish} disabled={saving}>
+              <Btn variant="primary" onClick={requestPublish} disabled={saving}>
                 {saving ? (isEdit ? "Saving…" : "Publishing…") : (isEdit ? "Save changes" : "Publish")}
               </Btn>
               {isEdit ? (
@@ -1082,6 +1124,20 @@ export default function CrmPropertyForm() {
         )}
       </div>
 
+      {reviewing && (
+        <PhotoReview
+          items={reviewItems}
+          initialCover={initialCoverFor(reviewItems, saved.current.cover)}
+          confirmLabel={isEdit ? "Save" : "Publish"}
+          busy={saving}
+          onCancel={() => setReviewing(false)}
+          onConfirm={async (rev) => {
+            setMedia((cur) => rev.order.map((k) => cur.find((m) => m.key === k)).filter(Boolean));
+            await publish(rev);
+            setReviewing(false);
+          }}
+        />
+      )}
       <Toast {...(toast ?? {})} />
     </div>
   );

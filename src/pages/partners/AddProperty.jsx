@@ -36,6 +36,8 @@ import { isVideoFile, orderListingMedia } from "../../lib/listingMedia";
 import { resolveMapsLink } from "../../lib/mapLink";
 import { normalizeIndianMobile } from "../../lib/mobile";
 import { PUBLIC_ORIGIN, createPartnerListing, friendlyError, inr, pp, saveOwnContacts } from "../../lib/partners";
+import PhotoReview from "../../components/PhotoReview";
+import { savedCoverUrl } from "../../lib/photoReview";
 
 const RENT_CHIPS = [15000, 20000, 25000, 30000, 40000, 50000];
 const PREFS_KEY = "mz_partner_post";
@@ -173,7 +175,14 @@ function PostFlat({ onAnother }) {
   };
 
   /* ── Publish ────────────────────────────────────────────────────────────── */
-  const publish = async () => {
+  // The review screen (swipe, reorder, frame the cover) opens before the first
+  // publish whenever there are photos; `rev` is what it settled.
+  const [reviewing, setReviewing] = useState(false);
+  const reviewItems = useMemo(
+    () => photos.filter((p) => p.status === "done").map((p) => ({ key: p.key, src: p.preview || p.url, isVideo: isVideoFile(p.file) })),
+    [photos],
+  );
+  const publish = async (rev) => {
     const need = [];
     if (!(Number(rent) >= 1000)) need.push("rent");
     if (!area) need.push("area");
@@ -185,6 +194,7 @@ function PostFlat({ onAnother }) {
     }
     if (uploading) { setErr("Photos are still uploading — a few seconds."); return; }
     if (x.ownerPhone && !normalizeIndianMobile(x.ownerPhone)) { setMore(true); setErr("The owner's mobile should be 10 digits."); return; }
+    if (!rev && reviewItems.some((m) => !m.isVideo)) { setReviewing(true); return; }
     setSaving(true);
     setErr("");
     try {
@@ -194,7 +204,13 @@ function PostFlat({ onAnother }) {
         const g = await geocodePlace(`${area}, Bengaluru`).catch(() => null);
         if (g?.ok) { latitude = g.lat; longitude = g.lng; }
       }
-      const images = orderListingMedia(photos.filter((p) => p.status === "done").map((p) => p.url));
+      const done = photos.filter((p) => p.status === "done");
+      const ordered = rev ? rev.order.map((k) => done.find((p) => p.key === k)).filter(Boolean) : done;
+      const images = orderListingMedia(ordered.map((p) => p.url));
+      const chosen = rev?.cover ? done.find((p) => p.key === rev.cover.key) : null;
+      const coverImageUrl = chosen
+        ? await savedCoverUrl({ cover: rev.cover, source: chosen.file, finalUrl: chosen.url, folder: pid })
+        : "";
       const room = type === ROOM_LABEL;
       const id = await createPartnerListing({
         propertyId: pid,
@@ -212,6 +228,7 @@ function PostFlat({ onAnother }) {
         title: x.title.trim() || `${type} in ${area}`,
         description: cleanPasted(x.description),
         images,
+        coverImageUrl,
       }, user, toSharing(share));
       if (x.ownerName.trim() || x.ownerPhone.trim()) {
         await saveOwnContacts(id, [{ role: "owner", name: x.ownerName.trim(), phone: normalizeIndianMobile(x.ownerPhone) || "" }]).catch(() => {});
@@ -448,10 +465,24 @@ function PostFlat({ onAnother }) {
           <b>{typeLabel(type)}{rent ? ` · ${inr(rent)}` : ""}</b>
           <span>{area || "Pick a locality"}{furnishing ? ` · ${furnishing.replace(" Furnished", "")}` : ""} · {photos.length ? `${uploaded} photo${uploaded === 1 ? "" : "s"}` : "no photos"}</span>
         </div>
-        <button type="button" className={`pz-btn ${ready ? "pz-btn--gold" : "pz-btn--primary"} ap-publish`} onClick={publish} disabled={saving}>
+        <button type="button" className={`pz-btn ${ready ? "pz-btn--gold" : "pz-btn--primary"} ap-publish`} onClick={() => publish()} disabled={saving}>
           {saving ? "Posting…" : uploading && ready ? "Uploading…" : ready ? "Publish" : !(Number(rent) >= 1000) ? "Add rent" : "Publish"}
         </button>
       </footer>
+
+      {reviewing && (
+        <PhotoReview
+          items={reviewItems}
+          confirmLabel="Publish"
+          busy={saving}
+          onCancel={() => setReviewing(false)}
+          onConfirm={async (rev) => {
+            setPhotos((cur) => [...rev.order.map((k) => cur.find((p) => p.key === k)).filter(Boolean), ...cur.filter((p) => !rev.order.includes(p.key))]);
+            await publish(rev);
+            setReviewing(false);
+          }}
+        />
+      )}
 
       {shareSheet && (
         <Sheet title="Who sees it" onClose={() => setShareSheet(false)}>

@@ -51,3 +51,19 @@ export async function uploadMediaItems(items, propertyId, onProgress, onFileErro
   }
   return urls;
 }
+
+/** Like uploadMediaItems, but keeps each item's key: [{ key, url }], in the
+ *  list's order, failures left out. For finding where a chosen photo landed. */
+export async function uploadMediaItemsKeyed(items, propertyId, onProgress, onFileError) {
+  const total = items.filter((m) => m.file).length;
+  const out = [];
+  let done = 0;
+  for (const m of items) {
+    if (!m.file) { out.push({ key: m.key, url: m.url }); continue; }
+    const [url] = await uploadInventoryPhotos([m.file], propertyId, null, onFileError);
+    done += 1;
+    onProgress?.(done, total);
+    if (url) out.push({ key: m.key, url });
+  }
+  return out;
+}

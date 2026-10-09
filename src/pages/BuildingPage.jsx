@@ -14,7 +14,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Link, useParams, useSearchParams } from "react-router-dom";
 import { useAuth } from "../context/AuthContext";
 import { BadgeCheck, Building2, CalendarCheck, Check, ChevronLeft, Clock, Film, Images, Layers, MapPin, Navigation, Phone, Sparkles, X, Zap } from "lucide-react";
-import { MediaItem, listingMedia } from "./partners/partnerMedia";
+import { MediaItem, listingCover, listingMedia } from "./partners/partnerMedia";
 import { inr } from "../lib/partners";
 import {
   cleanMobile, fetchBuildingPage, flatsByFloor, floorLabel, isMobile, nextDays, recordBuildingView, requestBuildingVisit,
@@ -282,7 +282,7 @@ function Gallery({ photos, name }) {
 }
 
 function FlatCard({ flat, picked, onToggle, onOpen }) {
-  const [first] = listingMedia(flat);
+  const first = listingCover(flat);
   return (
     <div className={`bp-card${flat.available ? "" : " bp-card--off"}${picked ? " bp-card--on" : ""}`}>
       <button type="button" className="bp-card-main" onClick={onOpen}>

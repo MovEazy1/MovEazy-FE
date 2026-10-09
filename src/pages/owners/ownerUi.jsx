@@ -9,7 +9,7 @@
 import { useEffect, useState } from "react";
 import { Link, useLocation, useNavigate } from "react-router-dom";
 import { Building2, ChevronLeft, Home, Menu, Star, Users, Wrench, X } from "lucide-react";
-import { MediaItem, listingMedia } from "../partners/partnerMedia";
+import { MediaItem, listingCover } from "../partners/partnerMedia";
 import { op } from "../../lib/owners";
 
 const CSS = `
@@ -276,7 +276,7 @@ export function Stars({ value = 0, onChange, size = 22 }) {
 }
 
 export function PropertyThumb({ property, style }) {
-  const [first] = listingMedia(property);
+  const first = listingCover(property);
   return (
     <div className="oz-thumb" style={style}>
       {first ? <MediaItem src={first} alt="" /> : <Building2 size={28} />}

@@ -10,9 +10,12 @@ import PageShell from "../components/layout/PageShell";
 import ListingMapPicker from "../components/ListingMapPicker";
 import ListMyFlatMobile, { posterRoleFor } from "../components/ListMyFlatMobile";
 import { reverseGeocode, nearbyLandmarks } from "../lib/geocode";
-import { createInventoryItem, uploadInventoryPhotos, generatePropertyId, mediaRejectionReason } from "../lib/inventory";
+import { createInventoryItem, generatePropertyId, mediaRejectionReason } from "../lib/inventory";
+import PhotoReview from "../components/PhotoReview";
+import { fileReviewItems, uploadReviewedFiles } from "../lib/photoReview";
+import { autoDepositHint } from "../lib/deposit";
 import {
-  coverMedia, describeMedia, isListingMediaFile, isVideoFile, isVideoUrl, orderListingMedia,
+  coverMedia, describeMedia, isListingMediaFile, isVideoFile, isVideoUrl,
 } from "../lib/listingMedia";
 import { fetchAllUserRequirements } from "../lib/userRequirements";
 import { matchListingToRequirements } from "../lib/inventoryMatch";
@@ -286,7 +289,7 @@ export default function ListMyFlat() {
   // than abandoning a half-filled listing. Steps here are 0-based.
   useHistorySteps(step, back);
 
-  const buildDraft = (images = []) => ({
+  const buildDraft = (images = [], coverImageUrl = "") => ({
     propertyId,
     postedBy,
     phone: user?.phone || "",
@@ -315,31 +318,36 @@ export default function ListMyFlat() {
     title,
     description,
     images,
+    coverImageUrl,
   });
 
-  const handleSubmit = async () => {
+  // The review screen (swipe, reorder, frame the cover) opens before publishing
+  // whenever there are photos; `rev` is what it settled.
+  const [reviewing, setReviewing] = useState(false);
+  const handleSubmit = async (rev) => {
     if (!validateStep()) return;
+    if (!rev && photoFiles.some((f) => !isVideoFile(f))) { setReviewing(true); return; }
     setSaving(true);
     setErrors({});
     setUploadMsg("");
     try {
       // 1) Upload the gallery photos, then 2) store the inventory row in the DB.
       let images = [];
+      let coverImageUrl = "";
       let uploadSkipped = [];
       if (photoFiles.length) {
         const label = describeMedia(photoFiles.map((f) => (isVideoFile(f) ? "x.mp4" : "x.jpg")));
         setUploadMsg(`Uploading ${label}…`);
         const skipped = [];
-        const uploaded = await uploadInventoryPhotos(
-          photoFiles, propertyId,
-          (d, t) => setUploadMsg(`Uploading ${label}… ${d}/${t}`),
-          (file, why) => skipped.push(`${file.name || "A file"}: ${why}`),
-        );
-        images = orderListingMedia(uploaded);
+        ({ images, coverImageUrl } = await uploadReviewedFiles({
+          files: photoFiles, previews: photoPreviews, rev, folder: propertyId,
+          onProgress: (d, t) => setUploadMsg(`Uploading ${label}… ${d}/${t}`),
+          onFileError: (file, why) => skipped.push(`${file.name || "A file"}: ${why}`),
+        }));
         uploadSkipped = skipped;
       }
       setUploadMsg("");
-      const row = await createInventoryItem(buildDraft(images), user);
+      const row = await createInventoryItem(buildDraft(images, coverImageUrl), user);
       // Map the new flat against every active seeker requirement.
       let matches = [];
       try {
@@ -817,7 +825,7 @@ export default function ListMyFlat() {
                 </div>
                 <div>
                   <Label>Security Deposit (₹)</Label>
-                  <input type="number" min="0" value={deposit} onChange={(e) => setDeposit(e.target.value)} placeholder="1,00,000" className={inp} />
+                  <input type="number" min="0" value={deposit} onChange={(e) => setDeposit(e.target.value)} placeholder={autoDepositHint(rent)} className={inp} />
                 </div>
                 <div>
                   <Label>Monthly maintenance (₹)</Label>
@@ -985,7 +993,16 @@ export default function ListMyFlat() {
               </div>
             )}
 
-            <button type="button" onClick={handleSubmit} disabled={saving}
+            {reviewing && (
+              <PhotoReview
+                items={fileReviewItems(photoFiles, photoPreviews)}
+                confirmLabel="Publish"
+                busy={saving}
+                onCancel={() => setReviewing(false)}
+                onConfirm={async (rev) => { setReviewing(false); await handleSubmit(rev); }}
+              />
+            )}
+            <button type="button" onClick={() => handleSubmit()} disabled={saving}
               className="w-full py-4 rounded-2xl text-[16px] font-bold text-white transition-opacity disabled:opacity-60"
               style={{ background: `linear-gradient(135deg,${BRAND_RED},#ef4444)` }}>
               {saving ? (uploadMsg || "Publishing & matching…") : "Publish Listing →"}

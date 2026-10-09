@@ -19,6 +19,7 @@ import { findNearbyListings } from "../lib/geo";
 import { isListingSaved, toggleSavedListing } from "../lib/userActivity";
 import { logSavedListingChange } from "../lib/crmSync";
 import { buildBrokerWhatsAppUrl, logBrokerWhatsAppContact } from "../lib/brokerWhatsApp";
+import { autoDeposit } from "../lib/deposit";
 
 /**
  * The listing view's palette — MovEazy's emerald, not the slate-and-red mix this
@@ -494,7 +495,9 @@ export default function PropertyModal({
   };
   const depositFromField = parseMoney(property.securityDeposit);
   const maintenanceFromField = parseMoney(property.maintenanceCost);
-  const securityDeposit = depositFromField ?? (numericRent > 0 ? Math.round(numericRent * 2.5) : 0);
+  // Listings now always carry one (3.5 × rent when the poster left it blank,
+  // lib/deposit.js); the same figure stands in for anything older.
+  const securityDeposit = depositFromField ?? autoDeposit(numericRent);
   // Maintenance is whatever the lister quoted, or nothing at all. It used to
   // default to 8% of rent, which put a monthly charge on every listing that
   // nobody had asked for and the owner would then have to deny. Read through

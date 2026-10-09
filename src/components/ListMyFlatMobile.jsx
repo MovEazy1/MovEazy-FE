@@ -19,8 +19,11 @@ import { useDragReorder } from "../hooks/useDragReorder";
 import ListingMapPicker from "./ListingMapPicker";
 import PropertyVisitSlots from "./PropertyVisitSlots";
 import { reverseGeocode, nearbyLandmarks } from "../lib/geocode";
-import { createInventoryItem, uploadInventoryPhotos, generatePropertyId, mediaRejectionReason } from "../lib/inventory";
-import { describeMedia, isListingMediaFile, isVideoFile, orderListingMedia } from "../lib/listingMedia";
+import { createInventoryItem, generatePropertyId, mediaRejectionReason } from "../lib/inventory";
+import PhotoReview from "./PhotoReview";
+import { fileReviewItems, uploadReviewedFiles } from "../lib/photoReview";
+import { autoDepositHint } from "../lib/deposit";
+import { describeMedia, isListingMediaFile, isVideoFile } from "../lib/listingMedia";
 import { useHistorySteps } from "../hooks/useBackClose";
 import { autoTitle, bedroomsForFlatType, flatmatesForFlatType } from "../lib/listingDraft";
 import MovEazyLogo from "./branding/MovEAZYLogo";
@@ -339,21 +342,25 @@ export default function ListMyFlatMobile({ user, onPublished }) {
   // timing step needs an actual property_id to write property_visit_slots
   // against (that table's FK requires the property to already exist), so the
   // listing is genuinely published here, then step 7 finishes it off.
-  const publishListing = async () => {
+  // The review screen (swipe, reorder, frame the cover) opens before publishing
+  // whenever there are photos; `rev` is what it settled.
+  const [reviewing, setReviewing] = useState(false);
+  const publishListing = async (rev) => {
+    if (!rev && photoFiles.some((f) => !isVideoFile(f))) { setReviewing(true); return; }
     setSaving(true);
     setErr("");
     try {
       let images = [];
+      let coverImageUrl = "";
       if (photoFiles.length) {
         const label = describeMedia(photoFiles.map((f) => (isVideoFile(f) ? "x.mp4" : "x.jpg")));
         setUploadMsg(`Uploading ${label}…`);
         const skipped = [];
-        const uploaded = await uploadInventoryPhotos(
-          photoFiles, propertyId,
-          (d, t) => setUploadMsg(`Uploading ${label}… ${d}/${t}`),
-          (file, why) => skipped.push(`${file.name || "A file"}: ${why}`),
-        );
-        images = orderListingMedia(uploaded);
+        ({ images, coverImageUrl } = await uploadReviewedFiles({
+          files: photoFiles, previews: photoPreviews, rev, folder: propertyId,
+          onProgress: (d, t) => setUploadMsg(`Uploading ${label}… ${d}/${t}`),
+          onFileError: (file, why) => skipped.push(`${file.name || "A file"}: ${why}`),
+        }));
         if (skipped.length) setErr(`Couldn't upload ${skipped.length} file${skipped.length === 1 ? "" : "s"} — ${skipped[0]}`);
       }
       setUploadMsg("");
@@ -362,7 +369,7 @@ export default function ListMyFlatMobile({ user, onPublished }) {
         latitude: marker?.[0] ?? null, longitude: marker?.[1] ?? null,
         rent, deposit, maintenance, availableFrom, flatType, bedrooms, bathrooms, floorNumber, totalFloors, furnishing,
         maxFlatmates, genderPref, occupantsAllowed, amenities, lifestyle, houseRules,
-        title, description, images,
+        title, description, images, coverImageUrl,
       }, user);
       let matches = [];
       try {
@@ -606,7 +613,7 @@ export default function ListMyFlatMobile({ user, onPublished }) {
               <div>
                 <Q>Security deposit</Q>
                 <Field prefix={<span style={{ color: "#6F8681", fontSize: 16, fontWeight: 700, flex: "none" }}>₹</span>}>
-                  <input type="number" min="0" placeholder="1,00,000" value={deposit}
+                  <input type="number" min="0" placeholder={autoDepositHint(rent)} value={deposit}
                     onChange={(e) => setDeposit(e.target.value)} style={inputStyle} />
                 </Field>
               </div>
@@ -777,6 +784,15 @@ export default function ListMyFlatMobile({ user, onPublished }) {
                 <path d="M14.5 5.5 8 12l6.5 6.5" strokeLinecap="round" strokeLinejoin="round" />
               </svg>
             </button>
+          )}
+          {reviewing && (
+            <PhotoReview
+              items={fileReviewItems(photoFiles, photoPreviews)}
+              confirmLabel="Publish"
+              busy={saving}
+              onCancel={() => setReviewing(false)}
+              onConfirm={async (rev) => { setReviewing(false); await publishListing(rev); }}
+            />
           )}
           <button type="button" onClick={onNext} disabled={saving}
             style={{

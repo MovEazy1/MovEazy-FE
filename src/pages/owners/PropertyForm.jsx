@@ -18,7 +18,10 @@ import { bedroomsOf } from "../../lib/partnerMatch";
 import { geocodePlace } from "../../lib/geocode";
 import { mediaRejectionReason } from "../../lib/inventory";
 import { coverPhoto, orderListingMedia } from "../../lib/listingMedia";
-import { isVideoItem, newItem, orderMediaItems, releaseItems, savedItems, uploadMediaItems } from "../../lib/mediaItems";
+import { isVideoItem, newItem, orderMediaItems, releaseItems, savedItems, uploadMediaItemsKeyed } from "../../lib/mediaItems";
+import PhotoReview from "../../components/PhotoReview";
+import { initialCoverFor, keptCover, photosChanged, savedCoverUrl } from "../../lib/photoReview";
+import { autoDepositHint } from "../../lib/deposit";
 import { moveByKey, useDragReorder } from "../../hooks/useDragReorder";
 import { listingMedia, MediaItem } from "../partners/partnerMedia";
 import { createOwnerProperty, friendlyError, op, updateProperty } from "../../lib/owners";
@@ -111,7 +114,21 @@ function PropertyFormInner({ existing }) {
     setMedia((cur) => orderMediaItems([...cur, ...ok.slice(0, Math.max(0, 20 - cur.filter((m) => m.file).length)).map(newItem)]));
   };
 
-  const save = async () => {
+  const [reviewing, setReviewing] = useState(false);
+  const reviewItems = useMemo(
+    () => media.map((m) => ({ key: m.key, src: m.url, isVideo: isVideoItem(m), file: m.file })),
+    [media],
+  );
+  /** Save, by way of the review screen when photos were added, removed or reordered. */
+  const requestSave = () => {
+    if (!validate()) { window.scrollTo(0, 0); return; }
+    const before = existing ? listingMedia(existing) : [];
+    if (reviewItems.some((m) => !m.isVideo) && photosChanged(reviewItems, before)) setReviewing(true);
+    else save();
+  };
+
+  // `rev`: what the review screen settled — the order and the framed cover.
+  const save = async (rev) => {
     if (!validate()) { window.scrollTo(0, 0); return; }
     setSaving(existing ? "Saving…" : "Adding…");
     try {
@@ -133,8 +150,18 @@ function PropertyFormInner({ existing }) {
       }
       const fresh = media.filter((m) => m.file).length;
       if (fresh) setSaving(`Uploading photos (0/${fresh})…`);
-      const images = orderListingMedia(await uploadMediaItems(media, pid, (d, t) => setSaving(`Uploading photos (${d}/${t})…`),
-        (file, msg) => toast(`${file.name}: ${msg}`, "error")));
+      const list = rev ? rev.order.map((k) => media.find((m) => m.key === k)).filter(Boolean) : media;
+      const keyed = await uploadMediaItemsKeyed(list, pid, (d, t) => setSaving(`Uploading photos (${d}/${t})…`),
+        (file, msg) => toast(`${file.name}: ${msg}`, "error"));
+      const images = orderListingMedia(keyed.map((x) => x.url));
+      const chosen = rev?.cover ? list.find((m) => m.key === rev.cover.key) : null;
+      if (chosen) setSaving("Framing the cover…");
+      const coverUrl = chosen
+        ? (await savedCoverUrl({
+          cover: rev.cover, source: chosen.file || chosen.url, folder: pid,
+          finalUrl: keyed.find((x) => x.key === chosen.key)?.url, existingCoverUrl: existing?.cover_image_url || "",
+        })) || coverPhoto(images)
+        : keptCover(existing?.cover_image_url || "", images);
       const patch = {
         ...(existing ? {
           property_type: f.propertyType, flat_type: f.flatType, bedrooms, rent: Number(f.rent), furnishing: f.furnishing,
@@ -142,9 +169,9 @@ function PropertyFormInner({ existing }) {
           latitude, longitude, area_sqft: f.areaSqft || "", deposit: f.deposit || "", available_from: f.availableFrom || "",
           description: f.description, title: existing.title || `${f.flatType} in ${area}`,
         } : {}),
-        // Sent when anything changed: a photo added, removed or moved.
-        ...(!existing || images.join("\n") !== listingMedia(existing).join("\n")
-          ? { images, cover_image_url: coverPhoto(images) } : {}),
+        // Sent when anything changed: a photo added, removed or moved, or the cover reframed.
+        ...(!existing || rev || images.join("\n") !== listingMedia(existing).join("\n")
+          ? { images, cover_image_url: coverUrl } : {}),
       };
       if (Object.keys(patch).length) await updateProperty(pid, patch);
       if (bld !== (existing?.building_id || "") || (bld && floor !== (existing?.floor_number ?? null))) {
@@ -291,6 +318,7 @@ function PropertyFormInner({ existing }) {
               <div className="oz-field">
                 <label className="oz-label" htmlFor="pf-dep">Deposit (₹)</label>
                 <input id="pf-dep" className="oz-input" inputMode="numeric" value={f.deposit}
+                  placeholder={autoDepositHint(f.rent)}
                   onChange={(e) => set({ deposit: e.target.value.replace(/\D/g, "").slice(0, 8) })} />
               </div>
             </div>
@@ -306,10 +334,24 @@ function PropertyFormInner({ existing }) {
           </div>
         )}
 
-        <button type="button" className="oz-btn oz-btn--primary oz-btn--block" onClick={save} disabled={!!saving}>
+        <button type="button" className="oz-btn oz-btn--primary oz-btn--block" onClick={requestSave} disabled={!!saving}>
           {saving || (existing ? "Save changes" : "Add property")}
         </button>
       </div>
+      {reviewing && (
+        <PhotoReview
+          items={reviewItems}
+          initialCover={initialCoverFor(reviewItems, existing?.cover_image_url || "")}
+          confirmLabel={existing ? "Save" : "Add property"}
+          busy={!!saving}
+          onCancel={() => setReviewing(false)}
+          onConfirm={async (rev) => {
+            setMedia((cur) => rev.order.map((k) => cur.find((m) => m.key === k)).filter(Boolean));
+            setReviewing(false);
+            await save(rev);
+          }}
+        />
+      )}
     </>
   );
 }

@@ -16,7 +16,7 @@ import {
 } from "lucide-react";
 import { useOwner } from "./OwnerApp";
 import { Avatar, Empty, Loading, Pill, Sheet, TopBar, WhatsAppIcon, toast } from "./ownerUi";
-import { MediaItem, listingMedia } from "../partners/partnerMedia";
+import { MediaItem, listingCover } from "../partners/partnerMedia";
 import {
   VISIT_STATUS, buildingDisplay, buildingUrl, fetchBuildingDetail, floorLabel, isInstant, markFlatBooked, setFlatBuilding,
   setInstantVisit, updateBuildingLead, visitWhen,
@@ -76,7 +76,7 @@ export default function BuildingDetail() {
   const now = Date.now();
   const upcoming = leads.filter((l) => ["new", "confirmed"].includes(l.status) && (!l.visit_at || new Date(l.visit_at).getTime() > now - 3 * 3600e3));
   const shownLeads = visitTab === "upcoming" ? upcoming : leads;
-  const cover = (d.photos ?? [])[0] || flats.flatMap((f) => listingMedia(f))[0];
+  const cover = (d.photos ?? [])[0] || flats.map((f) => listingCover(f)).find(Boolean);
 
   return (
     <>
@@ -119,7 +119,7 @@ export default function BuildingDetail() {
               <div className="bd-floor-h">In the order tenants see them<span>{flats.filter((f) => f.available).length}/{flats.length} available</span></div>
               {flats.map((f) => (
                 <button key={f.property_id} type="button" className="bd-flat" onClick={() => setSheet({ kind: "flat", item: f })}>
-                  <div className="bd-flat-img">{listingMedia(f)[0] ? <MediaItem src={listingMedia(f)[0]} alt="" /> : <KeyRound size={20} />}</div>
+                  <div className="bd-flat-img">{listingCover(f) ? <MediaItem src={listingCover(f)} alt="" /> : <KeyRound size={20} />}</div>
                   <div className="bd-flat-body">
                     <b>{f.unit_no ? `Flat ${f.unit_no} · ` : ""}{bhk(f)}{f.furnishing && !f.unit_no ? <span> · {f.furnishing}</span> : null}</b>
                     <div className="oz-rent">{f.rent ? inr(f.rent) : "—"} <small>/ month · {floorLabel(f.floor_number)}</small></div>
@@ -316,7 +316,7 @@ function PosterCard({ d, available, flats }) {
   }, [flats]);
 
   const posterData = useCallback(async () => {
-    const coverSrc = (d.photos ?? [])[0] || flats.flatMap((f) => listingMedia(f))[0] || "";
+    const coverSrc = (d.photos ?? [])[0] || flats.map((f) => listingCover(f)).find(Boolean) || "";
     const [photo, logo] = await Promise.all([loadImage(coverSrc), loadImage(logoOnDark), posterFontsReady()]);
     return {
       building: { name: d.name, area: d.area, landmark: d.landmark, available, rentFrom },

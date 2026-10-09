@@ -24,6 +24,8 @@ import { buildingUrl, floorLabel } from "../../lib/buildings";
 import { SCOPES } from "../../lib/adminScopes";
 import { moveByKey, useDragReorder } from "../../hooks/useDragReorder";
 import { BUILDING_AMENITIES } from "../owners/BuildingForm";
+import PhotoReview from "../../components/PhotoReview";
+import { initialCoverFor, keptCover, photosChanged, savedCoverUrl, splitCover, withCover } from "../../lib/photoReview";
 
 const MAX_PHOTOS = 30;
 
@@ -68,15 +70,20 @@ export default function CrmBuildingEditor() {
   const say = (message, tone = "ok") => { setToast({ message, tone }); setTimeout(() => setToast(null), 3200); };
   const byId = useMemo(() => new Map((inventory ?? []).map((l) => [l.property_id, l])), [inventory]);
 
+  const savedPhotos = useRef({ cover: "", gallery: [] });
+  const [reviewing, setReviewing] = useState(false);
   const load = useCallback(async () => {
     if (isNew) return;
     try {
       const d = await fetchCrmBuilding(id);
       if (!d) { setB(false); return; }
+      // A framed cover rides as photos[0]; it is edited on the review screen, not in the grid.
+      const split = splitCover(d.photos);
+      savedPhotos.current = split;
       setB({
         name: d.name || "", kind: d.kind || "building", area: d.area || "", landmark: d.landmark || "", full_address: d.full_address || "",
         total_floors: d.total_floors ?? "", owner_email: d.owner_email || "", owner_phone: d.owner_phone || "",
-        description: d.description || "", amenities: d.amenities ?? [], photos: d.photos ?? [], cover_video: d.cover_video || "",
+        description: d.description || "", amenities: d.amenities ?? [], photos: split.gallery, cover_video: d.cover_video || "",
       });
       setCode(d.code);
       setStats(d.stats);
@@ -187,17 +194,29 @@ export default function CrmBuildingEditor() {
     return () => window.removeEventListener("paste", onPaste);
   }, []);
 
-  const save = async () => {
+  const reviewItems = useMemo(() => (b?.photos ?? []).map((src) => ({ key: src, src })), [b?.photos]);
+  /** Save, by way of the review screen when photos were added, removed or reordered. */
+  const requestSave = () => {
     if (!b.name.trim()) { say("Give the building a name", "error"); return; }
     if (!b.area.trim()) { say("Which locality is it in?", "error"); return; }
     if (!(b.photos ?? []).length && !b.cover_video
       && !window.confirm("No cover photos or video yet — they're the first thing a tenant sees when they scan the QR. Save anyway?")) return;
+    if (reviewItems.length && photosChanged(reviewItems, savedPhotos.current.gallery)) setReviewing(true);
+    else save();
+  };
+
+  // `rev`: what the review screen settled — the order and the framed cover.
+  const save = async (rev) => {
     setSaving(true);
     try {
+      const gallery = rev ? rev.order : (b.photos ?? []);
+      const coverUrl = rev?.cover
+        ? await savedCoverUrl({ cover: rev.cover, source: rev.cover.key, finalUrl: rev.cover.key, folder, existingCoverUrl: savedPhotos.current.cover })
+        : keptCover(savedPhotos.current.cover, gallery);
       const r = await saveCrmBuilding({
         ...(isNew ? {} : { id }),
         name: b.name.trim(), kind: b.kind, area: b.area.trim(), landmark: b.landmark, full_address: b.full_address,
-        total_floors: String(b.total_floors ?? ""), description: b.description, amenities: b.amenities, photos: b.photos,
+        total_floors: String(b.total_floors ?? ""), description: b.description, amenities: b.amenities, photos: withCover(coverUrl, gallery),
         cover_video: b.cover_video,
         ...(b.kind === "building" ? { owner_email: b.owner_email.trim().toLowerCase(), owner_phone: b.owner_phone.trim() } : {}),
       });
@@ -231,7 +250,7 @@ export default function CrmBuildingEditor() {
         <span className="crm-label">{isNew ? "Group flats into a building" : `${b.kind === "society" ? "Society" : "Building"} · ${b.name}`}</span>
         <div style={{ display: "flex", gap: 6 }}>
           <Btn onClick={() => navigate(-1)}>Back</Btn>
-          <Btn variant="primary" onClick={save} disabled={saving || Boolean(uploading)}>{saving ? "Saving…" : uploading || "Save"}</Btn>
+          <Btn variant="primary" onClick={requestSave} disabled={saving || Boolean(uploading)}>{saving ? "Saving…" : uploading || "Save"}</Btn>
         </div>
       </div>
       <div className="crm-scroll" style={{ flex: 1, padding: 16 }}>
@@ -409,6 +428,20 @@ export default function CrmBuildingEditor() {
           </div>
         </div>
       </div>
+      {reviewing && (
+        <PhotoReview
+          items={reviewItems}
+          initialCover={initialCoverFor(reviewItems, savedPhotos.current.cover)}
+          confirmLabel="Save"
+          busy={saving}
+          onCancel={() => setReviewing(false)}
+          onConfirm={async (rev) => {
+            set({ photos: rev.order });
+            await save(rev);
+            setReviewing(false);
+          }}
+        />
+      )}
       <Toast {...(toast ?? {})} />
     </div>
   );

@@ -8,10 +8,16 @@ import { Home } from "lucide-react";
 import SmartImage from "../../components/SmartImage";
 import { isVideoUrl, orderListingMedia } from "../../lib/listingMedia";
 import ThumbImg from "../../components/ThumbImg";
+import { galleryOf, isMadeCover } from "../../lib/coverCrop";
 
+/** The gallery: every photo and video. A framed cover (lib/coverCrop.js) is a copy of one of them, so it isn't repeated here. */
 export function listingMedia(l) {
-  const all = orderListingMedia([l?.cover_image_url, ...(l?.images ?? [])].filter(Boolean));
-  return [...new Set(all)];
+  return orderListingMedia(galleryOf(l?.cover_image_url, l?.images ?? []));
+}
+
+/** What a card shows: the framed cover, or else the gallery's first photo. */
+export function listingCover(l) {
+  return isMadeCover(l?.cover_image_url) ? l.cover_image_url : listingMedia(l)[0];
 }
 
 export function MediaItem({ src, alt = "", thumb = false }) {
@@ -34,7 +40,7 @@ function PhotoOrPlaceholder({ src, alt, thumb }) {
 
 /** The listing's first photo. `thumb` for small places — cards, rows, tiles — which get the 480 px copy. */
 export function SmartListingImage({ listing, thumb = false }) {
-  const [first] = listingMedia(listing);
+  const first = listingCover(listing);
   if (!first) {
     return (
       <div style={{ width: "100%", height: "100%", display: "grid", placeItems: "center", color: "#9CA3AF" }}>

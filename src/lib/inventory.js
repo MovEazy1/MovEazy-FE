@@ -101,6 +101,26 @@ export async function uploadInventoryPhotos(files = [], propertyId, onProgress, 
   return urls;
 }
 
+/**
+ * Upload a framed cover (lib/coverCrop.js) beside the listing's photos and
+ * return its public URL — cover-<time>.jpg, with its thumbnail. `folder` is the
+ * property id (or a building's BLD- folder), the same one its photos use.
+ */
+export async function uploadCoverImage(blob, folder) {
+  if (!isSupabaseConfigured || !supabase) throw new Error("Supabase is not configured");
+  const path = `inventory/${folder}/cover-${Date.now()}.jpg`;
+  const { data, error } = await supabase.storage.from(PHOTO_BUCKET)
+    .upload(path, blob, { upsert: false, contentType: "image/jpeg", cacheControl: "31536000" });
+  if (error) throw new Error(uploadErrorMessage(error, blob));
+  const thumb = await shrinkImage(blob, THUMB_MAX).catch(() => null);
+  if (thumb) {
+    await supabase.storage.from(PHOTO_BUCKET)
+      .upload(thumbPath(data.path), thumb, { upsert: true, contentType: "image/jpeg", cacheControl: "31536000" })
+      .catch(() => {});
+  }
+  return supabase.storage.from(PHOTO_BUCKET).getPublicUrl(data.path).data.publicUrl;
+}
+
 /** Short shareable id: MZ-XXXXXX. */
 export function generatePropertyId() {
   let s = "";
@@ -174,7 +194,8 @@ export function buildInventoryRow(draft, poster) {
     // Stored in the order they're shown in, so every reader — the app, an
     // export, someone looking at the table — sees the same listing.
     images: orderListingMedia(list(draft.images)),
-    cover_image_url: coverPhoto(list(draft.images)),
+    // The framed cover from the review screen (lib/coverCrop.js), or else the first photo.
+    cover_image_url: draft.coverImageUrl || coverPhoto(list(draft.images)),
 
     status: "published",
     updated_at: new Date().toISOString(),

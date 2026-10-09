@@ -16,6 +16,8 @@ import { geocodePlace } from "../../lib/geocode";
 import { saveBuilding } from "../../lib/buildings";
 import { friendlyError, op } from "../../lib/owners";
 import { moveByKey, useDragReorder } from "../../hooks/useDragReorder";
+import PhotoReview from "../../components/PhotoReview";
+import { initialCoverFor, keptCover, photosChanged, savedCoverUrl, splitCover, withCover } from "../../lib/photoReview";
 
 export const BUILDING_AMENITIES = [
   "Lift", "Power backup", "Car parking", "Bike parking", "24×7 security", "CCTV", "Gated", "Water 24×7",
@@ -48,7 +50,10 @@ function BuildingFormInner({ existing }) {
   }));
   const [videoBusy, setVideoBusy] = useState(false);
   // Each photo: { key, url (once uploaded), preview, state: 'up' | 'ok' | 'err', file }
-  const [photos, setPhotos] = useState(() => (existing?.photos ?? []).map((url) => ({ key: url, url, preview: url, state: "ok" })));
+  // A framed cover rides as photos[0]; it is edited on the review screen, not in the grid.
+  const [savedPhotos] = useState(() => splitCover(existing?.photos));
+  const [photos, setPhotos] = useState(() => savedPhotos.gallery.map((url) => ({ key: url, url, preview: url, state: "ok" })));
+  const [reviewing, setReviewing] = useState(false);
   const [errors, setErrors] = useState({});
   const [saving, setSaving] = useState(false);
   const [folder] = useState(() => `BLD-${existing?.code || Math.random().toString(36).slice(2, 10).toUpperCase()}`);
@@ -78,7 +83,13 @@ function BuildingFormInner({ existing }) {
 
   const toggleAmenity = (a) => set({ amenities: f.amenities.includes(a) ? f.amenities.filter((x) => x !== a) : [...f.amenities, a] });
 
-  const save = async () => {
+  const reviewItems = useMemo(
+    () => photos.filter((p) => p.state === "ok" && p.url).map((p) => ({ key: p.key, src: p.preview || p.url, file: p.file })),
+    [photos],
+  );
+
+  // `rev`: what the review screen settled — the order and the framed cover.
+  const save = async (rev) => {
     const e = {};
     if (f.name.trim().length < 2) e.name = "Give the property a name tenants will recognise";
     if (!f.area.trim()) e.area = "Which locality is it in?";
@@ -86,6 +97,10 @@ function BuildingFormInner({ existing }) {
     setErrors(e);
     if (Object.keys(e).length) { window.scrollTo(0, 0); return; }
     if (uploading || videoBusy) { toast("Hold on — still uploading."); return; }
+    if (!rev && reviewItems.length && photosChanged(reviewItems.map((m) => ({ ...m, src: photos.find((p) => p.key === m.key)?.url })), savedPhotos.gallery)) {
+      setReviewing(true);
+      return;
+    }
     setSaving(true);
     try {
       let { latitude, longitude } = f;
@@ -98,7 +113,16 @@ function BuildingFormInner({ existing }) {
         name: f.name.trim(), area: f.area.trim(), landmark: f.landmark.trim(), full_address: f.fullAddress.trim(),
         latitude: latitude ?? "", longitude: longitude ?? "", total_floors: f.totalFloors,
         amenities: f.amenities, description: f.description.trim(),
-        photos: photos.filter((p) => p.state === "ok" && p.url).map((p) => p.url),
+        photos: await (async () => {
+          const ok = photos.filter((p) => p.state === "ok" && p.url);
+          const ordered = rev ? rev.order.map((k) => ok.find((p) => p.key === k)).filter(Boolean) : ok;
+          const gallery = ordered.map((p) => p.url);
+          const chosen = rev?.cover ? ok.find((p) => p.key === rev.cover.key) : null;
+          const coverUrl = chosen
+            ? await savedCoverUrl({ cover: rev.cover, source: chosen.file || chosen.url, finalUrl: chosen.url, folder, existingCoverUrl: savedPhotos.cover })
+            : keptCover(savedPhotos.cover, gallery);
+          return withCover(coverUrl, gallery);
+        })(),
         cover_video: f.coverVideo,
       });
       await reloadBuildings();
@@ -216,7 +240,7 @@ function BuildingFormInner({ existing }) {
           </div>
         </div>
 
-        <button type="button" className="oz-btn oz-btn--primary oz-btn--block" onClick={save} disabled={saving}>
+        <button type="button" className="oz-btn oz-btn--primary oz-btn--block" onClick={() => save()} disabled={saving}>
           {saving ? "Saving…" : uploading || videoBusy ? "Uploading…" : existing ? "Save changes" : "Create property & QR"}
         </button>
       </div>
@@ -236,6 +260,20 @@ function BuildingFormInner({ existing }) {
         .bf-spin { animation: bfspin .8s linear infinite; }
         @keyframes bfspin { to { transform: rotate(360deg); } }
       `}</style>
+      {reviewing && (
+        <PhotoReview
+          items={reviewItems}
+          initialCover={initialCoverFor(reviewItems, savedPhotos.cover)}
+          confirmLabel={existing ? "Save" : "Add property"}
+          busy={saving}
+          onCancel={() => setReviewing(false)}
+          onConfirm={async (rev) => {
+            setPhotos((cur) => [...rev.order.map((k) => cur.find((p) => p.key === k)).filter(Boolean), ...cur.filter((p) => !rev.order.includes(p.key))]);
+            setReviewing(false);
+            await save(rev);
+          }}
+        />
+      )}
     </>
   );
 }
