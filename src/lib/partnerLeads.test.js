@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { cleanUtr, closureDue, isUtr, leadNeedLine, moveInRows, topSets, upiLink } from "./partnerLeads";
+import { cleanUtr, closureDue, hasAskedForLeads, isUtr, leadNeedLine, moveInRows, moveazyTabBadge, topSets, upiLink } from "./partnerLeads";
 
 describe("upiLink", () => {
   it("pays MovEazy's UPI ID with the amount filled in", () => {
@@ -59,4 +59,20 @@ describe("leadNeedLine", () => {
     expect(leadNeedLine({ flat_types: ["1 BHK"], localities: ["HSR Layout"], budget_max: 30000, move_in: "2026-10-16" }))
       .toBe("1 BHK · HSR Layout · up to ₹30,000 · move-in 16 Oct");
   });
+});
+
+describe("moveazyTabBadge", () => {
+  const a = (status) => ({ status });
+  it("NEW until the tab is first opened", () => expect(moveazyTabBadge(false, [a("assigned")])).toBe("NEW"));
+  it("then the leads not yet contacted", () =>
+    expect(moveazyTabBadge(true, [a("assigned"), a("contacted"), a("assigned"), a("closed")])).toBe("2"));
+  it("nothing when all are contacted", () => expect(moveazyTabBadge(true, [a("contacted")])).toBe(""));
+  it("caps at 99+", () => expect(moveazyTabBadge(true, Array.from({ length: 120 }, () => a("assigned")))).toBe("99+"));
+});
+
+describe("hasAskedForLeads", () => {
+  it("any real request counts, rejected too", () => expect(hasAskedForLeads([{ status: "rejected" }])).toBe(true));
+  it("an abandoned online payment doesn't", () =>
+    expect(hasAskedForLeads([{ status: "awaiting_payment" }, { status: "cancelled" }])).toBe(false));
+  it("none yet", () => expect(hasAskedForLeads([])).toBe(false));
 });

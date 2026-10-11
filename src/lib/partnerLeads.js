@@ -161,3 +161,14 @@ export function leadNeedLine(l) {
     : l.move_in_raw ? `move-in: ${l.move_in_raw}` : "";
   return [(l.flat_types ?? []).join("/"), (l.localities ?? []).slice(0, 3).join(", "), budget, moveIn].filter(Boolean).join(" · ");
 }
+
+/** The badge on the MovEazy leads tab: NEW until it's first opened, then the leads not yet contacted. */
+export function moveazyTabBadge(seen, assigned = []) {
+  if (!seen) return "NEW";
+  const n = assigned.filter((a) => a.status === "assigned").length;
+  return n > 99 ? "99+" : n ? String(n) : "";
+}
+
+/** Whether a broker has asked for MovEazy leads yet (an online payment never finished doesn't count). */
+export const hasAskedForLeads = (requests = []) =>
+  requests.some((r) => !["cancelled", "awaiting_payment"].includes(r.status));

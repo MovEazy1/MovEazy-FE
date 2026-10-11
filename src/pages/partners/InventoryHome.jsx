@@ -22,6 +22,7 @@ import { DEMO_COUNTS, DEMO_GROUPS, DemoBanner, demoRows } from "./demoMode";
 import { CompleteProfileCard, PremiumCard, useGoldLogo } from "./PremiumJourney";
 import { NotificationBell } from "./PartnerInbox";
 import { AiMatcherCard } from "./AiMatcher";
+import { MoveazyLeadsCard } from "./MoveazyLeadsPromo";
 import { customerMessage, hasPremium, inSource, listerWhatsApp, pp, waLink } from "../../lib/partners";
 import { BHK_CHIPS, BROKERAGE_CHIPS, EMPTY_FILTERS, activeFilterCount, applyFilters } from "../../lib/partnerFilters";
 
@@ -230,6 +231,7 @@ export default function InventoryHome() {
       <div className="pz-pad pz-list">
         {planActive && !status?.profile?.completed_at && <CompleteProfileCard onDone={reloadStatus} />}
         {gold && <PremiumCard me={me} status={status} />}
+        <MoveazyLeadsCard me={me} />
         <div ref={aiRef}><AiMatcherCard /></div>
         {demo && (
           <DemoBanner>Samples from {DEMO_COUNTS.moveazy.toLocaleString("en-IN")} MovEazy, {DEMO_COUNTS.broker} network and {DEMO_COUNTS.group} group listings.</DemoBanner>

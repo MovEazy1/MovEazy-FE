@@ -281,8 +281,8 @@ function RequestSheet({ pack, stats, myAreas, me, onDone, onCancel }) {
 
 /* ── The tab ──────────────────────────────────────────────────────────────── */
 
-/** `me`: the broker, from the partner app (or passed in). */
-export default function MoveazyLeads({ me: meProp = null }) {
+/** `me`: the broker, from the partner app (or passed in). `onAssigned`: told each fresh list (the tab's count). */
+export default function MoveazyLeads({ me: meProp = null, onAssigned = null }) {
   const ctx = usePartner();
   const me = meProp ?? ctx?.me ?? null;
   const [stats, setStats] = useState(null);
@@ -292,7 +292,7 @@ export default function MoveazyLeads({ me: meProp = null }) {
   const [asking, setAsking] = useState(null);
   const [closing, setClosing] = useState(null);
   const [allSets, setAllSets] = useState(false);
-  const myAreas = useMemo(() => me?.operational_areas ?? [], [me]);
+  const myAreas = useMemo(() => me?.partner?.operational_areas ?? [], [me]);
   const [params, setParams] = useSearchParams();
 
   // Back from Razorpay: its webhook opens the request; say so and tidy the URL.
@@ -305,8 +305,8 @@ export default function MoveazyLeads({ me: meProp = null }) {
   const load = useCallback(() => {
     fetchLeadStats().then(setStats, (e) => setErr(friendlyError(e, "Couldn't load MovEazy leads.")));
     fetchMyLeadRequests().then(setRequests, () => setRequests([]));
-    fetchMyAssignedLeads().then(setAssigned, () => setAssigned([]));
-  }, []);
+    fetchMyAssignedLeads().then((r) => { setAssigned(r); onAssigned?.(r); }, () => setAssigned([]));
+  }, [onAssigned]);
   useEffect(() => { load(); }, [load]);
 
   if (err) return <Empty>{err}</Empty>;
