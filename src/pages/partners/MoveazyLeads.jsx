@@ -194,6 +194,9 @@ function RequestSheet({ pack, stats, myAreas, me, onDone, onCancel }) {
         const a = stats?.allowance ?? {};
         window.open(waLink(MOVEAZY_DESK, moreLeadsMessage(me?.name, a.premium_given, a.premium_closed)), "_blank", "noopener");
         toast("Sent to MovEazy for approval");
+      } else if (r?.assigned > 0) {
+        // A first request is filled on the spot (partner_moveazy_leads.sql).
+        toast(`${r.assigned} lead${r.assigned === 1 ? " is" : "s are"} yours — names and numbers are below`);
       } else {
         toast(pack === "paid30" ? "Got it — we'll check the payment and assign your leads" : "Request sent — MovEazy is picking your leads");
       }
