@@ -98,7 +98,7 @@ export default function Terms() {
             <h2 className="text-xl font-bold text-gray-900 mt-8 mb-3">7. Intellectual Property</h2>
             <p>
               All content, branding, and technology on the MovEazy platform are the property of
-              MovEazy Architectural Relocation. Unauthorized reproduction or distribution is prohibited.
+              MovEazy. Unauthorized reproduction or distribution is prohibited.
             </p>
           </section>
 
