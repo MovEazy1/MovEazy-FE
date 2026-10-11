@@ -205,7 +205,7 @@ function RequestSheet({ pack, stats, myAreas, me, onDone, onCancel }) {
   };
 
   return (
-    <Sheet title={`${PACKS[pack].title}${pack === "paid30" ? ` · ${inr(price)}` : pack === "free10" ? " · free" : " · Premium"}`} onClose={onCancel}>
+    <Sheet title={pack === "premium" ? "Request MovEazy leads" : `${PACKS[pack].title}${pack === "paid30" ? ` · ${inr(price)}` : " · free"}`} onClose={onCancel}>
       <div className="pz-pad">
         {step === "prefs" ? (
           <>
@@ -356,20 +356,39 @@ export default function MoveazyLeads({ me: meProp = null }) {
         </div>
       )}
 
-      <h2 style={{ fontSize: 17, margin: "4px 0 10px" }}>Get MovEazy leads</h2>
-      {packCard("free10", <Gift size={18} />, "free", "Get", allow.free_used ? "Already used" : "")}
-      {packCard("paid30", <Wallet size={18} />, inr(stats.pack_price), "Buy", "")}
-      {stats.premium
-        ? packCard("premium", <Crown size={18} />, "10 a request", "Ask",
-          premiumWait ? `Next request after ${premiumWait}` : allow.premium_needs_approval ? "Needs MovEazy's OK (on WhatsApp) — close one first to skip" : "")
-        : (
+      {stats.premium ? (
+        /* Premium partners: MovEazy leads are part of the plan — no packs to buy. */
+        <div className="pz-card" style={{ padding: 16, marginBottom: 10, background: "var(--noir)", borderColor: "var(--noir)", color: "#fff" }}>
+          <div className="pz-row" style={{ gap: 10, alignItems: "center" }}>
+            <span className="pz-avatar" style={{ background: "var(--goldg)", color: "#1F1605" }}><Crown size={18} /></span>
+            <strong style={{ fontSize: 16 }}>Congratulations, Premium partner!</strong>
+          </div>
+          <p style={{ margin: "10px 0 12px", fontSize: 14, lineHeight: 1.55, color: "#E7E4DD" }}>
+            You're eligible for MovEazy leads free of cost. You pay nothing upfront — only a small share when a lead closes.
+          </p>
+          <button type="button" className="pz-btn pz-btn--gold pz-btn--block"
+            disabled={Boolean(openReq) || Boolean(premiumWait)} onClick={() => setAsking("premium")}>
+            {openReq ? "Request in progress" : premiumWait ? `Request again after ${premiumWait}` : "Request leads"}
+          </button>
+          <span style={{ display: "block", marginTop: 8, fontSize: 12, color: "#A7A3B3", lineHeight: 1.5 }}>
+            {allow.premium_needs_approval
+              ? "You've had 20 leads since your last closure — this request goes to MovEazy on WhatsApp for an OK."
+              : "Up to 10 leads a request, one request every 3 days."}
+          </span>
+        </div>
+      ) : (
+        <>
+          <h2 style={{ fontSize: 17, margin: "4px 0 10px" }}>Get MovEazy leads</h2>
+          {packCard("free10", <Gift size={18} />, "free", "Get", allow.free_used ? "Already used" : "")}
+          {packCard("paid30", <Wallet size={18} />, inr(stats.pack_price), "Buy", "")}
           <Link to={pp("/premium")} className="pz-card" style={{ display: "flex", gap: 12, alignItems: "center", padding: 14, marginBottom: 10, color: "inherit", textDecoration: "none" }}>
             <span className="pz-avatar" style={{ background: "var(--noir)", color: "#D4A437" }}><Crown size={18} /></span>
             <span style={{ flex: 1 }}><strong style={{ display: "block" }}>Unlimited with Premium</strong>
               <span className="pz-hint">No upfront cost for leads — pay MovEazy only when one closes.</span></span>
             <span className="pz-btn pz-btn--sm" style={{ flex: "none" }}>See Premium</span>
           </Link>
-        )}
+        </>
+      )}
 
       <h2 style={{ fontSize: 17, margin: "18px 0 4px" }}>Who's looking right now</h2>
       <p className="pz-hint" style={{ margin: "0 0 10px" }}>
