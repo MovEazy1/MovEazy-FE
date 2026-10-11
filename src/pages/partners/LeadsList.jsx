@@ -10,7 +10,7 @@ import { BarChart3, ChevronRight, Plus, Search, Sparkles } from "lucide-react";
 import { usePartner } from "./PartnerApp";
 import { Avatar, Empty, Loading, TopBar, WhatsAppIcon } from "./partnerUi";
 import { DEMO_LEADS, DemoBanner } from "./demoMode";
-import { MoveazyTab } from "./MoveazyLeadsPromo";
+import { MoveazyTab, MyLeadsTab } from "./MoveazyLeadsPromo";
 import { lastContactedLabel, requirementLine } from "./leadBits";
 import { patchLead, pp, waLink } from "../../lib/partners";
 import { hasRequirement, matchesForLead } from "../../lib/partnerMatch";
@@ -20,18 +20,13 @@ const TABS = [["all", "All"], ["active", "Active"], ["closed", "Closed"]];
 // Its own file, loaded when the tab is opened.
 const MoveazyLeads = lazy(() => import("./MoveazyLeads"));
 
-/** My Leads | MovEazy leads (black, with the logo — it should catch the eye), at the top of the screen. */
+/** My Leads | MovEazy leads (black halftone with the logo — it should catch the eye); the open one is red. */
 function BookSwitch({ book, setBook, me, assigned }) {
   const mine = book === "mine";
   return (
     <div className="pz-pad" style={{ paddingTop: 16, paddingBottom: 0, background: "var(--card)" }}>
       <div role="tablist" style={{ display: "flex", background: "var(--bg)", borderRadius: 12, padding: 4, gap: 6 }}>
-        <button type="button" role="tab" aria-selected={mine} onClick={() => setBook("mine")}
-          style={{ flex: 1, padding: "9px 6px", border: 0, borderRadius: 9, font: "inherit", fontWeight: 700, fontSize: 14, cursor: "pointer",
-            background: mine ? "var(--card)" : "transparent", color: mine ? "var(--ink)" : "var(--dim)",
-            boxShadow: mine ? "0 1px 3px rgba(0,0,0,.12)" : "none" }}>
-          My Leads
-        </button>
+        <MyLeadsTab selected={mine} onSelect={() => setBook("mine")} />
         <MoveazyTab me={me} selected={!mine} onSelect={() => setBook("moveazy")} assigned={assigned} />
       </div>
     </div>

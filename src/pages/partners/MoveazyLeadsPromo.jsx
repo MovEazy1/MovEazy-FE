@@ -1,5 +1,6 @@
 /**
- * MovEazy leads, made hard to miss: the black, logo-led tab in Leads (NEW until
+ * MovEazy leads, made hard to miss: the logo-led tab in Leads — black halftone
+ * dots when closed, red (like whichever tab is open) when open — NEW until
  * it's first opened, then a count of leads not yet contacted) and the Home card
  * that shows until a broker first asks for leads. Kept small — Home and Leads
  * load it up front, MoveazyLeads.jsx itself stays lazy.
@@ -15,11 +16,59 @@ import { pp } from "../../lib/partners";
 const flag = (k) => { try { return localStorage.getItem(k) === "1"; } catch { return false; } };
 const setFlag = (k) => { try { localStorage.setItem(k, "1"); } catch { /* fine without */ } };
 
+const OPEN_RED = "#C62828";
+
+/** Black halftone: big dots that all but touch on the left, thinning out to the right. */
+export function halftoneSvg(w = 240, h = 40, step = 6) {
+  let dots = "";
+  for (let row = 0, y = step / 2; y < h + step; row += 1, y += step * 0.866) {
+    for (let x = (row % 2) * (step / 2); x < w; x += step) {
+      const r = 3.7 * Math.max(0, 1 - x / (w * 0.85)) ** 1.15;
+      if (r >= 0.4) dots += `<circle cx="${x.toFixed(1)}" cy="${y.toFixed(1)}" r="${r.toFixed(1)}"/>`;
+    }
+  }
+  return `<svg xmlns="http://www.w3.org/2000/svg" width="${w}" height="${h}" viewBox="0 0 ${w} ${h}">${dots}</svg>`;
+}
+const HALFTONE = `url("data:image/svg+xml,${encodeURIComponent(halftoneSvg())}")`;
+
+/** The logo in one solid colour (white on the red tab); the original until it's drawn. */
+const tinted = new Map();
+function useTintedLogo(src, color) {
+  const key = `${src}|${color}`;
+  const [url, setUrl] = useState(() => tinted.get(key) || "");
+  useEffect(() => {
+    if (tinted.has(key)) { setUrl(tinted.get(key)); return undefined; }
+    let alive = true;
+    const img = new Image();
+    img.onload = () => {
+      try {
+        const c = document.createElement("canvas");
+        c.width = img.naturalWidth;
+        c.height = img.naturalHeight;
+        const x = c.getContext("2d");
+        x.fillStyle = color;
+        x.fillRect(0, 0, c.width, c.height);
+        x.globalCompositeOperation = "destination-in";
+        x.drawImage(img, 0, 0);
+        tinted.set(key, c.toDataURL("image/png"));
+        if (alive) setUrl(tinted.get(key));
+      } catch { /* keep the regular logo */ }
+    };
+    img.src = src;
+    return () => { alive = false; };
+  }, [key, src, color]);
+  return url;
+}
+
 const CSS = `
-.mzl-tab { position: relative; flex: 1; display: flex; align-items: center; justify-content: center; gap: 5px; padding: 9px 6px;
-  border: 0; border-radius: 9px; font: inherit; font-weight: 700; font-size: 14px; cursor: pointer; background: #0B0B0F; color: #fff;
-  box-shadow: 0 2px 8px rgba(0,0,0,.22); transition: box-shadow .2s; }
-.mzl-tab[aria-selected="true"] { box-shadow: 0 0 0 2px var(--gold), 0 4px 14px rgba(212,164,55,.35); }
+.mzl-mine, .mzl-tab { flex: 1; padding: 9px 6px; border: 0; border-radius: 9px; font: inherit; font-weight: 700; font-size: 14px;
+  cursor: pointer; transition: background-color .2s, color .2s, box-shadow .2s; }
+.mzl-mine { background: transparent; color: var(--dim); }
+.mzl-tab { position: relative; display: flex; align-items: center; justify-content: center; gap: 5px; color: #fff;
+  background: ${HALFTONE} left center / auto 100% no-repeat, #26232E; box-shadow: 0 2px 8px rgba(0,0,0,.22); }
+.mzl-mine[aria-selected="true"], .mzl-tab[aria-selected="true"] { background: ${OPEN_RED}; color: #fff;
+  box-shadow: 0 0 0 2px var(--gold), 0 4px 14px rgba(198,40,40,.32); }
+.mzl-tab[aria-selected="true"] .mzl-badge { background: #fff; color: ${OPEN_RED}; }
 .mzl-tab img, .mzl-card img { display: block; width: auto; }
 .mzl-badge { position: absolute; top: -9px; right: -5px; min-width: 20px; height: 19px; padding: 0 6px; border-radius: 99px;
   background: #EF4444; color: #fff; font-size: 10.5px; font-weight: 800; letter-spacing: .04em; line-height: 1;
@@ -37,6 +86,13 @@ const CSS = `
   background: var(--goldg); color: #1F1605; font-weight: 800; font-size: 14px; }
 @media (prefers-reduced-motion: reduce) { .mzl-badge--new { animation: none; } }
 `;
+
+/** "My Leads" — red when open, like its neighbour. */
+export function MyLeadsTab({ selected, onSelect }) {
+  return (
+    <button type="button" role="tab" aria-selected={selected} className="mzl-mine" onClick={onSelect}>My Leads</button>
+  );
+}
 
 /** The "MovEazy leads" tab button for the Leads switch. */
 export function MoveazyTab({ me, selected, onSelect, assigned: assignedProp }) {
@@ -58,13 +114,14 @@ export function MoveazyTab({ me, selected, onSelect, assigned: assignedProp }) {
     return () => { alive = false; };
   }, [id, assignedProp]);
 
+  const white = useTintedLogo(logo, "#FFFFFF");
   const badge = moveazyTabBadge(seen || selected, assignedProp ?? assigned);
   return (
     <>
       <style>{CSS}</style>
       <button type="button" role="tab" aria-selected={selected} className="mzl-tab" onClick={onSelect}
         aria-label={`MovEazy leads${badge === "NEW" ? ", new" : badge ? `, ${badge} not contacted yet` : ""}`}>
-        <img src={logo} alt="" height="15" style={{ height: 15 }} />
+        <img src={selected && white ? white : logo} alt="" height="15" style={{ height: 15 }} />
         <span>leads</span>
         {badge && <span className={`mzl-badge${badge === "NEW" ? " mzl-badge--new" : ""}`} aria-hidden="true">{badge}</span>}
       </button>
