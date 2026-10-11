@@ -433,7 +433,9 @@ export function LandingFooter({ product, blurb, links, other }) {
           <div><h4>Legal</h4><ul>
             <li><a href="https://www.moveazy.co.in/terms">Terms</a></li>
             <li><a href="https://www.moveazy.co.in/privacy">Privacy</a></li>
-            <li><a href="https://www.moveazy.co.in/terms#refunds">Refunds</a></li>
+            <li><a href="https://www.moveazy.co.in/refund-policy">Refunds &amp; cancellation</a></li>
+            <li><a href="https://www.moveazy.co.in/delivery-policy">Service delivery</a></li>
+            <li><a href="https://www.moveazy.co.in/contact">Contact us</a></li>
           </ul></div>
         </div>
         <div className="lp-footer-bottom"><span>© {new Date().getFullYear()} MovEazy. All rights reserved.</span><span>Made in Bengaluru</span></div>

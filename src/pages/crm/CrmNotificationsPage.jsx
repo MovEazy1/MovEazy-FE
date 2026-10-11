@@ -25,6 +25,8 @@ import {
 import { fetchProfilesFor } from "../../lib/crmVisits";
 import CrmDailyTasks from "./CrmDailyTasks";
 import CrmPropertyFollowUp from "./CrmPropertyFollowUp";
+import CrmContactMessages from "./CrmContactMessages";
+import { crmContactMessages } from "../../lib/contactMessages";
 
 /** A tenant with no number can't be messaged, only called back by email. */
 function WaitingRow({ person, group, nameFor, onMessaged }) {
@@ -191,6 +193,7 @@ const SECTIONS = [
   { id: "tasks", label: "Daily tasks" },
   { id: "slots", label: "Flat slots required" },
   { id: "props", label: "Prop follow-up" },
+  { id: "messages", label: "Messages" },
 ];
 
 export default function CrmNotificationsPage() {
@@ -205,6 +208,9 @@ export default function CrmNotificationsPage() {
   const [slots, setSlots] = useState(new Map());
   const [profiles, setProfiles] = useState(new Map());
   const [loading, setLoading] = useState(true);
+  // Contact-page messages waiting, for the chip — counted here so it shows before the tab is opened.
+  const [messages, setMessages] = useState(0);
+  useEffect(() => { crmContactMessages("new").then((r) => setMessages(r.length), () => {}); }, []);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -267,6 +273,7 @@ export default function CrmNotificationsPage() {
             <Chip key={s.id} on={section === s.id} onClick={() => setSection(s.id)}>
               {s.label}
               {s.id === "slots" && groups.length > 0 ? ` · ${groups.length}` : ""}
+              {s.id === "messages" && messages > 0 ? ` · ${messages}` : ""}
             </Chip>
           ))}
         </div>
@@ -275,6 +282,8 @@ export default function CrmNotificationsPage() {
           <CrmDailyTasks />
         ) : section === "props" ? (
           <CrmPropertyFollowUp />
+        ) : section === "messages" ? (
+          <CrmContactMessages onCount={setMessages} />
         ) : (
         <>
         <div className="crm-colhead">

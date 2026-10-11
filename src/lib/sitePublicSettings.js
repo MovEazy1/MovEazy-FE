@@ -1,4 +1,5 @@
 import { supabase, isSupabaseConfigured } from "./supabase";
+import { BUSINESS } from "./business";
 
 export const CONTACT_GRADIENTS = [
   "from-red-500 to-orange-500",
@@ -24,10 +25,10 @@ export const DEFAULT_CONTACT_TEAM = [
 
 export const DEFAULT_SITE_PUBLIC = {
   contacts: DEFAULT_CONTACT_TEAM,
-  supportEmail: "support@moveazy.co.in",
-  privacyEmail: "privacy@moveazy.co.in",
-  legalPhoneDisplay: "+91 96089 86517",
-  legalPhoneTel: "tel:+919608986517",
+  supportEmail: BUSINESS.email,
+  privacyEmail: BUSINESS.email,
+  legalPhoneDisplay: BUSINESS.phoneDisplay,
+  legalPhoneTel: BUSINESS.phoneTel,
 };
 
 const MAX_CONTACTS = 12;

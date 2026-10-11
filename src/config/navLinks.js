@@ -33,6 +33,8 @@ export const FLAT_SEARCH_CTA = {
 export const FOOTER_NAV_LINKS = [
   { label: "Terms of Service", path: "/terms" },
   { label: "Privacy Policy", path: "/privacy" },
+  { label: "Refunds & Cancellation", path: "/refund-policy" },
+  { label: "Service Delivery", path: "/delivery-policy" },
   { label: "Contact & Support", path: "/contact" },
   { label: "Agents", path: "/agents" },
   { label: "Flat Plan", path: "/plan" },

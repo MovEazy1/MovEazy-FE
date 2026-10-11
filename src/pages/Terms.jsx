@@ -79,6 +79,10 @@ export default function Terms() {
               email during that month. We will end your Premium access and refund that month's fee in full — no questions
               asked. Refunds go back to the original payment method within 7–14 business days.
             </p>
+            <p className="mt-3">
+              MovEazy lead packs for partners, and every other payment, are covered by our{" "}
+              <a href="/refund-policy" className="text-red-500 hover:underline">Refunds &amp; Cancellation policy</a>.
+            </p>
           </section>
 
           <section>

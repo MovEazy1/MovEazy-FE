@@ -9,6 +9,8 @@ const EASE = [0.22, 1, 0.36, 1];
 const FOOTER_LINKS = [
   { label: "Terms of Service", route: "/terms" },
   { label: "Privacy Policy", route: "/privacy" },
+  { label: "Refunds & Cancellation", route: "/refund-policy" },
+  { label: "Service Delivery", route: "/delivery-policy" },
   { label: "Services", route: "/services" },
   { label: "Contact & Support", route: "/contact" },
 ];

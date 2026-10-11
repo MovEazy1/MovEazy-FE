@@ -98,7 +98,9 @@ export function SiteFooter({ onFind, onList }) {
           <div><h4>Legal</h4><ul>
             <li><Link to="/terms">Terms</Link></li>
             <li><Link to="/privacy">Privacy</Link></li>
-            <li><Link to="/terms#refunds">Refunds</Link></li>
+            <li><Link to="/refund-policy">Refunds &amp; cancellation</Link></li>
+            <li><Link to="/delivery-policy">Service delivery</Link></li>
+            <li><Link to="/contact">Contact us</Link></li>
           </ul></div>
         </div>
         <div className="lp-footer-bottom"><span>© {new Date().getFullYear()} MovEazy. All rights reserved.</span><span>Made in Bengaluru</span></div>

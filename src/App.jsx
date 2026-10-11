@@ -43,6 +43,9 @@ const BuildingPage = lazy(() => import("./pages/BuildingPage"));
 const TenantPreview = lazy(() => import("./pages/tenant/TenantPreview"));
 const TenantProfilePage = lazy(() => import("./pages/tenant/TenantProfilePage"));
 const Privacy = lazy(() => import("./pages/Privacy"));
+const Contact = lazy(() => import("./pages/Contact"));
+const RefundPolicy = lazy(() => import("./pages/Policies").then((m) => ({ default: m.RefundPolicy })));
+const DeliveryPolicy = lazy(() => import("./pages/Policies").then((m) => ({ default: m.DeliveryPolicy })));
 const ListMyFlat = lazy(() => import("./pages/ListMyFlat"));
 const AdminDatabase = lazy(() => import("./pages/AdminDatabase"));
 const Visits = lazy(() => import("./pages/Visits"));
@@ -228,6 +231,12 @@ function AppRoutes() {
         <Route path="/preview/tenant" element={<TenantPreview />} />
         <Route path="/tenant-profile" element={<TenantProfilePage />} />
         <Route path="/privacy" element={<Privacy />} />
+        <Route path="/contact" element={<Contact />} />
+        {/* The two policies a payment gateway reads; the other names people (and gateways) look for land on them too. */}
+        <Route path="/refund-policy" element={<RefundPolicy />} />
+        <Route path="/cancellation-policy" element={<Navigate to="/refund-policy" replace />} />
+        <Route path="/delivery-policy" element={<DeliveryPolicy />} />
+        <Route path="/shipping-policy" element={<Navigate to="/delivery-policy" replace />} />
         <Route
           path="/list-my-flat"
           element={

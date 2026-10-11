@@ -3,9 +3,10 @@ import { Link } from "react-router-dom";
 import Navbar from "../components/layout/Navbar";
 import Footer from "../components/layout/Footer";
 import { motion } from "framer-motion";
-import { useSitePublicSettings } from "../hooks/useSitePublicSettings";
-import { db, isFirebaseConfigured } from "../lib/firebase";
-import { addDoc, collection, serverTimestamp } from "firebase/firestore";
+import { BUSINESS } from "../lib/business";
+import { CONTACT_TOPICS, cleanMobile, submitContactMessage } from "../lib/contactMessages";
+
+const WHATSAPP_URL = `https://wa.me/${BUSINESS.whatsapp}?text=${encodeURIComponent("Hi MovEazy, I need help")}`;
 
 const MAX_MSG = 500;
 const EASE = [0.22, 1, 0.36, 1];
@@ -24,8 +25,8 @@ const CONTACT_ITEMS = [
       </svg>
     ),
     label: "Email us",
-    value: "support@moveazy.co.in",
-    href: "mailto:support@moveazy.co.in",
+    value: BUSINESS.email,
+    href: `mailto:${BUSINESS.email}`,
   },
   {
     icon: (
@@ -34,9 +35,9 @@ const CONTACT_ITEMS = [
         <path d="M12 0C5.373 0 0 5.373 0 12c0 2.123.555 4.116 1.528 5.845L0 24l6.335-1.652C8.05 23.404 9.983 24 12 24c6.627 0 12-5.373 12-12S18.627 0 12 0zm0 22c-1.855 0-3.596-.5-5.093-1.373l-.365-.217-3.762.981.999-3.645-.238-.376A9.959 9.959 0 012 12C2 6.477 6.477 2 12 2s10 4.477 10 10-4.477 10-10 10z"/>
       </svg>
     ),
-    label: "WhatsApp",
-    value: "+91 9608986517",
-    href: "https://wa.me/919608986517?text=Hi%20MovEazy%2C%20I%20need%20help",
+    label: "Call or WhatsApp",
+    value: BUSINESS.phoneDisplay,
+    href: WHATSAPP_URL,
   },
   {
     icon: (
@@ -45,8 +46,8 @@ const CONTACT_ITEMS = [
         <path strokeLinecap="round" strokeLinejoin="round" d="M15 11a3 3 0 11-6 0 3 3 0 016 0z" />
       </svg>
     ),
-    label: "Location",
-    value: "Bengaluru, India",
+    label: "Office",
+    value: BUSINESS.address,
     href: null,
   },
   {
@@ -56,7 +57,7 @@ const CONTACT_ITEMS = [
       </svg>
     ),
     label: "Hours",
-    value: "Mon–Sun · 9 am – 9 pm IST",
+    value: BUSINESS.hours,
     href: null,
   },
 ];
@@ -77,10 +78,9 @@ const inputCls =
   "w-full rounded-xl border border-gray-200 bg-white px-4 py-3 text-[14px] text-gray-900 placeholder:text-gray-400 outline-none transition-all duration-200 focus:border-red-400 focus:ring-2 focus:ring-red-100";
 
 export default function Contact() {
-  const { sitePublic } = useSitePublicSettings();
-  const supportEmail = sitePublic.supportEmail || "support@moveazy.co.in";
+  const supportEmail = BUSINESS.email;
 
-  const [form, setForm] = useState({ name: "", email: "", phone: "", message: "", agreed: false });
+  const [form, setForm] = useState({ name: "", email: "", phone: "", topic: "tenant", message: "", agreed: false });
   const [status, setStatus] = useState(null);
   const [errorMsg, setErrorMsg] = useState("");
 
@@ -89,26 +89,20 @@ export default function Contact() {
   const handleSubmit = async (e) => {
     e.preventDefault();
     if (!form.agreed) { setErrorMsg("Please agree to the Privacy Policy."); return; }
-    if (!form.name.trim() || !form.email.trim()) { setErrorMsg("Name and email are required."); return; }
+    if (!form.name.trim()) { setErrorMsg("Please tell us your name."); return; }
+    if (!cleanMobile(form.phone)) { setErrorMsg("Please enter a valid 10-digit mobile number."); return; }
+    if (!form.message.trim()) { setErrorMsg("Please write a message."); return; }
     setErrorMsg("");
     setStatus("sending");
     try {
-      if (isFirebaseConfigured) {
-        await addDoc(collection(db, "contactQueries"), {
-          name: form.name.trim(),
-          email: form.email.trim().toLowerCase(),
-          phone: form.phone.trim(),
-          message: form.message.trim(),
-          status: "pending",
-          createdAt: serverTimestamp(),
-        });
-      }
+      await submitContactMessage({ ...form, phone: cleanMobile(form.phone) });
       setStatus("sent");
-      setForm({ name: "", email: "", phone: "", message: "", agreed: false });
+      setForm({ name: "", email: "", phone: "", topic: "tenant", message: "", agreed: false });
     } catch (err) {
       setStatus("error");
-      setErrorMsg("Something went wrong. Please try WhatsApp directly.");
-      console.error(err);
+      // The database's own messages are written for people; a network failure isn't.
+      const msg = String(err?.message || "");
+      setErrorMsg(msg && !/fetch|network/i.test(msg) ? msg : "Something went wrong. Please try WhatsApp directly.");
     }
   };
 
@@ -162,7 +156,7 @@ export default function Contact() {
 
               {/* WhatsApp CTA */}
               <a
-                href="https://wa.me/919608986517?text=Hi%20MovEazy%2C%20I%20need%20help"
+                href={WHATSAPP_URL}
                 target="_blank"
                 rel="noopener noreferrer"
                 className="inline-flex items-center gap-3 px-6 py-3.5 rounded-2xl bg-[#25D366] text-white font-semibold text-[14px] hover:bg-[#20bd5a] transition-colors shadow-[0_8px_24px_rgba(37,211,102,0.22)] w-fit"
@@ -174,20 +168,14 @@ export default function Contact() {
                 Chat on WhatsApp
               </a>
 
-              {/* Social proof */}
-              <div className="flex items-center gap-3">
-                <div className="flex -space-x-2">
-                  {["men/32", "women/44", "men/75"].map((p) => (
-                    <img
-                      key={p}
-                      src={`https://randomuser.me/api/portraits/${p}.jpg`}
-                      alt=""
-                      className="w-8 h-8 rounded-full border-2 border-white object-cover"
-                    />
-                  ))}
-                </div>
-                <p className="text-[13px] text-gray-500">
-                  <span className="font-semibold text-gray-700">500+</span> customers helped this month
+              {/* What a payment buys, and what happens if it goes wrong. */}
+              <div className="rounded-2xl border border-stone-200 bg-white p-5 text-[13px] text-gray-500 leading-relaxed">
+                <p className="font-bold text-[#1E2A3A] mb-1.5">Payments &amp; policies</p>
+                <p>
+                  <Link to="/terms" className="font-semibold text-red-500 hover:underline">Terms</Link>{" · "}
+                  <Link to="/privacy" className="font-semibold text-red-500 hover:underline">Privacy</Link>{" · "}
+                  <Link to="/refund-policy" className="font-semibold text-red-500 hover:underline">Refunds &amp; cancellation</Link>{" · "}
+                  <Link to="/delivery-policy" className="font-semibold text-red-500 hover:underline">Service delivery</Link>
                 </p>
               </div>
             </motion.div>
@@ -241,36 +229,47 @@ export default function Contact() {
                           />
                         </InputField>
 
-                        <InputField label="Email Address" required>
+                        <InputField label="Mobile Number" required>
+                          <div className="flex">
+                            <span className="flex items-center px-3.5 text-[13px] font-semibold rounded-l-xl border border-r-0 border-gray-200 bg-gray-50 text-gray-500 shrink-0">
+                              +91
+                            </span>
+                            <input
+                              type="tel"
+                              inputMode="tel"
+                              autoComplete="tel-national"
+                              required
+                              placeholder="98765 43210"
+                              value={form.phone}
+                              onChange={(e) => set("phone", e.target.value.replace(/[^\d\s\-()+]/g, ""))}
+                              className={`${inputCls} rounded-l-none border-l-0`}
+                            />
+                          </div>
+                        </InputField>
+                      </div>
+
+                      <div className="grid sm:grid-cols-2 gap-5">
+                        <InputField label="Email (optional)">
                           <input
                             type="email"
-                            required
+                            autoComplete="email"
                             placeholder="your@email.com"
                             value={form.email}
                             onChange={(e) => set("email", e.target.value)}
                             className={inputCls}
                           />
                         </InputField>
+                        <InputField label="About">
+                          <select value={form.topic} onChange={(e) => set("topic", e.target.value)} className={inputCls}>
+                            {CONTACT_TOPICS.map(([k, label]) => <option key={k} value={k}>{label}</option>)}
+                          </select>
+                        </InputField>
                       </div>
 
-                      <InputField label="Phone Number">
-                        <div className="flex">
-                          <span className="flex items-center px-3.5 text-[13px] font-semibold rounded-l-xl border border-r-0 border-gray-200 bg-gray-50 text-gray-500 shrink-0">
-                            +91
-                          </span>
-                          <input
-                            type="tel"
-                            placeholder="98765 43210"
-                            value={form.phone}
-                            onChange={(e) => set("phone", e.target.value.replace(/[^\d\s\-()]/g, ""))}
-                            className={`${inputCls} rounded-l-none border-l-0`}
-                          />
-                        </div>
-                      </InputField>
-
-                      <InputField label="Message">
+                      <InputField label="Message" required>
                         <div className="relative">
                           <textarea
+                            required
                             placeholder="Tell us how we can help…"
                             rows={4}
                             maxLength={MAX_MSG}
