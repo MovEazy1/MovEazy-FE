@@ -1,5 +1,6 @@
 /**
- * Razorpay → us, when a partner's payment link is paid.
+ * Razorpay → us, when a partner's payment link is paid: a plan (partner-pay.js)
+ * or a 30-lead pack (lead-pay.js, notes.product "partner_leads").
  *
  * Set up in Razorpay Dashboard → Settings → Webhooks:
  *   URL      https://www.moveazy.co.in/api/razorpay-webhook
@@ -33,6 +34,25 @@ export default async function handler(req) {
 
   const link = event.payload?.payment_link?.entity || {};
   const payment = event.payload?.payment?.entity || {};
+  if (link.notes?.product === "partner_leads") {
+    const requestId = link.notes?.request_id || link.reference_id || "";
+    if (!/^[0-9a-f-]{36}$/i.test(requestId)) return json({ ok: true, ignored: "no lead request id" });
+    try {
+      const result = await service("rpc/partner_lead_razorpay_paid", {
+        method: "POST",
+        body: JSON.stringify({
+          p_request: requestId,
+          p_link_id: link.id || "",
+          p_gateway_payment: payment.id || "",
+          p_amount_paise: Number(link.amount_paid || payment.amount || 0),
+        }),
+      });
+      return json({ ok: true, result });
+    } catch (e) {
+      return json({ error: String(e?.message || e).slice(0, 200) }, 500);
+    }
+  }
+
   const paymentId = link.notes?.payment_id || link.reference_id || "";
   if (link.notes?.product && link.notes.product !== "partners") return json({ ok: true, ignored: "not a partner payment" });
   if (!/^[0-9a-f-]{36}$/i.test(paymentId)) return json({ ok: true, ignored: "no partner payment id" });

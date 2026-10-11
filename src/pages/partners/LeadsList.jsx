@@ -1,13 +1,14 @@
 /**
- * PRD 08 — the lead book. No chat, no pipeline: All / Active / Closed.
+ * PRD 08 — the lead book, in two: My Leads (the broker's own; no chat, no
+ * pipeline: All / Active / Closed) and MovEazy leads (MoveazyLeads.jsx).
  * Every lead has AI matching one tap away. In demo mode sample tenants sit
  * alongside the partner's own, and premium buttons explain themselves.
  */
-import { useMemo, useState } from "react";
-import { Link } from "react-router-dom";
+import { Suspense, lazy, useMemo, useState } from "react";
+import { Link, useSearchParams } from "react-router-dom";
 import { BarChart3, ChevronRight, Plus, Search, Sparkles } from "lucide-react";
 import { usePartner } from "./PartnerApp";
-import { Avatar, Empty, TopBar, WhatsAppIcon } from "./partnerUi";
+import { Avatar, Empty, Loading, TopBar, WhatsAppIcon } from "./partnerUi";
 import { DEMO_LEADS, DemoBanner } from "./demoMode";
 import { lastContactedLabel, requirementLine } from "./leadBits";
 import { patchLead, pp, waLink } from "../../lib/partners";
@@ -15,11 +16,35 @@ import { hasRequirement, matchesForLead } from "../../lib/partnerMatch";
 
 const TABS = [["all", "All"], ["active", "Active"], ["closed", "Closed"]];
 
+// Its own file, loaded when the tab is opened.
+const MoveazyLeads = lazy(() => import("./MoveazyLeads"));
+
+/** My Leads | MovEazy leads, at the top of the screen. */
+function BookSwitch({ book, setBook }) {
+  return (
+    <div className="pz-pad" style={{ paddingBottom: 0, background: "var(--card)" }}>
+      <div role="tablist" style={{ display: "flex", background: "var(--bg)", borderRadius: 12, padding: 4, gap: 4 }}>
+        {[["mine", "My Leads"], ["moveazy", "MovEazy leads"]].map(([k, label]) => (
+          <button key={k} type="button" role="tab" aria-selected={book === k} onClick={() => setBook(k)}
+            style={{ flex: 1, padding: "9px 6px", border: 0, borderRadius: 9, font: "inherit", fontWeight: 700, fontSize: 14, cursor: "pointer",
+              background: book === k ? "var(--card)" : "transparent", color: book === k ? "var(--ink)" : "var(--dim)",
+              boxShadow: book === k ? "0 1px 3px rgba(0,0,0,.12)" : "none" }}>
+            {label}
+          </button>
+        ))}
+      </div>
+    </div>
+  );
+}
+
 export default function LeadsList() {
   const { leads: realLeads, setLeads, inventory, demo, explain } = usePartner();
   const leads = useMemo(() => (demo ? [...realLeads, ...DEMO_LEADS] : realLeads), [demo, realLeads]);
   const [tab, setTab] = useState("active");
   const [q, setQ] = useState("");
+  const [params, setParams] = useSearchParams();
+  const book = params.get("tab") === "moveazy" ? "moveazy" : "mine";
+  const setBook = (b) => setParams(b === "moveazy" ? { tab: "moveazy" } : {}, { replace: true });
 
   const matchCount = useMemo(() => {
     const m = new Map();
@@ -59,6 +84,11 @@ export default function LeadsList() {
           <Plus size={20} />
         </Link>
       } />
+      <BookSwitch book={book} setBook={setBook} />
+      {book === "moveazy" ? (
+        <Suspense fallback={<Loading />}><MoveazyLeads /></Suspense>
+      ) : (
+      <>
       <div className="pz-pad" style={{ paddingBottom: 0, background: "var(--card)" }}>
         <div className="pz-search">
           <Search size={17} />
@@ -114,6 +144,8 @@ export default function LeadsList() {
           </div>
         )}
       </div>
+      </>
+      )}
     </>
   );
 }
