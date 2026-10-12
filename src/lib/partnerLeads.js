@@ -172,3 +172,11 @@ export function moveazyTabBadge(seen, assigned = []) {
 /** Whether a broker has asked for MovEazy leads yet (an online payment never finished doesn't count). */
 export const hasAskedForLeads = (requests = []) =>
   requests.some((r) => !["cancelled", "awaiting_payment"].includes(r.status));
+
+/** "Unable to pay?" on a UPI QR: the WhatsApp to MovEazy, pre-filled. */
+export function unablePayMessage(what, name = "", phone = "") {
+  const digits = String(phone || "").replace(/\D/g, "").slice(-10);
+  const mobile = digits.length === 10 ? `${digits.slice(0, 5)} ${digits.slice(5)}` : "";
+  return `Hi MovEazy, I'm unable to pay for ${what} on the partner app.`
+    + [name && ` Name: ${name}`, mobile && ` Mobile: ${mobile}`].filter(Boolean).join(" ·") + (name || mobile ? "." : "");
+}

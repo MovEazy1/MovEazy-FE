@@ -140,7 +140,8 @@ export default function PremiumPage() {
         <Sheet title={`${paying.label} · ${inr(paying.amount)}`} onClose={() => setPaying(null)}>
           <div className="pz-pad">
             <UpiPay upi={paying.upi_id} amount={paying.amount} note={`MovEazy Premium ${paying.label}`} utr={utr} setUtr={setUtr}
-              busy={busy} onSubmit={submit}>
+              busy={busy} onSubmit={submit} payingFor={`the ${paying.label} Premium plan (${inr(paying.amount)})`}
+              who={{ name: me?.partner?.name, phone: me?.partner?.phone }}>
               <p className="pz-hint" style={{ margin: "0 0 12px" }}>
                 Premium starts as soon as the MovEazy team confirms the payment — usually within a few hours.
                 {trial?.active ? " Your remaining trial days are added on at the end." : ""}

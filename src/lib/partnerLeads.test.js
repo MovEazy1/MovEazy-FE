@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { cleanUtr, closureDue, hasAskedForLeads, isUtr, leadNeedLine, moveInRows, moveazyTabBadge, topSets, upiLink } from "./partnerLeads";
+import { cleanUtr, closureDue, hasAskedForLeads, isUtr, leadNeedLine, moveInRows, moveazyTabBadge, topSets, unablePayMessage, upiLink } from "./partnerLeads";
 
 describe("upiLink", () => {
   it("pays MovEazy's UPI ID with the amount filled in", () => {
@@ -75,4 +75,12 @@ describe("hasAskedForLeads", () => {
   it("an abandoned online payment doesn't", () =>
     expect(hasAskedForLeads([{ status: "awaiting_payment" }, { status: "cancelled" }])).toBe(false));
   it("none yet", () => expect(hasAskedForLeads([])).toBe(false));
+});
+
+describe("unablePayMessage", () => {
+  it("says what, who and their number", () =>
+    expect(unablePayMessage("the 5 months Premium plan (₹4,999)", "Rita", "+91 98000 00001"))
+      .toBe("Hi MovEazy, I'm unable to pay for the 5 months Premium plan (₹4,999) on the partner app. Name: Rita · Mobile: 98000 00001."));
+  it("without a name or number", () =>
+    expect(unablePayMessage("30 MovEazy leads (₹2,000)")).toBe("Hi MovEazy, I'm unable to pay for 30 MovEazy leads (₹2,000) on the partner app."));
 });

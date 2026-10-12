@@ -247,7 +247,8 @@ function RequestSheet({ pack, stats, myAreas, me, onDone, onCancel }) {
         ) : (
           <>
             <UpiPay upi={upi} amount={price} note="30 MovEazy leads" utr={utr} setUtr={setUtr} busy={busy}
-              onSubmit={submit} onBack={() => setStep("prefs")} />
+              onSubmit={submit} onBack={() => setStep("prefs")} payingFor={`30 MovEazy leads (${inr(price)})`}
+              who={{ name: me?.partner?.name ?? me?.name, phone: me?.partner?.phone ?? me?.phone }} />
           </>
         )}
       </div>

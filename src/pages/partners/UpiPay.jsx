@@ -1,15 +1,17 @@
 /**
  * Pay MovEazy by UPI: the QR (or "Open a UPI app"), the UPI ID to copy, and
  * the UTR box. Shared by the ₹2,000 lead pack (MoveazyLeads) and Premium
- * plans (PremiumPage), so both look and work the same.
+ * plans (PremiumPage), so both look and work the same. "Unable to pay?"
+ * opens WhatsApp to MovEazy (MOVEAZY_DESK) with what they were paying for.
  */
 import { Copy } from "lucide-react";
-import { toast } from "./partnerUi";
 import { QrImage } from "../../components/QrPosterBlock";
-import { inr } from "../../lib/partners";
-import { isUtr, upiLink } from "../../lib/partnerLeads";
+import { inr, waLink } from "../../lib/partners";
+import { MOVEAZY_DESK, isUtr, unablePayMessage, upiLink } from "../../lib/partnerLeads";
+import { WhatsAppIcon, toast } from "./partnerUi";
 
-export default function UpiPay({ upi, amount, note, utr, setUtr, busy, onSubmit, onBack, submitLabel = "I've paid — submit", children }) {
+/** `payingFor`: what it's for, in words ("the 5 months Premium plan (₹4,999)"); `who`: { name, phone } for the WhatsApp. */
+export default function UpiPay({ upi, amount, note, utr, setUtr, busy, onSubmit, onBack, submitLabel = "I've paid — submit", payingFor, who, children }) {
   const link = upiLink({ vpa: upi, amount, note });
   return (
     <>
@@ -39,6 +41,10 @@ export default function UpiPay({ upi, amount, note, utr, setUtr, busy, onSubmit,
       <button type="button" className="pz-btn pz-btn--primary pz-btn--block" onClick={onSubmit} disabled={busy || !isUtr(utr)}>
         {busy ? "Sending…" : submitLabel}
       </button>
+      <a className="pz-btn pz-btn--block pz-wa" style={{ marginTop: 8 }} target="_blank" rel="noopener noreferrer"
+        href={waLink(MOVEAZY_DESK, unablePayMessage(payingFor || `${note} (${inr(amount)})`, who?.name, who?.phone))}>
+        <WhatsAppIcon size={17} /> Unable to pay? Message MovEazy
+      </a>
       {onBack && <button type="button" className="pz-btn pz-btn--ghost pz-btn--block" onClick={onBack} style={{ marginTop: 6 }}>Back</button>}
     </>
   );
