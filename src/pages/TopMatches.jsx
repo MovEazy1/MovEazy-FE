@@ -26,6 +26,7 @@ import { logSavedListingChange } from "../lib/crmSync";
 import { fetchBookings, fetchReactions, setReaction } from "../lib/visits";
 import { MOVEAZY_TEAM_WHATSAPP } from "../config/contactChannels";
 import { fetchMyCuratedProperties } from "../lib/curatedShares";
+import ExploreSocietiesCard from "./societies/ExploreSocietiesCard";
 
 const TOP_N = 5;
 const T = { ink: "#04211D", teal: "#0E7C68", gold: "#E8A33D", text: "#171412", textDim: "#5c554e" };
@@ -483,6 +484,7 @@ export default function TopMatches() {
             <div style={{ display: "flex", justifyContent: "center", margin: "0 0 30px" }}>
               <RelaxCup />
             </div>
+            <ExploreSocietiesCard style={{ margin: "0 auto 26px", maxWidth: 420 }} />
 
             {curatedCount > 0 ? (
               <>

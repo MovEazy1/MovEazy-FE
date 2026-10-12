@@ -22,6 +22,7 @@ import { AgentScreen, MoveInScreen, RankedScreen, SearchScreen, SwipeScreen, Vis
 import { profileScore, scoreLabel } from "../../lib/tenantProfile";
 import { ScoreRing, TN_CSS, TenantCard } from "./tenantUi";
 import YourPartner from "./YourPartner";
+import ExploreSocietiesCard from "../societies/ExploreSocietiesCard";
 
 
 function greeting() {
@@ -139,6 +140,8 @@ export default function TenantHome({ name = "", profile = {}, onFind, onList, on
           </button>
         </div>
       </section>
+
+      <section className="tn-col" style={{ marginTop: 14 }}><ExploreSocietiesCard /></section>
 
       <section className="tn-how">
         <div className="tn-col">

@@ -70,6 +70,7 @@ const CrmBrokersPage = lazy(() => import("./pages/crm/CrmBrokersPage"));
 const CrmBrokerLeadsPage = lazy(() => import("./pages/crm/CrmBrokerLeadsPage"));
 const CrmLeadRequestsPage = lazy(() => import("./pages/crm/CrmLeadRequestsPage"));
 const CrmBuildingsPage = lazy(() => import("./pages/crm/CrmBuildingsPage"));
+const CrmSocietiesPage = lazy(() => import("./pages/crm/CrmSocietiesPage"));
 const CrmBuildingEditor = lazy(() => import("./pages/crm/CrmBuildingEditor"));
 const CrmVisitsPage = lazy(() => import("./pages/crm/CrmVisitsPage"));
 const CrmNotificationsPage = lazy(() => import("./pages/crm/CrmNotificationsPage"));
@@ -79,6 +80,9 @@ const CrmSettingsPage = lazy(() => import("./pages/crm/CrmSettingsPage"));
 // The broker app. Its own route tree: at /partners here, and at the root of
 // partners.moveazy.co.in (same deployment, same bundle — see lib/partners.js).
 const PartnerApp = lazy(() => import("./pages/partners/PartnerApp"));
+const SocietyApp = lazy(() => import("./pages/society/SocietyApp"));
+const ExploreSocieties = lazy(() => import("./pages/societies/ExploreSocieties"));
+const SocietyPage = lazy(() => import("./pages/societies/SocietyPage"));
 // The owner app: /owners here, the root of owners.moveazy.co.in.
 const OwnerApp = lazy(() => import("./pages/owners/OwnerApp"));
 const CrmInventoryOpsPage = lazy(() => import("./pages/crm/CrmInventoryOpsPage"));
@@ -99,6 +103,7 @@ function prefetchCrmPage(path) {
     "broker-leads": () => import("./pages/crm/CrmBrokerLeadsPage"),
     "lead-requests": () => import("./pages/crm/CrmLeadRequestsPage"),
     "owner-qr": () => import("./pages/crm/CrmBuildingsPage"),
+    societies: () => import("./pages/crm/CrmSocietiesPage"),
     buildings: () => import("./pages/crm/CrmBuildingEditor"),
     ops: () => import("./pages/crm/CrmInventoryOpsPage"),
     visits: () => import("./pages/crm/CrmVisitsPage"),
@@ -115,6 +120,8 @@ if (typeof window !== "undefined" && /^\/crm(\/|$)/.test(window.location.pathnam
 
 const IS_OWNER_HOST = typeof window !== "undefined" && /^owners?\./i.test(window.location.hostname);
 const IS_PARTNER_HOST = typeof window !== "undefined" && /^partners\./i.test(window.location.hostname);
+// society.moveazy.co.in: MovEazy Society, for society managers and guards (pages/society/).
+const IS_SOCIETY_HOST = typeof window !== "undefined" && /^society\./i.test(window.location.hostname);
 // tenant.moveazy.co.in: the whole site, but its front door is the tenant app.
 const IS_TENANT_HOST = typeof window !== "undefined" && /^tenants?\./i.test(window.location.hostname);
 
@@ -193,6 +200,15 @@ function AppRoutes() {
       </Suspense>
     );
   }
+  if (IS_SOCIETY_HOST) {
+    return (
+      <Suspense fallback={<PageLoader />}>
+        <Routes>
+          <Route path="/*" element={<SocietyApp />} />
+        </Routes>
+      </Suspense>
+    );
+  }
   if (IS_PARTNER_HOST) {
     return (
       <Suspense fallback={<PageLoader />}>
@@ -208,6 +224,10 @@ function AppRoutes() {
         <Route path="/" element={IS_TENANT_HOST ? <ForkHome tenantEntry /> : <ForkHome />} />
         <Route path="/tenant" element={<ForkHome tenantEntry />} />
         <Route path="/partners/*" element={<PartnerApp />} />
+        <Route path="/society/*" element={<SocietyApp />} />
+        {/* Explore societies (MovEazy Society's flats), live once the CRM switches it on. */}
+        <Route path="/societies" element={<ExploreSocieties />} />
+        <Route path="/societies/:code" element={<SocietyPage />} />
         <Route path="/owners/*" element={<OwnerApp />} />
         {/* Browsing is off — see the note by the imports.
             <Route path="/map" element={<MapPage />} /> */}
@@ -282,6 +302,8 @@ function AppRoutes() {
           <Route path="broker-leads" element={<CrmBrokerLeadsPage />} />
           <Route path="lead-requests" element={<CrmLeadRequestsPage />} />
           <Route path="owner-qr" element={<CrmBuildingsPage />} />
+          <Route path="societies" element={<CrmSocietiesPage />} />
+          <Route path="societies/:id" element={<CrmSocietiesPage />} />
           <Route path="buildings/new" element={<CrmBuildingEditor />} />
           <Route path="buildings/:id" element={<CrmBuildingEditor />} />
           <Route path="ops" element={<CrmInventoryOpsPage />} />

@@ -48,6 +48,7 @@ const RAIL = [
   { to: "/crm/lead-requests", code: "LR", label: "Lead requests", scope: SCOPES.PARTNERS_MANAGE },
   // Owners' buildings with a QR: assign the partner, work the visit requests.
   { to: "/crm/owner-qr", code: "QR", label: "Owner QR" },
+  { to: "/crm/societies", code: "SO", label: "Societies", scope: SCOPES.PROPERTIES_WRITE },
   // The owner app's queue: repairs, service bookings, designer calls, owners.
   { to: "/crm/ops",        code: "IO", label: "Inventory Ops" },
   { to: "/crm/visits",     code: "VS", label: "Visits" },
@@ -202,6 +203,7 @@ const NEEDS = {
   "broker-leads": [],
   "lead-requests": [],
   "owner-qr": [],
+  societies: [],
   buildings: ["inventory"],
   ops: ["inventory"],
   visits: ["clients", "inventory", "requirements", "settings"],

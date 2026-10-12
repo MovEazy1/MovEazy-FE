@@ -24,6 +24,8 @@ import { useAuth } from "../context/AuthContext";
 import { formatForDisplay, normalizeIndianMobile } from "../lib/mobile";
 import { isPartnerHost } from "../lib/partners";
 import { pendingSignupPhone } from "../lib/partnerSignup";
+import { isSocietyHost } from "../lib/society";
+import { pendingSocietyPhone } from "../pages/society/societySignup";
 
 const INK     = "#1A2421";
 const WHITE   = "#FFFEFB";
@@ -43,8 +45,10 @@ export default function RequirePhoneModal() {
   // A partner who gave their number on "Become Partner" has it saved by the
   // partner app's gate a moment after Google; asking again would be a second prompt.
   const partnerPending = (isPartnerHost() || pathname.startsWith("/partners")) && Boolean(pendingSignupPhone());
+  // The same for MovEazy Society: the number typed on its login screen is saved by its gate.
+  const societyPending = (isSocietyHost() || pathname.startsWith("/society")) && Boolean(pendingSocietyPhone());
   const needsPhone =
-    !loading && !!user?.uid && !String(user.phone || "").trim() && !pathname.startsWith("/auth") && !partnerPending;
+    !loading && !!user?.uid && !String(user.phone || "").trim() && !pathname.startsWith("/auth") && !partnerPending && !societyPending;
 
   // The modal owns the scroll lock while it's up, so the page behind can't be
   // scrolled past a gate the visitor can't dismiss.
