@@ -140,6 +140,11 @@ function JoinRoute() {
 }
 
 export default function SocietyApp() {
+  useEffect(() => {
+    const was = document.title;
+    document.title = "MovEazy Society";
+    return () => { document.title = was; };
+  }, []);
   return (
     <div className="sx">
       <SocietyStyles />
