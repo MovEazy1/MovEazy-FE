@@ -313,8 +313,11 @@ export async function syncClientsFromSignups({ actorEmail = "" } = {}) {
           assigned_to: actorEmail,
         })
         .select("id")
-        .single();
+        .maybeSingle();
       if (error) throw error;
+      // No row back: a partner who hasn't searched for a flat — not a lead
+      // (crm_partners_not_leads.sql).
+      if (!data) continue;
 
       const req = reqByUser.get(p.id);
       if (req) {
