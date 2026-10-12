@@ -118,7 +118,7 @@ export function CuratedListPage() {
         <div className="pz-section">
           <strong style={{ fontSize: 17 }}>{list.lead_name || tenant?.name || "Your tenant"}</strong>
           <p className="pz-meta" style={{ margin: "4px 0 0" }}>
-            {list.property_ids.length} homes · opened {list.open_count}× · <b style={{ color: "#E11D48" }}>♥ {liked} liked</b> · ✕ {list.property_ids.filter((p) => acts[p]?.action === "skipped").length} skipped
+            {list.property_ids.length} homes · opened {list.open_count}× · <b style={{ color: "#E11D48" }}>♥ {liked} liked</b> · ✕ {list.property_ids.filter((p) => acts[p]?.action === "skipped").length} disliked
           </p>
           {tenant?.phone ? (
             <a className="pz-btn pz-wa pz-btn--block" style={{ marginTop: 12 }} target="_blank" rel="noreferrer"
@@ -147,7 +147,7 @@ export function CuratedListPage() {
                   <span className="pz-meta">{l ? `${inr(l.rent)} / month` : "No longer in your inventory"}</span>
                 </span>
                 {a === "liked" ? <span style={{ color: "#E11D48", fontWeight: 800, fontSize: 13 }}><Heart size={14} fill="#E11D48" /> Liked</span>
-                  : a === "skipped" ? <span className="pz-meta"><ThumbsDown size={13} /> Skipped</span>
+                  : a === "skipped" ? <span className="pz-meta"><ThumbsDown size={13} /> Disliked</span>
                     : <span className="pz-hint">Not seen</span>}
               </Link>
             );

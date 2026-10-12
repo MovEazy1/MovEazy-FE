@@ -103,7 +103,7 @@ export default function Insights() {
                   {e.kind === "liked" ? <Heart size={15} fill="#E11D48" /> : <ThumbsDown size={15} />}
                 </span>
                 <span style={{ flex: 1, textAlign: "left" }}>
-                  <strong style={{ display: "block", fontSize: 14 }}>{e.who} {e.kind === "liked" ? "liked" : "skipped"} {[e.flat_type, e.area].filter(Boolean).join(" · ")}</strong>
+                  <strong style={{ display: "block", fontSize: 14 }}>{e.who} {e.kind === "liked" ? "liked" : "disliked"} {[e.flat_type, e.area].filter(Boolean).join(" · ")}</strong>
                   <span className="pz-meta">{e.via === "qr" ? "on your QR page" : "on your curated list"}{e.phone ? ` · ${e.phone}` : ""}</span>
                 </span>
                 <span className="pz-hint">{ago(e.at)}</span>

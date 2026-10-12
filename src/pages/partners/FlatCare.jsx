@@ -17,7 +17,7 @@ import { leadsForListing } from "../../lib/partnerMatch";
 import { keyToSlug, matcherTenants, sendCuratedTo } from "../../lib/partnerMatcher";
 import { fetchFlatInterest, flatDetailScore } from "../../lib/partnerTenants";
 
-const ACTION = { liked: ["♥ Liked", "#E11D48"], skipped: ["Skipped", "var(--dim)"], opened: ["Opened", "#4F46E5"], sent: ["Sent", "var(--dim)"] };
+const ACTION = { liked: ["♥ Liked", "#E11D48"], skipped: ["Disliked", "var(--dim)"], opened: ["Opened", "#4F46E5"], sent: ["Sent", "var(--dim)"] };
 
 export default function FlatCare({ listing: l, mine, onAddDetails }) {
   const { me, leads } = usePartner();

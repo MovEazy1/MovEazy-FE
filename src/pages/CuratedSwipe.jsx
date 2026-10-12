@@ -1,35 +1,60 @@
 /**
- * moveazy.co.in/c/<token> — a broker's curated list, as the tenant sees it.
+ * moveazy.co.in/c/<token> — a partner's curated list, as the tenant sees it.
  *
- * Mobile number first (name optional): the tenant becomes that broker's
+ * Mobile number first (name optional): the tenant becomes that partner's
  * tenant (unverified), never a MovEazy lead. Then a swipe deck — right or ♥ to
- * like, left or ✕ to skip. Every like reaches the broker as a notification.
- * Separate from MovEazy's own curated shortlists at /curated/<token>.
+ * like, left or ✕ to dislike; tapping a card opens every photo and detail
+ * right here (CuratedDetails), with only Like / Dislike: visits are fixed with
+ * the partner, never booked on MovEazy. Every new like reaches the partner.
+ *
+ * At the end — and every time the link is opened again — "My homes": the
+ * partner, the flats liked across every list they sent this tenant, a
+ * WhatsApp message listing them, and a change of mind any time. Nothing here
+ * leads to MovEazy's own pages. Separate from MovEazy's curated shortlists at
+ * /curated/<token>.
  */
-import { useEffect, useMemo, useRef, useState } from "react";
-import { Link, useParams } from "react-router-dom";
-import { Heart, MapPin, RotateCcw, X } from "lucide-react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useParams } from "react-router-dom";
+import { ChevronDown, ChevronRight, Heart, Info, MapPin, Phone, RotateCcw, X } from "lucide-react";
 import { SmartListingImage } from "./partners/partnerMedia";
 import { WhatsAppIcon } from "./partners/partnerUi";
 import { inr, waLink } from "../lib/partners";
-import { actOnCurated, giveCuratedContact, openCuratedList } from "../lib/partnerCurated";
+import { actOnCurated, curatedUrl, fetchCuratedSiblings, giveCuratedContact, openCuratedList } from "../lib/partnerCurated";
 import { formatForDisplay, normalizeIndianMobile } from "../lib/mobile";
+import CuratedDetails from "./curated/CuratedDetails";
+import { allHomes, firstName, flatLine, likedMessage } from "./curated/curatedText";
 import logoOnDark from "../assets/logo/moveazy-logo-mint-dark.png";
 
 const seenKey = (t) => `mz_curated_${t}`;
 const initials = (n) => String(n || "").trim().split(/\s+/).slice(0, 2).map((w) => w[0] || "").join("").toUpperCase() || "M";
 
+function HomeRow({ h, onOpen }) {
+  return (
+    <button type="button" className="cs-row" onClick={onOpen}>
+      <span className="cs-thumb"><SmartListingImage listing={h} thumb /></span>
+      <span className="cs-row-main">
+        <b>{inr(h.rent)}<small> / month</small></b>
+        <span>{flatLine(h)}</span>
+        {h.let_out && <em className="cs-tag cs-tag--warn">May be let out</em>}
+      </span>
+      <ChevronRight size={18} className="cs-row-go" />
+    </button>
+  );
+}
+
 export default function CuratedSwipe() {
   const { token = "" } = useParams();
   const [data, setData] = useState(undefined);
+  const [lists, setLists] = useState([]);
   const [contact, setContact] = useState(false);
   const [phone, setPhone] = useState("");
   const [name, setName] = useState("");
   const [err, setErr] = useState("");
   const [busy, setBusy] = useState(false);
   const [idx, setIdx] = useState(0);
-  const [acts, setActs] = useState({});
   const [drag, setDrag] = useState(0);
+  const [open, setOpen] = useState(null); // { token, property_id }
+  const [showNo, setShowNo] = useState(false);
   const start = useRef(null);
 
   useEffect(() => {
@@ -40,16 +65,36 @@ export default function CuratedSwipe() {
       try { local = localStorage.getItem(seenKey(token)) === "1"; } catch { /* private tab */ }
       // A MovEazy tenant's list (`known`) needs no number: MovEazy already has it.
       setContact(Boolean((d.has_contact && local) || d.known));
-      const done = Object.fromEntries((d.homes || []).filter((h) => h.action).map((h) => [h.property_id, h.action]));
-      setActs(done);
-      const first = (d.homes || []).findIndex((h) => !h.action);
-      setIdx(first < 0 ? (d.homes || []).length : first);
+      const homes = d.homes || [];
+      setLists([{ token, homes }]);
+      const first = homes.findIndex((h) => !h.action);
+      setIdx(first < 0 ? homes.length : first);
     }, () => setData(null));
   }, [token]);
 
-  const homes = useMemo(() => data?.homes ?? [], [data]);
+  // Once we know who they are: the partner's other lists to them.
+  useEffect(() => {
+    if (!contact || !data) return undefined;
+    let alive = true;
+    fetchCuratedSiblings(token).then((more) => {
+      if (alive && more.length) setLists((ls) => [ls[0], ...more.map((m) => ({ token: m.token, homes: m.homes ?? [] }))]);
+    }, () => {});
+    return () => { alive = false; };
+  }, [contact, data, token]);
+
+  const homes = useMemo(() => lists[0]?.homes ?? [], [lists]);
+  const everything = useMemo(() => allHomes(lists), [lists]);
   const b = data?.broker || {};
-  const liked = homes.filter((h) => acts[h.property_id] === "liked");
+  const partner = firstName(b.name) || "your partner";
+  const Partner = firstName(b.name) || "Your partner";
+  const liked = everything.filter((h) => h.action === "liked");
+  const disliked = everything.filter((h) => h.action === "skipped");
+  const pending = everything.filter((h) => !h.action && h.token !== token);
+
+  const setAction = useCallback((tok, pid, action) => {
+    setLists((ls) => ls.map((l) => (l.token !== tok ? l : { ...l, homes: l.homes.map((h) => (h.property_id === pid ? { ...h, action } : h)) })));
+    actOnCurated(tok, pid, action).catch(() => {});
+  }, []);
 
   const submitContact = async (e) => {
     e.preventDefault();
@@ -70,10 +115,9 @@ export default function CuratedSwipe() {
   const decide = (action) => {
     const h = homes[idx];
     if (!h) return;
-    setActs((a) => ({ ...a, [h.property_id]: action }));
+    setAction(token, h.property_id, action);
     setDrag(0);
     setIdx((i) => i + 1);
-    actOnCurated(token, h.property_id, action).catch(() => {});
   };
 
   const onDown = (e) => { start.current = e.clientX; e.currentTarget.setPointerCapture?.(e.pointerId); };
@@ -83,7 +127,11 @@ export default function CuratedSwipe() {
     start.current = null;
     if (drag > 90) decide("liked");
     else if (drag < -90) decide("skipped");
-    else setDrag(0);
+    else {
+      // A tap, not a swipe: open the flat.
+      if (Math.abs(drag) < 6 && homes[idx]) setOpen({ token, property_id: homes[idx].property_id });
+      setDrag(0);
+    }
   };
 
   if (data === undefined) return <div className="cs"><style>{CSS}</style><div className="cs-load"><span /></div></div>;
@@ -92,12 +140,21 @@ export default function CuratedSwipe() {
       <div className="cs"><style>{CSS}</style>
         <div className="cs-col cs-center">
           <h1>This list isn’t available.</h1>
-          <p>Ask your broker to send a fresh link — or browse verified homes on MovEazy.</p>
-          <Link className="cs-btn cs-btn--gold" to="/">Browse homes</Link>
+          <p>The link may be old or mistyped. Ask your partner to send you a fresh one on WhatsApp.</p>
         </div>
       </div>
     );
   }
+
+  const openHome = open ? everything.find((x) => x.property_id === open.property_id && x.token === open.token)
+    ?? lists.find((l) => l.token === open.token)?.homes.find((x) => x.property_id === open.property_id) : null;
+  const details = openHome && (
+    <CuratedDetails home={openHome} brokerName={b.name} onClose={() => setOpen(null)}
+      onDecide={(action) => {
+        if (open.token === token && homes[idx]?.property_id === open.property_id) decide(action);
+        else setAction(open.token, open.property_id, action);
+      }} />
+  );
 
   const head = (
     <header className="cs-head">
@@ -105,8 +162,8 @@ export default function CuratedSwipe() {
       <div className="cs-broker">
         {b.photo_url ? <img src={b.photo_url} alt="" width="46" height="46" className="cs-photo" /> : <span className="cs-photo cs-photo--none">{initials(b.name)}</span>}
         <div>
-          <b>{b.name || "Your broker"}</b>
-          <span>picked {homes.length} home{homes.length === 1 ? "" : "s"} for you{data.lead_name ? `, ${data.lead_name.split(" ")[0]}` : ""}</span>
+          <b>{b.name || "Your partner"}</b>
+          <span>picked {homes.length} home{homes.length === 1 ? "" : "s"} for you{data.lead_name ? `, ${firstName(data.lead_name)}` : ""}</span>
         </div>
       </div>
     </header>
@@ -118,7 +175,7 @@ export default function CuratedSwipe() {
         {head}
         <form className="cs-col cs-gate" onSubmit={submitContact} noValidate>
           <h1>Your homes are ready</h1>
-          <p>Enter your mobile number to start swiping. {b.name ? b.name.split(" ")[0] : "Your broker"} sees the homes you like and sets up the visits.</p>
+          <p>Enter your mobile number to start. {Partner} sees the homes you like and sets up the visits.</p>
           <label htmlFor="cs-phone">Mobile number</label>
           <div className={`cs-field${err ? " bad" : ""}`}>
             <span>+91</span>
@@ -129,7 +186,7 @@ export default function CuratedSwipe() {
           <input id="cs-name" className="cs-input" value={name} onChange={(e) => setName(e.target.value)} placeholder="Your name" autoComplete="name" />
           {err && <p className="cs-err" role="alert">{err}</p>}
           <button type="submit" className="cs-btn cs-btn--gold" disabled={busy}>{busy ? "One moment…" : "See my homes"}</button>
-          <p className="cs-fine">Shared only with {b.name || "your broker"}. <a href="https://www.moveazy.co.in/terms">Terms</a></p>
+          <p className="cs-fine">Shared only with {b.name || "your partner"}. <a href="https://www.moveazy.co.in/terms" target="_blank" rel="noreferrer">Terms</a></p>
         </form>
       </div>
     );
@@ -137,48 +194,107 @@ export default function CuratedSwipe() {
 
   const h = homes[idx];
   const next = homes[idx + 1];
+  if (h) {
+    return (
+      <div className="cs"><style>{CSS}</style>
+        {head}
+        <main className="cs-col">
+          <p className="cs-progress">{idx + 1} of {homes.length} · tap for photos & details</p>
+          <div className="cs-deck">
+            {next && <article className="cs-card cs-card--under" aria-hidden><div className="cs-img"><SmartListingImage listing={next} /></div></article>}
+            <article className="cs-card" style={{ transform: `translateX(${drag}px) rotate(${drag / 18}deg)` }}
+              onPointerDown={onDown} onPointerMove={onMove} onPointerUp={onUp} onPointerCancel={onUp}>
+              {drag > 30 && <span className="cs-stamp like">LIKE</span>}
+              {drag < -30 && <span className="cs-stamp nope">DISLIKE</span>}
+              <div className="cs-img"><SmartListingImage listing={h} /></div>
+              <div className="cs-body">
+                <div className="cs-rent">{inr(h.rent)} <small>/ month</small></div>
+                <div className="cs-line">{h.flat_type} · <MapPin size={14} /> {h.area}</div>
+                <div className="cs-meta">{[h.furnishing, h.deposit ? `Deposit ${inr(h.deposit)}` : "", h.available_from ? `From ${new Date(h.available_from).toLocaleDateString("en-IN", { day: "numeric", month: "short" })}` : ""].filter(Boolean).join(" · ")}</div>
+                {h.let_out && <em className="cs-tag cs-tag--warn">May be let out</em>}
+                <button type="button" className="cs-more" onPointerDown={(e) => e.stopPropagation()} onClick={() => setOpen({ token, property_id: h.property_id })}>
+                  <Info size={15} /> See all photos & details
+                </button>
+              </div>
+            </article>
+          </div>
+          <div className="cs-actions">
+            <button type="button" className="cs-round nope" onClick={() => decide("skipped")}><X size={30} /><span>Dislike</span></button>
+            <button type="button" className="cs-round like" onClick={() => decide("liked")}><Heart size={30} fill="currentColor" /><span>Like</span></button>
+          </div>
+        </main>
+        {details}
+      </div>
+    );
+  }
+
+  // My homes: the end of the list, and what every later visit to the link opens.
+  const url = curatedUrl(token);
   return (
     <div className="cs"><style>{CSS}</style>
-      {head}
-      <main className="cs-col">
-        {h ? (
-          <>
-            <p className="cs-progress">{idx + 1} of {homes.length} · swipe right to like</p>
-            <div className="cs-deck">
-              {next && <article className="cs-card cs-card--under" aria-hidden><div className="cs-img"><SmartListingImage listing={next} /></div></article>}
-              <article className="cs-card" style={{ transform: `translateX(${drag}px) rotate(${drag / 18}deg)` }}
-                onPointerDown={onDown} onPointerMove={onMove} onPointerUp={onUp} onPointerCancel={onUp}>
-                {drag > 30 && <span className="cs-stamp like">LIKE</span>}
-                {drag < -30 && <span className="cs-stamp nope">SKIP</span>}
-                <div className="cs-img"><SmartListingImage listing={h} /></div>
-                <div className="cs-body">
-                  <div className="cs-rent">{inr(h.rent)} <small>/ month</small></div>
-                  <div className="cs-line">{h.flat_type} · <MapPin size={14} /> {h.area}</div>
-                  <div className="cs-meta">{[h.furnishing, h.deposit ? `Deposit ${inr(h.deposit)}` : "", h.available_from ? `From ${new Date(h.available_from).toLocaleDateString("en-IN", { day: "numeric", month: "short" })}` : ""].filter(Boolean).join(" · ")}</div>
-                  <a className="cs-more" href={`/property/${h.property_id}`} target="_blank" rel="noreferrer" onPointerDown={(e) => e.stopPropagation()}>See all photos & details</a>
-                </div>
-              </article>
-            </div>
-            <div className="cs-actions">
-              <button type="button" className="cs-round nope" aria-label="Skip" onClick={() => decide("skipped")}><X size={30} /></button>
-              <button type="button" className="cs-round like" aria-label="Like" onClick={() => decide("liked")}><Heart size={30} fill="currentColor" /></button>
-            </div>
-          </>
-        ) : (
-          <div className="cs-done">
-            <span className="cs-done-ic"><Heart size={30} fill="#fff" /></span>
-            <h1>{liked.length ? `You liked ${liked.length} home${liked.length === 1 ? "" : "s"}` : "That's the list"}</h1>
-            <p>{liked.length ? `${b.name ? b.name.split(" ")[0] : "Your broker"} has been told and will set up your visits.` : "Nothing caught your eye? Tell your broker what to change."}</p>
-            {b.phone && (
-              <a className="cs-btn cs-btn--wa" target="_blank" rel="noreferrer"
-                href={waLink(b.phone, liked.length ? `Hi ${b.name ? b.name.split(" ")[0] : ""}, I liked ${liked.map((x) => `${x.flat_type} in ${x.area}`).join(", ")}. When can I visit?` : "Hi, I went through the list — can you show me a few more options?")}>
-                <WhatsAppIcon /> Message {b.name ? b.name.split(" ")[0] : "your broker"}
-              </a>
-            )}
-            {homes.length > 0 && <button type="button" className="cs-again" onClick={() => setIdx(0)}><RotateCcw size={15} /> Go through again</button>}
+      <header className="cs-head cs-head--home">
+        <img src={logoOnDark} alt="MovEazy" height="22" className="cs-logo" />
+        <p className="cs-kicker">Your partner</p>
+        <div className="cs-broker">
+          {b.photo_url ? <img src={b.photo_url} alt="" width="56" height="56" className="cs-photo cs-photo--lg" /> : <span className="cs-photo cs-photo--none cs-photo--lg">{initials(b.name)}</span>}
+          <div>
+            <b>{b.name || "Your partner"}</b>
+            {b.agency && <span>{b.agency}</span>}
+          </div>
+        </div>
+        {b.phone && (
+          <div className="cs-contact">
+            <a className="cs-chip-btn" href={waLink(b.phone, `Hi${firstName(b.name) ? ` ${firstName(b.name)}` : ""}, `)} target="_blank" rel="noreferrer"><WhatsAppIcon /> WhatsApp</a>
+            <a className="cs-chip-btn" href={`tel:+91${normalizeIndianMobile(b.phone)}`}><Phone size={16} /> Call</a>
           </div>
         )}
+      </header>
+
+      <main className="cs-col cs-home">
+        <h1>{liked.length ? `You liked ${liked.length} home${liked.length === 1 ? "" : "s"}` : "That's the list"}</h1>
+        <p className="cs-lead">
+          {liked.length ? `Send them to ${partner} and fix a time to see them.` : `Nothing caught your eye? Tell ${partner} what to change.`}
+        </p>
+        {b.phone && (
+          <a className="cs-btn cs-btn--wa" target="_blank" rel="noreferrer"
+            href={waLink(b.phone, likedMessage({ brokerName: b.name, liked, url }))}>
+            <WhatsAppIcon /> {liked.length ? `Ask ${partner} for visits` : `Ask ${partner} for more options`}
+          </a>
+        )}
+
+        {liked.length > 0 && (
+          <section className="cs-sec">
+            <h2><Heart size={16} fill="#E11D48" color="#E11D48" /> Liked</h2>
+            {liked.map((x) => <HomeRow key={x.property_id} h={x} onOpen={() => setOpen({ token: x.token, property_id: x.property_id })} />)}
+          </section>
+        )}
+
+        {pending.length > 0 && (
+          <section className="cs-sec">
+            <h2>Still to decide · {pending.length}</h2>
+            <p className="cs-hint">From {partner}’s other lists. Open one to like or dislike it.</p>
+            {pending.map((x) => <HomeRow key={x.property_id} h={x} onOpen={() => setOpen({ token: x.token, property_id: x.property_id })} />)}
+          </section>
+        )}
+
+        {disliked.length > 0 && (
+          <section className="cs-sec">
+            <button type="button" className="cs-fold" onClick={() => setShowNo((v) => !v)} aria-expanded={showNo}>
+              <span>Disliked · {disliked.length}</span><ChevronDown size={18} style={{ transform: showNo ? "rotate(180deg)" : "none" }} />
+            </button>
+            {showNo && (
+              <>
+                <p className="cs-hint">Changed your mind? Open one and tap Like.</p>
+                {disliked.map((x) => <HomeRow key={x.property_id} h={x} onOpen={() => setOpen({ token: x.token, property_id: x.property_id })} />)}
+              </>
+            )}
+          </section>
+        )}
+
+        {homes.length > 0 && <button type="button" className="cs-again" onClick={() => setIdx(0)}><RotateCcw size={15} /> Go through this list again</button>}
+        <p className="cs-fine">Visits are fixed with {b.name || "your partner"}. Keep this link to come back to your homes.</p>
       </main>
+      {details}
     </div>
   );
 }
@@ -216,7 +332,7 @@ const CSS = `
 .cs-progress { text-align: center; font-size: 13px; color: #56655F; font-weight: 700; margin: 14px 0 10px; }
 .cs-deck { position: relative; height: min(64dvh, 520px); }
 .cs-card { position: absolute; inset: 0; background: #fff; border-radius: 22px; overflow: hidden; box-shadow: 0 16px 40px rgba(10,40,30,.18);
-  touch-action: pan-y; user-select: none; transition: transform .08s linear; display: flex; flex-direction: column; }
+  touch-action: pan-y; user-select: none; transition: transform .08s linear; display: flex; flex-direction: column; cursor: pointer; }
 .cs-card--under { transform: scale(.95) translateY(12px); opacity: .7; box-shadow: none; }
 .cs-img { flex: 1; min-height: 0; background: #E5E7EB; pointer-events: none; }
 .cs-img img, .cs-img video { width: 100%; height: 100% !important; object-fit: cover; display: block; }
@@ -225,18 +341,47 @@ const CSS = `
 .cs-rent small { font-size: 14px; color: #56655F; font-weight: 600; }
 .cs-line { display: flex; align-items: center; gap: 4px; font-weight: 700; margin-top: 2px; }
 .cs-meta { font-size: 13px; color: #56655F; margin-top: 4px; }
-.cs-more { display: inline-block; margin-top: 8px; font-size: 13px; font-weight: 800; color: #0A3A2A; }
+.cs-more { display: inline-flex; align-items: center; gap: 6px; margin-top: 10px; padding: 8px 12px; border-radius: 99px; border: 1.5px solid #CFE3D9;
+  background: #F1F8F4; font: inherit; font-size: 13.5px; font-weight: 800; color: #0A3A2A; cursor: pointer; }
 .cs-stamp { position: absolute; top: 18px; z-index: 2; font-size: 26px; font-weight: 900; letter-spacing: .08em; padding: 4px 12px; border-radius: 10px; border: 4px solid; transform: rotate(-12deg); }
 .cs-stamp.like { left: 18px; color: #16A34A; border-color: #16A34A; background: rgba(255,255,255,.8); }
 .cs-stamp.nope { right: 18px; color: #E11D48; border-color: #E11D48; background: rgba(255,255,255,.8); transform: rotate(12deg); }
 .cs-actions { display: flex; justify-content: center; gap: 28px; margin-top: 16px; }
-.cs-round { width: 68px; height: 68px; border-radius: 99px; border: 0; background: #fff; display: grid; place-items: center; cursor: pointer; box-shadow: 0 10px 24px rgba(10,40,30,.16); }
+.cs-round { width: 76px; height: 76px; border-radius: 99px; border: 0; background: #fff; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 2px;
+  cursor: pointer; box-shadow: 0 10px 24px rgba(10,40,30,.16); font: inherit; }
+.cs-round span { font-size: 11px; font-weight: 800; }
 .cs-round.nope { color: #E11D48; }
 .cs-round.like { color: #fff; background: linear-gradient(135deg, #22C55E, #15803D); }
-.cs-done { text-align: center; padding-top: 40px; }
-.cs-done-ic { width: 72px; height: 72px; border-radius: 99px; margin: 0 auto 14px; display: grid; place-items: center; background: #E11D48; }
-.cs-done h1 { font-size: 26px; margin: 0 0 6px; }
-.cs-done p { color: #56655F; margin: 0; }
 .cs-again { margin-top: 14px; border: 0; background: none; font: inherit; font-weight: 700; color: #0A3A2A; display: inline-flex; align-items: center; gap: 6px; cursor: pointer; }
-.cs-center { min-height: 100dvh; display: flex; flex-direction: column; justify-content: center; }
+.cs-center { min-height: 100dvh; display: flex; flex-direction: column; justify-content: center; text-align: center; }
+.cs-center p { color: #56655F; line-height: 1.5; }
+.cs-tag { display: inline-block; margin-top: 6px; font-style: normal; font-size: 12px; font-weight: 800; padding: 3px 8px; border-radius: 99px; }
+.cs-tag--warn { background: #FEF3C7; color: #92400E; }
+.cs-head--home { padding-bottom: 20px; }
+.cs-kicker { margin: 16px 0 0; font-size: 12px; font-weight: 800; letter-spacing: .08em; text-transform: uppercase; color: #E4B659; }
+.cs-head--home .cs-broker { margin-top: 8px; }
+.cs .cs-photo--lg { width: 56px; height: 56px; }
+.cs-contact { display: flex; gap: 8px; margin-top: 14px; max-width: 480px; }
+.cs-chip-btn { flex: 1; display: inline-flex; align-items: center; justify-content: center; gap: 6px; min-height: 42px; border-radius: 12px;
+  background: rgba(255,255,255,.12); border: 1px solid rgba(255,255,255,.25); color: #fff; font-weight: 800; font-size: 14px; text-decoration: none; }
+.cs-chip-btn svg { width: 18px; height: 18px; }
+.cs-home h1 { font-size: 25px; letter-spacing: -0.02em; margin: 20px 0 4px; }
+.cs-lead { color: #56655F; margin: 0; line-height: 1.5; }
+.cs-sec { margin-top: 22px; }
+.cs-sec h2 { display: flex; align-items: center; gap: 6px; font-size: 15px; margin: 0 0 8px; }
+.cs-hint { font-size: 13px; color: #56655F; margin: -4px 0 8px; }
+.cs-row { width: 100%; display: flex; align-items: center; gap: 12px; padding: 10px; margin-bottom: 8px; background: #fff; border: 1px solid #E6E2D6;
+  border-radius: 14px; font: inherit; color: inherit; text-align: left; cursor: pointer; }
+.cs-thumb { width: 72px; height: 56px; border-radius: 10px; overflow: hidden; flex: none; background: #E5E7EB; }
+.cs-thumb img, .cs-thumb video { width: 100%; height: 100% !important; object-fit: cover; display: block; }
+.cs-row-main { flex: 1; min-width: 0; display: flex; flex-direction: column; }
+.cs-row-main b { font-size: 16px; }
+.cs-row-main b small { font-size: 12.5px; color: #56655F; font-weight: 600; }
+.cs-row-main > span { font-size: 13.5px; color: #2F3B36; font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.cs-row-main .cs-tag { align-self: flex-start; margin-top: 4px; }
+.cs-row-go { color: #9CA3AF; flex: none; }
+.cs-fold { width: 100%; display: flex; justify-content: space-between; align-items: center; background: none; border: 0; padding: 4px 0 8px;
+  font: inherit; font-size: 15px; font-weight: 800; color: #13201B; cursor: pointer; }
+.cs-home .cs-again { display: flex; margin: 18px auto 0; }
+.cs-home .cs-fine { color: #56655F; }
 `;

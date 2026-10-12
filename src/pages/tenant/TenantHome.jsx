@@ -10,6 +10,9 @@
  *      us once" and the AI agents hunting the web to move-in.
  *   4. The future we're building: the offline city mapped digitally, and a
  *      taste that sharpens with every flat — until we help you buy.
+ *
+ * Under the card, for a tenant a MovEazy partner is helping: that partner and
+ * their lists (YourPartner).
  */
 import {
   ChevronRight, Droplets, Home, KeyRound, MapPin, Search, ShieldCheck, Sparkles, TrainFront, TrendingUp,
@@ -18,6 +21,7 @@ import { Phone, SITE_CSS } from "../home/homeKit";
 import { AgentScreen, MoveInScreen, RankedScreen, SearchScreen, SwipeScreen, VisitScreen, useShowcaseMatches } from "../home/homeScreens";
 import { profileScore, scoreLabel } from "../../lib/tenantProfile";
 import { ScoreRing, TN_CSS, TenantCard } from "./tenantUi";
+import YourPartner from "./YourPartner";
 
 
 function greeting() {
@@ -113,6 +117,8 @@ export default function TenantHome({ name = "", profile = {}, onFind, onList, on
           </div>
         </div>
       </header>
+
+      <YourPartner />
 
       <section className="tn-col tn-actions">
         <button type="button" className="tn-act tn-act--find" onClick={onFind}>

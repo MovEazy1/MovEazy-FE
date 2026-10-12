@@ -190,10 +190,10 @@ export function DemoListPreview({ lead, homes, onClose }) {
   const act = (kind) => {
     if (!h) return;
     const what = `${bhkLabel(h)} · ${h.area || "Bengaluru"}`;
-    const next = [{ kind, text: `${first} ${kind === "liked" ? "liked" : "skipped"} ${what}`, sub: kind === "liked" ? `${inr(h.rent)}/month — call them now` : "" }, ...feed];
+    const next = [{ kind, text: `${first} ${kind === "liked" ? "liked" : "disliked"} ${what}`, sub: kind === "liked" ? `${inr(h.rent)}/month — call them now` : "" }, ...feed];
     if (i + 1 >= homes.length) {
       const l = next.filter((f) => f.kind === "liked").length;
-      next.unshift({ kind: "done", text: `${first} finished your list`, sub: `♥ ${l} liked · ✕ ${homes.length - l} skipped` });
+      next.unshift({ kind: "done", text: `${first} finished your list`, sub: `♥ ${l} liked · ✕ ${homes.length - l} disliked` });
     }
     setFeed(next);
     setI((x) => x + 1);
@@ -217,7 +217,7 @@ export function DemoListPreview({ lead, homes, onClose }) {
                 <span><MapPin size={12} /> {bhkLabel(h)} · {h.area}</span>
               </div>
               <div className="dlp-acts">
-                <button type="button" className="no" aria-label="Skip" onClick={() => act("skipped")}><X size={22} /></button>
+                <button type="button" className="no" aria-label="Dislike" onClick={() => act("skipped")}><X size={22} /></button>
                 <span>{i + 1} / {homes.length}</span>
                 <button type="button" className="yes" aria-label="Like" onClick={() => act("liked")}><Heart size={22} fill="currentColor" /></button>
               </div>

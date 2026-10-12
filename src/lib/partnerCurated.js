@@ -38,6 +38,11 @@ export const decideSoldOut = (propertyId, approve) => rpc("partner_decide_sold_o
 export const openCuratedList = (token) => rpc("partner_curated_open", { p_token: token });
 export const giveCuratedContact = (token, phone, name = "") => rpc("partner_curated_contact", { p_token: token, p_phone: phone, p_name: name });
 export const actOnCurated = (token, propertyId, action) => rpc("partner_curated_act", { p_token: token, p_property: propertyId, p_action: action });
+/** The partner's other lists to the same tenant (My homes), once they've given their number. */
+export const fetchCuratedSiblings = (token) => rpc("partner_curated_siblings", { p_token: token }).then((r) => r ?? []);
+
+/* Tenant (signed in on moveazy.co.in): their partners and lists (partner_curated_tenant.sql) */
+export const fetchMyPartners = () => rpc("tenant_my_partners").then((r) => r ?? []);
 
 /* CRM */
 export const fetchBrokerLeads = () => rpc("crm_broker_leads");
