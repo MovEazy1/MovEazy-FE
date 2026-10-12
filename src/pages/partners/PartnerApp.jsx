@@ -55,7 +55,7 @@ const EditSharing = lazy(() => import("./EditSharing"));
 const LeadsList = lazy(() => import("./LeadsList"));
 const LeadForm = lazy(() => import("./LeadForm"));
 
-const LeadMatches = lazy(() => import("./LeadMatches"));
+const Shortlist = lazy(() => import("./Shortlist"));
 const GroupsList = lazy(() => import("./GroupsList"));
 const GroupDetail = lazy(() => import("./GroupDetail"));
 const MorePage = lazy(() => import("./MorePage"));
@@ -79,10 +79,10 @@ const CuratedListPage = lazy(() => import("./PartnerInbox").then((m) => ({ defau
 
 const PartnerContext = createContext(null);
 
-/** An old /leads/:id link: that client's tenant page now. */
-function LeadRedirect() {
+/** An old /leads/:id link: that client's tenant page now (/leads/:id/matches: their shortlist). */
+function LeadRedirect({ to = "tenants" }) {
   const { id } = useParams();
-  return <Navigate to={pp(`/tenants/lead-${id}`)} replace />;
+  return <Navigate to={pp(`/${to}/lead-${id}`)} replace />;
 }
 export const usePartner = () => useContext(PartnerContext);
 
@@ -285,7 +285,7 @@ function PartnerWorkspace({ me, reloadMe }) {
             <Route path="my-flats" element={<MyFlats />} />
             <Route path="performance" element={<PerformancePage />} />
             <Route path="leads/:id/edit" element={<LeadForm />} />
-            <Route path="leads/:id/matches" element={<LeadMatches />} />
+            <Route path="leads/:id/matches" element={<LeadRedirect to="ai-matcher" />} />
             <Route path="groups" element={<GroupsList />} />
             <Route path="groups/:id" element={<GroupDetail />} />
             <Route path="more" element={<MorePage />} />
@@ -295,7 +295,7 @@ function PartnerWorkspace({ me, reloadMe }) {
             <Route path="referrals" element={<ReferralsPage />} />
             <Route path="notifications" element={<NotificationsPage />} />
             <Route path="ai-matcher" element={<AiMatcher />} />
-            <Route path="ai-matcher/:slug" element={<TenantPage />} />
+            <Route path="ai-matcher/:slug" element={<Shortlist />} />
             <Route path="insights" element={<Insights />} />
             <Route path="building-leads" element={<BuildingLeads />} />
             <Route path="curated/:id" element={<CuratedListPage />} />

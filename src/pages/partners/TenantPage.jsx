@@ -1,5 +1,5 @@
 /**
- * One tenant (/tenants/<lead-…|asg-…>, also /ai-matcher/<…>): everything a
+ * One tenant (/tenants/<lead-…|asg-…>): everything a
  * partner needs to take them to a closure, top to bottom —
  *
  *   who and what they want · the stage and the next step · move-in date ·
@@ -294,9 +294,12 @@ export default function TenantPage() {
                 {r.near > 0 ? `${r.near} ${r.near === 1 ? "is a near match" : "are near matches"} — their area or BHK, a little off on the rest.` : ""}
               </p>
             )}
-            <button type="button" className="pz-btn pz-btn--ai pz-btn--block" style={{ marginTop: 10 }} disabled={!r.picks.length || busy} onClick={sendMore}>
-              <Sparkles size={16} /> {busy ? "Making the list…" : r.picks.length ? `Send ${r.picks.length} flat${r.picks.length === 1 ? "" : "s"}` : "Nothing new to send"}
-            </button>
+            <div className="pz-actions" style={{ gridTemplateColumns: "1fr 1fr", marginTop: 10 }}>
+              <Link to={pp(`/ai-matcher/${slug}`)} className="pz-btn">Review list</Link>
+              <button type="button" className="pz-btn pz-btn--ai" disabled={!r.picks.length || busy} onClick={sendMore}>
+                <Sparkles size={16} /> {busy ? "Making the list…" : r.picks.length ? `Send ${r.picks.length}` : "Nothing new"}
+              </button>
+            </div>
           </div>
         )}
 

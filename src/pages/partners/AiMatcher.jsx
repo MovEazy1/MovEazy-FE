@@ -2,8 +2,8 @@
  * AI Property Matcher — every home the broker can see, matched against every
  * client at once: their own clients and the MovEazy tenants assigned to them.
  * Fresh tenants (never sent a list) get a ready shortlist of ten, one tap to
- * send. Existing ones open their own page (MatcherTenant.jsx): what they liked,
- * visits, and ten more. A flat is never suggested twice — not one this broker
+ * send. Tapping any tenant opens their shortlist (Shortlist.jsx): the AI's ten
+ * to review — remove, mark sold, swap in backups — and every list sent. A flat is never suggested twice — not one this broker
  * sent, one the same tenant swiped on any partner's list, or one they turned
  * down on MovEazy (lib/partnerMatcher.js).
  *
@@ -272,7 +272,7 @@ export default function AiMatcher() {
 
   const freshRow = (r, i) => (
     <div key={`${r.lead.key}-${seed}`} className="aim-row" style={{ animationDelay: `${Math.min(i, 8) * 70}ms` }}>
-      <div className="pz-row" style={{ alignItems: "flex-start" }}>
+      <Link to={pp(`/ai-matcher/${keyToSlug(r.lead.key)}`)} className="pz-row" style={{ alignItems: "flex-start", color: "inherit", textDecoration: "none" }}>
         <Avatar name={r.lead.name} />
         <div style={{ flex: 1, minWidth: 0 }}>
           <strong style={{ display: "block", fontSize: 15.5 }}>
@@ -282,20 +282,19 @@ export default function AiMatcher() {
           <span className="pz-meta">{[requirementLine(r.lead), (r.lead.localities ?? []).join(", ")].filter(Boolean).join(" · ") || "No requirement from MovEazy yet"}</span>
         </div>
         <span className="aim-count">{r.total}<small>matches</small></span>
-      </div>
+      </Link>
       {r.picks.length > 0 && (
-        <div className="aim-thumbs">
+        <Link to={pp(`/ai-matcher/${keyToSlug(r.lead.key)}`)} className="aim-thumbs" aria-label={`See ${r.lead.name}'s shortlist`}>
           {r.picks.slice(0, 5).map((m) => <div key={m.listing.property_id} className="aim-th"><SmartListingImage listing={m.listing} thumb /><i>{m.score}</i></div>)}
           {r.picks.length > 5 && <div className="aim-more">+{r.picks.length - 5}</div>}
-        </div>
+        </Link>
       )}
       {r.near > 0 && <p className="aim-last">{r.near} of these {r.near === 1 ? "is a near match" : "are near matches"} — their area or BHK, a little off on the rest.</p>}
       <div className="pz-actions" style={{ gridTemplateColumns: "1fr auto" }}>
         <button type="button" className="pz-btn pz-btn--ai" disabled={!r.picks.length || busy === r.lead.key} onClick={() => send(r)}>
           <Sparkles size={16} /> {busy === r.lead.key ? "Making the list…" : r.picks.length ? `Send shortlist · ${r.picks.length}` : "No matches yet"}
         </button>
-        <button type="button" className="pz-btn"
-          onClick={() => navigate(pp(r.lead.kind === "moveazy" ? `/ai-matcher/${keyToSlug(r.lead.key)}` : `/leads/${r.lead.id}/matches`))}>
+        <button type="button" className="pz-btn" onClick={() => navigate(pp(`/ai-matcher/${keyToSlug(r.lead.key)}`))}>
           Review
         </button>
       </div>

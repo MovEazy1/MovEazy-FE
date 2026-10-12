@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import {
-  flatLine, freshPicks, keyToSlug, likedFlats, listsFor, matcherTenants, slugToKey, splitTenants, visitsMessage,
+  autoFill, backupsFor, flatLine, freshPicks, keyToSlug, likedFlats, listUpdatedMessage, listsFor, matcherTenants, slugToKey, splitTenants, visitsMessage,
 } from "./partnerMatcher";
 
 const flat = (id, o = {}) => ({ property_id: id, area: "HSR Layout", rent: 30000, flat_type: "2 BHK", status: "published", ...o });
@@ -87,4 +87,27 @@ describe("messages", () => {
   });
   it("one flat reads as one", () => expect(visitsMessage("", [flat("A")])).toMatch(/^Hi, you liked this home:/));
   it("flatLine", () => expect(flatLine({ bedrooms: 3, area: "HSR", rent: 0 })).toBe("3 BHK · HSR"));
+});
+
+describe("the shortlist screen", () => {
+  it("backups: the next best, never what's on the list or taken off", () => {
+    const ranked = ["A", "B", "C", "D", "E", "F"];
+    expect(backupsFor(ranked, ["A", "B"], ["C"], 2)).toEqual(["D", "E"]);
+    expect(backupsFor(ranked, ranked)).toEqual([]);
+  });
+  it("auto-fill tops the list back up to ten, in the AI's order", () => {
+    expect(autoFill(["A", "B"], ["X", "Y", "Z"], 4)).toEqual(["A", "B", "X", "Y"]);
+    expect(autoFill(["A", "B"], [], 4)).toEqual(["A", "B"]);
+    expect(autoFill(["A", "B", "C"], ["X"], 2)).toEqual(["A", "B", "C"]);
+  });
+  it("tells the tenant their list changed", () => {
+    expect(listUpdatedMessage("Riya Sharma", "https://x/c/1", 2)).toBe("Hi Riya, I've added 2 new homes to your list. Have a look and tap ♥ on the ones you like:\nhttps://x/c/1");
+    expect(listUpdatedMessage("", "u", 0)).toMatch(/^Hi, I've updated your list\./);
+    expect(listUpdatedMessage("A", "u", 1)).toMatch(/1 new home to/);
+  });
+  it("a flat flagged as rented is never suggested", () => {
+    const lead = { localities: ["HSR Layout"], flat_types: ["2 BHK"], budget_max: 40000 };
+    const { picks } = freshPicks(lead, [flat("OK"), flat("GONE", { rent_flag: "potentially_rented" })]);
+    expect(picks.map((m) => m.listing.property_id)).toEqual(["OK"]);
+  });
 });

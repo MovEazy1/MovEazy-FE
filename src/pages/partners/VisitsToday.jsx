@@ -32,7 +32,7 @@ export default function VisitsToday() {
         return (
           <div key={v.id} className="pz-row" style={{ gap: 10, paddingTop: 10, marginTop: 10, borderTop: "1px solid var(--line)" }}>
             <b style={{ width: 64, flex: "none", fontSize: 14 }}>{time(v.visit_at)}</b>
-            <Link to={pp(`/ai-matcher/${keyToSlug(key)}`)} style={{ flex: 1, minWidth: 0, color: "inherit", textDecoration: "none" }}>
+            <Link to={pp(`/tenants/${keyToSlug(key)}`)} style={{ flex: 1, minWidth: 0, color: "inherit", textDecoration: "none" }}>
               <strong style={{ display: "block", fontSize: 14 }}>{name}</strong>
               <span className="pz-hint">{flat}</span>
             </Link>

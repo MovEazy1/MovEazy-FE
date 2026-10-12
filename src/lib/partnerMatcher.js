@@ -24,6 +24,14 @@ const who = (t) => ({
 
 export const sendCuratedTo = (tenant, propertyIds) =>
   rpc("partner_curated_send", { ...who(tenant), p_properties: propertyIds });
+/** Off this tenant's shortlist for good (or back on: undo). partner_matcher_edit.sql */
+export const excludeForTenant = (tenant, propertyId, undo = false) =>
+  rpc("partner_matcher_exclude", { ...who(tenant), p_property: propertyId, p_undo: undo });
+/** A sent list: take out unswiped flats, add new ones. → { id, token, count, added, removed } */
+export const editCuratedList = (listId, remove = [], add = []) =>
+  rpc("partner_curated_edit", { p_list: listId, p_remove: remove, p_add: add });
+/** Their own flat: let out. Anyone else's: flagged potentially rented. → { kind: "let_out" | "flagged" } */
+export const markSold = (propertyId) => rpc("partner_mark_sold", { p_property: propertyId });
 export const fetchMatcherSeen = () => rpc("partner_matcher_seen").then((r) => r ?? {});
 export const setVisit = (tenant, propertyId, at) =>
   rpc("partner_visit_set", { ...who(tenant), p_property: propertyId, p_at: new Date(at).toISOString() });
@@ -94,7 +102,8 @@ export function splitTenants(tenants = [], lists = []) {
   return { fresh, existing };
 }
 
-const isLive = (l) => !l.status || l.status === "published";
+// Off the market, or flagged as rented: never suggested.
+const isLive = (l) => (!l.status || l.status === "published") && !l.rent_flag;
 
 /**
  * The next `n` flats for a tenant, never one in `exclude`. Strong matches
@@ -144,4 +153,31 @@ export function visitLabel(at) {
   return d.toLocaleString("en-IN", {
     timeZone: "Asia/Kolkata", weekday: "short", day: "numeric", month: "short", hour: "numeric", minute: "2-digit",
   });
+}
+
+/* ── The shortlist screen (pages/partners/Shortlist.jsx) ─────────────────── */
+
+export const SHORTLIST_SIZE = FRESH_COUNT;
+export const BACKUP_COUNT = 10;
+
+/**
+ * The AI's next best, after what's on the list: `ranked` (best first) minus
+ * the list and anything taken off it. → the first `n` property ids.
+ */
+export function backupsFor(ranked = [], onList = [], removed = [], n = BACKUP_COUNT) {
+  const skip = new Set([...onList, ...removed]);
+  return ranked.filter((id) => !skip.has(id)).slice(0, n);
+}
+
+/** Top the list back up to `size` from the backups, in their order. */
+export function autoFill(onList = [], backups = [], size = SHORTLIST_SIZE) {
+  const need = Math.max(0, size - onList.length);
+  return [...onList, ...backups.slice(0, need)];
+}
+
+/** "Hi Riya, I've added 2 new homes to your list…" — after editing a sent list. */
+export function listUpdatedMessage(name, url, added = 0) {
+  const first = String(name || "").trim().split(/\s+/)[0];
+  const what = added > 0 ? `added ${added} new home${added === 1 ? "" : "s"} to your list` : "updated your list";
+  return `Hi${first ? ` ${first}` : ""}, I've ${what}. Have a look and tap ♥ on the ones you like:\n${url}`;
 }
