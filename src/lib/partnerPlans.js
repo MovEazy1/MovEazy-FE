@@ -15,7 +15,10 @@ async function rpc(fn, args) {
 }
 
 export const PARTNER_ORIGIN = "https://partners.moveazy.co.in";
-export const REFERRAL_REWARD = 1500;
+/** The largest reward on today's plans, for copy that has no plan list to hand (each plan's own is in referral_reward). */
+export const REFERRAL_REWARD = 3000;
+/** The plan pre-selected and marked "Most popular". */
+export const POPULAR_PLAN = "pro_5m";
 
 export const fetchPlans = () => rpc("partner_plans_list").then((r) => r ?? []);
 export const fetchPartnerStatus = () => rpc("partner_status");
@@ -67,6 +70,45 @@ export async function startPlanPayment(planId) {
   }
   throw new Error(res.body?.error || "Online payment isn't available right now. Please message the MovEazy team.");
 }
+
+/* ── Paying by UPI (partner_premium_upi.sql) ─────────────────────────────── */
+/** Starts a payment for the plan: → { id, amount, label, months, upi_id }. */
+export const startPlanUpi = (planId) => rpc("partner_plan_pay_upi", { p_plan: planId });
+export const submitPlanUtr = (paymentId, utr) => rpc("partner_plan_submit_utr", { p_payment: paymentId, p_utr: utr });
+
+/** A plan's card: "₹1,000/month", and under it "₹4,999 · 5 months". */
+export function planPriceLines(p) {
+  const months = Math.max(1, Number(p?.months) || 1);
+  const price = Number(p?.price) || 0;
+  const per = Math.round(price / months);
+  return {
+    perMonth: `₹${per.toLocaleString("en-IN")}/month`,
+    total: `₹${price.toLocaleString("en-IN")} · ${months} month${months === 1 ? "" : "s"}`,
+  };
+}
+
+/** A referral reward's countdown, and the (i) that explains it. */
+export function rewardTimer(j) {
+  const n = Math.max(0, Number(j?.days_left) || 0);
+  const amount = `₹${Number(j?.amount || 0).toLocaleString("en-IN")}`;
+  const when = n === 0 ? "any day now" : `in ${n} day${n === 1 ? "" : "s"}`;
+  return {
+    label: n === 0 ? `${amount} · redeemable now` : `${amount} · redeemable in ${n} day${n === 1 ? "" : "s"}`,
+    info: `If ${j?.name || "they"} doesn't cancel the subscription, ${amount} will be credited directly to your bank account ${when}.`,
+  };
+}
+
+export const setPayout = ({ upi = "", name = "", account = "", ifsc = "" }) =>
+  rpc("partner_set_payout", { p_upi: upi, p_name: name, p_account: account, p_ifsc: ifsc });
+
+/* CRM */
+export const crmPremiumPayments = () => rpc("crm_premium_payments");
+export const crmDecidePremiumPayment = (id, approve, note = "") =>
+  rpc("crm_premium_payment_decide", { p_payment: id, p_approve: approve, p_note: note });
+export const crmPlans = () => rpc("crm_plans_list").then((r) => r ?? []);
+export const crmSetPlanReward = (planId, reward) => rpc("crm_set_plan_reward", { p_plan: planId, p_reward: Number(reward) });
+export const crmReferralPayouts = () => rpc("crm_referral_payouts").then((r) => r ?? []);
+export const crmMarkReferralPaid = (id) => rpc("crm_referral_mark_paid", { p_referral: id });
 
 export const fetchMyReferrals = () => rpc("partner_my_referrals");
 export const fetchReferralCode = () => rpc("partner_referral_code");

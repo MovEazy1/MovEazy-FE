@@ -17,12 +17,12 @@ import { Link, useSearchParams } from "react-router-dom";
 import { CalendarClock, Copy, Crown, Gift, IndianRupee, MapPin, Phone, Sparkles, Wallet } from "lucide-react";
 import { usePartner } from "./PartnerApp";
 import { Chip, Empty, Loading, Sheet, WhatsAppIcon, toast } from "./partnerUi";
-import { QrImage } from "../../components/QrPosterBlock";
+import UpiPay from "./UpiPay";
 import { friendlyError, pp, waLink } from "../../lib/partners";
 import {
   ASSIGNED_STATUS, BUDGET_BANDS, MOVEAZY_DESK, PACKS, REQUEST_STATUS, cleanUtr, closureDue, fetchLeadStats,
   fetchMyAssignedLeads, fetchMyLeadRequests, isUtr, leadNeedLine, logReachOut, moreLeadsMessage, moveInRows,
-  onlinePaymentReady, requestLeads, startLeadPayment, topSets, updateAssignedLead, upiLink,
+  onlinePaymentReady, requestLeads, startLeadPayment, topSets, updateAssignedLead,
 } from "../../lib/partnerLeads";
 
 const BHKS = ["1 RK", "1 BHK", "2 BHK", "3 BHK", "Room in Preoccupied flat"];
@@ -164,7 +164,6 @@ function RequestSheet({ pack, stats, myAreas, me, onDone, onCancel }) {
   const [busy, setBusy] = useState(false);
   const price = stats?.pack_price ?? 2000;
   const upi = stats?.upi_id || "";
-  const link = upiLink({ vpa: upi, amount: price, note: "30 MovEazy leads" });
   const toggle = (list, set, v) => set(list.includes(v) ? list.filter((x) => x !== v) : [...list, v]);
   const prefs = () => ({ areas, flat_types: bhk, budget_min: bmin || null, budget_max: bmax || null });
 
@@ -247,32 +246,8 @@ function RequestSheet({ pack, stats, myAreas, me, onDone, onCancel }) {
           </>
         ) : (
           <>
-            <div style={{ textAlign: "center" }}>
-              <p style={{ margin: "0 0 10px", fontSize: 15 }}>Scan with any UPI app and pay <strong>{inr(price)}</strong></p>
-              {link ? (
-                <div style={{ display: "inline-block", padding: 10, background: "#fff", borderRadius: 14, border: "1px solid var(--line)" }}>
-                  <QrImage url={link} size={210} title="Pay MovEazy by UPI" />
-                </div>
-              ) : <p className="pz-err">Payment isn't set up yet — message MovEazy on WhatsApp.</p>}
-              {upi && (
-                <div className="pz-row" style={{ justifyContent: "center", gap: 8, marginTop: 10 }}>
-                  <span style={{ fontWeight: 600 }}>{upi}</span>
-                  <button type="button" className="pz-iconbtn" aria-label="Copy UPI ID"
-                    onClick={() => navigator.clipboard?.writeText(upi).then(() => toast("UPI ID copied"), () => {})}><Copy size={16} /></button>
-                </div>
-              )}
-              {link && <a className="pz-btn pz-btn--sm" href={link} style={{ marginTop: 8 }}>Open a UPI app</a>}
-            </div>
-            <div className="pz-field" style={{ marginTop: 18 }}>
-              <label className="pz-label" htmlFor="utr">After paying, enter the UTR / reference number</label>
-              <input id="utr" className="pz-input" value={utr} placeholder="e.g. 412345678901" autoComplete="off"
-                onChange={(e) => setUtr(e.target.value.slice(0, 40))} />
-              <span className="pz-hint">It's on the payment's success screen in your UPI app (12 digits).</span>
-            </div>
-            <button type="button" className="pz-btn pz-btn--primary pz-btn--block" onClick={submit} disabled={busy || !isUtr(utr)}>
-              {busy ? "Sending…" : "I've paid — submit"}
-            </button>
-            <button type="button" className="pz-btn pz-btn--ghost pz-btn--block" onClick={() => setStep("prefs")} style={{ marginTop: 6 }}>Back</button>
+            <UpiPay upi={upi} amount={price} note="30 MovEazy leads" utr={utr} setUtr={setUtr} busy={busy}
+              onSubmit={submit} onBack={() => setStep("prefs")} />
           </>
         )}
       </div>

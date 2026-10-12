@@ -18,6 +18,7 @@ import { Btn, C, Chip, Empty, Toast, shortDate } from "./crmUi";
 import CrmProgramSettings from "./CrmProgramSettings";
 import CrmBrokerQr from "./CrmBrokerQr";
 import CrmTrialPanel from "./CrmTrialPanel";
+import { PremiumPayments, ReferralPayouts } from "./CrmPremiumPayments";
 import { useLandingSettings } from "../../lib/landingSettings";
 import { SCOPES } from "../../lib/adminScopes";
 import { whatsappUrl } from "../../lib/crmSettings";
@@ -122,7 +123,9 @@ export default function CrmPartnersSection({ access }) {
           </span>
         </div>
         {pricing && <CrmProgramSettings canManage={canManage} onToast={showToast} onSaved={setSavedProgram} />}
+        <PremiumPayments canManage={canManage} onToast={showToast} onChanged={load} />
         <CrmTrialPanel canManage={canManage} onToast={showToast} onChanged={load} />
+        <ReferralPayouts canManage={canManage} onToast={showToast} />
         <span className="crm-mute" style={{ fontSize: 11.5 }}>
           Partner app: <a href={partnerUrl} target="_blank" rel="noreferrer" style={{ color: C.accent }}>{partnerUrl.replace("https://", "")}</a>
           {" "}(also at moveazy.co.in/partners). Premium is granted by hand here until online payment is live.

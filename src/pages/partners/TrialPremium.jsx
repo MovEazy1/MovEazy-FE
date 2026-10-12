@@ -5,7 +5,7 @@
  */
 import { useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
-import { Crown, PartyPopper, Sparkles } from "lucide-react";
+import { Clock, Crown, PartyPopper, Sparkles } from "lucide-react";
 import logo from "../../assets/logo/moveazy-logo-mint-dark.png";
 import { pp } from "../../lib/partners";
 import { TRIAL_WARN_DAYS, daysLabel, extendedMessage, trialPopup, trialSeen } from "../../lib/partnerTrial";
@@ -88,6 +88,19 @@ export function TrialPopups({ trial, onSeen }) {
         <img src={logo} alt="MovEazy" />
         {body}
       </div>
+    </div>
+  );
+}
+
+/** Home: a Premium payment sent by UPI, waiting for the MovEazy team to confirm it. */
+export function PaymentCheckBanner({ payment }) {
+  if (payment?.status !== "payment_check") return null;
+  return (
+    <div className="tp-warn" style={{ display: "flex", gap: 10, alignItems: "center" }}>
+      <style>{CSS}</style>
+      <Clock size={20} color="#8A6419" style={{ flex: "none" }} />
+      <span><b>Payment received — we’re checking it</b>
+        <p style={{ margin: "2px 0 0" }}>Premium starts as soon as it’s confirmed, usually within a few hours. You’ll get a notification.</p></span>
     </div>
   );
 }

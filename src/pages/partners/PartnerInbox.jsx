@@ -5,7 +5,7 @@
  */
 import { useEffect, useMemo, useState } from "react";
 import { Link, useNavigate, useParams } from "react-router-dom";
-import { Bell, Building2, CalendarCheck, CalendarClock, Heart, Home, MapPin, Sparkles, ThumbsDown, Users } from "lucide-react";
+import { AlertCircle, Bell, Building2, CalendarCheck, CalendarClock, Crown, Gift, Heart, Home, MapPin, Sparkles, ThumbsDown, Users } from "lucide-react";
 import { usePartner } from "./PartnerApp";
 import { Empty, Loading, TopBar, WhatsAppIcon, toast } from "./partnerUi";
 import { SmartListingImage } from "./partnerMedia";
@@ -21,7 +21,7 @@ const ago = (iso) => {
 };
 const ICON = { tenant_liked: Heart, storefront_like: Heart, sold_out_request: Home, sold_out_decided: Home, list_opened: Sparkles, list_done: Sparkles,
   building_visit: CalendarCheck, building_assigned: Building2, location_request: MapPin, location_decided: MapPin,
-  leads_assigned: Users, lead_request: Users, visit_reminder: CalendarClock };
+  leads_assigned: Users, lead_request: Users, visit_reminder: CalendarClock, referral: Gift, plan_approved: Crown, plan_rejected: AlertCircle };
 
 /**
  * Unread count for the bell, checked every 30 seconds while the app is open —

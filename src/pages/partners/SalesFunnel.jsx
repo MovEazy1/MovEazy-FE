@@ -47,7 +47,7 @@ function nudge(b) {
 }
 
 const fmt = (d) => (d ? new Date(d).toLocaleDateString("en-IN", { day: "numeric", month: "short" }) : "");
-const PAY_TONE = { started: "#B45309", paid: "#15803D", approved: "#15803D", rejected: "#B91C1C", refunded: "#B91C1C" };
+const PAY_TONE = { started: "#B45309", payment_check: "#B45309", paid: "#15803D", approved: "#15803D", rejected: "#B91C1C", refunded: "#B91C1C" };
 
 export default function SalesFunnel() {
   const { user, loading } = useAuth();

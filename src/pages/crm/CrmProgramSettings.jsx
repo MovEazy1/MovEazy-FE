@@ -10,6 +10,7 @@
 import { useEffect, useState } from "react";
 import { Btn, C, shortDate } from "./crmUi";
 import { adminSaveProgramSettings, fetchLandingSettings } from "../../lib/landingSettings";
+import { PlanRewards } from "./CrmPremiumPayments";
 
 const GROUPS = [
   ["Broker Premium", [
@@ -95,6 +96,7 @@ export default function CrmProgramSettings({ canManage, onToast, onSaved }) {
             </div>
           </div>
         ))}
+        <PlanRewards canManage={canManage} onToast={onToast} />
       </div>
       <div style={{ display: "flex", gap: 10, alignItems: "center", flexWrap: "wrap" }}>
         <Btn variant="primary" sm disabled={!canManage || busy || changed.length === 0} onClick={save}>
