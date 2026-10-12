@@ -14,7 +14,7 @@
  */
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { Link, useSearchParams } from "react-router-dom";
-import { CalendarClock, Copy, Crown, Gift, IndianRupee, MapPin, Phone, Wallet } from "lucide-react";
+import { CalendarClock, Copy, Crown, Gift, IndianRupee, MapPin, Phone, Sparkles, Wallet } from "lucide-react";
 import { usePartner } from "./PartnerApp";
 import { Chip, Empty, Loading, Sheet, WhatsAppIcon, toast } from "./partnerUi";
 import { QrImage } from "../../components/QrPosterBlock";
@@ -88,6 +88,7 @@ function AssignedLead({ lead, me, onChanged, onClose }) {
           <div className="pz-row" style={{ gap: 8, marginTop: 10 }}>
             <button type="button" className="pz-btn pz-btn--gold pz-btn--sm" onClick={() => reach("whatsapp")}><WhatsAppIcon size={15} /> WhatsApp</button>
             <button type="button" className="pz-btn pz-btn--sm" onClick={() => reach("call")}><Phone size={15} /> Call</button>
+            <Link to={pp(`/ai-matcher/asg-${lead.id}`)} className="pz-btn pz-btn--sm pz-btn--ai"><Sparkles size={14} /> AI matches</Link>
           </div>
           <div className="pz-chips" style={{ marginTop: 8 }}>
             {["contacted", "visit", "closed", "not_interested"].map((s) => (

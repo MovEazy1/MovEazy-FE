@@ -50,15 +50,19 @@ const furnishRank = (f) => FURNISH_RANK[norm(f).replace("-", " ")];
 export function scoreLeadMatch(listing, lead, { today = new Date() } = {}) {
   const reasons = [];
   let score = 0;
+  // Which criteria earned full marks (a blank one counts) — for "near" matches.
+  const hits = { location: false, budget: false, bhk: false };
 
   // Location — the listing's own area, or any area it is also in.
   const wanted = expandAreas(lead.localities ?? []).map(norm);
   if (!wanted.length) {
     score += WEIGHTS.location;
+    hits.location = true;
   } else {
     const where = [listing.area, ...(listing.nearby_areas ?? [])].map(norm).filter(Boolean);
     if (where.some((w) => wanted.includes(w))) {
       score += WEIGHTS.location;
+      hits.location = true;
       reasons.push(listing.area);
     }
   }
@@ -69,9 +73,11 @@ export function scoreLeadMatch(listing, lead, { today = new Date() } = {}) {
   const hi = num(lead.budget_max);
   if (lo == null && hi == null) {
     score += WEIGHTS.budget;
+    hits.budget = true;
   } else if (rent != null) {
     if ((lo == null || rent >= lo * 0.9) && (hi == null || rent <= hi)) {
       score += WEIGHTS.budget;
+      hits.budget = true;
       reasons.push("In budget");
     } else if (hi != null && rent <= hi * 1.1) {
       score += Math.round(WEIGHTS.budget / 2);
@@ -84,10 +90,12 @@ export function scoreLeadMatch(listing, lead, { today = new Date() } = {}) {
   const wantNames = (lead.flat_types ?? []).map(norm);
   if (!wantNames.length) {
     score += WEIGHTS.bhk;
+    hits.bhk = true;
   } else {
     const beds = listingBedrooms(listing);
     if (wantNames.includes(norm(listing.flat_type)) || (beds != null && wantBeds.includes(beds))) {
       score += WEIGHTS.bhk;
+      hits.bhk = true;
       reasons.push(listing.flat_type || `${beds} BHK`);
     } else if (beds != null && wantBeds.some((b) => Math.abs(b - beds) === 1)) {
       score += Math.round(WEIGHTS.bhk / 3);
@@ -115,7 +123,7 @@ export function scoreLeadMatch(listing, lead, { today = new Date() } = {}) {
     score += soon ? WEIGHTS.availability : Math.round(WEIGHTS.availability / 2);
   }
 
-  return { score: Math.min(100, score), reasons };
+  return { score: Math.min(100, score), reasons, hits };
 }
 
 /** The flats matching one lead, best first. None for a lead with no requirement. */

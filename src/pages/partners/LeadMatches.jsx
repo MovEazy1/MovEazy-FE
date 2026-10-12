@@ -19,6 +19,7 @@ import { EMPTY_FILTERS, activeFilterCount, applyFilters } from "../../lib/partne
 import { createCuratedList, curatedMessage, curatedUrl } from "../../lib/partnerCurated";
 import { DemoListPreview, useMatchPool } from "./AiMatcher";
 import { DEMO_LEADS, DemoBanner } from "./demoMode";
+import { useMatcherData } from "./matcherData";
 
 const SORTS = [["match", "Best match"], ["rent", "Rent: low to high"], ["brokerage", "Brokerage: high to low"]];
 const PRESELECT = 10;
@@ -39,7 +40,10 @@ export default function LeadMatches() {
   const [sent, setSent] = useState(null);
   const send = useSendToLead(lead || { id, name: "", phone: "" });
 
-  const all = useMemo(() => (lead ? matchesForLead(lead, pool) : []), [lead, pool]);
+  // Never a flat they've already been sent or seen (lib/partnerMatcher.js).
+  const md = useMatcherData();
+  const seen = useMemo(() => new Set(md.seen[`lead:${id}`] ?? []), [md.seen, id]);
+  const all = useMemo(() => (lead ? matchesForLead(lead, pool.filter((l) => !seen.has(l.property_id))) : []), [lead, pool, seen]);
   const rows = useMemo(() => {
     const keep = new Set(applyFilters(all.map((m) => m.listing), filters).map((l) => l.property_id));
     const list = all.filter((m) => keep.has(m.listing.property_id));
@@ -50,9 +54,9 @@ export default function LeadMatches() {
 
   // The best ten, picked for them the first time matches arrive.
   useEffect(() => {
-    if (picked || !all.length) return;
+    if (picked || !all.length || (!demo && !md.loaded)) return;
     setPicked(new Set(all.slice(0, PRESELECT).map((m) => m.listing.property_id)));
-  }, [all, picked]);
+  }, [all, picked, demo, md.loaded]);
 
   if (!lead) return <><TopBar title="AI matching" back={pp("/leads")} />{leads.length ? <Empty>Lead not found.</Empty> : <Loading />}</>;
 
@@ -71,6 +75,7 @@ export default function LeadMatches() {
       const ordered = all.map((m) => m.listing.property_id).filter((pid) => picked.has(pid));
       const r = await createCuratedList(lead.id, ordered);
       setSent(r);
+      md.reload();
     } catch (e) {
       toast(friendlyError(e, "Could not make the list."), "error");
     } finally {

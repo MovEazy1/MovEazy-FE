@@ -1,7 +1,11 @@
 /**
  * AI Property Matcher — every home the broker can see, matched against every
- * client at once. Each client gets a ready shortlist (the best ten); one tap
- * turns it into a curated list and sends it (lib/partnerCurated.js).
+ * client at once: their own clients and the MovEazy tenants assigned to them.
+ * Fresh tenants (never sent a list) get a ready shortlist of ten, one tap to
+ * send. Existing ones open their own page (MatcherTenant.jsx): what they liked,
+ * visits, and ten more. A flat is never suggested twice — not one this broker
+ * sent, one the same tenant swiped on any partner's list, or one they turned
+ * down on MovEazy (lib/partnerMatcher.js).
  *
  * It is the headline feature, so it works without a plan too: in demo mode the
  * sample clients (and the partner's own) are matched against what they can
@@ -13,18 +17,23 @@
  */
 import { useEffect, useMemo, useRef, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
-import { Bell, Check, ChevronRight, Crown, Heart, MapPin, RefreshCw, Sparkles, WandSparkles, X } from "lucide-react";
+import { Bell, CalendarClock, Check, ChevronRight, Crown, Heart, MapPin, RefreshCw, Sparkles, WandSparkles, X } from "lucide-react";
 import { usePartner } from "./PartnerApp";
 import { Avatar, Empty, Loading, Sheet, TopBar, toast } from "./partnerUi";
 import { SmartListingImage } from "./partnerMedia";
 import ShareOptions from "./ShareOptions";
 import { requirementLine } from "./leadBits";
 import { DEMO_COUNTS, DEMO_LEADS, DemoBanner, demoHomesFor, demoRows } from "./demoMode";
+import { useMatcherData } from "./matcherData";
+import logo from "../../assets/logo/moveazy-logo-mint-dark.png";
 import { bhkLabel, friendlyError, inr, pp } from "../../lib/partners";
-import { hasRequirement, matchesForLead } from "../../lib/partnerMatch";
-import { createCuratedList, curatedMessage, curatedUrl, fetchMyCuratedLists } from "../../lib/partnerCurated";
+import { hasRequirement } from "../../lib/partnerMatch";
+import { curatedMessage, curatedUrl } from "../../lib/partnerCurated";
+import {
+  FRESH_COUNT, freshPicks, keyToSlug, likedFlats, listsFor, matcherTenants, sendCuratedTo, splitTenants,
+} from "../../lib/partnerMatcher";
 
-const TOP = 10;
+const TOP = FRESH_COUNT;
 
 /**
  * What the matcher can pick from: the partner's inventory — or in demo mode,
@@ -43,21 +52,45 @@ export function useMatchPool(forLeads = [], seed = 0) {
   }, [inventory, demo, forLeads, seed]);
 }
 
-/** Every active client with a requirement, and their best matches. */
-function useShortlists(seed = 0) {
-  const { leads, demo } = usePartner();
-  const clients = useMemo(() => (demo ? [...leads, ...DEMO_LEADS] : leads).filter((l) => l.status !== "closed"), [leads, demo]);
-  const pool = useMatchPool(clients, seed);
+/**
+ * Every tenant the matcher works on, each with their next ten: never a flat in
+ * their "seen" set. In demo mode the broker's own (and sample) clients are
+ * matched against sample homes; MovEazy tenants are real, against real flats.
+ */
+export function useMatcherRows(seed = 0) {
+  const { leads, inventory, demo } = usePartner();
+  const md = useMatcherData();
+  const own = useMemo(() => (demo ? [...leads, ...DEMO_LEADS] : leads), [leads, demo]);
+  const tenants = useMemo(() => matcherTenants(own, md.assigned), [own, md.assigned]);
+  const ownTenants = useMemo(() => tenants.filter((t) => t.kind === "own"), [tenants]);
+  const demoPool = useMatchPool(ownTenants, seed);
   return useMemo(() => {
-    const ready = clients.filter(hasRequirement).map((lead) => {
-      // In demo mode each client is ranked against the sample homes made for them.
-      const matches = matchesForLead(lead, demo ? pool.filter((h) => h.for_lead === lead.id) : pool);
-      return { lead, matches, top: matches.slice(0, TOP) };
-    }).sort((a, b) => b.top.length - a.top.length);
-    // In demo mode the scale is the one a plan unlocks, not the handful of samples on screen.
-    const homes = demo ? DEMO_COUNTS.moveazy + DEMO_COUNTS.broker + DEMO_COUNTS.group : pool.length;
-    return { ready, needs: clients.filter((l) => !hasRequirement(l)), homes };
-  }, [clients, pool, demo]);
+    const rows = tenants.map((t) => {
+      const pool = demo && t.kind === "own" ? demoPool.filter((h) => h.for_lead === t.id) : (inventory ?? []);
+      const lists = listsFor(t, md.lists);
+      return { lead: t, lists, ...freshPicks(t, pool, new Set(md.seen[t.key] ?? [])) };
+    });
+    const { fresh, existing } = splitTenants(tenants, md.lists);
+    const byKey = new Map(rows.map((r) => [r.lead.key, r]));
+    const homes = demo ? DEMO_COUNTS.moveazy + DEMO_COUNTS.broker + DEMO_COUNTS.group : (inventory ?? []).length;
+    return {
+      rows,
+      byKey,
+      fresh: fresh.map((t) => byKey.get(t.key)).filter((r) => hasRequirement(r.lead) || r.lead.kind === "moveazy")
+        .sort((x, y) => (y.lead.kind === "moveazy") - (x.lead.kind === "moveazy") || y.picks.length - x.picks.length),
+      existing: existing.map((t) => byKey.get(t.key))
+        .sort((x, y) => String(y.lists[0]?.created_at).localeCompare(String(x.lists[0]?.created_at))),
+      needs: fresh.filter((t) => t.kind === "own" && !hasRequirement(t)),
+      homes,
+      loaded: md.loaded && inventory != null,
+      md,
+    };
+  }, [tenants, demo, demoPool, inventory, md]);
+}
+
+/** The MovEazy mark on a tenant MovEazy gave them. */
+export function MzBadge() {
+  return <span className="aim-mz" title="A MovEazy tenant"><img src={logo} alt="MovEazy" /></span>;
 }
 
 const RUN_STEPS = (clients, homes) => [
@@ -102,8 +135,9 @@ function MatcherRun({ clients, homes, onDone }) {
 /** The card on the home screen; `compact` is the slim sticky bar it becomes on scroll. */
 export function AiMatcherCard({ compact = false }) {
   const navigate = useNavigate();
-  const { ready, homes } = useShortlists(0);
-  const matched = ready.filter((r) => r.top.length).length;
+  const { rows, homes } = useMatcherRows(0);
+  const ready = rows.filter((r) => hasRequirement(r.lead));
+  const matched = ready.filter((r) => r.picks.length).length;
   const go = () => navigate(pp("/ai-matcher"));
   if (compact) {
     return (
@@ -207,32 +241,24 @@ export function DemoListPreview({ lead, homes, onClose }) {
 
 export default function AiMatcher() {
   const navigate = useNavigate();
-  const { me, inventory, demo } = usePartner();
+  const { me, demo } = usePartner();
   const [seed, setSeed] = useState(0);
   const [running, setRunning] = useState(true);
-  const { ready, needs, homes } = useShortlists(seed);
-  const rerun = () => { if (demo) setSeed((s) => s + 1); setRunning(true); window.scrollTo(0, 0); };
-  const [sent, setSent] = useState({}); // lead id → latest list
+  const [tab, setTab] = useState("fresh");
+  const { fresh, existing, needs, homes, loaded, md } = useMatcherRows(seed);
+  const rerun = () => { if (demo) setSeed((x) => x + 1); setRunning(true); window.scrollTo(0, 0); };
   const [busy, setBusy] = useState("");
   const [share, setShare] = useState(null);
   const [preview, setPreview] = useState(null);
-
-  useEffect(() => {
-    if (demo) return;
-    fetchMyCuratedLists().then((lists) => {
-      const by = {};
-      for (const l of lists) if (l.lead_id && !by[l.lead_id]) by[l.lead_id] = l;
-      setSent(by);
-    }, () => {});
-  }, [demo]);
+  const scanned = fresh.length + existing.length;
 
   const send = async (r) => {
-    if (demo || r.lead.demo) { setPreview(r); return; }
-    setBusy(r.lead.id);
+    if (r.lead.demo || (demo && r.lead.kind === "own")) { setPreview(r); return; }
+    setBusy(r.lead.key);
     try {
-      const list = await createCuratedList(r.lead.id, r.top.map((m) => m.listing.property_id));
-      setSent((s) => ({ ...s, [r.lead.id]: { ...list, created_at: new Date().toISOString(), open_count: 0, actions: {} } }));
+      const list = await sendCuratedTo(r.lead, r.picks.map((m) => m.listing.property_id));
       setShare({ lead: r.lead, list });
+      md.reload();
     } catch (e) {
       toast(friendlyError(e, "Could not make the list."), "error");
     } finally {
@@ -240,63 +266,104 @@ export default function AiMatcher() {
     }
   };
 
+  const freshRow = (r, i) => (
+    <div key={`${r.lead.key}-${seed}`} className="aim-row" style={{ animationDelay: `${Math.min(i, 8) * 70}ms` }}>
+      <div className="pz-row" style={{ alignItems: "flex-start" }}>
+        <Avatar name={r.lead.name} />
+        <div style={{ flex: 1, minWidth: 0 }}>
+          <strong style={{ display: "block", fontSize: 15.5 }}>
+            {r.lead.name}{r.lead.kind === "moveazy" && <MzBadge />}
+            {r.lead.demo && <span className="pz-pill pz-pill--grey" style={{ marginLeft: 6, fontSize: 10.5 }}>Sample</span>}
+          </strong>
+          <span className="pz-meta">{[requirementLine(r.lead), (r.lead.localities ?? []).join(", ")].filter(Boolean).join(" · ") || "No requirement from MovEazy yet"}</span>
+        </div>
+        <span className="aim-count">{r.total}<small>matches</small></span>
+      </div>
+      {r.picks.length > 0 && (
+        <div className="aim-thumbs">
+          {r.picks.slice(0, 5).map((m) => <div key={m.listing.property_id} className="aim-th"><SmartListingImage listing={m.listing} thumb /><i>{m.score}</i></div>)}
+          {r.picks.length > 5 && <div className="aim-more">+{r.picks.length - 5}</div>}
+        </div>
+      )}
+      {r.near > 0 && <p className="aim-last">{r.near} of these {r.near === 1 ? "is a near match" : "are near matches"} — their area or BHK, a little off on the rest.</p>}
+      <div className="pz-actions" style={{ gridTemplateColumns: "1fr auto" }}>
+        <button type="button" className="pz-btn pz-btn--ai" disabled={!r.picks.length || busy === r.lead.key} onClick={() => send(r)}>
+          <Sparkles size={16} /> {busy === r.lead.key ? "Making the list…" : r.picks.length ? `Send shortlist · ${r.picks.length}` : "No matches yet"}
+        </button>
+        <button type="button" className="pz-btn"
+          onClick={() => navigate(pp(r.lead.kind === "moveazy" ? `/ai-matcher/${keyToSlug(r.lead.key)}` : `/leads/${r.lead.id}/matches`))}>
+          Review
+        </button>
+      </div>
+    </div>
+  );
+
+  const existingRow = (r, i) => {
+    const last = r.lists[0];
+    const liked = likedFlats(r.lists).length;
+    const visits = md.visits.filter((v) => (r.lead.kind === "moveazy" ? v.assignment_id === r.lead.assignment_id : v.lead_id === r.lead.lead_id)).length;
+    return (
+      <Link key={r.lead.key} to={pp(`/ai-matcher/${keyToSlug(r.lead.key)}`)} className="aim-row aim-ex"
+        style={{ animationDelay: `${Math.min(i, 8) * 50}ms` }}>
+        <Avatar name={r.lead.name} />
+        <span style={{ flex: 1, minWidth: 0 }}>
+          <strong style={{ display: "block", fontSize: 15.5 }}>{r.lead.name}{r.lead.kind === "moveazy" && <MzBadge />}</strong>
+          <span className="pz-meta" style={{ display: "block" }}>
+            {r.lists.length} list{r.lists.length === 1 ? "" : "s"} · last {new Date(last.created_at).toLocaleDateString("en-IN", { day: "numeric", month: "short" })}
+            {last.open_count ? "" : " · not opened yet"}
+          </span>
+          <span className="aim-ex-stats">
+            <span className={liked ? "on" : ""}><Heart size={13} fill={liked ? "currentColor" : "none"} /> {liked} liked</span>
+            {visits > 0 && <span className="on"><CalendarClock size={13} /> {visits} visit{visits === 1 ? "" : "s"}</span>}
+            <span>{r.picks.length ? `${r.picks.length} new to send` : "nothing new right now"}</span>
+          </span>
+        </span>
+        <ChevronRight size={18} color="var(--dim)" />
+      </Link>
+    );
+  };
+
   return (
     <>
       <TopBar title="AI Property Matcher" back />
       <style>{CSS}</style>
       <div className="pz-pad">
-        {demo && <DemoBanner>Sample clients and homes — try it, then send for real with Premium.</DemoBanner>}
+        {demo && <DemoBanner>Sample clients and homes — try it, then send for real with Premium. MovEazy tenants given to you are real, and you can send them lists now.</DemoBanner>}
         <div className="aim-hero">
           <span className="aim-ic sm"><WandSparkles size={18} /></span>
           <div>
-            <b>{homes.toLocaleString("en-IN")} homes scanned for {ready.length} client{ready.length === 1 ? "" : "s"}</b>
-            <span>The best {TOP} for each, ranked on budget, area, BHK and furnishing. Send each client their own list — they swipe, you see every like and skip.</span>
+            <b>{homes.toLocaleString("en-IN")} homes scanned for {scanned} tenant{scanned === 1 ? "" : "s"}</b>
+            <span>The best {TOP} for each, ranked on budget, area, BHK and furnishing — never a flat they’ve already seen or turned down. They swipe, you see every like.</span>
           </div>
         </div>
 
-        {!inventory ? <Loading label="Matching…" /> : running && ready.length > 0 ? (
-          <MatcherRun clients={ready.length} homes={homes} onDone={() => setRunning(false)} />
-        ) : ready.length === 0 ? (
-          <Empty action={<Link className="pz-btn pz-btn--primary" to={pp("/leads/new")}>Add a client</Link>}>
-            Add a client with a budget, area or BHK and the matcher builds their shortlist.
-          </Empty>
-        ) : ready.map((r) => {
-          const last = sent[r.lead.id];
-          const liked = last ? Object.values(last.actions || {}).filter((a) => a.action === "liked").length : 0;
-          return (
-            <div key={`${r.lead.id}-${seed}`} className="aim-row" style={{ animationDelay: `${Math.min(ready.indexOf(r), 8) * 70}ms` }}>
-              <div className="pz-row" style={{ alignItems: "flex-start" }}>
-                <Avatar name={r.lead.name} />
-                <div style={{ flex: 1, minWidth: 0 }}>
-                  <strong style={{ display: "block", fontSize: 15.5 }}>{r.lead.name}{r.lead.demo && <span className="pz-pill pz-pill--grey" style={{ marginLeft: 6, fontSize: 10.5 }}>Sample</span>}</strong>
-                  <span className="pz-meta">{[requirementLine(r.lead), (r.lead.localities ?? []).join(", ")].filter(Boolean).join(" · ")}</span>
-                </div>
-                <span className="aim-count">{r.matches.length}<small>matches</small></span>
-              </div>
-              {r.top.length > 0 && (
-                <div className="aim-thumbs">
-                  {r.top.slice(0, 5).map((m) => <div key={m.listing.property_id} className="aim-th"><SmartListingImage listing={m.listing} thumb /><i>{m.score}</i></div>)}
-                  {r.top.length > 5 && <div className="aim-more">+{r.top.length - 5}</div>}
-                </div>
-              )}
-              {last && <p className="aim-last">Last list {new Date(last.created_at).toLocaleDateString("en-IN", { day: "numeric", month: "short" })} · {last.open_count ? `opened · ${liked} liked` : "not opened yet"}{last.id && <Link to={pp(`/curated/${last.id}`)}> · see responses</Link>}</p>}
-              <div className="pz-actions" style={{ gridTemplateColumns: "1fr auto" }}>
-                <button type="button" className="pz-btn pz-btn--ai" disabled={!r.top.length || busy === r.lead.id} onClick={() => send(r)}>
-                  <Sparkles size={16} /> {busy === r.lead.id ? "Making the list…" : r.top.length ? `Send shortlist · ${r.top.length}` : "No matches yet"}
-                </button>
-                <button type="button" className="pz-btn" onClick={() => navigate(pp(`/leads/${r.lead.id}/matches`))}>Review</button>
-              </div>
-            </div>
-          );
-        })}
+        <div className="aim-tabs" role="tablist">
+          {[["fresh", "Fresh leads", fresh.length], ["existing", "Existing leads", existing.length]].map(([k, label, n]) => (
+            <button key={k} type="button" role="tab" aria-selected={tab === k} className={tab === k ? "on" : ""} onClick={() => setTab(k)}>
+              {label} <span>{n}</span>
+            </button>
+          ))}
+        </div>
 
-        {!running && ready.length > 0 && (
+        {!loaded ? <Loading label="Matching…" /> : running && fresh.length + existing.length > 0 ? (
+          <MatcherRun clients={fresh.length + existing.length} homes={homes} onDone={() => setRunning(false)} />
+        ) : tab === "fresh" ? (
+          fresh.length === 0 ? (
+            <Empty action={<Link className="pz-btn pz-btn--primary" to={pp("/leads/new")}>Add a client</Link>}>
+              {existing.length ? "Everyone has had a list — open Existing leads to send more." : "Add a client with a budget, area or BHK and the matcher builds their shortlist."}
+            </Empty>
+          ) : fresh.map(freshRow)
+        ) : existing.length === 0 ? (
+          <Empty>No lists sent yet. Send one from Fresh leads — the tenant then shows up here, with every like.</Empty>
+        ) : existing.map(existingRow)}
+
+        {!running && tab === "fresh" && fresh.length > 0 && (
           <button type="button" className="pz-btn pz-btn--ai pz-btn--block" style={{ marginTop: 4 }} onClick={rerun}>
             <RefreshCw size={16} /> Run AI matcher again
           </button>
         )}
 
-        {needs.length > 0 && (
+        {tab === "fresh" && needs.length > 0 && (
           <div className="pz-section" style={{ marginTop: 12 }}>
             <h2>Need a requirement ({needs.length})</h2>
             {needs.slice(0, 8).map((l) => (
@@ -308,20 +375,27 @@ export default function AiMatcher() {
         )}
       </div>
 
-      {preview && <DemoListPreview lead={preview.lead} homes={preview.top.map((m) => m.listing)} onClose={() => setPreview(null)} />}
-      {share && (
-        <Sheet title={`Send to ${share.lead.no_name ? "your client" : share.lead.name.split(" ")[0]}`} onClose={() => setShare(null)}>
-          <div className="pz-pad">
-            <p className="pz-meta" style={{ margin: "0 0 14px" }}>{share.list.count} homes. You’ll hear when they open it, every like, and a summary when they finish.</p>
-            <ShareOptions url={curatedUrl(share.list.token)} phone={share.lead.phone}
-              message={curatedMessage(share.list.token, { leadName: share.lead.no_name ? "" : share.lead.name, count: share.list.count, brokerName: me?.partner?.name })}
-              post={`${share.list.count} verified rental homes picked for you — swipe and tap ♥ on the ones you like.`} />
-          </div>
-        </Sheet>
-      )}
+      {preview && <DemoListPreview lead={preview.lead} homes={preview.picks.map((m) => m.listing)} onClose={() => setPreview(null)} />}
+      {share && <ShareListSheet lead={share.lead} list={share.list} brokerName={me?.partner?.name} onClose={() => setShare(null)} />}
     </>
   );
 }
+
+/** After sending: the link, on WhatsApp or anywhere. */
+export function ShareListSheet({ lead, list, brokerName, onClose }) {
+  return (
+    <Sheet title={`Send to ${lead.no_name ? "your client" : String(lead.name || "your client").split(" ")[0]}`} onClose={onClose}>
+      <div className="pz-pad">
+        <p className="pz-meta" style={{ margin: "0 0 14px" }}>{list.count} homes. You’ll hear when they open it, every like, and a summary when they finish.</p>
+        <ShareOptions url={curatedUrl(list.token)} phone={lead.phone}
+          message={curatedMessage(list.token, { leadName: lead.no_name ? "" : lead.name, count: list.count, brokerName })}
+          post={`${list.count} verified rental homes picked for you — swipe and tap ♥ on the ones you like.`} />
+      </div>
+    </Sheet>
+  );
+}
+
+export const MATCHER_CSS = () => CSS;
 
 const CSS = `
 .aim-card { width: 100%; display: flex; align-items: center; gap: 12px; text-align: left; padding: 14px; border-radius: 18px; cursor: pointer;
@@ -398,4 +472,16 @@ const CSS = `
 .dlp-n.done, .dlp-n.opened { background: var(--ail); border-color: #CFE3D8; color: var(--ai2); }
 .dlp-n b { display: block; font-size: 13.5px; color: var(--ink); }
 .dlp-n small { display: block; font-size: 12px; color: var(--dim); margin-top: 1px; }
+.aim-mz { display: inline-flex; align-items: center; vertical-align: middle; margin-left: 6px; padding: 3px 7px; border-radius: 99px; background: #0B0B0F; }
+.aim-mz img { height: 10px; width: auto; display: block; }
+.aim-tabs { display: flex; gap: 4px; padding: 4px; margin: 0 0 12px; border-radius: 12px; background: var(--bg); border: 1px solid var(--line); }
+.aim-tabs button { flex: 1; padding: 9px 6px; border: 0; border-radius: 9px; font: inherit; font-weight: 700; font-size: 14px; cursor: pointer;
+  background: transparent; color: var(--dim); }
+.aim-tabs button span { display: inline-block; min-width: 20px; margin-left: 4px; padding: 1px 6px; border-radius: 99px; font-size: 12px; background: var(--line); color: var(--ink); }
+.aim-tabs button.on { background: #C62828; color: #fff; box-shadow: 0 0 0 2px var(--gold); }
+.aim-tabs button.on span { background: #fff; color: #C62828; }
+.aim-ex { display: flex; align-items: center; gap: 12px; color: inherit; text-decoration: none; }
+.aim-ex-stats { display: flex; flex-wrap: wrap; gap: 4px 12px; margin-top: 4px; font-size: 12.5px; color: var(--dim); }
+.aim-ex-stats > span { display: inline-flex; align-items: center; gap: 4px; }
+.aim-ex-stats .on { color: #E11D48; font-weight: 700; }
 `;

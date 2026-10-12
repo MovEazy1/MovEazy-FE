@@ -68,6 +68,7 @@ const WelcomePremium = lazy(() => import("./PremiumJourney").then((m) => ({ defa
 const ReferralsPage = lazy(() => import("./PremiumJourney").then((m) => ({ default: m.ReferralsPage })));
 const SalesFunnel = lazy(() => import("./SalesFunnel"));
 const AiMatcher = lazy(() => import("./AiMatcher"));
+const MatcherTenant = lazy(() => import("./MatcherTenant"));
 const Insights = lazy(() => import("./Insights"));
 const BuildingLeads = lazy(() => import("./BuildingLeads"));
 const NotificationsPage = lazy(() => import("./PartnerInbox").then((m) => ({ default: m.NotificationsPage })));
@@ -282,6 +283,7 @@ function PartnerWorkspace({ me, reloadMe }) {
             <Route path="referrals" element={<ReferralsPage />} />
             <Route path="notifications" element={<NotificationsPage />} />
             <Route path="ai-matcher" element={<AiMatcher />} />
+            <Route path="ai-matcher/:slug" element={<MatcherTenant />} />
             <Route path="insights" element={<Insights />} />
             <Route path="building-leads" element={<BuildingLeads />} />
             <Route path="curated/:id" element={<CuratedListPage />} />

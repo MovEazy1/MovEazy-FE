@@ -38,7 +38,8 @@ export default function CuratedSwipe() {
       if (!d) return;
       let local = false;
       try { local = localStorage.getItem(seenKey(token)) === "1"; } catch { /* private tab */ }
-      setContact(Boolean(d.has_contact && local));
+      // A MovEazy tenant's list (`known`) needs no number: MovEazy already has it.
+      setContact(Boolean((d.has_contact && local) || d.known));
       const done = Object.fromEntries((d.homes || []).filter((h) => h.action).map((h) => [h.property_id, h.action]));
       setActs(done);
       const first = (d.homes || []).findIndex((h) => !h.action);
