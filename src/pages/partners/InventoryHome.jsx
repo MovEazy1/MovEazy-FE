@@ -24,6 +24,7 @@ import { NotificationBell } from "./PartnerInbox";
 import { AiMatcherCard } from "./AiMatcher";
 import { MoveazyLeadsCard } from "./MoveazyLeadsPromo";
 import VisitsToday from "./VisitsToday";
+import { TrialBanner } from "./TrialPremium";
 import { customerMessage, hasPremium, inSource, listerWhatsApp, pp, waLink } from "../../lib/partners";
 import { BHK_CHIPS, BROKERAGE_CHIPS, EMPTY_FILTERS, activeFilterCount, applyFilters } from "../../lib/partnerFilters";
 
@@ -232,6 +233,7 @@ export default function InventoryHome() {
       <div className="pz-pad pz-list">
         {planActive && !status?.profile?.completed_at && <CompleteProfileCard onDone={reloadStatus} />}
         {gold && <PremiumCard me={me} status={status} />}
+        <TrialBanner trial={status?.trial} />
         <VisitsToday />
         <MoveazyLeadsCard me={me} />
         <div ref={aiRef}><AiMatcherCard /></div>

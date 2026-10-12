@@ -32,6 +32,7 @@ export default function PremiumPage() {
   const [busy, setBusy] = useState(false);
   const [manual, setManual] = useState(null);
   const active = status?.plan?.active;
+  const trial = status?.trial;
   const until = status?.plan?.until ? new Date(status.plan.until).toLocaleDateString("en-IN", { day: "numeric", month: "short", year: "numeric" }) : "";
 
   useEffect(() => {
@@ -67,8 +68,10 @@ export default function PremiumPage() {
       <div className="pz-pad jp">
         <div className="jp-hero">
           <span className="jp-crown"><Crown size={26} /></span>
-          <h2>{active ? "You're on Premium" : "Become a MovEazy Premium Partner"}</h2>
-          <p>{active ? `Active until ${until}. Add more time below — it starts when your current plan ends.` : `Everything unlocked. You keep ${me?.property_share ?? s.propertyShare}% of the brokerage on MovEazy properties.`}</p>
+          <h2>{active ? "You're on Premium" : trial?.active ? `You're on Trial Premium · ${trial.days_left} day${trial.days_left === 1 ? "" : "s"} left` : "Become a MovEazy Premium Partner"}</h2>
+          <p>{active ? `Active until ${until}. Add more time below — it starts when your current plan ends.`
+            : trial?.active ? "Take Premium now and keep everything after the trial — plus unlimited MovEazy leads. Your remaining trial days are added on at the end."
+              : `Everything unlocked. You keep ${me?.property_share ?? s.propertyShare}% of the brokerage on MovEazy properties.`}</p>
         </div>
 
         {!plans ? <Loading label="Loading plans…" /> : plans.length === 0 ? (

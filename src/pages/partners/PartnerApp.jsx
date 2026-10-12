@@ -69,6 +69,7 @@ const ReferralsPage = lazy(() => import("./PremiumJourney").then((m) => ({ defau
 const SalesFunnel = lazy(() => import("./SalesFunnel"));
 const AiMatcher = lazy(() => import("./AiMatcher"));
 const MatcherTenant = lazy(() => import("./MatcherTenant"));
+const TrialPopups = lazy(() => import("./TrialPremium").then((m) => ({ default: m.TrialPopups })));
 const Insights = lazy(() => import("./Insights"));
 const BuildingLeads = lazy(() => import("./BuildingLeads"));
 const NotificationsPage = lazy(() => import("./PartnerInbox").then((m) => ({ default: m.NotificationsPage })));
@@ -297,6 +298,7 @@ function PartnerWorkspace({ me, reloadMe }) {
         {showBar && <JoinPremiumBar />}
         {plusOpen && <CreateSheet onClose={() => setPlusOpen(false)} />}
         <PremiumExplainer what={explaining} onClose={() => setExplaining(null)} />
+        {settled && status?.trial && <Suspense fallback={null}><TrialPopups trial={status.trial} onSeen={reloadStatus} /></Suspense>}
       </div>
     </PartnerContext.Provider>
   );

@@ -17,6 +17,7 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import { Btn, C, Chip, Empty, Toast, shortDate } from "./crmUi";
 import CrmProgramSettings from "./CrmProgramSettings";
 import CrmBrokerQr from "./CrmBrokerQr";
+import CrmTrialPanel from "./CrmTrialPanel";
 import { useLandingSettings } from "../../lib/landingSettings";
 import { SCOPES } from "../../lib/adminScopes";
 import { whatsappUrl } from "../../lib/crmSettings";
@@ -121,6 +122,7 @@ export default function CrmPartnersSection({ access }) {
           </span>
         </div>
         {pricing && <CrmProgramSettings canManage={canManage} onToast={showToast} onSaved={setSavedProgram} />}
+        <CrmTrialPanel canManage={canManage} onToast={showToast} onChanged={load} />
         <span className="crm-mute" style={{ fontSize: 11.5 }}>
           Partner app: <a href={partnerUrl} target="_blank" rel="noreferrer" style={{ color: C.accent }}>{partnerUrl.replace("https://", "")}</a>
           {" "}(also at moveazy.co.in/partners). Premium is granted by hand here until online payment is live.
@@ -163,7 +165,11 @@ export default function CrmPartnersSection({ access }) {
                   <td className="crm-mute crm-num">{shortDate(r.created_at)}</td>
                   <td className="crm-num">{r.listing_count}</td>
                   <td className="crm-num">{r.group_count}</td>
-                  <td className="crm-num">{r.premium_until ? `until ${shortDate(r.premium_until)}` : <span className="crm-mute">—</span>}</td>
+                  <td className="crm-num">
+                    {r.premium_until ? `until ${shortDate(r.premium_until)}`
+                      : r.trial_until ? <span style={{ color: C.gold, fontWeight: 600 }}>Trial · until {shortDate(r.trial_until)}</span>
+                        : <span className="crm-mute">—</span>}
+                  </td>
                   <td className="crm-num">
                     <button type="button" disabled={!canManage || !!busy}
                       title={canManage ? "Change this broker's share on MovEazy clients" : ""}

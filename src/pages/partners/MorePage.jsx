@@ -79,8 +79,11 @@ export default function MorePage() {
           {row(pp("/ai-matcher"), <WandSparkles size={19} color="#6B4EFF" />, "AI Property Matcher", "A shortlist for every client")}
           {row(pp("/qr"), <QrCode size={19} color="var(--g)" />, "My QR poster", "Print it · see who viewed and liked your flats")}
           {row(pp("/building-leads"), <Building2 size={19} color="var(--g)" />, "Building visits", "Owner properties MovEazy assigned to you")}
-          {row(pp("/premium"), <Crown size={19} color="#8A6419" />, premium ? "MovEazy Premium — active" : "Join Premium",
-            premium ? `Plans${status?.plan?.until ? ` · till ${new Date(status.plan.until).toLocaleDateString("en-IN", { day: "numeric", month: "short" })}` : ""}` : "Unlock 1000+ listings, AI matching and groups")}
+          {status?.trial?.active && !status?.plan?.active
+            ? row(pp("/premium"), <Crown size={19} color="#8A6419" />, "Trial Premium — active",
+              `${status.trial.days_left} day${status.trial.days_left === 1 ? "" : "s"} left · take Premium to keep it`)
+            : row(pp("/premium"), <Crown size={19} color="#8A6419" />, premium ? "MovEazy Premium — active" : "Join Premium",
+              premium ? `Plans${status?.plan?.until ? ` · till ${new Date(status.plan.until).toLocaleDateString("en-IN", { day: "numeric", month: "short" })}` : ""}` : "Unlock 1000+ listings, AI matching and groups")}
           {premium && row(pp("/referrals"), <Gift size={19} color="#8A6419" />, "Refer & Earn ₹1,500", "Per broker who joins with your link")}
           {row(pp("/saved"), <Bookmark size={19} />, "Saved properties", `${saved.size} saved`)}
           {row(`${MOVEAZY_TEAM_WHATSAPP}?text=${encodeURIComponent("Hi MovEazy, I need help with the partner app.")}`,

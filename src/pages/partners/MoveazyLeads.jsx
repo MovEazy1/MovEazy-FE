@@ -388,7 +388,9 @@ export default function MoveazyLeads({ me: meProp = null, onAssigned = null }) {
           <Link to={pp("/premium")} className="pz-card" style={{ display: "flex", gap: 12, alignItems: "center", padding: 14, marginBottom: 10, color: "inherit", textDecoration: "none" }}>
             <span className="pz-avatar" style={{ background: "var(--noir)", color: "#D4A437" }}><Crown size={18} /></span>
             <span style={{ flex: 1 }}><strong style={{ display: "block" }}>Unlimited with Premium</strong>
-              <span className="pz-hint">No upfront cost for leads — pay MovEazy only when one closes.</span></span>
+              <span className="pz-hint">{ctx?.status?.trial?.active
+                ? "Your Trial Premium covers everything else — unlimited leads come with paid Premium. No upfront cost for them: pay MovEazy only when one closes."
+                : "No upfront cost for leads — pay MovEazy only when one closes."}</span></span>
             <span className="pz-btn pz-btn--sm" style={{ flex: "none" }}>See Premium</span>
           </Link>
         </>
