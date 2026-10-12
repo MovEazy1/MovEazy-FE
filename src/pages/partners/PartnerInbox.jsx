@@ -5,7 +5,8 @@
  */
 import { useEffect, useMemo, useState } from "react";
 import { Link, useNavigate, useParams } from "react-router-dom";
-import { AlertCircle, Bell, Building2, CalendarCheck, CalendarClock, Crown, Gift, Heart, Home, MapPin, Sparkles, ThumbsDown, Users } from "lucide-react";
+import { AlarmClock, AlertCircle, Bell, Building2, CalendarCheck, CalendarClock, Crown, Gift, Heart, Home, MapPin, Sparkles, ThumbsDown, Users } from "lucide-react";
+import { fireReminders } from "../../lib/partnerTenants";
 import { usePartner } from "./PartnerApp";
 import { Empty, Loading, TopBar, WhatsAppIcon, toast } from "./partnerUi";
 import { SmartListingImage } from "./partnerMedia";
@@ -21,7 +22,7 @@ const ago = (iso) => {
 };
 const ICON = { tenant_liked: Heart, storefront_like: Heart, sold_out_request: Home, sold_out_decided: Home, list_opened: Sparkles, list_done: Sparkles,
   building_visit: CalendarCheck, building_assigned: Building2, location_request: MapPin, location_decided: MapPin,
-  leads_assigned: Users, lead_request: Users, visit_reminder: CalendarClock, referral: Gift, plan_approved: Crown, plan_rejected: AlertCircle };
+  leads_assigned: Users, lead_request: Users, visit_reminder: CalendarClock, referral: Gift, plan_approved: Crown, plan_rejected: AlertCircle, reminder: AlarmClock };
 
 /**
  * Unread count for the bell, checked every 30 seconds while the app is open —
@@ -33,7 +34,7 @@ export function useUnreadCount(enabled) {
     if (!enabled) return undefined;
     let alive = true;
     let last = null; // newest notification id seen
-    const tick = () => fetchNotifications().then((r) => {
+    const tick = () => fireReminders().then(() => fetchNotifications()).then((r) => {
       if (!alive) return;
       setN(Number(r?.unread) || 0);
       const newest = r?.items?.[0];

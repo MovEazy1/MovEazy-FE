@@ -23,7 +23,7 @@ import { CompleteProfileCard, PremiumCard, useGoldLogo } from "./PremiumJourney"
 import { NotificationBell } from "./PartnerInbox";
 import { AiMatcherCard } from "./AiMatcher";
 import { MoveazyLeadsCard } from "./MoveazyLeadsPromo";
-import VisitsToday from "./VisitsToday";
+import { TodayPanel } from "./TenantKit";
 import { PaymentCheckBanner, TrialBanner } from "./TrialPremium";
 import { customerMessage, hasPremium, inSource, listerWhatsApp, pp, waLink } from "../../lib/partners";
 import { BHK_CHIPS, BROKERAGE_CHIPS, EMPTY_FILTERS, activeFilterCount, applyFilters } from "../../lib/partnerFilters";
@@ -141,7 +141,7 @@ export default function InventoryHome() {
           <h1 style={{ margin: 0, lineHeight: 0 }}><img src={goldLogo || logo} alt="MovEazy" height="26" style={{ height: 26, width: "auto" }} /></h1>
           <span className="pz-chip" style={{ cursor: "default" }}>Bangalore</span>
           <span className="pz-row" style={{ gap: 4 }}>
-            {!demo && <NotificationBell count={unread} />}
+            <NotificationBell count={unread} />
             <Link to={pp("/qr")} className="pz-iconbtn" aria-label="My QR poster" title="My QR poster"><QrCode size={21} /></Link>
             <Link to={pp("/more")} aria-label="Your profile" style={{ textDecoration: "none" }}>
               <Avatar name={me?.partner?.name || "You"} />
@@ -235,7 +235,7 @@ export default function InventoryHome() {
         {gold && <PremiumCard me={me} status={status} />}
         <PaymentCheckBanner payment={status?.payment} />
         <TrialBanner trial={status?.trial} />
-        <VisitsToday />
+        <TodayPanel />
         <MoveazyLeadsCard me={me} />
         <div ref={aiRef}><AiMatcherCard /></div>
         {demo && (

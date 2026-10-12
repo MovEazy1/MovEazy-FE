@@ -1,7 +1,7 @@
 /** More — profile, QR poster, plan, saved, help, activity. */
 import { useState } from "react";
 import { Link } from "react-router-dom";
-import { BarChart3, Bookmark, Building2, ChevronRight, Crown, Eye, Gift, HelpCircle, LayoutDashboard, LogOut, Pencil, QrCode, TrendingUp, WandSparkles } from "lucide-react";
+import { BarChart3, Bookmark, Building2, ChevronRight, Crown, Eye, Gift, HelpCircle, Home, LayoutDashboard, Lock, LogOut, Pencil, QrCode, TrendingUp, Trophy, WandSparkles } from "lucide-react";
 import { useAuth } from "../../context/AuthContext";
 import { usePartner } from "./PartnerApp";
 import { Avatar, Sheet, TopBar, WhatsAppIcon, formatPhone, toast } from "./partnerUi";
@@ -85,6 +85,9 @@ export default function MorePage() {
             : row(pp("/premium"), <Crown size={19} color="#8A6419" />, premium ? "MovEazy Premium — active" : "Join Premium",
               premium ? `Plans${status?.plan?.until ? ` · till ${new Date(status.plan.until).toLocaleDateString("en-IN", { day: "numeric", month: "short" })}` : ""}` : "Unlock 1000+ listings, AI matching and groups")}
           {premium && row(pp("/referrals"), <Gift size={19} color="#8A6419" />, "Refer & Earn ₹1,500", "Per broker who joins with your link")}
+          {row(pp("/my-flats"), <Home size={19} color="var(--g)" />, "My flats", "Live, paused and let out · details to add")}
+          {row(premium ? pp("/performance") : pp("/premium"), premium ? <Trophy size={19} color="#8A6419" /> : <Lock size={19} color="#8A6419" />,
+            "Performance vs other partners", premium ? "Coming soon" : "Premium feature")}
           {row(pp("/saved"), <Bookmark size={19} />, "Saved properties", `${saved.size} saved`)}
           {row(`${MOVEAZY_TEAM_WHATSAPP}?text=${encodeURIComponent("Hi MovEazy, I need help with the partner app.")}`,
             <HelpCircle size={19} />, "Help", "Chat with the MovEazy team", true)}

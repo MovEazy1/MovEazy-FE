@@ -58,21 +58,20 @@ export function useMatchPool(forLeads = [], seed = 0) {
  * matched against sample homes; MovEazy tenants are real, against real flats.
  */
 export function useMatcherRows(seed = 0) {
-  const { leads, inventory, demo } = usePartner();
+  const { leads, inventory } = usePartner();
   const md = useMatcherData();
-  const own = useMemo(() => (demo ? [...leads, ...DEMO_LEADS] : leads), [leads, demo]);
-  const tenants = useMemo(() => matcherTenants(own, md.assigned), [own, md.assigned]);
-  const ownTenants = useMemo(() => tenants.filter((t) => t.kind === "own"), [tenants]);
-  const demoPool = useMatchPool(ownTenants, seed);
+  // Real tenants and real flats, free or Premium: a free partner's pool is their
+  // own flats and MovEazy's (what partner_inventory shows them).
+  const tenants = useMemo(() => matcherTenants(leads, md.assigned), [leads, md.assigned]);
   return useMemo(() => {
     const rows = tenants.map((t) => {
-      const pool = demo && t.kind === "own" ? demoPool.filter((h) => h.for_lead === t.id) : (inventory ?? []);
+      const pool = inventory ?? [];
       const lists = listsFor(t, md.lists);
       return { lead: t, lists, ...freshPicks(t, pool, new Set(md.seen[t.key] ?? [])) };
     });
     const { fresh, existing } = splitTenants(tenants, md.lists);
     const byKey = new Map(rows.map((r) => [r.lead.key, r]));
-    const homes = demo ? DEMO_COUNTS.moveazy + DEMO_COUNTS.broker + DEMO_COUNTS.group : (inventory ?? []).length;
+    const homes = (inventory ?? []).length;
     return {
       rows,
       byKey,
@@ -85,12 +84,18 @@ export function useMatcherRows(seed = 0) {
       loaded: md.loaded && inventory != null,
       md,
     };
-  }, [tenants, demo, demoPool, inventory, md]);
+  }, [tenants, inventory, md, seed]); // eslint-disable-line react-hooks/exhaustive-deps
 }
 
 /** The MovEazy mark on a tenant MovEazy gave them. */
 export function MzBadge() {
-  return <span className="aim-mz" title="A MovEazy tenant"><img src={logo} alt="MovEazy" /></span>;
+  // Styled inline: it shows on pages that don't load the matcher's CSS (Leads, Home, flats).
+  return (
+    <span className="aim-mz" title="A MovEazy tenant" style={{ display: "inline-flex", alignItems: "center", verticalAlign: "middle", marginLeft: 6,
+      padding: "3px 7px", borderRadius: 99, background: "#0B0B0F", flex: "none" }}>
+      <img src={logo} alt="MovEazy" style={{ height: 10, width: "auto", display: "block" }} />
+    </span>
+  );
 }
 
 const RUN_STEPS = (clients, homes) => [
@@ -249,11 +254,10 @@ export default function AiMatcher() {
   const rerun = () => { if (demo) setSeed((x) => x + 1); setRunning(true); window.scrollTo(0, 0); };
   const [busy, setBusy] = useState("");
   const [share, setShare] = useState(null);
-  const [preview, setPreview] = useState(null);
   const scanned = fresh.length + existing.length;
 
   const send = async (r) => {
-    if (r.lead.demo || (demo && r.lead.kind === "own")) { setPreview(r); return; }
+
     setBusy(r.lead.key);
     try {
       const list = await sendCuratedTo(r.lead, r.picks.map((m) => m.listing.property_id));
@@ -328,7 +332,7 @@ export default function AiMatcher() {
       <TopBar title="AI Property Matcher" back />
       <style>{CSS}</style>
       <div className="pz-pad">
-        {demo && <DemoBanner>Sample clients and homes — try it, then send for real with Premium. MovEazy tenants given to you are real, and you can send them lists now.</DemoBanner>}
+        {demo && <DemoBanner>Send your own flats and MovEazy’s to every tenant. Other brokers’ flats come with Premium.</DemoBanner>}
         <div className="aim-hero">
           <span className="aim-ic sm"><WandSparkles size={18} /></span>
           <div>
@@ -375,7 +379,6 @@ export default function AiMatcher() {
         )}
       </div>
 
-      {preview && <DemoListPreview lead={preview.lead} homes={preview.picks.map((m) => m.listing)} onClose={() => setPreview(null)} />}
       {share && <ShareListSheet lead={share.lead} list={share.list} brokerName={me?.partner?.name} onClose={() => setShare(null)} />}
     </>
   );

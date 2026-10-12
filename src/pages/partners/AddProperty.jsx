@@ -36,6 +36,7 @@ import { isVideoFile, orderListingMedia } from "../../lib/listingMedia";
 import { resolveMapsLink } from "../../lib/mapLink";
 import { normalizeIndianMobile } from "../../lib/mobile";
 import { PUBLIC_ORIGIN, createPartnerListing, friendlyError, inr, pp, saveOwnContacts } from "../../lib/partners";
+import { freeLeadsTopup } from "../../lib/partnerTenants";
 import PhotoReview from "../../components/PhotoReview";
 import { savedCoverUrl } from "../../lib/photoReview";
 
@@ -236,6 +237,7 @@ function PostFlat({ onAnother }) {
       savePrefs({ area, furnishing, share, areas: [area, ...(prefs.areas || []).filter((a) => a !== area)].slice(0, 5) });
       reloadInventory();
       setDone({ id, images: images.length });
+      freeLeadsTopup().then((n) => { if (n > 0) toast(`${n} MovEazy tenant${n === 1 ? " fits" : "s fit"} your flats — see Leads → MovEazy leads`); });
     } catch (e) {
       setErr(friendlyError(e, "Could not post the flat."));
       setSaving(false);

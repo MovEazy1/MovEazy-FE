@@ -14,10 +14,11 @@
  */
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { Link, useSearchParams } from "react-router-dom";
-import { CalendarClock, Copy, Crown, Gift, IndianRupee, MapPin, Phone, Sparkles, Wallet } from "lucide-react";
+import { Building2, CalendarClock, Copy, Crown, Gift, IndianRupee, MapPin, Phone, Plus, Sparkles, Wallet } from "lucide-react";
 import { usePartner } from "./PartnerApp";
 import { Chip, Empty, Loading, Sheet, WhatsAppIcon, toast } from "./partnerUi";
 import UpiPay from "./UpiPay";
+import { freeLeadsTopup } from "../../lib/partnerTenants";
 import { friendlyError, pp, waLink } from "../../lib/partners";
 import {
   ASSIGNED_STATUS, BUDGET_BANDS, MOVEAZY_DESK, PACKS, REQUEST_STATUS, cleanUtr, closureDue, fetchLeadStats,
@@ -194,6 +195,11 @@ function RequestSheet({ pack, stats, myAreas, me, onDone, onCancel }) {
         const a = stats?.allowance ?? {};
         window.open(waLink(MOVEAZY_DESK, moreLeadsMessage(me?.name, a.premium_given, a.premium_closed)), "_blank", "noopener");
         toast("Sent to MovEazy for approval");
+      } else if (pack === "free10") {
+        // Matched to their flats on the spot; more as they add flats (partner_moveazy_leads.sql).
+        toast(r?.assigned >= 10 ? "10 tenants who fit your flats are yours — names and numbers are below"
+          : r?.assigned > 0 ? `${r.assigned} tenant${r.assigned === 1 ? " fits" : "s fit"} your flats now — add more flats and more get matched, up to 10`
+            : "No tenant fits your flats right now — add more flats, or more details to them, and they're matched as they come");
       } else if (r?.assigned > 0) {
         // A first request is filled on the spot (partner_moveazy_leads.sql).
         toast(`${r.assigned} lead${r.assigned === 1 ? " is" : "s are"} yours — names and numbers are below`);
@@ -210,7 +216,21 @@ function RequestSheet({ pack, stats, myAreas, me, onDone, onCancel }) {
   return (
     <Sheet title={pack === "premium" ? "Request MovEazy leads" : `${PACKS[pack].title}${pack === "paid30" ? ` · ${inr(price)}` : " · free"}`} onClose={onCancel}>
       <div className="pz-pad">
-        {step === "prefs" ? (
+        {pack === "free10" ? (
+          <>
+            <p style={{ margin: "0 0 10px", fontSize: 15, lineHeight: 1.5 }}>
+              MovEazy matches tenants to your <b>{stats?.flats_live ?? 0} available flat{stats?.flats_live === 1 ? "" : "s"}</b> — their area, BHK and budget —
+              and gives you the best fits, with names and numbers.
+            </p>
+            <p className="pz-hint" style={{ margin: "0 0 14px" }}>
+              Fewer than 10 fit today? You get those now, and more as you add flats, up to 10. The more flats you upload — and the more
+              details on each — the better the tenants the AI finds for you.
+            </p>
+            <button type="button" className="pz-btn pz-btn--primary pz-btn--block" onClick={submit} disabled={busy}>
+              <Gift size={16} /> {busy ? "Matching…" : "Get my free leads"}
+            </button>
+          </>
+        ) : step === "prefs" ? (
           <>
             <p className="pz-hint" style={{ margin: "0 0 12px" }}>What kind of tenants do you want? MovEazy picks leads that fit.</p>
             <div className="pz-field">
@@ -284,7 +304,13 @@ export default function MoveazyLeads({ me: meProp = null, onAssigned = null }) {
     fetchMyLeadRequests().then(setRequests, () => setRequests([]));
     fetchMyAssignedLeads().then((r) => { setAssigned(r); onAssigned?.(r); }, () => setAssigned([]));
   }, [onAssigned]);
-  useEffect(() => { load(); }, [load]);
+  useEffect(() => {
+    let alive = true;
+    freeLeadsTopup().then((n) => {
+      if (n > 0 && alive) toast(`${n} more tenant${n === 1 ? " fits" : "s fit"} your flats — they're below`);
+    }).finally(() => { if (alive) load(); });
+    return () => { alive = false; };
+  }, [load]);
 
   if (err) return <Empty>{err}</Empty>;
   if (!stats || assigned === null) return <Loading />;
@@ -316,6 +342,7 @@ export default function MoveazyLeads({ me: meProp = null, onAssigned = null }) {
 
   return (
     <div className="pz-pad">
+      <style>{ML_CSS}</style>
       {assigned.length > 0 && (
         <div className="pz-card" style={{ marginBottom: 14, overflow: "hidden" }}>
           <div style={{ padding: "12px 14px 4px" }}>
@@ -359,7 +386,40 @@ export default function MoveazyLeads({ me: meProp = null, onAssigned = null }) {
       ) : (
         <>
           <h2 style={{ fontSize: 17, margin: "4px 0 10px" }}>Get MovEazy leads</h2>
-          {packCard("free10", <Gift size={18} />, "free", "Get", allow.free_used ? "Already used" : "")}
+          {!allow.free_used && (stats.flats_live ?? 0) < 3 ? (
+            <div className="pz-card" style={{ padding: 14, marginBottom: 10, borderColor: "var(--gold)" }}>
+              <div className="pz-row" style={{ gap: 12, alignItems: "flex-start" }}>
+                <span className="pz-avatar" style={{ background: "var(--goldg)", color: "#1F1605" }}><Gift size={18} /></span>
+                <span style={{ flex: 1, minWidth: 0 }}>
+                  <strong style={{ display: "block", fontSize: 15.5 }}>10 free leads — matched to your flats</strong>
+                  <span className="pz-hint">Upload at least 3 available flats and MovEazy gives you the tenants who best fit them.</span>
+                </span>
+              </div>
+              <div className="ml-progress" aria-label={`${stats.flats_live ?? 0} of 3 flats added`}>
+                {[0, 1, 2].map((i) => <i key={i} className={i < (stats.flats_live ?? 0) ? "on" : ""} />)}
+              </div>
+              <span className="pz-meta">{stats.flats_live ?? 0} of 3 flats added</span>
+              <ul className="ml-tips">
+                <li>The more flats you upload, the better the tenants you’re matched with.</li>
+                <li>The more details on each — photos, rent, BHK, furnishing, available date — the better the AI maps them to the right tenant.</li>
+              </ul>
+              <div className="pz-row" style={{ gap: 8 }}>
+                <Link to={pp("/add/property")} className="pz-btn pz-btn--sm pz-btn--primary"><Plus size={15} /> Add a flat</Link>
+                <Link to={pp("/my-flats")} className="pz-btn pz-btn--sm"><Building2 size={15} /> My flats</Link>
+              </div>
+            </div>
+          ) : !allow.free_used ? (
+            packCard("free10", <Gift size={18} />, "free", "Get", "")
+          ) : (stats.free_given ?? 0) < 10 ? (
+            <div className="pz-card" style={{ padding: 14, marginBottom: 10 }}>
+              <strong style={{ display: "block" }}>{stats.free_given ?? 0} of 10 free leads given</strong>
+              <span className="pz-hint">The rest come as more tenants fit your flats. Add flats, or more details to them, to be matched sooner.</span>
+              <div className="pz-row" style={{ gap: 8, marginTop: 10 }}>
+                <Link to={pp("/add/property")} className="pz-btn pz-btn--sm pz-btn--primary"><Plus size={15} /> Add a flat</Link>
+                <Link to={pp("/my-flats")} className="pz-btn pz-btn--sm"><Building2 size={15} /> My flats</Link>
+              </div>
+            </div>
+          ) : packCard("free10", <Gift size={18} />, "free", "Get", "Already used")}
           {packCard("paid30", <Wallet size={18} />, inr(stats.pack_price), "Buy", "")}
           <Link to={pp("/premium")} className="pz-card" style={{ display: "flex", gap: 12, alignItems: "center", padding: 14, marginBottom: 10, color: "inherit", textDecoration: "none" }}>
             <span className="pz-avatar" style={{ background: "var(--noir)", color: "#D4A437" }}><Crown size={18} /></span>
@@ -417,3 +477,10 @@ export default function MoveazyLeads({ me: meProp = null, onAssigned = null }) {
     </div>
   );
 }
+
+const ML_CSS = `
+.ml-progress { display: grid; grid-template-columns: repeat(3, 1fr); gap: 6px; margin: 12px 0 4px; }
+.ml-progress i { height: 8px; border-radius: 99px; background: var(--line); }
+.ml-progress i.on { background: var(--goldg); }
+.ml-tips { margin: 10px 0 12px; padding-left: 18px; font-size: 13px; color: var(--dim); display: grid; gap: 4px; }
+`;

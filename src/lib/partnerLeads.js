@@ -17,7 +17,7 @@ async function rpc(name, args) {
 export const MOVEAZY_DESK = "918090911024";
 
 export const PACKS = {
-  free10: { id: "free10", count: 10, title: "10 leads", sub: "Free · once" },
+  free10: { id: "free10", count: 10, title: "10 leads", sub: "Free · once · matched to your flats" },
   paid30: { id: "paid30", count: 30, title: "30 leads", sub: "One payment" },
   premium: { id: "premium", count: 10, title: "Unlimited", sub: "Premium · pay only on closures" },
 };

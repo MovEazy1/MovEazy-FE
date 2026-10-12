@@ -16,9 +16,8 @@ import { requirementLine } from "./leadBits";
 import { friendlyError, pp } from "../../lib/partners";
 import { matchesForLead } from "../../lib/partnerMatch";
 import { EMPTY_FILTERS, activeFilterCount, applyFilters } from "../../lib/partnerFilters";
-import { createCuratedList, curatedMessage, curatedUrl } from "../../lib/partnerCurated";
-import { DemoListPreview, useMatchPool } from "./AiMatcher";
-import { DEMO_LEADS, DemoBanner } from "./demoMode";
+import { curatedMessage, curatedUrl } from "../../lib/partnerCurated";
+import { sendCuratedTo } from "../../lib/partnerMatcher";
 import { useMatcherData } from "./matcherData";
 
 const SORTS = [["match", "Best match"], ["rent", "Rent: low to high"], ["brokerage", "Brokerage: high to low"]];
@@ -26,11 +25,9 @@ const PRESELECT = 10;
 
 export default function LeadMatches() {
   const { id } = useParams();
-  const { me, leads, inventory, saved, toggleSave, demo, explain } = usePartner();
-  const lead = leads.find((l) => l.id === id) || (demo ? DEMO_LEADS.find((l) => l.id === id) : null);
-  const forLead = useMemo(() => (lead ? [lead] : []), [lead]);
-  const pool = useMatchPool(forLead);
-  const [preview, setPreview] = useState(false);
+  const { me, leads, inventory, saved, toggleSave } = usePartner();
+  const lead = leads.find((l) => l.id === id) || null;
+  const pool = useMemo(() => inventory ?? [], [inventory]);
   const [filters, setFilters] = useState(EMPTY_FILTERS);
   const [sheet, setSheet] = useState(false);
   const [sort, setSort] = useState("match");
@@ -54,9 +51,9 @@ export default function LeadMatches() {
 
   // The best ten, picked for them the first time matches arrive.
   useEffect(() => {
-    if (picked || !all.length || (!demo && !md.loaded)) return;
+    if (picked || !all.length || !md.loaded) return;
     setPicked(new Set(all.slice(0, PRESELECT).map((m) => m.listing.property_id)));
-  }, [all, picked, demo, md.loaded]);
+  }, [all, picked, md.loaded]);
 
   if (!lead) return <><TopBar title="AI matching" back={pp("/leads")} />{leads.length ? <Empty>Lead not found.</Empty> : <Loading />}</>;
 
@@ -68,12 +65,11 @@ export default function LeadMatches() {
   const count = picked?.size || 0;
 
   const create = async () => {
-    if (demo) { if (count) setPreview(true); else explain("curated"); return; }
     if (!count) { toast("Pick at least one home.", "error"); return; }
     setBusy(true);
     try {
       const ordered = all.map((m) => m.listing.property_id).filter((pid) => picked.has(pid));
-      const r = await createCuratedList(lead.id, ordered);
+      const r = await sendCuratedTo({ kind: "own", lead_id: lead.id }, ordered);
       setSent(r);
       md.reload();
     } catch (e) {
@@ -86,7 +82,7 @@ export default function LeadMatches() {
   const n = activeFilterCount(filters);
   return (
     <>
-      <TopBar title="AI matching" back={pp(`/leads/${id}`)} right={
+      <TopBar title="AI matching" back={pp(`/tenants/lead-${id}`)} right={
         <div className="pz-row" style={{ gap: 0 }}>
           <button type="button" className="pz-iconbtn" aria-label="Sort" onClick={() => setSortOpen((o) => !o)}><ArrowUpDown size={20} /></button>
           <button type="button" className="pz-iconbtn" aria-label="Filter" onClick={() => setSheet(true)} style={n ? { color: "var(--g)" } : undefined}>
@@ -112,7 +108,6 @@ export default function LeadMatches() {
         )}
       </div>
       <div className="pz-pad pz-list" style={{ paddingBottom: 110 }}>
-        {demo && <DemoBanner>Sample homes — try the curated list, then send for real with Premium.</DemoBanner>}
         {!inventory ? <Loading /> : rows.length === 0 ? (
           <Empty action={<Link className="pz-btn" to={pp(`/leads/${id}/edit`)}>Edit requirement</Link>}>
             {all.length ? "No matches with those filters." : "Nothing matches this requirement yet."}
@@ -121,9 +116,8 @@ export default function LeadMatches() {
           const on = picked?.has(m.listing.property_id);
           return (
             <PropertyCard key={m.listing.property_id} listing={m.listing} saved={saved.has(m.listing.property_id)}
-              onOpen={m.listing.demo ? () => explain("details") : undefined}
-              onToggleSave={() => (m.listing.demo ? explain("save") : toggleSave(m.listing.property_id))}
-              onWhatsApp={() => (m.listing.demo ? explain("whatsapp") : send(m.listing))}
+              onToggleSave={() => toggleSave(m.listing.property_id)}
+              onWhatsApp={() => send(m.listing)}
               extra={
                 <div className="pz-row" style={{ marginTop: 10, gap: 8 }}>
                   <span className="pz-score" title="Match score">{m.score}</span>
@@ -145,10 +139,6 @@ export default function LeadMatches() {
         </div>
       )}
 
-      {preview && (
-        <DemoListPreview lead={lead} onClose={() => setPreview(false)}
-          homes={all.map((m) => m.listing).filter((l) => picked?.has(l.property_id))} />
-      )}
       {sent && (
         <Sheet title="Curated list ready" onClose={() => setSent(null)}>
           <div className="pz-pad">

@@ -11,20 +11,20 @@ import {
 import { usePartner } from "./PartnerApp";
 import ShareSheet from "./ShareSheet";
 import PropertyDetailsSheet from "./PropertyDetailsSheet";
+import FlatCare from "./FlatCare";
 import { decideSoldOut, markSoldOut } from "../../lib/partnerCurated";
 import { MediaItem, listingMedia } from "./partnerMedia";
 import { useSnapTrack } from "../../hooks/useSnapTrack";
 import { usePhotoViewer } from "../../hooks/usePhotoViewer";
 import { Avatar, BrokeragePill, Empty, Loading, Sheet, TopBar, WhatsAppIcon, sourceLabel, toast } from "./partnerUi";
 import {
-  bhkLabel, customerMessage, fetchPropertyContacts, friendlyError, inr, partnerPropertyLink, patchLead, pp,
+  bhkLabel, customerMessage, fetchPropertyContacts, friendlyError, inr, partnerPropertyLink, pp,
   setListingStatus, telLink, waLink,
 } from "../../lib/partners";
 import {
   contactMessage, decideLocation, fetchLocationRequests, locationHidden, requestLocation, slotLabel,
 } from "../../lib/partnerContact";
 import { fetchSlotsForProperty } from "../../lib/visits";
-import { leadsForListing } from "../../lib/partnerMatch";
 import { MOVEAZY_TEAM_WHATSAPP } from "../../config/contactChannels";
 
 /**
@@ -70,7 +70,7 @@ function mapsUrl(l) {
 export default function PropertyDetail() {
   const { id } = useParams();
   const navigate = useNavigate();
-  const { me, inventory, byId, saved, toggleSave, leads, setLeads, groups, reloadInventory, demo, explain } = usePartner();
+  const { me, inventory, byId, saved, toggleSave, groups, reloadInventory, demo, explain } = usePartner();
   const l = byId.get(id);
   const [share, setShare] = useState(false);
   const [menu, setMenu] = useState(false);
@@ -127,7 +127,6 @@ export default function PropertyDetail() {
       .then((all) => setSlots(all.filter((s) => new Date(s.slot_at) > new Date()).slice(0, 12)), () => setSlots([]));
   }, [id, l, demo]);
 
-  const matching = useMemo(() => (l ? leadsForListing(l, leads).slice(0, 5) : []), [l, leads]);
   const media = useMemo(() => (l ? listingMedia(l) : []), [l]);
   const { index: slide, trackProps } = useSnapTrack();
   const photos = usePhotoViewer(media, l?.title || "");
@@ -181,18 +180,10 @@ export default function PropertyDetail() {
     try {
       await setListingStatus(l.property_id, status);
       await reloadInventory();
-      toast(status === "published" ? "Listing is live" : status === "rented" ? "Closed — removed from your list" : `Marked ${status}`);
+      toast(status === "published" ? "Listing is live" : status === "rented" ? "Marked let out — it's in My flats" : `Marked ${status}`);
     } catch (e) {
       toast(friendlyError(e), "error");
     }
-  };
-
-  const sendToLead = async (lead) => {
-    window.open(waLink(lead.phone, customerMessage(l, { leadName: lead.name })), "_blank", "noopener");
-    try {
-      const row = await patchLead(lead.id, { last_contacted_at: new Date().toISOString() });
-      setLeads((ls) => ls.map((x) => (x.id === row.id ? row : x)));
-    } catch { /* the send already happened; the timestamp is a nicety */ }
   };
 
   return (
@@ -372,24 +363,7 @@ export default function PropertyDetail() {
           </div>
         )}
 
-        <div className="pz-section">
-          <h2><span className="pz-row" style={{ gap: 6 }}><Users size={17} /> Matching leads</span>
-            <span className="pz-meta">{matching.length}</span></h2>
-          {matching.length === 0 ? (
-            <span className="pz-meta">None of your active leads fits this flat yet.</span>
-          ) : matching.map((m) => (
-            <div key={m.lead.id} className="pz-row" style={{ padding: "8px 0", borderTop: "1px solid var(--line)" }}>
-              <span className="pz-score">{m.score}</span>
-              <Link to={pp(`/leads/${m.lead.id}`)} style={{ flex: 1, minWidth: 0, color: "inherit", textDecoration: "none" }}>
-                <strong style={{ display: "block" }}>{m.lead.name}</strong>
-                <span className="pz-meta">{m.reasons.slice(0, 3).join(" · ")}</span>
-              </Link>
-              <button type="button" className="pz-iconbtn" aria-label={`Send to ${m.lead.name} on WhatsApp`} onClick={() => sendToLead(m.lead)}>
-                <WhatsAppIcon color="#16A34A" size={21} />
-              </button>
-            </div>
-          ))}
-        </div>
+        <FlatCare listing={l} mine={mine} onAddDetails={() => setDetails(true)} />
         <p className="pz-hint" style={{ textAlign: "center" }}>{l.property_id}</p>
       </div>
 
@@ -407,15 +381,15 @@ export default function PropertyDetail() {
         </Sheet>
       )}
       {closing && (
-        <Sheet title="Mark as closed?" onClose={() => setClosing(false)}>
+        <Sheet title="Let out?" onClose={() => setClosing(false)}>
           <div className="pz-pad">
             <p style={{ margin: "0 0 16px", fontSize: 15, lineHeight: 1.55 }}>
-              The deal is done? Closing removes this property from your list, for easier management. It comes off MovEazy for tenants
-              and other brokers too — MovEazy keeps the record.
+              Let out? It stops being matched and sent to tenants, and comes off MovEazy for tenants and other brokers. It waits in
+              My flats — one tap makes it available again for the next tenant.
             </p>
             <button type="button" className="pz-btn pz-btn--primary pz-btn--block"
-              onClick={async () => { setClosing(false); await changeStatus("rented"); navigate(pp("/"), { replace: true }); }}>
-              Yes, mark as closed
+              onClick={async () => { setClosing(false); await changeStatus("rented"); navigate(pp("/my-flats"), { replace: true }); }}>
+              Yes, it’s let out
             </button>
             <button type="button" className="pz-btn pz-btn--ghost" style={{ width: "100%", marginTop: 8 }} onClick={() => setClosing(false)}>Keep it</button>
           </div>
@@ -435,7 +409,7 @@ export default function PropertyDetail() {
           )}
           {mine && l.status !== "rented" && (
             <button type="button" className="pz-menurow" onClick={() => { setMenu(false); setClosing(true); }}>
-              <Archive size={18} /> <span>Mark as closed</span>
+              <Archive size={18} /> <span>Mark let out</span>
             </button>
           )}
           {mine && l.status === "published" && (

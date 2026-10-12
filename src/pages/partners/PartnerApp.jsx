@@ -18,7 +18,7 @@
  * clears, so "tap link → Google → number → you're in the group" is one flow.
  */
 import { createContext, lazy, Suspense, useCallback, useContext, useEffect, useMemo, useRef, useState } from "react";
-import { Navigate, Route, Routes, useLocation, useNavigate } from "react-router-dom";
+import { Navigate, Route, Routes, useLocation, useNavigate, useParams } from "react-router-dom";
 import { Clock, ShieldOff } from "lucide-react";
 import { useAuth } from "../../context/AuthContext";
 import {
@@ -54,7 +54,7 @@ const AddProperty = lazy(() => import("./AddProperty"));
 const EditSharing = lazy(() => import("./EditSharing"));
 const LeadsList = lazy(() => import("./LeadsList"));
 const LeadForm = lazy(() => import("./LeadForm"));
-const LeadDetail = lazy(() => import("./LeadDetail"));
+
 const LeadMatches = lazy(() => import("./LeadMatches"));
 const GroupsList = lazy(() => import("./GroupsList"));
 const GroupDetail = lazy(() => import("./GroupDetail"));
@@ -68,7 +68,9 @@ const WelcomePremium = lazy(() => import("./PremiumJourney").then((m) => ({ defa
 const ReferralsPage = lazy(() => import("./PremiumJourney").then((m) => ({ default: m.ReferralsPage })));
 const SalesFunnel = lazy(() => import("./SalesFunnel"));
 const AiMatcher = lazy(() => import("./AiMatcher"));
-const MatcherTenant = lazy(() => import("./MatcherTenant"));
+const TenantPage = lazy(() => import("./TenantPage"));
+const MyFlats = lazy(() => import("./MyFlats"));
+const PerformancePage = lazy(() => import("./MyFlats").then((m) => ({ default: m.PerformancePage })));
 const TrialPopups = lazy(() => import("./TrialPremium").then((m) => ({ default: m.TrialPopups })));
 const Insights = lazy(() => import("./Insights"));
 const BuildingLeads = lazy(() => import("./BuildingLeads"));
@@ -76,6 +78,12 @@ const NotificationsPage = lazy(() => import("./PartnerInbox").then((m) => ({ def
 const CuratedListPage = lazy(() => import("./PartnerInbox").then((m) => ({ default: m.CuratedListPage })));
 
 const PartnerContext = createContext(null);
+
+/** An old /leads/:id link: that client's tenant page now. */
+function LeadRedirect() {
+  const { id } = useParams();
+  return <Navigate to={pp(`/tenants/lead-${id}`)} replace />;
+}
 export const usePartner = () => useContext(PartnerContext);
 
 export const INVITE_KEY = "mz_partner_invite";
@@ -133,7 +141,7 @@ function PartnerWorkspace({ me, reloadMe }) {
   });
   const demo = me?.staff ? previewDemo : !hasPremium(me);
   const explain = useCallback((what) => setExplaining(what), []);
-  const unread = useUnreadCount(!demo);
+  const unread = useUnreadCount(true);
   const reloadStatus = useCallback(async () => {
     try { setStatus(await fetchPartnerStatus()); } catch { /* keep what we had */ }
   }, []);
@@ -272,7 +280,10 @@ function PartnerWorkspace({ me, reloadMe }) {
             <Route path="add/property" element={<AddProperty />} />
             <Route path="leads" element={<LeadsList />} />
             <Route path="leads/new" element={<LeadForm />} />
-            <Route path="leads/:id" element={<LeadDetail />} />
+            <Route path="leads/:id" element={<LeadRedirect />} />
+            <Route path="tenants/:slug" element={<TenantPage />} />
+            <Route path="my-flats" element={<MyFlats />} />
+            <Route path="performance" element={<PerformancePage />} />
             <Route path="leads/:id/edit" element={<LeadForm />} />
             <Route path="leads/:id/matches" element={<LeadMatches />} />
             <Route path="groups" element={<GroupsList />} />
@@ -284,7 +295,7 @@ function PartnerWorkspace({ me, reloadMe }) {
             <Route path="referrals" element={<ReferralsPage />} />
             <Route path="notifications" element={<NotificationsPage />} />
             <Route path="ai-matcher" element={<AiMatcher />} />
-            <Route path="ai-matcher/:slug" element={<MatcherTenant />} />
+            <Route path="ai-matcher/:slug" element={<TenantPage />} />
             <Route path="insights" element={<Insights />} />
             <Route path="building-leads" element={<BuildingLeads />} />
             <Route path="curated/:id" element={<CuratedListPage />} />

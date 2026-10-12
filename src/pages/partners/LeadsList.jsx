@@ -1,24 +1,28 @@
 /**
- * PRD 08 — the lead book, in two: My Leads (the broker's own; no chat, no
- * pipeline: All / Active / Closed) and MovEazy leads (MoveazyLeads.jsx).
- * Every lead has AI matching one tap away. In demo mode sample tenants sit
- * alongside the partner's own, and premium buttons explain themselves.
+ * Leads, in two: My Leads — every tenant the partner works, their own and the
+ * MovEazy tenants given to them, in one list (TenantKit) — and MovEazy leads,
+ * where more are asked for (MoveazyLeads.jsx).
+ *
+ * The list opens on everyone still in play, the ones needing attention first:
+ * a follow-up due, something new they did (a like, an open), then the next
+ * reminder, then the newest. Stage chips narrow it; search finds anyone.
+ * Free and Premium alike, on real data only.
  */
 import { Suspense, lazy, useMemo, useState } from "react";
 import { Link, useSearchParams } from "react-router-dom";
-import { BarChart3, ChevronRight, Plus, Search, Sparkles } from "lucide-react";
+import { BarChart3, ChevronRight, Plus, Search } from "lucide-react";
 import { usePartner } from "./PartnerApp";
-import { Avatar, Empty, Loading, TopBar, WhatsAppIcon } from "./partnerUi";
-import { DEMO_LEADS, DemoBanner } from "./demoMode";
+import { Chip, Empty, Loading, TopBar } from "./partnerUi";
 import { MoveazyTab, MyLeadsTab } from "./MoveazyLeadsPromo";
-import { lastContactedLabel, requirementLine } from "./leadBits";
-import { patchLead, pp, waLink } from "../../lib/partners";
-import { hasRequirement, matchesForLead } from "../../lib/partnerMatch";
-
-const TABS = [["all", "All"], ["active", "Active"], ["closed", "Closed"]];
+import { KIT_CSS, TenantRow, useReach } from "./TenantKit";
+import { useTenants } from "./tenantData";
+import { pp } from "../../lib/partners";
+import { OPEN_STAGES, STAGES, stageCounts } from "../../lib/partnerTenants";
 
 // Its own file, loaded when the tab is opened.
 const MoveazyLeads = lazy(() => import("./MoveazyLeads"));
+
+const CHIPS = [["open", "In play"], ...STAGES.map((s) => [s.id, s.label]), ["all", "All"]];
 
 /** My Leads | MovEazy leads (black halftone with the logo — it should catch the eye); the open one is red. */
 function BookSwitch({ book, setBook, me, assigned }) {
@@ -33,51 +37,48 @@ function BookSwitch({ book, setBook, me, assigned }) {
   );
 }
 
+/** Needing attention first. */
+function rank(t, now) {
+  const r = t.next_reminder;
+  if (r && new Date(r.due_at) <= now) return [0, r.due_at];
+  if (t.new_actions > 0) return [1, String(-Date.parse(t.last_action_at || 0))];
+  if (r) return [2, r.due_at];
+  return [3, String(-Date.parse(t.created_at || 0))];
+}
+
 export default function LeadsList() {
-  const { me, leads: realLeads, setLeads, inventory, demo, explain } = usePartner();
-  const [assigned, setAssigned] = useState(null); // as the MovEazy tab last loaded them
-  const leads = useMemo(() => (demo ? [...realLeads, ...DEMO_LEADS] : realLeads), [demo, realLeads]);
-  const [tab, setTab] = useState("active");
+  const { me, demo, explain } = usePartner();
+  const { board, loaded } = useTenants();
+  const reach = useReach();
+  const [stage, setStage] = useState("open");
   const [q, setQ] = useState("");
+  const [assigned, setAssigned] = useState(null); // as the MovEazy tab last loaded them
   const [params, setParams] = useSearchParams();
   const book = params.get("tab") === "moveazy" ? "moveazy" : "mine";
   const setBook = (b) => setParams(b === "moveazy" ? { tab: "moveazy" } : {}, { replace: true });
 
-  const matchCount = useMemo(() => {
-    const m = new Map();
-    for (const lead of leads) m.set(lead.id, matchesForLead(lead, inventory ?? []).length);
-    return m;
-  }, [leads, inventory]);
-
+  const counts = useMemo(() => stageCounts(board), [board]);
   const rows = useMemo(() => {
     const needle = q.trim().toLowerCase();
     const digits = q.replace(/\D/g, "");
-    return leads.filter((l) => {
-      if (tab !== "all" && l.status !== tab) return false;
-      if (!needle) return true;
-      return String(l.name || "").toLowerCase().includes(needle) || (digits.length >= 3 && String(l.phone).includes(digits));
-    });
-  }, [leads, tab, q]);
-
-  const counts = {
-    all: leads.length,
-    active: leads.filter((l) => l.status === "active").length,
-    closed: leads.filter((l) => l.status === "closed").length,
-  };
-
-  const whatsapp = async (lead) => {
-    if (lead.demo) { explain("lead_whatsapp"); return; }
-    window.open(waLink(lead.phone, `Hi ${String(lead.name || "").split(" ")[0] || "there"}, `), "_blank", "noopener");
-    try {
-      const row = await patchLead(lead.id, { last_contacted_at: new Date().toISOString() });
-      setLeads((ls) => ls.map((x) => (x.id === row.id ? row : x)));
-    } catch { /* timestamp only */ }
-  };
+    const now = new Date();
+    return board
+      .filter((t) => {
+        if (needle) {
+          return String(t.name || "").toLowerCase().includes(needle) || (digits.length >= 3 && String(t.phone || "").includes(digits))
+            || (t.localities ?? []).some((l) => l.toLowerCase().includes(needle));
+        }
+        return stage === "all" || (stage === "open" ? OPEN_STAGES.has(t.stage) : t.stage === stage);
+      })
+      .map((t) => ({ t, k: rank(t, now) }))
+      .sort((a, b) => a.k[0] - b.k[0] || String(a.k[1]).localeCompare(String(b.k[1])))
+      .map((x) => x.t);
+  }, [board, stage, q]);
 
   return (
     <>
       <TopBar title="Leads" right={
-        <Link to={pp("/leads/new")} className="pz-iconbtn" aria-label="Add lead" style={{ background: "var(--goldg)", color: "#1F1605", borderRadius: 999 }}>
+        <Link to={pp("/leads/new")} className="pz-iconbtn" aria-label="Add a tenant" style={{ background: "var(--goldg)", color: "#1F1605", borderRadius: 999 }}>
           <Plus size={20} />
         </Link>
       } />
@@ -86,20 +87,21 @@ export default function LeadsList() {
         <Suspense fallback={<Loading />}><MoveazyLeads onAssigned={setAssigned} /></Suspense>
       ) : (
       <>
+      <style>{KIT_CSS}</style>
       <div className="pz-pad" style={{ paddingBottom: 0, background: "var(--card)" }}>
         <div className="pz-search">
           <Search size={17} />
-          <input className="pz-input" type="search" placeholder="Search leads by name or mobile…" value={q} onChange={(e) => setQ(e.target.value)} />
+          <input className="pz-input" type="search" placeholder="Search by name, mobile or area…" value={q} onChange={(e) => setQ(e.target.value)} />
         </div>
-      </div>
-      <div className="pz-tabs" role="tablist">
-        {TABS.map(([k, label]) => (
-          <button key={k} type="button" role="tab" aria-selected={tab === k} className={`pz-tab${tab === k ? " pz-tab--on" : ""}`}
-            onClick={() => setTab(k)}>{label} ({counts[k]})</button>
-        ))}
+        {!q.trim() && (
+          <div className="pz-chips" style={{ flexWrap: "nowrap", overflowX: "auto", padding: "10px 0 8px" }}>
+            {CHIPS.map(([k, label]) => (
+              <Chip key={k} on={stage === k} onClick={() => setStage(k)}>{label} · {counts[k] ?? 0}</Chip>
+            ))}
+          </div>
+        )}
       </div>
       <div className="pz-pad">
-        {demo && <DemoBanner>Sample tenants are mixed in with yours.</DemoBanner>}
         <Link to={pp("/insights")} onClick={demo ? (e) => { e.preventDefault(); explain("insights"); } : undefined} className="pz-card pz-row"
           style={{ padding: 14, marginBottom: 12, color: "inherit", textDecoration: "none", background: "var(--noir)", borderColor: "var(--noir)" }}>
           <span className="pz-avatar" style={{ background: "var(--goldg)", color: "#1F1605" }}><BarChart3 size={17} /></span>
@@ -107,37 +109,13 @@ export default function LeadsList() {
             <span style={{ fontSize: 12.5, color: "#A7A3B3" }}>QR scans by area · what clients like · every like & skip</span></span>
           <ChevronRight size={18} color="#D4A437" />
         </Link>
-        {rows.length === 0 ? (
-          <Empty action={<Link to={pp("/leads/new")} className="pz-btn pz-btn--primary"><Plus size={16} /> Add lead</Link>}>
-            {leads.length ? "No leads match." : "Add your first customer — a name and mobile is enough."}
+        {!loaded ? <Loading /> : rows.length === 0 ? (
+          <Empty action={<Link to={pp("/leads/new")} className="pz-btn pz-btn--primary"><Plus size={16} /> Add a tenant</Link>}>
+            {board.length ? (q.trim() ? "Nobody matches that." : "Nobody at this stage.") : "Add your first tenant — a name and mobile is enough. Tenants MovEazy gives you show up here too."}
           </Empty>
         ) : (
           <div className="pz-card">
-            {rows.map((lead, i) => {
-              const n = matchCount.get(lead.id) ?? 0;
-              return (
-                <div key={lead.id} className="pz-row" style={{ padding: 14, alignItems: "flex-start", borderTop: i ? "1px solid var(--line)" : 0 }}>
-                  <Avatar name={lead.name} size="lg" />
-                  <Link to={pp(lead.demo ? `/leads/${lead.id}/matches` : `/leads/${lead.id}`)}
-                    style={{ flex: 1, minWidth: 0, color: "inherit", textDecoration: "none" }}>
-                    <strong style={{ display: "block", fontSize: 16 }}>{lead.name}{lead.demo && <span className="pz-pill pz-pill--grey" style={{ marginLeft: 6, fontSize: 11 }}>Sample</span>}</strong>
-                    {requirementLine(lead) && <span style={{ display: "block", fontSize: 14 }}>{requirementLine(lead)}</span>}
-                    {(lead.localities ?? []).length > 0 && <span className="pz-meta" style={{ display: "block" }}>{lead.localities.join(", ")}</span>}
-                    <span style={{ display: "block", color: "var(--g)", fontWeight: 600, fontSize: 13.5, marginTop: 2 }}>
-                      {hasRequirement(lead) ? `${n} matching propert${n === 1 ? "y" : "ies"}` : "Add a requirement to see matches"}
-                    </span>
-                    <span className="pz-hint">{lastContactedLabel(lead.last_contacted_at)}</span>
-                  </Link>
-                  <div style={{ display: "flex", flexDirection: "column", alignItems: "flex-end", gap: 8 }}>
-                    <button type="button" className="pz-iconbtn" aria-label={`WhatsApp ${lead.name}`} onClick={() => whatsapp(lead)}
-                      style={{ background: "var(--goldg)", color: "#1F1605", borderRadius: 999, width: 34, height: 34 }}>
-                      <WhatsAppIcon size={18} />
-                    </button>
-                    <Link to={pp(`/leads/${lead.id}/matches`)} className="pz-btn pz-btn--sm pz-btn--ai"><Sparkles size={14} /> AI matching</Link>
-                  </div>
-                </div>
-              );
-            })}
+            {rows.map((t) => <TenantRow key={t.key} t={t} onReach={reach} />)}
           </div>
         )}
       </div>
