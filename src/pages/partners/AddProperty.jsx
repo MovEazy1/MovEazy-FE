@@ -3,12 +3,16 @@
  *
  *   Photos       first: pick from the gallery and they upload in the background
  *                while the rest is filled in (a tick or a retry per photo).
- *   The flat     type, rent, furnishing, locality — taps, not typing. 1 BHK and
+ *   The flat     type, rent, security deposit (2x / 2.5x / 3x / 4x the rent,
+ *                rounded to ₹10k, one tap), maintenance (blank = none),
+ *                furnishing, locality, Only Family | Only Bachelors (neither =
+ *                both), floor and amenities (outside parking, pet friendly
+ *                and walkable already ticked) — taps, not typing. 1 BHK and
  *                the last locality used are already selected.
  *   Who sees it  only me / all MovEazy brokers at a share / groups — remembered.
  *   More         the property's details pasted from WhatsApp (saved as
- *                written), deposit, move-in date, floor, the owner's contact
- *                and a name — all optional.
+ *                written), move-in date, the owner's contact and a name —
+ *                all optional.
  *
  * Photos reorder by dragging (finger or mouse); the first is the cover.
  *
@@ -39,6 +43,9 @@ import { PUBLIC_ORIGIN, createPartnerListing, friendlyError, inr, pp, saveOwnCon
 import { freeLeadsTopup } from "../../lib/partnerTenants";
 import PhotoReview from "../../components/PhotoReview";
 import { savedCoverUrl } from "../../lib/photoReview";
+import {
+  DEFAULT_PARTNER_AMENITIES, FLOOR_CHIPS, POSTING_AMENITIES, depositOptions, maintenanceValue, occupantsFor,
+} from "../../lib/postingDetails";
 
 const RENT_CHIPS = [15000, 20000, 25000, 30000, 40000, 50000];
 const PREFS_KEY = "mz_partner_post";
@@ -79,6 +86,10 @@ function PostFlat({ onAnother }) {
   const [shareSheet, setShareSheet] = useState(false);
   const [more, setMore] = useState(false);
   const [x, setX] = useState({ deposit: "", availableFrom: "", floor: "", ownerName: "", ownerPhone: "", description: "", title: "" });
+  const [maintenance, setMaintenance] = useState("");
+  const [tenants, setTenants] = useState(""); // "" (both) | "Family" | "Bachelor"
+  const [amenities, setAmenities] = useState(DEFAULT_PARTNER_AMENITIES);
+  const [floorMore, setFloorMore] = useState(false);
   const [saving, setSaving] = useState(false);
   const [missing, setMissing] = useState([]);
   const [err, setErr] = useState("");
@@ -222,6 +233,9 @@ function PostFlat({ onAnother }) {
         rent,
         furnishing,
         deposit: x.deposit,
+        maintenance: maintenanceValue(maintenance),
+        occupantsAllowed: occupantsFor(tenants),
+        amenities,
         availableFrom: x.availableFrom || null,
         floorNumber: x.floor,
         area,
@@ -346,6 +360,35 @@ function PostFlat({ onAnother }) {
         </section>
 
         <section className="ap-sec">
+          <h2>Security deposit</h2>
+          <label className="ap-money ap-money--sm">
+            <span>₹</span>
+            <input inputMode="numeric" placeholder={depositOptions(rent)[2] ? Number(depositOptions(rent)[2].amount).toLocaleString("en-IN") : "75,000"}
+              aria-label="Security deposit in rupees" value={x.deposit ? Number(x.deposit).toLocaleString("en-IN") : ""}
+              onChange={(e) => setMoreField({ deposit: e.target.value.replace(/\D/g, "").slice(0, 8) })} />
+          </label>
+          {depositOptions(rent).length > 0 ? (
+            <div className="ap-chips ap-chips--scroll">
+              {depositOptions(rent).map(({ m, amount }) => (
+                <button key={m} type="button" className={`ap-chip ap-chip--sm${Number(x.deposit) === amount ? " on" : ""}`}
+                  onClick={() => setMoreField({ deposit: Number(x.deposit) === amount ? "" : String(amount) })}>{m}x · {inr(amount)}</button>
+              ))}
+            </div>
+          ) : <p className="pz-hint" style={{ margin: "6px 0 0" }}>Add the rent to see 2x, 2.5x, 3x and 4x.</p>}
+        </section>
+
+        <section className="ap-sec">
+          <h2>Maintenance <span>per month</span></h2>
+          <label className="ap-money ap-money--sm">
+            <span>₹</span>
+            <input inputMode="numeric" placeholder="0" aria-label="Monthly maintenance in rupees"
+              value={maintenance ? Number(maintenance).toLocaleString("en-IN") : ""}
+              onChange={(e) => setMaintenance(e.target.value.replace(/\D/g, "").slice(0, 6))} />
+          </label>
+          <p className="pz-hint" style={{ margin: "6px 0 0" }}>Leave empty if there's none.</p>
+        </section>
+
+        <section className="ap-sec">
           <h2>Furnishing</h2>
           <div className="ap-seg">
             {FURNISHING_CHIPS.map((f) => (
@@ -397,6 +440,50 @@ function PostFlat({ onAnother }) {
           )}
         </section>
 
+        <section className="ap-sec">
+          <h2>Who can live here</h2>
+          <div className="ap-seg ap-seg--two">
+            {[["Family", "Only Family"], ["Bachelor", "Only Bachelors"]].map(([k, label]) => (
+              <button key={k} type="button" className={tenants === k ? "on" : ""} aria-pressed={tenants === k}
+                onClick={() => setTenants(tenants === k ? "" : k)}>{label}</button>
+            ))}
+          </div>
+          <p className="pz-hint" style={{ margin: "6px 0 0" }}>{tenants ? "Tap again to open it to both." : "Open to both families and bachelors."}</p>
+        </section>
+
+        <section className="ap-sec">
+          <h2>Floor</h2>
+          <div className="ap-chips">
+            {FLOOR_CHIPS.map(([v, label]) => (
+              <button key={v} type="button" className={`ap-chip ap-chip--sm${x.floor === v ? " on" : ""}`}
+                onClick={() => { setFloorMore(false); setMoreField({ floor: x.floor === v ? "" : v }); }}>{label}</button>
+            ))}
+            <button type="button" className={`ap-chip ap-chip--sm${Number(x.floor) >= 5 ? " on" : ""}`} onClick={() => setFloorMore(true)}>
+              {Number(x.floor) >= 5 ? `${x.floor}th` : "5+"}
+            </button>
+          </div>
+          {(floorMore || Number(x.floor) >= 5) && (
+            <select className="pz-select" style={{ marginTop: 8 }} value={Number(x.floor) >= 5 ? x.floor : ""} aria-label="Floor"
+              onChange={(e) => setMoreField({ floor: e.target.value })}>
+              <option value="">Pick the floor</option>
+              {Array.from({ length: 26 }, (_, i) => i + 5).map((n) => <option key={n} value={String(n)}>{n}</option>)}
+            </select>
+          )}
+        </section>
+
+        <section className="ap-sec">
+          <h2>Amenities</h2>
+          <div className="ap-chips">
+            {POSTING_AMENITIES.map(({ label, value }) => {
+              const on = amenities.includes(value);
+              return (
+                <button key={value} type="button" className={`ap-chip ap-chip--sm${on ? " on" : ""}`} aria-pressed={on}
+                  onClick={() => setAmenities((cur) => (on ? cur.filter((a) => a !== value) : [...cur, value]))}>{on ? "✓ " : ""}{label}</button>
+              );
+            })}
+          </div>
+        </section>
+
         {/* Who sees it */}
         <section className="ap-sec">
           <h2>Who sees it</h2>
@@ -422,7 +509,7 @@ function PostFlat({ onAnother }) {
         {/* More, optional */}
         <section className="ap-sec ap-more">
           <button type="button" className="ap-more-h" onClick={() => setMore((m) => !m)} aria-expanded={more}>
-            <span><Sparkles size={15} /> More details <small>property details from WhatsApp, deposit, move-in, floor, owner</small></span>
+            <span><Sparkles size={15} /> More details <small>property details from WhatsApp, move-in, owner</small></span>
             <ChevronDown size={18} style={{ transform: more ? "rotate(180deg)" : "none", transition: "transform .2s" }} />
           </button>
           {more && (
@@ -432,17 +519,6 @@ function PostFlat({ onAnother }) {
                 <textarea className="pz-textarea" rows={5} value={x.description} onChange={(e) => setMoreField({ description: e.target.value.slice(0, 2000) })}
                   placeholder="Paste the content of the property from WhatsApp — this increases the chances of shortlists." />
                 <small>{x.description.length ? `${x.description.length}/2000 · saved as you wrote it` : "Amenities, rules, nearby places — everything you'd tell a client."}</small></label>
-              <div className="ap-two">
-                <label><span>Deposit (₹)</span>
-                  <input className="pz-input" inputMode="numeric" placeholder="60,000" value={x.deposit ? Number(x.deposit).toLocaleString("en-IN") : ""}
-                    onChange={(e) => setMoreField({ deposit: e.target.value.replace(/\D/g, "").slice(0, 8) })} /></label>
-                <label><span>Floor</span>
-                  <select className="pz-select" value={x.floor} onChange={(e) => setMoreField({ floor: e.target.value })}>
-                    <option value="">—</option>
-                    <option value="0">Ground</option>
-                    {Array.from({ length: 30 }, (_, i) => i + 1).map((n) => <option key={n} value={n}>{n}</option>)}
-                  </select></label>
-              </div>
               <label><span>Available from</span>
                 <div className="ap-chips" style={{ marginBottom: 6 }}>
                   <button type="button" className={`ap-chip ap-chip--sm${!x.availableFrom ? " on" : ""}`} onClick={() => setMoreField({ availableFrom: "" })}>Now</button>
@@ -549,6 +625,7 @@ const CSS = `
 .ap-money input { flex: 1; min-width: 0; border: 0; outline: 0; font: inherit; font-size: 34px; font-weight: 800; letter-spacing: -0.02em; background: transparent; color: var(--ink, #16141C); }
 .ap-seg { display: grid; grid-template-columns: repeat(3, 1fr); gap: 0; border: 1.5px solid var(--line, #E7E3DA); border-radius: 12px; overflow: hidden; }
 .ap-seg--two { grid-template-columns: 1fr 1fr; }
+.ap-money--sm input { font-size: 24px; }
 .ap-seg button { border: 0; border-left: 1px solid var(--line, #E7E3DA); background: #fff; font: inherit; font-size: 14px; font-weight: 700; padding: 11px 6px; cursor: pointer; color: var(--ink, #16141C); }
 .ap-seg button:first-child { border-left: 0; }
 .ap-seg button.on { background: var(--noir, #0E0D12); color: #fff; }
