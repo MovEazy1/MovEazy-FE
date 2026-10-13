@@ -31,7 +31,7 @@ export default function CrmPartnerFields({ value, onChange, partnerInfo }) {
     );
   }
 
-  const on = value.partner_visible !== false;
+  const on = value.partner_visible === true;
   return (
     <div className="crm-card" style={{ display: "grid", gap: 8 }}>
       <span className="crm-label">MovEazy partners</span>
@@ -39,9 +39,10 @@ export default function CrmPartnerFields({ value, onChange, partnerInfo }) {
         <input type="checkbox" checked={on} style={{ marginTop: 2 }}
           onChange={(e) => onChange({ partner_visible: e.target.checked })} />
         <span style={{ fontSize: 12.5 }}>
-          Share with broker partners
+          Show to MovEazy partners
           <span className="crm-mute" style={{ display: "block", fontSize: 11 }}>
-            Shown locked in the broker app; Premium partners unlock it and keep the share set in Brokers → Prices &amp; shares.
+            Off by default: flats from other brokers have no brokerage to share. Tick only for flats MovEazy can share brokerage on —
+            partner brokers then see it (Premium unlocks it, keeping the share set in Brokers → Prices &amp; shares).
           </span>
         </span>
       </label>
