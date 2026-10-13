@@ -1,11 +1,11 @@
 /**
  * After the plan: the payment return, the congratulations one-pager (ROI +
- * Refer & Earn), the referrals page, and the home cards — Complete profile,
+ * Refer & Earn), the Wallet's payout card, and the home cards — Complete profile,
  * then the golden Premium card (with the logo turned gold).
  */
 import { useEffect, useMemo, useRef, useState } from "react";
 import { Link, useNavigate, useSearchParams } from "react-router-dom";
-import { BadgeCheck, Copy, Crown, Gift, IndianRupee, Info, Landmark, MapPin, PartyPopper, Search, ShieldCheck, TrendingUp, X } from "lucide-react";
+import { BadgeCheck, Copy, Crown, Gift, IndianRupee, Landmark, MapPin, PartyPopper, Search, ShieldCheck, TrendingUp, X } from "lucide-react";
 import { usePartner } from "./PartnerApp";
 import { Chip, Loading, Sheet, TopBar, WhatsAppIcon, toast } from "./partnerUi";
 import { useLocalities } from "./useLocalities";
@@ -13,7 +13,7 @@ import { useLandingSettings } from "../../lib/landingSettings";
 import { friendlyError, inr, pp } from "../../lib/partners";
 import {
   REFERRAL_REWARD, completePartnerProfile, fetchMyReferrals, fetchPartnerStatus, fetchPlans, markCongratsSeen, planRoi,
-  referralLink, referralMessage, rewardTimer, setPayout,
+  referralLink, referralMessage, setPayout,
 } from "../../lib/partnerPlans";
 
 const fmtDate = (d) => (d ? new Date(d).toLocaleDateString("en-IN", { day: "numeric", month: "short", year: "numeric" }) : "");
@@ -143,15 +143,15 @@ export function ReferButtons({ code, name, big = false }) {
   );
 }
 
-/* ── /referrals ──────────────────────────────────────────────────────────── */
+/* ── For the Wallet (/referrals, Wallet.jsx) ─────────────────────────────── */
 
-const REF_STATUS = {
+export const REF_STATUS = {
   signed_up: ["Joined · no plan yet", "#6B7280"], pending: ["Plan taken", "#B45309"],
   earned: ["Due · paying out soon", "#15803D"], paid: ["Paid to you", "#166534"], void: ["Plan cancelled", "#B91C1C"],
 };
 
 /** Where the referral money goes: a UPI ID, or a bank account. */
-function PayoutCard({ payout, onSaved }) {
+export function PayoutCard({ payout, onSaved }) {
   const has = Boolean(payout?.upi || payout?.bank_last4);
   const [open, setOpen] = useState(false);
   const [mode, setMode] = useState(payout?.bank_last4 ? "bank" : "upi");
@@ -161,7 +161,7 @@ function PayoutCard({ payout, onSaved }) {
     setBusy(true);
     try {
       await setPayout(mode === "upi" ? { upi: f.upi } : { name: f.name, account: f.account, ifsc: f.ifsc });
-      toast("Saved — your rewards go there");
+      toast("Saved — your earnings go there");
       setOpen(false);
       onSaved();
     } catch (e) {
@@ -175,7 +175,7 @@ function PayoutCard({ payout, onSaved }) {
       <div className="pz-section pz-row" style={{ gap: 10 }}>
         <Landmark size={19} color="var(--g)" />
         <span style={{ flex: 1, fontSize: 14 }}>
-          Rewards are paid to <b>{payout.upi || `${payout.bank_name} · A/c ••${payout.bank_last4} · ${payout.ifsc}`}</b>
+          Your earnings are paid to <b>{payout.upi || `${payout.bank_name} · A/c ••${payout.bank_last4} · ${payout.ifsc}`}</b>
         </span>
         <button type="button" className="pz-btn pz-btn--sm" onClick={() => setOpen(true)}>Change</button>
       </div>
@@ -184,7 +184,7 @@ function PayoutCard({ payout, onSaved }) {
   return (
     <div className="pz-section">
       <strong style={{ display: "flex", alignItems: "center", gap: 6 }}><Landmark size={17} /> Where should we pay you?</strong>
-      <p className="pz-hint" style={{ margin: "4px 0 10px" }}>Your referral rewards are sent here 30 days after the broker pays.</p>
+      <p className="pz-hint" style={{ margin: "4px 0 10px" }}>Referral rewards and your lifetime commission are sent here.</p>
       <div className="pz-chips" style={{ marginBottom: 10 }}>
         <Chip on={mode === "upi"} onClick={() => setMode("upi")}>UPI ID</Chip>
         <Chip on={mode === "bank"} onClick={() => setMode("bank")}>Bank account</Chip>
@@ -205,80 +205,6 @@ function PayoutCard({ payout, onSaved }) {
         {has && <button type="button" className="pz-btn" onClick={() => setOpen(false)}>Cancel</button>}
       </div>
     </div>
-  );
-}
-
-/** One referred broker: who, where they've got to, and the reward's countdown with its (i). */
-function ReferralRow({ j }) {
-  const [info, setInfo] = useState(false);
-  const [label, color] = REF_STATUS[j.status] || REF_STATUS.signed_up;
-  const timer = j.status === "pending" ? rewardTimer(j) : null;
-  return (
-    <div style={{ padding: "12px 14px", borderTop: "1px solid var(--line)" }}>
-      <div className="pz-row">
-        <span style={{ flex: 1 }}>
-          <strong style={{ display: "block" }}>{j.name}</strong>
-          <span className="pz-meta">Joined {fmtDate(j.joined_at)}{j.plan_label ? ` · ${j.plan_label} plan` : ""}</span>
-        </span>
-        <span style={{ fontSize: 12.5, fontWeight: 700, color, textAlign: "right" }}>
-          {timer ? (
-            <span className="rf-timer">
-              {timer.label}
-              <button type="button" className="rf-i" aria-label="How this works" aria-expanded={info} onClick={() => setInfo((v) => !v)}><Info size={15} /></button>
-            </span>
-          ) : <>{label}{j.amount ? <><br />{inr(j.amount)}</> : null}{j.status === "paid" && j.paid_at ? <><br />{fmtDate(j.paid_at)}</> : null}</>}
-        </span>
-      </div>
-      {timer && info && <p className="rf-info">{timer.info}</p>}
-    </div>
-  );
-}
-
-export function ReferralsPage() {
-  const { me } = usePartner();
-  const [r, setR] = useState(null);
-  const [err, setErr] = useState("");
-  const load = () => fetchMyReferrals().then(setR, (e) => setErr(friendlyError(e)));
-  useEffect(() => { load(); }, []);
-  const top = Math.max(0, ...(r?.rewards ?? []).map((x) => Number(x.reward) || 0)) || REFERRAL_REWARD;
-  return (
-    <>
-      <TopBar title="Refer & Earn" back />
-      <style>{WP_CSS}</style>
-      <div className="pz-pad">
-        <div className="rf-hero">
-          <Gift size={28} />
-          <h2>Earn up to {inr(top)} per broker</h2>
-          <p>Share your link. When a broker joins with it and takes Premium, you earn — paid to your bank 30 days later if they keep their plan.</p>
-          {(r?.rewards ?? []).length > 0 && (
-            <div className="rf-rates">
-              {r.rewards.map((x) => (
-                <span key={x.label}><b>{inr(x.reward)}</b> when they take {inr(x.price)} · {x.months} month{x.months === 1 ? "" : "s"}</span>
-              ))}
-            </div>
-          )}
-          <ReferButtons code={r?.code} name={me?.partner?.name} />
-        </div>
-        {err && <div className="pz-err">{err}</div>}
-        {r && (
-          <>
-            <div className="pz-section" style={{ display: "grid", gridTemplateColumns: "repeat(3,1fr)", textAlign: "center", padding: 10, marginTop: 12 }}>
-              {[["On the way", r.pending], ["Due", r.earned], ["Paid", r.paid]].map(([k, v]) => (
-                <div key={k}><div style={{ fontSize: 19, fontWeight: 800 }}>{inr(v)}</div><div className="pz-meta">{k}</div></div>
-              ))}
-            </div>
-            <PayoutCard payout={r.payout} onSaved={load} />
-            <div className="pz-section" style={{ padding: 0 }}>
-              <h2 style={{ padding: "14px 14px 0" }}>Brokers you referred</h2>
-              {r.joined.length === 0
-                ? <p className="pz-meta" style={{ padding: "0 14px 14px", margin: 0 }}>Nobody yet — share your link on your broker WhatsApp groups.</p>
-                : r.joined.map((j, i) => <ReferralRow key={i} j={j} />)}
-            </div>
-            <p className="pz-hint" style={{ textAlign: "center" }}>A reward is cancelled if the broker cancels their plan within its first 30 days.</p>
-          </>
-        )}
-      </div>
-    </>
   );
 }
 
@@ -410,7 +336,7 @@ export function PremiumCard({ me, status }) {
   );
 }
 
-const WP_CSS = `
+export const WP_CSS = `
 .wp { min-height: 100dvh; position: relative; overflow: hidden; color: #fff; background: radial-gradient(120% 70% at 50% 0%, #1B6B4E, #0A3A2A 50%, #05241A); }
 .wp-in { position: relative; z-index: 1; max-width: 520px; margin: 0 auto; padding: 48px 20px 36px; text-align: center; }
 .wp-confetti { position: absolute; inset: 0; pointer-events: none; }

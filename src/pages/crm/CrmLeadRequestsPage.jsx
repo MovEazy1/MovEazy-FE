@@ -16,7 +16,7 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import { Btn, C, Chip, Empty, Loading, Toast, inr, relTime } from "./crmUi";
 import { waLink } from "../../lib/partners";
 import {
-  PACKS, REQUEST_STATUS, crmAssignLeads, crmDecideLeadRequest, crmLeadCandidates, crmLeadClosures, crmLeadRequests,
+  PACKS, REQUEST_STATUS, crmAssignLeads, crmDecideLeadRequest, crmLeadCandidates, crmLeadClosureReceived, crmLeadClosures, crmLeadRequests,
   crmLeadSettings, crmSetLeadSettings, leadNeedLine,
 } from "../../lib/partnerLeads";
 
@@ -182,6 +182,39 @@ function PaySettings({ say }) {
   );
 }
 
+const COMMISSION_WORD = { due: "due", held: "held (not on Premium)", paid: "paid", lost: "lost" };
+
+/** Has MovEazy got its share? Marking it received pays the closing partner's referrer their commission. */
+function ClosureReceived({ c, say, onChanged }) {
+  const [busy, setBusy] = useState(false);
+  const run = async (undo) => {
+    if (!window.confirm(undo ? "Undo — MovEazy hasn't received this after all? Any unpaid referral commission on it is taken back."
+      : `MovEazy has received ${inr(c.due_amount)} from ${c.broker_name}?${c.referrer_name ? ` ${c.referrer_name}, who referred them, earns their commission.` : ""}`)) return;
+    setBusy(true);
+    try {
+      const r = await crmLeadClosureReceived(c.assignment_id, undo);
+      say(undo ? "Marked not received" : r?.commission ? `Received · ${r.commission.referrer} earns ${inr(r.commission.amount)}` : "Received");
+      onChanged();
+    } catch (e) { say(e.message, "error"); } finally { setBusy(false); }
+  };
+  return (
+    <span style={{ display: "block", fontSize: 11, marginTop: 3 }}>
+      {c.received_at ? (
+        <>
+          <span style={{ color: C.textMute }}>Received {relTime(c.received_at)}</span>{" "}
+          {c.commission_status !== "paid" && <button type="button" disabled={busy} onClick={() => run(true)}
+            style={{ border: 0, background: "none", padding: 0, color: C.textMute, textDecoration: "underline", cursor: "pointer", font: "inherit" }}>undo</button>}
+        </>
+      ) : <Btn sm disabled={busy} onClick={() => run(false)}>Mark received</Btn>}
+      {c.referrer_name && (
+        <span style={{ display: "block", color: C.gold }}>
+          {c.commission != null ? `${c.referrer_name} · ${inr(c.commission)} ${COMMISSION_WORD[c.commission_status] ?? ""}` : `Referred by ${c.referrer_name}`}
+        </span>
+      )}
+    </span>
+  );
+}
+
 export default function CrmLeadRequestsPage() {
   const [tab, setTab] = useState("todo");
   const [reqs, setReqs] = useState(null);
@@ -228,7 +261,10 @@ export default function CrmLeadRequestsPage() {
                       {PACKS[c.pack]?.title} · rent {inr(c.closed_rent)} · {c.deal_type === "direct" ? "direct with owner (30%)" : "shared (20%)"} · {relTime(c.closed_at)}
                     </span>
                   </span>
-                  <b className="crm-num" style={{ color: Number(c.due_amount) > 0 ? C.accent : C.textMute }}>{Number(c.due_amount) > 0 ? inr(c.due_amount) : "—"}</b>
+                  <span style={{ textAlign: "right", flex: "none" }}>
+                    <b className="crm-num" style={{ color: Number(c.due_amount) > 0 ? C.accent : C.textMute }}>{Number(c.due_amount) > 0 ? inr(c.due_amount) : "—"}</b>
+                    {Number(c.due_amount) > 0 && <ClosureReceived c={c} say={say} onChanged={load} />}
+                  </span>
                 </div>
               ))}
             </div>

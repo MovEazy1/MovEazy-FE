@@ -109,8 +109,40 @@ export const crmPlans = () => rpc("crm_plans_list").then((r) => r ?? []);
 export const crmSetPlanReward = (planId, reward) => rpc("crm_set_plan_reward", { p_plan: planId, p_reward: Number(reward) });
 export const crmReferralPayouts = () => rpc("crm_referral_payouts").then((r) => r ?? []);
 export const crmMarkReferralPaid = (id) => rpc("crm_referral_mark_paid", { p_referral: id });
+/** Lifetime referral commission (partner_referral_commission.sql). */
+export const crmReferralCommissions = () => rpc("crm_referral_commissions").then((r) => r ?? []);
+export const crmMarkCommissionPaid = (id) => rpc("crm_referral_commission_paid", { p_commission: id });
 
 export const fetchMyReferrals = () => rpc("partner_my_referrals");
+
+/**
+ * The Wallet's numbers from partner_my_referrals(): one-time Premium rewards
+ * plus the lifetime commission. `available` is due to be paid out; `onTheWay`
+ * is rewards in their 30 days and deals waiting for MovEazy's share; `held`
+ * waits for the partner to go Premium (until `heldUntil`).
+ */
+export function walletTotals(r) {
+  const n = (v) => Number(v) || 0;
+  const c = r?.commission ?? {};
+  const waiting = (r?.joined ?? []).flatMap((j) => j.deals ?? []).filter((d) => d.status === "waiting").reduce((t, d) => t + n(d.amount), 0);
+  return {
+    available: n(r?.earned) + n(c.due),
+    onTheWay: n(r?.pending) + waiting,
+    held: n(c.held),
+    heldUntil: c.held_until || null,
+    paid: n(r?.paid) + n(c.paid),
+    lifetime: n(c.due) + n(c.paid),
+  };
+}
+
+/** "Bring `partners` partners, each closing `deals` a month at `rent`": the referrer's commission a month and a year. */
+export function lifetimeEstimate(partners, deals, rent, ratePct = 10) {
+  const monthly = Math.round(Math.max(0, partners) * Math.max(0, deals) * Math.max(0, rent) * (Number(ratePct) || 0) / 100);
+  return { monthly, yearly: monthly * 12 };
+}
+
+/** "10%", "6.67%" */
+export const pctLabel = (v) => `${Number((Number(v) || 0).toFixed(2))}%`;
 export const fetchReferralCode = () => rpc("partner_referral_code");
 export const referralLink = (code) => `${PARTNER_ORIGIN}/?ref=${encodeURIComponent(code)}`;
 export function referralMessage(code, name = "") {

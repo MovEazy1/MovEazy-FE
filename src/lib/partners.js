@@ -345,6 +345,9 @@ export const adminListPartners = () => rpc("partner_admin_list").then((r) => r ?
 export const adminSetStatus = (userId, status) => rpc("partner_admin_set_status", { p_user: userId, p_status: status });
 export const adminSetAutoApprove = (on) => rpc("partner_admin_set_auto_approve", { p_on: on });
 export const adminSetClientShare = (userId, pct) => rpc("partner_admin_set_client_share", { p_user: userId, p_pct: pct });
+/** A referrer's lifetime commission, % of rent on direct / shared deals (null = default). */
+export const adminSetReferralRate = (userId, direct, shared) =>
+  rpc("partner_admin_set_referral_rate", { p_user: userId, p_direct: direct, p_shared: shared });
 export const adminGrantPremium = (userId, months) =>
   rpc("partner_admin_grant_tier", { p_user: userId, p_tier: "moveazy_inventory", p_months: months });
 

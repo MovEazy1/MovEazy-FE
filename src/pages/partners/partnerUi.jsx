@@ -38,6 +38,10 @@ const CSS = `
   padding: 10px 16px; display: flex; align-items: center; gap: 10px; min-height: 54px; }
 .pz-top h1 { font-size: 18px; font-weight: 700; margin: 0; flex: 1; letter-spacing: -0.01em; color: #fff; }
 .pz-top .pz-iconbtn { color: #fff; }
+.pz-tolet { display: inline-flex; align-items: center; height: 32px; padding: 0 13px; margin-right: 4px; border-radius: 999px; background: var(--goldg);
+  color: #1F1605; font-size: 13.5px; font-weight: 800; letter-spacing: .01em; text-decoration: none; white-space: nowrap;
+  box-shadow: 0 4px 14px rgba(212,164,55,.35); }
+.pz-tolet:active { transform: scale(.97); }
 .pz-top .pz-iconbtn:active { background: var(--noir3); }
 .pz-top .pz-btn--ghost { color: var(--gold); }
 .pz-top .pz-btn--primary { background: var(--goldg); border-color: transparent; color: #1F1605; }

@@ -14,7 +14,8 @@ import { Btn, C, Chip, Empty, inr, relTime, shortDate } from "./crmUi";
 import { formatForDisplay } from "../../lib/mobile";
 import { friendlyError } from "../../lib/partners";
 import {
-  crmDecidePremiumPayment, crmMarkReferralPaid, crmPlans, crmPremiumPayments, crmReferralPayouts, crmSetPlanReward,
+  crmDecidePremiumPayment, crmMarkCommissionPaid, crmMarkReferralPaid, crmPlans, crmPremiumPayments, crmReferralCommissions, crmReferralPayouts,
+  crmSetPlanReward, pctLabel,
 } from "../../lib/partnerPlans";
 
 const box = { display: "grid", gap: 10, background: C.bg };
@@ -155,6 +156,57 @@ export function ReferralPayouts({ canManage, onToast }) {
           </table>
         </div>
       )}
+    </div>
+  );
+}
+
+const COMMISSION_STATUS = { held: ["Held — referrer not on Premium", C.gold], due: ["Due — pay now", C.accent], paid: ["Paid", C.textMute] };
+
+/** Lifetime referral commission: a cut of MovEazy's share on deals by partners someone referred (partner_referral_commission.sql). */
+export function ReferralCommissions({ canManage, onToast }) {
+  const [rows, setRows] = useState(null);
+  const [busy, setBusy] = useState("");
+  const load = useCallback(() => crmReferralCommissions().then(setRows, (e) => { setRows([]); onToast(friendlyError(e), "error"); }), [onToast]);
+  useEffect(() => { if (canManage) load(); }, [canManage, load]);
+  if (!canManage || !rows?.length) return null;
+
+  const paid = async (r) => {
+    if (!window.confirm(`Mark ${inr(r.amount)} to ${r.referrer} as paid? They'll be told.`)) return;
+    setBusy(r.id);
+    try { await crmMarkCommissionPaid(r.id); onToast("Marked paid"); await load(); } catch (e) { onToast(friendlyError(e), "error"); } finally { setBusy(""); }
+  };
+  const due = rows.filter((r) => r.status === "due");
+  return (
+    <div className="crm-card" style={box}>
+      <div>
+        <span style={{ fontWeight: 800, fontSize: 14 }}>Lifetime referral commission{due.length ? ` · ${due.length} due (${inr(due.reduce((t, r) => t + r.amount, 0))})` : ""}</span>
+        <span className="crm-mute" style={{ display: "block", fontSize: 11.5 }}>
+          Out of MovEazy's share on a MovEazy lead closed by a partner someone referred — earned when the closure is marked received
+          (Lead requests → Closures). Held for 30 days when the referrer isn't on Premium.
+        </span>
+      </div>
+      <div style={{ overflowX: "auto" }}>
+        <table className="crm-table">
+          <thead><tr><th>Referrer</th><th>Deal by</th><th>Commission</th><th>Status</th><th>Pay to</th><th /></tr></thead>
+          <tbody>
+            {rows.map((r) => {
+              const [label, tone] = COMMISSION_STATUS[r.status] ?? [r.status, C.textMute];
+              const bank = r.bank && r.bank.account ? `${r.bank.name} · A/c ${r.bank.account} · ${r.bank.ifsc}` : "";
+              return (
+                <tr key={r.id}>
+                  <td><div style={{ fontWeight: 600 }}>{r.referrer}</div><div className="crm-mute" style={{ fontSize: 11 }}>{r.referrer_phone ? formatForDisplay(r.referrer_phone) : ""}</div></td>
+                  <td>{r.referee}<div className="crm-mute" style={{ fontSize: 11 }}>rent {inr(r.rent)} · {r.deal_type} · {shortDate(r.created_at)}</div></td>
+                  <td className="crm-num" style={{ fontWeight: 700 }}>{inr(r.amount)}<div className="crm-mute" style={{ fontSize: 11, fontWeight: 400 }}>{pctLabel(r.rate_pct)} of rent</div></td>
+                  <td><span style={{ color: tone, fontWeight: 700 }}>{label}</span>
+                    <div className="crm-mute" style={{ fontSize: 11 }}>{r.status === "paid" ? `${shortDate(r.paid_at)}${r.paid_by ? ` by ${r.paid_by}` : ""}` : r.status === "held" ? `until ${shortDate(r.hold_until)}` : ""}</div></td>
+                  <td style={{ fontSize: 12 }}>{r.upi || bank || <span style={{ color: C.coral }}>No details yet — ask them</span>}</td>
+                  <td>{r.status === "due" && <Btn sm variant="primary" disabled={!!busy} onClick={() => paid(r)}>Mark paid</Btn>}</td>
+                </tr>
+              );
+            })}
+          </tbody>
+        </table>
+      </div>
     </div>
   );
 }

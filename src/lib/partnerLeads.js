@@ -87,6 +87,9 @@ export const crmLeadCandidates = (id) => rpc("crm_lead_candidates", { p_request:
 export const crmAssignLeads = (id, clientIds) => rpc("crm_lead_assign", { p_request: id, p_clients: clientIds });
 export const crmClientBrokers = (clientId) => rpc("crm_client_brokers", { p_client: clientId }).then((r) => r ?? []);
 export const crmLeadClosures = () => rpc("crm_lead_closures").then((r) => r ?? []);
+/** MovEazy has its share of a closed lead (or undo) — the closing partner's referrer earns their commission. */
+export const crmLeadClosureReceived = (assignmentId, undo = false) =>
+  rpc("crm_lead_closure_received", { p_assignment: assignmentId, p_undo: undo });
 export const crmLeadSettings = () => rpc("crm_lead_settings");
 export const crmSetLeadSettings = (upi, price) => rpc("crm_set_lead_settings", { p_upi: upi, p_price: Number(price) });
 

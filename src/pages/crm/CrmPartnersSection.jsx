@@ -18,13 +18,14 @@ import { Btn, C, Chip, Empty, Toast, shortDate } from "./crmUi";
 import CrmProgramSettings from "./CrmProgramSettings";
 import CrmBrokerQr from "./CrmBrokerQr";
 import CrmTrialPanel from "./CrmTrialPanel";
-import { PremiumPayments, ReferralPayouts } from "./CrmPremiumPayments";
+import { PremiumPayments, ReferralCommissions, ReferralPayouts } from "./CrmPremiumPayments";
 import { useLandingSettings } from "../../lib/landingSettings";
 import { SCOPES } from "../../lib/adminScopes";
 import { whatsappUrl } from "../../lib/crmSettings";
 import { formatForDisplay } from "../../lib/mobile";
 import {
-  adminGrantPremium, adminListPartners, adminSetAutoApprove, adminSetClientShare, adminSetStatus, fetchProgramSettings, friendlyError,
+  adminGrantPremium, adminListPartners, adminSetAutoApprove, adminSetClientShare, adminSetReferralRate, adminSetStatus, fetchProgramSettings,
+  friendlyError,
 } from "../../lib/partners";
 
 const STATUS_TONE = { pending: C.gold, approved: C.accent, suspended: C.coral };
@@ -126,6 +127,7 @@ export default function CrmPartnersSection({ access }) {
         <PremiumPayments canManage={canManage} onToast={showToast} onChanged={load} />
         <CrmTrialPanel canManage={canManage} onToast={showToast} onChanged={load} />
         <ReferralPayouts canManage={canManage} onToast={showToast} />
+        <ReferralCommissions canManage={canManage} onToast={showToast} />
         <span className="crm-mute" style={{ fontSize: 11.5 }}>
           Partner app: <a href={partnerUrl} target="_blank" rel="noreferrer" style={{ color: C.accent }}>{partnerUrl.replace("https://", "")}</a>
           {" "}(also at moveazy.co.in/partners). Premium is granted by hand here until online payment is live.
@@ -147,7 +149,7 @@ export default function CrmPartnersSection({ access }) {
           <table className="crm-table">
             <thead>
               <tr>
-                <th>Partner</th><th>Mobile</th><th>Status</th><th>Joined</th><th>Listings</th><th>Groups</th><th>Premium</th><th>Client share</th><th />
+                <th>Partner</th><th>Mobile</th><th>Status</th><th>Joined</th><th>Listings</th><th>Groups</th><th>Premium</th><th>Client share</th><th title="What this partner earns, % of the rent, on every MovEazy lead closed by partners they referred">Referral commission</th><th />
               </tr>
             </thead>
             <tbody>
@@ -186,6 +188,31 @@ export default function CrmPartnersSection({ access }) {
                         act(r.user_id, () => adminSetClientShare(r.user_id, pct), pct === null ? "Back to the default share" : `${r.name} keeps ${pct}% on MovEazy clients`);
                       }}>
                       {r.client_share_pct != null ? `${Number(r.client_share_pct)}%` : <span className="crm-mute">{program.clientShare}% (default)</span>}
+                    </button>
+                  </td>
+                  <td className="crm-num">
+                    <button type="button" disabled={!canManage || !!busy}
+                      title={canManage ? "Change this partner's lifetime referral commission" : ""}
+                      style={{ background: "none", border: 0, padding: 0, font: "inherit", color: C.text, cursor: canManage ? "pointer" : "default", textAlign: "left" }}
+                      onClick={() => {
+                        const ask = (label, cur, max, dflt) => {
+                          const v = window.prompt(`${r.name}'s commission on ${label} deals by partners they referred, % of the month's rent (0–${max}).\nLeave empty for the default (${dflt}%: a third of MovEazy's share, at most 10%).`, cur ?? "");
+                          if (v === null) return undefined;
+                          if (v.trim() === "") return null;
+                          const n = Number(v);
+                          return n >= 0 && n <= max ? n : NaN;
+                        };
+                        const d = ask("direct", r.referral_direct_pct, 30, 10);
+                        if (d === undefined) return;
+                        const s = ask("shared", r.referral_shared_pct, 20, 6.67);
+                        if (s === undefined) return;
+                        if (Number.isNaN(d) || Number.isNaN(s)) { showToast("Direct is 0–30%, shared 0–20%", "error"); return; }
+                        act(r.user_id, () => adminSetReferralRate(r.user_id, d, s), d === null && s === null ? "Back to the default commission" : `${r.name}'s referral commission saved`);
+                      }}>
+                      {r.referral_direct_pct != null || r.referral_shared_pct != null
+                        ? `Direct ${r.referral_direct_pct ?? 10}% · Shared ${r.referral_shared_pct ?? 6.67}%`
+                        : <span className="crm-mute">Direct 10% · Shared 6.67% (default)</span>}
+                      {r.referred_count > 0 && <div className="crm-mute" style={{ fontSize: 10.5 }}>{r.referred_count} referred</div>}
                     </button>
                   </td>
                   <td>

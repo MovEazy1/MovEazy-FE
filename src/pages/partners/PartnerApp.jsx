@@ -65,7 +65,7 @@ const SavedPage = lazy(() => import("./SavedPage"));
 const JoinPage = lazy(() => import("./JoinPage"));
 const PaymentReturn = lazy(() => import("./PremiumJourney").then((m) => ({ default: m.PaymentReturn })));
 const WelcomePremium = lazy(() => import("./PremiumJourney").then((m) => ({ default: m.WelcomePremium })));
-const ReferralsPage = lazy(() => import("./PremiumJourney").then((m) => ({ default: m.ReferralsPage })));
+const ReferralsPage = lazy(() => import("./Wallet"));
 const SalesFunnel = lazy(() => import("./SalesFunnel"));
 const AiMatcher = lazy(() => import("./AiMatcher"));
 const TenantPage = lazy(() => import("./TenantPage"));

@@ -13,7 +13,7 @@
 import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { Link } from "react-router-dom";
 import { useInView } from "react-intersection-observer";
-import { Check, ChevronDown, Crown, QrCode, Search, SlidersHorizontal, X } from "lucide-react";
+import { Check, ChevronDown, Crown, Search, SlidersHorizontal, Wallet, X } from "lucide-react";
 import { usePartner } from "./PartnerApp";
 import FilterSheet from "./FilterSheet";
 import logo from "../../assets/logo/moveazy-logo-mint-dark.png";
@@ -139,10 +139,10 @@ export default function InventoryHome() {
       <header className="pz-top" style={{ position: "relative", flexDirection: "column", alignItems: "stretch", gap: 10 }}>
         <div className="pz-between">
           <h1 style={{ margin: 0, lineHeight: 0 }}><img src={goldLogo || logo} alt="MovEazy" height="26" style={{ height: 26, width: "auto" }} /></h1>
-          <span className="pz-chip" style={{ cursor: "default" }}>Bangalore</span>
           <span className="pz-row" style={{ gap: 4 }}>
+            <Link to={pp("/qr")} className="pz-tolet" aria-label="To-Let QR poster" title="Your To-Let QR poster">To-Let</Link>
             <NotificationBell count={unread} />
-            <Link to={pp("/qr")} className="pz-iconbtn" aria-label="My QR poster" title="My QR poster"><QrCode size={21} /></Link>
+            <Link to={pp("/referrals")} className="pz-iconbtn" aria-label="Wallet" title="Wallet & referrals"><Wallet size={21} /></Link>
             <Link to={pp("/more")} aria-label="Your profile" style={{ textDecoration: "none" }}>
               <Avatar name={me?.partner?.name || "You"} />
             </Link>

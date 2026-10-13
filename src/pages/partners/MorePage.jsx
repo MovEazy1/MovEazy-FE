@@ -84,7 +84,7 @@ export default function MorePage() {
               `${status.trial.days_left} day${status.trial.days_left === 1 ? "" : "s"} left · take Premium to keep it`)
             : row(pp("/premium"), <Crown size={19} color="#8A6419" />, premium ? "MovEazy Premium — active" : "Join Premium",
               premium ? `Plans${status?.plan?.until ? ` · till ${new Date(status.plan.until).toLocaleDateString("en-IN", { day: "numeric", month: "short" })}` : ""}` : "Unlock 1000+ listings, AI matching and groups")}
-          {premium && row(pp("/referrals"), <Gift size={19} color="#8A6419" />, "Refer & Earn ₹1,500", "Per broker who joins with your link")}
+          {row(pp("/referrals"), <Gift size={19} color="#8A6419" />, "Wallet · Refer & Earn", "Lifetime 10% on every deal your partners close")}
           {row(pp("/my-flats"), <Home size={19} color="var(--g)" />, "My flats", "Live, paused and let out · details to add")}
           {row(premium ? pp("/performance") : pp("/premium"), premium ? <Trophy size={19} color="#8A6419" /> : <Lock size={19} color="#8A6419" />,
             "Performance vs other partners", premium ? "Coming soon" : "Premium feature")}
