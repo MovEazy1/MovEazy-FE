@@ -1,18 +1,19 @@
 /**
- * PRD 01 — Inventory, the Inventory tab: one list of everything the partner
- * can see, and cards you can act on without opening. (Home is PartnerHome.jsx.)
- *
- * Under the search, big pills pick the source — All · MovEazy · Brokers ·
- * Groups · Mine — then a row of BHK | Brokerage | ⚙: the first two open small
- * dropdowns; only ⚙ opens the full filter sheet.
- *
- * Search, filters and scroll position survive a trip into Details and back
- * (PRD: "Preserve scroll position when returning").
+ * The Inventory tab. Under the search, two pills:
+ *   - My inventory (always what the tab opens on): the partner's live flats.
+ *     None yet → upload your inventory to start getting clients. Some → how
+ *     complete each one's details are, and a nudge to fill the gaps (Add
+ *     details opens the flat's details sheet).
+ *   - All inventory: everything else they can see — their groups and
+ *     associations, other brokers' shared flats, and MovEazy's flats marked
+ *     to share with partners (partner_inventory decides). Chips narrow it to
+ *     MovEazy · Brokers · Groups, then BHK | Brokerage | ⚙.
+ * (Home is PartnerHome.jsx.) Search and filters survive a trip into a flat.
  */
-import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { Link } from "react-router-dom";
 import { useInView } from "react-intersection-observer";
-import { ChevronDown, Crown, Search, SlidersHorizontal, X } from "lucide-react";
+import { Building2, CheckCircle2, ChevronDown, Crown, Plus, Search, SlidersHorizontal, Sparkles, X } from "lucide-react";
 import { usePartner } from "./PartnerApp";
 import FilterSheet from "./FilterSheet";
 import { Chip, Empty, Loading, PropertyCard } from "./partnerUi";
@@ -20,14 +21,76 @@ import { PartnerHeader } from "./PartnerChrome";
 import { DEMO_COUNTS, DEMO_GROUPS, DemoBanner, demoRows } from "./demoMode";
 import { customerMessage, hasPremium, inSource, listerWhatsApp, pp, waLink } from "../../lib/partners";
 import { BHK_CHIPS, BROKERAGE_CHIPS, EMPTY_FILTERS, activeFilterCount, applyFilters } from "../../lib/partnerFilters";
+import { flatDetailScore, myFlats } from "../../lib/partnerTenants";
+import { flatLine } from "../../lib/partnerMatcher";
+import { SmartListingImage } from "./partnerMedia";
 
 const PAGE = 20;
+// All inventory's narrowing chips (the partner's own flats live under My inventory).
 const SOURCE_OPTIONS = [
   { key: "moveazy", label: "MovEazy" },
   { key: "broker", label: "Brokers" },
-  { key: "group", label: "Groups" },
-  { key: "mine", label: "Mine" },
+  { key: "group", label: "Groups & associations" },
 ];
+
+/** My inventory: the partner's live flats, each with how complete its details are. */
+function MyInventory({ inventory, query }) {
+  const live = useMemo(() => myFlats(inventory ?? []).live, [inventory]);
+  const others = useMemo(() => (inventory ?? []).filter((l) => l.source === "mine" && l.status !== "published").length, [inventory]);
+  const rows = useMemo(() => applyFilters(live, EMPTY_FILTERS, query)
+    .map((l) => ({ l, sc: flatDetailScore(l) }))
+    .sort((a, b) => a.sc.done / a.sc.total - b.sc.done / b.sc.total), [live, query]);
+  const missing = rows.filter((r) => r.sc.missing.length).length;
+
+  if (!inventory) return <Loading label="Loading your flats…" />;
+  if (!live.length) {
+    return (
+      <div className="ih-none">
+        <span className="ih-none-ic" aria-hidden><Building2 size={34} /></span>
+        <h2>You haven't uploaded your inventory yet</h2>
+        <p>Upload your inventory to start getting clients. MovEazy matches every flat you add to tenants looking for it.</p>
+        <Link to={pp("/add/property")} className="ih-add"><Plus size={20} strokeWidth={2.6} /> Upload a flat</Link>
+        {others > 0 && <Link to={pp("/my-flats")} className="ih-other">See your {others} paused or let-out flat{others === 1 ? "" : "s"}</Link>}
+      </div>
+    );
+  }
+  return (
+    <>
+      {missing > 0 ? (
+        <div className="ih-nudge">
+          <Sparkles size={20} />
+          <span><b>{missing === live.length && missing > 1 ? `All ${missing} flats are` : `${missing} flat${missing === 1 ? " is" : "s are"}`} missing details</b>
+            Add them to get matched to more clients: photos, deposit and furnishing count the most.</span>
+        </div>
+      ) : (
+        <div className="ih-nudge ih-nudge--ok">
+          <CheckCircle2 size={20} />
+          <span><b>Every live flat has full details</b>Upload more flats to get more clients.</span>
+        </div>
+      )}
+      {rows.length === 0 ? <Empty>None of your flats match that search.</Empty> : (
+        <div className="pz-card ih-mine">
+          {rows.map(({ l, sc }) => (
+            <div key={l.property_id} className="ih-flat">
+              <Link to={pp(`/property/${l.property_id}`)} className="ih-thumb" aria-label={flatLine(l) || "Open flat"}>
+                {(l.cover_image_url || (l.images ?? []).length) ? <SmartListingImage listing={l} thumb /> : <Building2 size={22} />}
+              </Link>
+              <Link to={pp(`/property/${l.property_id}`)} className="ih-flat-txt">
+                <strong>{flatLine(l) || l.title || l.property_id}</strong>
+                <span className={`ih-bar${sc.missing.length ? "" : " ih-bar--ok"}`} aria-hidden><i style={{ width: `${(sc.done / sc.total) * 100}%` }} /></span>
+                <span className="pz-hint">{sc.done}/{sc.total} details{sc.missing.length ? ` · add ${sc.missing.slice(0, 2).join(", ").toLowerCase()}` : " · complete"}</span>
+              </Link>
+              {sc.missing.length > 0
+                ? <Link to={pp(`/property/${l.property_id}?details=1`)} className="pz-btn pz-btn--sm pz-btn--gold" style={{ flex: "none" }}>Add details</Link>
+                : <CheckCircle2 size={20} color="var(--g)" style={{ flex: "none" }} aria-label="Complete" />}
+            </div>
+          ))}
+        </div>
+      )}
+      <Link to={pp("/add/property")} className="pz-btn pz-btn--block" style={{ marginTop: 4 }}><Plus size={17} /> Upload another flat</Link>
+    </>
+  );
+}
 
 export default function InventoryHome() {
   const { me, inventory, invError, ui, setUi, saved, toggleSave, groups, demo, explain } = usePartner();
@@ -40,6 +103,9 @@ export default function InventoryHome() {
   const sources = useMemo(() => (Array.isArray(ui.sources) ? ui.sources : []), [ui.sources]); // [] = everything
   const groupId = ui.groupId || "";
   const premium = hasPremium(me);
+  // Always opens on the partner's own flats.
+  const [view, setView] = useState("mine");
+  const [searching, setSearching] = useState(false);
 
   // Demo mode: sample rows for everything a plan unlocks (the partner's own listings stay real).
   const realMine = useMemo(() => (inventory ?? []).filter((l) => inSource(l, "mine")), [inventory]);
@@ -56,15 +122,17 @@ export default function InventoryHome() {
     return () => clearTimeout(id);
   }, [q, setUi]);
 
-  const inSources = useMemo(() => everything.filter((l) =>
-    (!sources.length || sources.some((s) => inSource(l, s)))
+  const inSources = useMemo(() => everything.filter((l) => !inSource(l, "mine")
+    && (!sources.length || sources.some((s) => inSource(l, s)))
     && (!groupId || !sources.includes("group") || (l.group_ids || []).includes(groupId))),
   [everything, sources, groupId]);
   const rows = useMemo(() => applyFilters(inSources, filters, ui.q), [inSources, filters, ui.q]);
   const counts = useMemo(() => (demo
-    ? { ...DEMO_COUNTS, mine: realMine.length || DEMO_COUNTS.mine }
-    : Object.fromEntries(SOURCE_OPTIONS.map((s) => [s.key, (inventory ?? []).filter((l) => inSource(l, s.key)).length]))),
-  [inventory, demo, realMine]);
+    ? { ...DEMO_COUNTS, all: DEMO_COUNTS.moveazy + DEMO_COUNTS.broker + DEMO_COUNTS.group }
+    : { ...Object.fromEntries(SOURCE_OPTIONS.map((s) => [s.key, (inventory ?? []).filter((l) => inSource(l, s.key)).length])),
+      all: (inventory ?? []).filter((l) => !inSource(l, "mine")).length }),
+  [inventory, demo]);
+  const liveMine = useMemo(() => myFlats(inventory ?? []).live.length, [inventory]);
 
   useEffect(() => { setShown(PAGE); }, [sources.join(), filters, ui.q, groupId]); // eslint-disable-line react-hooks/exhaustive-deps
   const { ref: more, inView } = useInView({ rootMargin: "600px" });
@@ -78,20 +146,6 @@ export default function InventoryHome() {
     return () => document.removeEventListener("pointerdown", away);
   }, [menu]);
 
-  // Scroll: restore once the list exists, remember on the way out.
-  const restored = useRef(false);
-  useLayoutEffect(() => {
-    if (restored.current || !inventory) return;
-    restored.current = true;
-    if (ui.scrollY) {
-      setShown(Math.max(PAGE, ui.shown || PAGE));
-      requestAnimationFrame(() => window.scrollTo(0, ui.scrollY));
-    }
-  }, [inventory, ui.scrollY, ui.shown]);
-  const shownRef = useRef(shown);
-  shownRef.current = shown;
-  useEffect(() => () => setUi({ scrollY: window.scrollY, shown: shownRef.current }), [setUi]);
-
   const open = (kind) => (e) => {
     const box = filterRef.current?.getBoundingClientRect();
     const chip = e.currentTarget.getBoundingClientRect();
@@ -100,7 +154,7 @@ export default function InventoryHome() {
   };
   const setFilters = (patch) => setUi({ filters: { ...filters, ...patch } });
   const pickSource = (key) => setUi({ sources: key ? [key] : [], groupId: "" });
-  const sourceOn = (key) => (key ? sources.length === 1 && sources[0] === key : !sources.length);
+  const sourceOn = (key) => (key ? sources.length === 1 && sources[0] === key : !sources.length || sources.includes("mine"));
 
   const nFilters = activeFilterCount(filters);
   const bhkLabel = !filters.bhk.length ? "BHK" : filters.bhk.length === 1 ? filters.bhk[0] : `${filters.bhk[0]} +${filters.bhk.length - 1}`;
@@ -109,22 +163,43 @@ export default function InventoryHome() {
   return (
     <>
       <PartnerHeader>
-        <div className="pc-band" role="toolbar" aria-label="Whose flats">
-          <label className="pc-search">
-            <Search size={18} strokeWidth={2.4} />
-            <input type="search" placeholder="Search area or BHK" value={q} onChange={(e) => setQ(e.target.value)} aria-label="Search inventory" />
-          </label>
-          <button type="button" className={`pc-pill${sourceOn("") ? " on" : ""}`} aria-pressed={sourceOn("")} onClick={() => pickSource("")}>All</button>
-          {SOURCE_OPTIONS.map((s) => (
-            <button key={s.key} type="button" className={`pc-pill${sourceOn(s.key) ? " on" : ""}`} aria-pressed={sourceOn(s.key)} onClick={() => pickSource(s.key)}>
-              {s.label} <span style={{ opacity: 0.6, fontWeight: 600 }}>{Number(counts[s.key] || 0).toLocaleString("en-IN")}</span>
-            </button>
-          ))}
+        <div className="pc-band" role="tablist" aria-label="Whose flats">
+          <button type="button" className={`pc-pill${searching || q ? " on" : ""}`} style={{ width: 42, padding: 0, justifyContent: "center", color: searching || q ? "#fff" : "#C8102E" }}
+            aria-label="Search" aria-expanded={searching} onClick={() => setSearching((v) => !v)}><Search size={18} strokeWidth={2.4} /></button>
+          <button type="button" role="tab" aria-selected={view === "mine"} className={`pc-pill${view === "mine" ? " on" : ""}`} onClick={() => setView("mine")}>
+            My inventory <span style={{ opacity: 0.6, fontWeight: 600 }}>{liveMine}</span>
+          </button>
+          <button type="button" role="tab" aria-selected={view === "all"} className={`pc-pill pc-pill--gold${view === "all" ? " on" : ""}`} onClick={() => setView("all")}>
+            All inventory <span style={{ opacity: 0.6, fontWeight: 600 }}>{Number(counts.all || 0).toLocaleString("en-IN")}</span>
+          </button>
         </div>
+        {(searching || q) && (
+          <div className="pz-pad" style={{ background: "#ECE9E2", paddingTop: 0, paddingBottom: 10 }}>
+            <label className="pc-search" style={{ width: "100%", boxSizing: "border-box" }}>
+              <Search size={18} strokeWidth={2.4} />
+              <input type="search" placeholder="Search area, BHK or rent" value={q} onChange={(e) => setQ(e.target.value)} aria-label="Search inventory"
+                autoFocus={searching && !q} style={{ width: "100%" }} />
+              {q && <button type="button" className="pz-iconbtn" style={{ width: 30, height: 30 }} aria-label="Clear search" onClick={() => { setQ(""); setSearching(false); }}><X size={16} /></button>}
+            </label>
+          </div>
+        )}
       </PartnerHeader>
+      <style>{FILTER_CSS}</style>
+
+      {view === "mine" ? (
+        <div className="pz-pad pz-list"><MyInventory inventory={inventory} query={ui.q} /></div>
+      ) : (
+      <>
 
       <div className="pz-pad ih-filters" style={{ paddingBottom: 4 }} ref={filterRef}>
-        <style>{FILTER_CSS}</style>
+        <div className="pz-chips pz-chips--scroll" style={{ marginBottom: 8 }}>
+          <Chip on={sourceOn("")} onClick={() => pickSource("")}>Everything</Chip>
+          {SOURCE_OPTIONS.map((o) => (
+            <Chip key={o.key} on={sourceOn(o.key)} onClick={() => pickSource(o.key)}>
+              {o.label} <span style={{ opacity: 0.6 }}>{Number(counts[o.key] || 0).toLocaleString("en-IN")}</span>
+            </Chip>
+          ))}
+        </div>
         <div className="pz-chips pz-chips--scroll">
           <Chip on={filters.bhk.length > 0} onClick={open("bhk")} aria-expanded={menu?.kind === "bhk"}>{bhkLabel} <ChevronDown size={14} /></Chip>
           <Chip on={filters.brokerageMin > 0} onClick={open("brokerage")} aria-expanded={menu?.kind === "brokerage"}>
@@ -191,11 +266,10 @@ export default function InventoryHome() {
         ) : invError ? (
           <Empty>{invError}</Empty>
         ) : rows.length === 0 ? (
-          <Empty action={sources.length === 1 && sources[0] === "mine" ? <Link to={pp("/add/property")} className="pz-btn pz-btn--primary">Add a property</Link> : null}>
+          <Empty>
             {inSources.length === 0
-              ? sources.length === 1 && sources[0] === "mine" ? "You haven't added a property yet."
-                : sources.length === 1 && sources[0] === "group" ? (groups.length ? "Nothing has been shared in your groups yet." : "Join or create a group to see its inventory.")
-                  : "No inventory here yet."
+              ? sources.length === 1 && sources[0] === "group" ? (groups.length ? "Nothing has been shared in your groups yet." : "Join or create a group to see its inventory.")
+                : "No inventory here yet."
               : "Nothing matches that search. Try fewer filters."}
           </Empty>
         ) : (
@@ -212,6 +286,8 @@ export default function InventoryHome() {
         )}
         {rows.length > shown && <div ref={more} className="pz-empty" style={{ padding: 16 }}>Loading more…</div>}
       </div>
+      </>
+      )}
 
       {sheet && (
         <FilterSheet value={filters} rows={inSources} query={ui.q} onClose={() => setSheet(false)}
@@ -221,8 +297,32 @@ export default function InventoryHome() {
   );
 }
 
-// The small dropdowns under BHK and Brokerage.
+// My inventory, and the small dropdowns under BHK and Brokerage.
 const FILTER_CSS = `
+.ih-none { display: flex; flex-direction: column; align-items: center; text-align: center; padding: 34px 18px 20px; background: var(--card);
+  border: 1px solid var(--line); border-radius: 18px; }
+.ih-none-ic { width: 76px; height: 76px; border-radius: 999px; background: var(--gl); color: var(--g); display: grid; place-items: center; }
+.ih-none h2 { margin: 16px 0 0; font-size: 21px; line-height: 1.25; }
+.ih-none p { margin: 10px 0 0; font-size: 15px; line-height: 1.5; color: var(--dim); }
+.ih-add { margin-top: 20px; height: 52px; padding: 0 28px; border-radius: 999px; background: var(--goldg); color: #1F1605; font-size: 16px; font-weight: 800;
+  text-decoration: none; display: inline-flex; align-items: center; gap: 8px; box-shadow: 0 10px 24px rgba(212,164,55,.35); }
+.ih-other { margin-top: 14px; font-size: 13.5px; font-weight: 700; color: var(--g); }
+.ih-nudge { display: flex; gap: 10px; align-items: flex-start; padding: 12px 14px; border-radius: 14px; background: #FEF7E6; border: 1px solid #F1D99B;
+  color: #5C3F05; font-size: 13.5px; line-height: 1.45; }
+.ih-nudge svg { flex: none; margin-top: 1px; color: #B8860B; }
+.ih-nudge b { display: block; font-size: 14.5px; }
+.ih-nudge--ok { background: var(--gl); border-color: var(--gl2); color: var(--g2); }
+.ih-nudge--ok svg { color: var(--g); }
+.ih-mine { padding: 0; overflow: hidden; }
+.ih-flat { display: flex; align-items: center; gap: 12px; padding: 12px; border-top: 1px solid var(--line); }
+.ih-flat:first-child { border-top: 0; }
+.ih-thumb { width: 58px; height: 58px; border-radius: 12px; overflow: hidden; flex: none; background: var(--bg); display: grid; place-items: center; color: var(--mute); }
+.ih-thumb img { width: 100%; height: 100%; object-fit: cover; }
+.ih-flat-txt { flex: 1; min-width: 0; color: inherit; text-decoration: none; display: grid; gap: 4px; }
+.ih-flat-txt strong { font-size: 14.5px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.ih-bar { display: block; height: 6px; border-radius: 99px; background: #EFECE6; overflow: hidden; }
+.ih-bar i { display: block; height: 100%; background: var(--gold); border-radius: 99px; }
+.ih-bar--ok i { background: var(--g); }
 .ih-filters { position: relative; }
 .ih-dd { position: absolute; top: calc(100% - 2px); z-index: 30; width: 250px; background: #fff; border: 1px solid var(--line); border-radius: 14px;
   box-shadow: 0 18px 40px rgba(14,13,18,.2); padding: 6px; animation: ihdd .14s ease; }
