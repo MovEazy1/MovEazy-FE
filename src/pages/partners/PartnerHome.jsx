@@ -14,6 +14,7 @@ import { Avatar } from "./partnerUi";
 import { PartnerHeader } from "./PartnerChrome";
 import { CompleteProfileSheet } from "./PremiumJourney";
 import { PaymentCheckBanner, TrialBanner } from "./TrialPremium";
+import { InstallBanner } from "./InstallApp";
 import { TodayPanel } from "./TenantKit";
 import { useTenants } from "./tenantData";
 import { useMatcherRows } from "./AiMatcher";
@@ -112,6 +113,7 @@ export default function PartnerHome() {
       <div className="pz-pad ph">
         <PaymentCheckBanner payment={status?.payment} />
         <TrialBanner trial={status?.trial} />
+        <InstallBanner />
 
         <section className="ph-me" aria-label="Your profile">
           {Number(rating) > 0 && (

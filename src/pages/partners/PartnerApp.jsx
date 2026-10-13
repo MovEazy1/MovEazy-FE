@@ -32,6 +32,7 @@ import { MOVEAZY_TEAM_WHATSAPP } from "../../config/contactChannels";
 import { clearPendingSignup, pendingSignupPhone, stampPartnerSignup } from "../../lib/partnerSignup";
 import { CreateSheet, Loading, PartnerStyles, ToastHost, WhatsAppIcon, toast } from "./partnerUi";
 import { AddFab, BottomNav, CHROME_CSS, FAB_ON, MenuDrawer } from "./PartnerChrome";
+import { InstallHost } from "./InstallApp";
 import { hasStoredSession } from "../../lib/supabase";
 import { prefetchWhenIdle } from "../../lib/prefetch";
 import { DAY_MS, readCache, writeCache } from "../../lib/localCache";
@@ -315,6 +316,7 @@ function PartnerWorkspace({ me, reloadMe }) {
         {!rel.startsWith("/welcome") && !rel.startsWith("/add/") && <BottomNav />}
         {FAB_ON.test(rel) && <AddFab onClick={() => setPlusOpen(true)} raised={showBar} />}
         <MenuDrawer open={menuOpen} onClose={closeMenu} />
+        <InstallHost />
         {showBar && <JoinPremiumBar />}
         {plusOpen && <CreateSheet onClose={() => setPlusOpen(false)} />}
         <PremiumExplainer what={explaining} onClose={() => setExplaining(null)} />

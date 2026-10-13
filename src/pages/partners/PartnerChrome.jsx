@@ -8,7 +8,7 @@
  */
 import { useEffect, useRef, useState } from "react";
 import { Link, useLocation } from "react-router-dom";
-import { Building2, Crown, HelpCircle, Home, LayoutDashboard, LogOut, MessageCircle, Plus, TrendingUp, UserRound, Users, Wallet, X, Eye } from "lucide-react";
+import { Building2, Crown, Download, HelpCircle, Home, LayoutDashboard, LogOut, MessageCircle, Plus, TrendingUp, UserRound, Users, Wallet, X, Eye } from "lucide-react";
 import { useAuth } from "../../context/AuthContext";
 import { usePartner } from "./PartnerApp";
 import { Avatar } from "./partnerUi";
@@ -18,6 +18,7 @@ import logo from "../../assets/logo/moveazy-logo-mint-dark.png";
 import { MOVEAZY_TEAM_WHATSAPP } from "../../config/contactChannels";
 import { PUBLIC_ORIGIN, isPartnerHost, pp } from "../../lib/partners";
 import { fetchMyRating } from "../../lib/storefront";
+import { openInstall, useInstall } from "./InstallApp";
 
 /** The partner's path inside the app: "/leads", "/" … */
 export function useRel() {
@@ -100,6 +101,7 @@ export function MenuDrawer({ open, onClose }) {
   const rel = useRel();
   const p = me?.partner;
   const [rating, setRating] = useState(null);
+  const install = useInstall();
   useEffect(() => {
     if (!open || rating != null) return;
     fetchMyRating().then((r) => setRating(r?.rating ?? 0), () => setRating(0));
@@ -157,6 +159,9 @@ export function MenuDrawer({ open, onClose }) {
         <div className="pc-group">
           <Link to={pp("/referrals")} className="pc-main"><Wallet size={19} color="#8A6419" /> Wallet · Refer &amp; Earn</Link>
           <Link to={pp("/premium")} className="pc-main"><Crown size={19} color="#8A6419" /> Premium plans</Link>
+          {install.available && (
+            <button type="button" className="pc-main pc-btn" onClick={() => { onClose(); openInstall(); }}><Download size={19} /> Install the app</button>
+          )}
           <a className="pc-main" href={`${MOVEAZY_TEAM_WHATSAPP}?text=${encodeURIComponent("Hi MovEazy, I need help with the partner app.")}`}
             target="_blank" rel="noreferrer"><HelpCircle size={19} /> Help on WhatsApp</a>
           {me?.staff && (
@@ -216,6 +221,7 @@ export const CHROME_CSS = `
 .pc-sub { padding: 9px 18px 9px 49px; font-size: 14.5px; color: var(--ink); text-decoration: none; }
 .pc-sub:active, .pc-main:active { background: var(--bg); }
 .pc-main { display: flex; align-items: center; gap: 12px; padding: 11px 18px; font-size: 15px; font-weight: 800; color: var(--ink); text-decoration: none; }
+.pc-btn { width: 100%; border: 0; background: none; font-family: inherit; text-align: left; cursor: pointer; }
 .pc-foot { margin-top: auto; display: flex; align-items: center; justify-content: space-between; padding: 12px 18px 16px; }
 .pc-out { display: flex; align-items: center; gap: 10px; border: 0; background: none; padding: 6px 0; font: inherit; font-size: 15px; font-weight: 800;
   color: #C8102E; cursor: pointer; }

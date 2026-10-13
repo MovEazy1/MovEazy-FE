@@ -36,6 +36,27 @@
 
     <!-- Theme -->
     <meta name="theme-color" content="#E85A4F" />
+    <!-- partners.moveazy.co.in installs as its own app, "MovEazy Partners"
+         (same deployment as every other host, so only there). Chrome's install
+         offer is kept for the app's own banner (src/lib/pwaInstall.js); it can
+         arrive before React has loaded. -->
+    <script>
+      (function () {
+        if (!/^partners\./i.test(location.hostname)) return;
+        var h = document.head;
+        function add(tag, attrs) { var el = document.createElement(tag); for (var k in attrs) el.setAttribute(k, attrs[k]); h.appendChild(el); }
+        add("link", { rel: "manifest", href: "/partners.webmanifest" });
+        add("link", { rel: "apple-touch-icon", href: "/partners-apple-touch-icon.png" });
+        add("meta", { name: "apple-mobile-web-app-title", content: "MovEazy Partners" });
+        add("meta", { name: "apple-mobile-web-app-capable", content: "yes" });
+        add("meta", { name: "mobile-web-app-capable", content: "yes" });
+        add("meta", { name: "apple-mobile-web-app-status-bar-style", content: "black" });
+        var theme = document.querySelector('meta[name="theme-color"]');
+        if (theme) theme.setAttribute("content", "#0E0D12");
+        window.addEventListener("beforeinstallprompt", function (e) { e.preventDefault(); window.__pzInstall = e; window.dispatchEvent(new Event("pz-install-ready")); });
+        window.addEventListener("appinstalled", function () { window.__pzInstall = null; window.__pzInstalled = true; window.dispatchEvent(new Event("pz-install-ready")); });
+      })();
+    </script>
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <!-- Every Google font in one request, and not in the way of the first
