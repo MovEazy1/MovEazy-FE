@@ -129,7 +129,7 @@ export function MoveazyTab({ me, selected, onSelect, assigned: assignedProp }) {
   );
 }
 
-/** Home: how many MovEazy clients are looking — until the broker first asks for leads. */
+/** Home: how many clients MovEazy has (its whole book, live) — until the broker first asks for leads. */
 export function MoveazyLeadsCard({ me }) {
   const id = me?.partner?.user_id ?? "";
   const askedKey = `pz-mzleads-asked:${id}`;
@@ -159,7 +159,7 @@ export function MoveazyLeadsCard({ me }) {
       </span>
       <strong className="mzl-card-n">{Number(stats.total).toLocaleString("en-IN")} clients</strong>
       <span className="mzl-card-line">
-        are looking for a flat right now{top ? ` · ${top.n} want a ${top.bhk.replace("Room in Preoccupied flat", "room")} in ${top.area}` : ""}
+        have come to MovEazy for a flat{top ? ` · ${top.n} want a ${top.bhk.replace("Room in Preoccupied flat", "room")} in ${top.area}` : ""}
       </span>
       <span className="mzl-card-sub">
         {stats.premium

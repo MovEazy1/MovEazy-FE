@@ -432,9 +432,9 @@ export default function MoveazyLeads({ me: meProp = null, onAssigned = null }) {
         </>
       )}
 
-      <h2 style={{ fontSize: 17, margin: "18px 0 4px" }}>Who's looking right now</h2>
+      <h2 style={{ fontSize: 17, margin: "18px 0 4px" }}>MovEazy's clients</h2>
       <p className="pz-hint" style={{ margin: "0 0 10px" }}>
-        <strong>{stats.total}</strong> MovEazy clients actively looking.
+        <strong>{Number(stats.total).toLocaleString("en-IN")}</strong> tenants have come to MovEazy for a flat.
         Names and numbers come once MovEazy assigns leads to you.
       </p>
       <div className="pz-card" style={{ padding: "8px 14px", marginBottom: 12 }}>
