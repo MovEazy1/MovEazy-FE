@@ -1,11 +1,11 @@
 /**
  * After the plan: the payment return, the congratulations one-pager (ROI +
- * Refer & Earn), the Wallet's payout card, and the home cards — Complete profile,
- * then the golden Premium card (with the logo turned gold).
+ * Refer & Earn), the Wallet's payout card, the profile sheet Home opens, and
+ * the logo turned gold for a completed Premium profile.
  */
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { Link, useNavigate, useSearchParams } from "react-router-dom";
-import { BadgeCheck, Copy, Crown, Gift, IndianRupee, Landmark, MapPin, PartyPopper, Search, ShieldCheck, TrendingUp, X } from "lucide-react";
+import { Copy, Crown, Gift, IndianRupee, Landmark, MapPin, PartyPopper, Search, ShieldCheck, TrendingUp, X } from "lucide-react";
 import { usePartner } from "./PartnerApp";
 import { Chip, Loading, Sheet, TopBar, WhatsAppIcon, toast } from "./partnerUi";
 import { useLocalities } from "./useLocalities";
@@ -208,7 +208,7 @@ export function PayoutCard({ payout, onSaved }) {
   );
 }
 
-/* ── Home cards ──────────────────────────────────────────────────────────── */
+/* ── For Home and the top bar ───────────────────────────────────────────── */
 
 /** The logo, redrawn in gold — for partners who've completed their profile. */
 export function useGoldLogo(src) {
@@ -241,25 +241,8 @@ export function useGoldLogo(src) {
   return gold;
 }
 
-export function CompleteProfileCard({ onDone }) {
-  const [open, setOpen] = useState(false);
-  return (
-    <>
-      <style>{WP_CSS}</style>
-      <button type="button" className="cp-card" onClick={() => setOpen(true)}>
-        <span className="cp-ring" aria-hidden><BadgeCheck size={22} /></span>
-        <span style={{ flex: 1, textAlign: "left" }}>
-          <b>Complete your profile</b>
-          <span>Add the areas you work in and your RERA ID to get your gold Premium badge.</span>
-        </span>
-        <span className="cp-go">Start</span>
-      </button>
-      {open && <CompleteProfileSheet onClose={() => setOpen(false)} onDone={onDone} />}
-    </>
-  );
-}
-
-function CompleteProfileSheet({ onClose, onDone }) {
+/** The areas and RERA sheet — opened from Home's profile-strength ring. */
+export function CompleteProfileSheet({ onClose, onDone }) {
   const localities = useLocalities();
   const [areas, setAreas] = useState([]);
   const [q, setQ] = useState("");
@@ -313,26 +296,6 @@ function CompleteProfileSheet({ onClose, onDone }) {
         </button>
       </form>
     </Sheet>
-  );
-}
-
-/** The gold card: shown once the profile is complete. */
-export function PremiumCard({ me, status }) {
-  const p = me?.partner || {};
-  const areas = status?.profile?.areas || [];
-  const shine = useRef(null);
-  return (
-    <div className="gc" ref={shine}>
-      <style>{WP_CSS}</style>
-      <div className="gc-top">
-        <span className="gc-tag"><Crown size={13} /> Gold Partner</span>
-        <span className="gc-until">Premium · till {fmtDate(status?.plan?.until)}</span>
-      </div>
-      <b className="gc-name">{p.name || "MovEazy Partner"}</b>
-      <span className="gc-meta">{[p.agency, status?.profile?.rera_id && `RERA ${status.profile.rera_id}`].filter(Boolean).join(" · ")}</span>
-      {areas.length > 0 && <span className="gc-areas"><MapPin size={12} /> {areas.slice(0, 4).join(", ")}{areas.length > 4 ? ` +${areas.length - 4}` : ""}</span>}
-      <Link to={pp("/referrals")} className="gc-ref"><Gift size={14} /> Refer & Earn up to {inr(REFERRAL_REWARD)}</Link>
-    </div>
   );
 }
 

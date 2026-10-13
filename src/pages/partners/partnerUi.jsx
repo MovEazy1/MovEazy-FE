@@ -7,9 +7,9 @@
  * customer site or the CRM that share this bundle.
  */
 import { useEffect, useState } from "react";
-import { Link, useLocation, useNavigate } from "react-router-dom";
+import { Link, useNavigate } from "react-router-dom";
 import {
-  ChevronLeft, Heart, Home, Lock, Menu, Plus, Users, UserRound, X, Building2, UserPlus,
+  ChevronLeft, Heart, Lock, X, Building2, UserPlus,
 } from "lucide-react";
 import { SmartListingImage } from "./partnerMedia";
 import { bhkLabel, inr, pp } from "../../lib/partners";
@@ -126,13 +126,13 @@ const CSS = `
 .pz-actions { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-top: 12px; }
 .pz-wa { background: var(--goldg); border-color: transparent; color: #1F1605; font-weight: 800; }
 .pz-nav { position: fixed; bottom: 0; left: 50%; transform: translateX(-50%); width: 100%; max-width: 520px; z-index: 30;
-  background: var(--noir); border-top: 1px solid var(--noir3); display: grid; grid-template-columns: repeat(5, 1fr);
-  padding: 6px 4px calc(6px + env(safe-area-inset-bottom)); }
-.pz-nav a, .pz-nav button { display: flex; flex-direction: column; align-items: center; gap: 2px; font-size: 11px; font-weight: 600;
-  color: #8E8A9A; text-decoration: none; border: 0; background: transparent; font-family: inherit; cursor: pointer; padding: 4px 0; }
-.pz-nav .on { color: var(--gold); }
-.pz-nav-plus { width: 54px; height: 54px; border-radius: 999px; background: var(--goldg) !important; color: #1F1605 !important;
-  margin-top: -22px; box-shadow: 0 6px 18px rgba(212,164,55,.45), 0 0 0 4px var(--noir); justify-content: center; align-self: center; }
+  background: #fff; border-top: 1px solid var(--line); display: grid; grid-template-columns: repeat(5, 1fr);
+  padding: 0 4px env(safe-area-inset-bottom); box-shadow: 0 -4px 18px rgba(22,20,28,.05); }
+.pz-nav a { position: relative; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 3px; min-height: 66px;
+  font-size: 12px; font-weight: 600; color: var(--dim); text-decoration: none; }
+.pz-nav a.on { color: var(--ink); font-weight: 800; }
+.pz-nav a.on svg { color: #B8860B; }
+.pz-nav a.on::before { content: ""; position: absolute; top: 0; left: 22%; right: 22%; height: 3px; border-radius: 0 0 3px 3px; background: var(--gold); }
 .pz-sheet-bg { position: fixed; inset: 0; background: rgba(17,24,39,.45); z-index: 60; display: flex; align-items: flex-end; justify-content: center; }
 .pz-sheet { background: var(--card); width: 100%; max-width: 520px; border-radius: 18px 18px 0 0; max-height: 92dvh; overflow: auto;
   padding: 0 0 calc(16px + env(safe-area-inset-bottom)); animation: pzUp .18s ease-out; }
@@ -337,22 +337,6 @@ export const formatPhone = (p) => {
 };
 
 /** Inventory | Leads | + | Groups | More */
-export function BottomNav({ onPlus }) {
-  const { pathname } = useLocation();
-  const base = pp("/").replace(/\/$/, "");
-  const rel = pathname.slice(base.length) || "/";
-  const on = (k) => (k === "/" ? rel === "/" || rel.startsWith("/property") : rel.startsWith(k)) ? "on" : "";
-  return (
-    <nav className="pz-nav" aria-label="Partner app">
-      <Link to={pp("/")} className={on("/")}><Home size={22} />Inventory</Link>
-      <Link to={pp("/leads")} className={on("/leads")}><UserRound size={22} />Leads</Link>
-      <button type="button" className="pz-nav-plus" aria-label="Add property or lead" onClick={onPlus}><Plus size={28} /></button>
-      <Link to={pp("/groups")} className={on("/groups")}><Users size={22} />Groups</Link>
-      <Link to={pp("/more")} className={on("/more")}><Menu size={22} />More</Link>
-    </nav>
-  );
-}
-
 /** The + action creates only two things in V1: Property and Lead. */
 export function CreateSheet({ onClose }) {
   const navigate = useNavigate();

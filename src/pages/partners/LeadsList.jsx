@@ -1,22 +1,24 @@
 /**
- * Leads, in two: My Leads — every tenant the partner works, their own and the
- * MovEazy tenants given to them, in one list (TenantKit) — and MovEazy leads,
- * where more are asked for (MoveazyLeads.jsx).
+ * The Leads tab, in two pills under the top bar: My leads — every tenant the
+ * partner works, their own and the MovEazy tenants given to them, in one list
+ * (TenantKit) — and MovEazy, where more are asked for (MoveazyLeads.jsx). A
+ * new client comes from the floating +.
  *
  * The list opens on everyone still in play, the ones needing attention first:
  * a follow-up due, something new they did (a like, an open), then the next
  * reminder, then the newest. Stage chips narrow it; search finds anyone.
  * Free and Premium alike, on real data only.
  */
-import { Suspense, lazy, useMemo, useState } from "react";
+import { Suspense, lazy, useEffect, useMemo, useState } from "react";
 import { Link, useSearchParams } from "react-router-dom";
-import { BarChart3, ChevronRight, Plus, Search } from "lucide-react";
+import { Plus, Search } from "lucide-react";
 import { usePartner } from "./PartnerApp";
-import { Chip, Empty, Loading, TopBar } from "./partnerUi";
-import { MoveazyTab, MyLeadsTab } from "./MoveazyLeadsPromo";
+import { Chip, Empty, Loading } from "./partnerUi";
+import { PartnerHeader } from "./PartnerChrome";
 import { KIT_CSS, TenantRow, useReach } from "./TenantKit";
 import { useTenants } from "./tenantData";
 import { pp } from "../../lib/partners";
+import { fetchMyAssignedLeads, moveazyTabBadge } from "../../lib/partnerLeads";
 import { OPEN_STAGES, STAGES, stageCounts } from "../../lib/partnerTenants";
 
 // Its own file, loaded when the tab is opened.
@@ -24,15 +26,35 @@ const MoveazyLeads = lazy(() => import("./MoveazyLeads"));
 
 const CHIPS = [["open", "In play"], ...STAGES.map((s) => [s.id, s.label]), ["all", "All"]];
 
-/** My Leads | MovEazy leads (black halftone with the logo — it should catch the eye); the open one is red. */
-function BookSwitch({ book, setBook, me, assigned }) {
-  const mine = book === "mine";
+const seenKey = (id) => `pz-mzleads-seen:${id}`;
+const readSeen = (id) => { try { return localStorage.getItem(seenKey(id)) === "1"; } catch { return true; } };
+
+/** My leads | MovEazy — big pills under the top bar; MovEazy says NEW until first opened, then how many await a call. */
+function BookPills({ book, setBook, me, mineCount, assigned }) {
+  const id = me?.partner?.user_id ?? "";
+  const [seen, setSeen] = useState(() => readSeen(id));
+  const [fetched, setFetched] = useState([]);
+  useEffect(() => {
+    if (book !== "moveazy" || seen) return;
+    try { localStorage.setItem(seenKey(id), "1"); } catch { /* fine */ }
+    setSeen(true);
+  }, [book, seen, id]);
+  useEffect(() => {
+    if (!id || assigned) return undefined;
+    let alive = true;
+    fetchMyAssignedLeads().then((r) => alive && setFetched(r ?? []), () => {});
+    return () => { alive = false; };
+  }, [id, assigned]);
+  const badge = moveazyTabBadge(seen || book === "moveazy", assigned ?? fetched);
   return (
-    <div className="pz-pad" style={{ paddingTop: 16, paddingBottom: 0, background: "var(--card)" }}>
-      <div role="tablist" style={{ display: "flex", background: "var(--bg)", borderRadius: 12, padding: 4, gap: 6 }}>
-        <MyLeadsTab selected={mine} onSelect={() => setBook("mine")} />
-        <MoveazyTab me={me} selected={!mine} onSelect={() => setBook("moveazy")} assigned={assigned} />
-      </div>
+    <div className="pc-band" role="tablist" aria-label="Leads">
+      <button type="button" role="tab" aria-selected={book === "mine"} className={`pc-pill${book === "mine" ? " on" : ""}`} onClick={() => setBook("mine")}>
+        My leads <span style={{ opacity: 0.6, fontWeight: 600 }}>{mineCount}</span>
+      </button>
+      <button type="button" role="tab" aria-selected={book === "moveazy"} className={`pc-pill pc-pill--gold${book === "moveazy" ? " on" : ""}`} onClick={() => setBook("moveazy")}>
+        MovEazy leads
+        {badge && <span style={{ padding: "1px 6px", borderRadius: 99, background: "#E3141B", color: "#fff", fontSize: 10.5, fontWeight: 800 }}>{badge}</span>}
+      </button>
     </div>
   );
 }
@@ -47,7 +69,7 @@ function rank(t, now) {
 }
 
 export default function LeadsList() {
-  const { me, demo, explain } = usePartner();
+  const { me } = usePartner();
   const { board, loaded } = useTenants();
   const reach = useReach();
   const [stage, setStage] = useState("open");
@@ -77,12 +99,9 @@ export default function LeadsList() {
 
   return (
     <>
-      <TopBar title="Leads" right={
-        <Link to={pp("/leads/new")} className="pz-iconbtn" aria-label="Add a tenant" style={{ background: "var(--goldg)", color: "#1F1605", borderRadius: 999 }}>
-          <Plus size={20} />
-        </Link>
-      } />
-      <BookSwitch book={book} setBook={setBook} me={me} assigned={assigned} />
+      <PartnerHeader>
+        <BookPills book={book} setBook={setBook} me={me} mineCount={counts.open ?? 0} assigned={assigned} />
+      </PartnerHeader>
       {book === "moveazy" ? (
         <Suspense fallback={<Loading />}><MoveazyLeads onAssigned={setAssigned} /></Suspense>
       ) : (
@@ -102,13 +121,6 @@ export default function LeadsList() {
         )}
       </div>
       <div className="pz-pad">
-        <Link to={pp("/insights")} onClick={demo ? (e) => { e.preventDefault(); explain("insights"); } : undefined} className="pz-card pz-row"
-          style={{ padding: 14, marginBottom: 12, color: "inherit", textDecoration: "none", background: "var(--noir)", borderColor: "var(--noir)" }}>
-          <span className="pz-avatar" style={{ background: "var(--goldg)", color: "#1F1605" }}><BarChart3 size={17} /></span>
-          <span style={{ flex: 1, color: "#fff" }}><strong style={{ display: "block" }}>Leads dashboard</strong>
-            <span style={{ fontSize: 12.5, color: "#A7A3B3" }}>QR scans by area · what clients like · every like & skip</span></span>
-          <ChevronRight size={18} color="#D4A437" />
-        </Link>
         {!loaded ? <Loading /> : rows.length === 0 ? (
           <Empty action={<Link to={pp("/leads/new")} className="pz-btn pz-btn--primary"><Plus size={16} /> Add a tenant</Link>}>
             {board.length ? (q.trim() ? "Nobody matches that." : "Nobody at this stage.") : "Add your first tenant — a name and mobile is enough. Tenants MovEazy gives you show up here too."}

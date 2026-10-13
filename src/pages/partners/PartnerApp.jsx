@@ -30,7 +30,8 @@ import { JoinPremiumBar, PremiumExplainer } from "./demoMode";
 import { useUnreadCount } from "./PartnerInbox";
 import { MOVEAZY_TEAM_WHATSAPP } from "../../config/contactChannels";
 import { clearPendingSignup, pendingSignupPhone, stampPartnerSignup } from "../../lib/partnerSignup";
-import { BottomNav, CreateSheet, Loading, PartnerStyles, ToastHost, WhatsAppIcon, toast } from "./partnerUi";
+import { CreateSheet, Loading, PartnerStyles, ToastHost, WhatsAppIcon, toast } from "./partnerUi";
+import { AddFab, BottomNav, CHROME_CSS, FAB_ON, MenuDrawer } from "./PartnerChrome";
 import { hasStoredSession } from "../../lib/supabase";
 import { prefetchWhenIdle } from "../../lib/prefetch";
 import { DAY_MS, readCache, writeCache } from "../../lib/localCache";
@@ -47,6 +48,7 @@ const loadPartnerLanding = () => import("./PartnerLanding");
 const PartnerLanding = lazy(loadPartnerLanding);
 if (typeof window !== "undefined" && !hasStoredSession()) loadPartnerLanding().catch(() => {});
 
+const PartnerHome = lazy(() => import("./PartnerHome"));
 const InventoryHome = lazy(() => import("./InventoryHome"));
 const PropertyDetail = lazy(() => import("./PropertyDetail"));
 const PropertyContacts = lazy(() => import("./PropertyContacts"));
@@ -151,6 +153,9 @@ function PartnerWorkspace({ me, reloadMe }) {
   const [leads, setLeads] = useState([]);
   const [saved, setSaved] = useState(() => new Set());
   const [plusOpen, setPlusOpen] = useState(false);
+  const [menuOpen, setMenuOpen] = useState(false);
+  const openMenu = useCallback(() => setMenuOpen(true), []);
+  const closeMenu = useCallback(() => setMenuOpen(false), []);
   const [ui, setUiState] = useState(() => ({ source: "moveazy", q: "", filters: null, scrollY: 0, ...readUi() }));
 
   const setUi = useCallback((patch) => {
@@ -262,9 +267,9 @@ function PartnerWorkspace({ me, reloadMe }) {
 
   const value = useMemo(() => ({
     me, reloadMe, inventory, invError, reloadInventory, byId, groups, reloadGroups, leads, setLeads, reloadLeads,
-    saved, toggleSave, ui, setUi, status, reloadStatus, demo, explain, unread,
+    saved, toggleSave, ui, setUi, status, reloadStatus, demo, explain, unread, openMenu,
   }), [me, reloadMe, inventory, invError, reloadInventory, byId, groups, reloadGroups, leads, reloadLeads, saved,
-    toggleSave, ui, setUi, status, reloadStatus, demo, explain, unread]);
+    toggleSave, ui, setUi, status, reloadStatus, demo, explain, unread, openMenu]);
   const showBar = demo && !NO_BAR.test(rel);
 
   return (
@@ -273,7 +278,8 @@ function PartnerWorkspace({ me, reloadMe }) {
       <div className="pz-col" style={showBar ? { paddingBottom: "calc(140px + env(safe-area-inset-bottom))" } : undefined}>
         <Suspense fallback={<Loading />}>
           <Routes>
-            <Route index element={<InventoryHome />} />
+            <Route index element={<PartnerHome />} />
+            <Route path="inventory" element={<InventoryHome />} />
             <Route path="property/:id" element={<PropertyDetail />} />
             <Route path="property/:id/contacts" element={<PropertyContacts />} />
             <Route path="property/:id/sharing" element={<EditSharing />} />
@@ -305,7 +311,10 @@ function PartnerWorkspace({ me, reloadMe }) {
           </Routes>
         </Suspense>
         {/* Posting a flat is one focused screen with its own Publish bar. */}
-        {!rel.startsWith("/welcome") && !rel.startsWith("/add/") && <BottomNav onPlus={() => setPlusOpen(true)} />}
+        <style>{CHROME_CSS}</style>
+        {!rel.startsWith("/welcome") && !rel.startsWith("/add/") && <BottomNav />}
+        {FAB_ON.test(rel) && <AddFab onClick={() => setPlusOpen(true)} raised={showBar} />}
+        <MenuDrawer open={menuOpen} onClose={closeMenu} />
         {showBar && <JoinPremiumBar />}
         {plusOpen && <CreateSheet onClose={() => setPlusOpen(false)} />}
         <PremiumExplainer what={explaining} onClose={() => setExplaining(null)} />

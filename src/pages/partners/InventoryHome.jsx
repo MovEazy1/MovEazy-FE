@@ -1,11 +1,10 @@
 /**
- * PRD 01 — Inventory, the home screen: one list of everything the partner can
- * see, the AI matcher on top, and cards you can act on without opening.
+ * PRD 01 — Inventory, the Inventory tab: one list of everything the partner
+ * can see, and cards you can act on without opening. (Home is PartnerHome.jsx.)
  *
- * Filters sit in one row — Source | BHK | Brokerage | ⚙ — each of the first
- * three opens its own small dropdown; only ⚙ opens the full filter sheet.
- * Source defaults to everything; the broker narrows it to their own, MovEazy's,
- * the broker network or their groups.
+ * Under the search, big pills pick the source — All · MovEazy · Brokers ·
+ * Groups · Mine — then a row of BHK | Brokerage | ⚙: the first two open small
+ * dropdowns; only ⚙ opens the full filter sheet.
  *
  * Search, filters and scroll position survive a trip into Details and back
  * (PRD: "Preserve scroll position when returning").
@@ -13,43 +12,34 @@
 import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { Link } from "react-router-dom";
 import { useInView } from "react-intersection-observer";
-import { Check, ChevronDown, Crown, Search, SlidersHorizontal, Wallet, X } from "lucide-react";
+import { ChevronDown, Crown, Search, SlidersHorizontal, X } from "lucide-react";
 import { usePartner } from "./PartnerApp";
 import FilterSheet from "./FilterSheet";
-import logo from "../../assets/logo/moveazy-logo-mint-dark.png";
-import { Avatar, Chip, Empty, Loading, PropertyCard } from "./partnerUi";
+import { Chip, Empty, Loading, PropertyCard } from "./partnerUi";
+import { PartnerHeader } from "./PartnerChrome";
 import { DEMO_COUNTS, DEMO_GROUPS, DemoBanner, demoRows } from "./demoMode";
-import { CompleteProfileCard, PremiumCard, useGoldLogo } from "./PremiumJourney";
-import { NotificationBell } from "./PartnerInbox";
-import { AiMatcherCard } from "./AiMatcher";
-import { MoveazyLeadsCard } from "./MoveazyLeadsPromo";
-import { TodayPanel } from "./TenantKit";
-import { PaymentCheckBanner, TrialBanner } from "./TrialPremium";
 import { customerMessage, hasPremium, inSource, listerWhatsApp, pp, waLink } from "../../lib/partners";
 import { BHK_CHIPS, BROKERAGE_CHIPS, EMPTY_FILTERS, activeFilterCount, applyFilters } from "../../lib/partnerFilters";
 
 const PAGE = 20;
 const SOURCE_OPTIONS = [
-  { key: "mine", label: "My listings" },
-  { key: "moveazy", label: "MovEazy inventory" },
-  { key: "broker", label: "Broker network" },
-  { key: "group", label: "My groups" },
+  { key: "moveazy", label: "MovEazy" },
+  { key: "broker", label: "Brokers" },
+  { key: "group", label: "Groups" },
+  { key: "mine", label: "Mine" },
 ];
 
 export default function InventoryHome() {
-  const { me, inventory, invError, ui, setUi, saved, toggleSave, groups, demo, explain, status, reloadStatus, unread } = usePartner();
+  const { me, inventory, invError, ui, setUi, saved, toggleSave, groups, demo, explain } = usePartner();
   const [q, setQ] = useState(ui.q || "");
   const [sheet, setSheet] = useState(false);
   const [shown, setShown] = useState(PAGE);
-  const [menu, setMenu] = useState(null); // { kind: "source" | "bhk" | "brokerage", left }
+  const [menu, setMenu] = useState(null); // { kind: "bhk" | "brokerage", left }
   const filterRef = useRef(null);
   const filters = ui.filters || EMPTY_FILTERS;
   const sources = useMemo(() => (Array.isArray(ui.sources) ? ui.sources : []), [ui.sources]); // [] = everything
   const groupId = ui.groupId || "";
   const premium = hasPremium(me);
-  const planActive = Boolean(status?.plan?.active);
-  const gold = planActive && Boolean(status?.profile?.completed_at);
-  const goldLogo = useGoldLogo(gold ? logo : "");
 
   // Demo mode: sample rows for everything a plan unlocks (the partner's own listings stay real).
   const realMine = useMemo(() => (inventory ?? []).filter((l) => inSource(l, "mine")), [inventory]);
@@ -78,24 +68,6 @@ export default function InventoryHome() {
 
   useEffect(() => { setShown(PAGE); }, [sources.join(), filters, ui.q, groupId]); // eslint-disable-line react-hooks/exhaustive-deps
   const { ref: more, inView } = useInView({ rootMargin: "600px" });
-  // The header scrolls away with the page. Only the AI matcher stays: once its card has
-  // scrolled off the top it pins as a slim bar — and scrolling back up brings the search
-  // in above it, like a browser's address bar.
-  const aiRef = useRef(null);
-  const [aiCompact, setAiCompact] = useState(false);
-  const [scrollingUp, setScrollingUp] = useState(false);
-  useEffect(() => {
-    let last = window.scrollY;
-    const onScroll = () => {
-      const y = window.scrollY;
-      const card = aiRef.current?.getBoundingClientRect();
-      setAiCompact(Boolean(card && card.bottom < 4));
-      if (Math.abs(y - last) > 6) { setScrollingUp(y < last); last = y; }
-    };
-    onScroll();
-    window.addEventListener("scroll", onScroll, { passive: true });
-    return () => window.removeEventListener("scroll", onScroll);
-  }, []);
   useEffect(() => { if (inView) setShown((n) => n + PAGE); }, [inView]);
 
   // A dropdown closes on a tap anywhere else.
@@ -127,52 +99,33 @@ export default function InventoryHome() {
     setMenu((m) => (m?.kind === kind ? null : { kind, left }));
   };
   const setFilters = (patch) => setUi({ filters: { ...filters, ...patch } });
-  const toggleSource = (key) => setUi({ sources: sources.includes(key) ? sources.filter((s) => s !== key) : [...sources, key], groupId: key === "group" ? "" : groupId });
+  const pickSource = (key) => setUi({ sources: key ? [key] : [], groupId: "" });
+  const sourceOn = (key) => (key ? sources.length === 1 && sources[0] === key : !sources.length);
 
   const nFilters = activeFilterCount(filters);
-  const sourceLabel = !sources.length ? "All inventory" : sources.length === 1 ? SOURCE_OPTIONS.find((s) => s.key === sources[0])?.label : `${sources.length} sources`;
   const bhkLabel = !filters.bhk.length ? "BHK" : filters.bhk.length === 1 ? filters.bhk[0] : `${filters.bhk[0]} +${filters.bhk.length - 1}`;
   const lockedCount = !demo && !premium ? rows.filter((l) => l.locked).length : 0;
 
   return (
     <>
-      <header className="pz-top" style={{ position: "relative", flexDirection: "column", alignItems: "stretch", gap: 10 }}>
-        <div className="pz-between">
-          <h1 style={{ margin: 0, lineHeight: 0 }}><img src={goldLogo || logo} alt="MovEazy" height="26" style={{ height: 26, width: "auto" }} /></h1>
-          <span className="pz-row" style={{ gap: 4 }}>
-            <Link to={pp("/qr")} className="pz-tolet" aria-label="To-Let QR poster" title="Your To-Let QR poster">To-Let</Link>
-            <NotificationBell count={unread} />
-            <Link to={pp("/referrals")} className="pz-iconbtn" aria-label="Wallet" title="Wallet & referrals"><Wallet size={21} /></Link>
-            <Link to={pp("/more")} aria-label="Your profile" style={{ textDecoration: "none" }}>
-              <Avatar name={me?.partner?.name || "You"} />
-            </Link>
-          </span>
+      <PartnerHeader>
+        <div className="pc-band" role="toolbar" aria-label="Whose flats">
+          <label className="pc-search">
+            <Search size={18} strokeWidth={2.4} />
+            <input type="search" placeholder="Search area or BHK" value={q} onChange={(e) => setQ(e.target.value)} aria-label="Search inventory" />
+          </label>
+          <button type="button" className={`pc-pill${sourceOn("") ? " on" : ""}`} aria-pressed={sourceOn("")} onClick={() => pickSource("")}>All</button>
+          {SOURCE_OPTIONS.map((s) => (
+            <button key={s.key} type="button" className={`pc-pill${sourceOn(s.key) ? " on" : ""}`} aria-pressed={sourceOn(s.key)} onClick={() => pickSource(s.key)}>
+              {s.label} <span style={{ opacity: 0.6, fontWeight: 600 }}>{Number(counts[s.key] || 0).toLocaleString("en-IN")}</span>
+            </button>
+          ))}
         </div>
-        <div className="pz-search">
-          <Search size={17} />
-          <input className="pz-input" type="search" placeholder="Search by location, BHK, rent…" value={q}
-            onChange={(e) => setQ(e.target.value)} aria-label="Search inventory" />
-        </div>
-      </header>
-
-      {aiCompact && (
-        <div className="ih-float">
-          <style>{FLOAT_CSS}</style>
-          {scrollingUp && (
-            <div className="pz-search ih-float-search">
-              <Search size={17} />
-              <input className="pz-input" type="search" placeholder="Search by location, BHK, rent…" value={q}
-                onChange={(e) => setQ(e.target.value)} aria-label="Search inventory" />
-            </div>
-          )}
-          <AiMatcherCard compact />
-        </div>
-      )}
+      </PartnerHeader>
 
       <div className="pz-pad ih-filters" style={{ paddingBottom: 4 }} ref={filterRef}>
         <style>{FILTER_CSS}</style>
         <div className="pz-chips pz-chips--scroll">
-          <Chip on={sources.length > 0} onClick={open("source")} aria-expanded={menu?.kind === "source"}>{sourceLabel} <ChevronDown size={14} /></Chip>
           <Chip on={filters.bhk.length > 0} onClick={open("bhk")} aria-expanded={menu?.kind === "bhk"}>{bhkLabel} <ChevronDown size={14} /></Chip>
           <Chip on={filters.brokerageMin > 0} onClick={open("brokerage")} aria-expanded={menu?.kind === "brokerage"}>
             {filters.brokerageMin > 0 ? `${filters.brokerageMin}%+ brokerage` : "Brokerage"} <ChevronDown size={14} />
@@ -187,25 +140,6 @@ export default function InventoryHome() {
 
         {menu && (
           <div className="ih-dd" style={{ left: 16 + menu.left }} role="dialog" aria-label={`${menu.kind} filter`}>
-            {menu.kind === "source" && (
-              <>
-                <button type="button" className={`ih-opt${!sources.length ? " on" : ""}`} onClick={() => { setUi({ sources: [], groupId: "" }); setMenu(null); }}>
-                  <span className="ih-box">{!sources.length && <Check size={13} />}</span> All inventory
-                </button>
-                {SOURCE_OPTIONS.map((s) => (
-                  <button key={s.key} type="button" className={`ih-opt${sources.includes(s.key) ? " on" : ""}`} onClick={() => toggleSource(s.key)}>
-                    <span className="ih-box">{sources.includes(s.key) && <Check size={13} />}</span>
-                    {s.label}<span className="ih-n">{Number(counts[s.key] || 0).toLocaleString("en-IN")}</span>
-                  </button>
-                ))}
-                {sources.includes("group") && tabGroups.length > 1 && (
-                  <div className="pz-chips" style={{ padding: "6px 4px 2px" }}>
-                    <Chip on={!groupId} onClick={() => setUi({ groupId: "" })}>All groups</Chip>
-                    {tabGroups.map((g) => <Chip key={g.id} on={groupId === g.id} onClick={() => setUi({ groupId: g.id })}>{g.name}</Chip>)}
-                  </div>
-                )}
-              </>
-            )}
             {menu.kind === "bhk" && (
               <div className="ih-grid">
                 {BHK_CHIPS.map((b) => (
@@ -220,24 +154,24 @@ export default function InventoryHome() {
                 <span className="ih-radio">{filters.brokerageMin === c.min && <i />}</span> {c.min ? `${c.label} brokerage` : "Any brokerage"}
               </button>
             ))}
-            {menu.kind !== "brokerage" && (
+            {menu.kind === "bhk" && (
               <div className="ih-dd-foot">
-                <button type="button" className="pz-btn pz-btn--sm" onClick={() => (menu.kind === "bhk" ? setFilters({ bhk: [] }) : setUi({ sources: [], groupId: "" }))}>Reset</button>
+                <button type="button" className="pz-btn pz-btn--sm" onClick={() => setFilters({ bhk: [] })}>Reset</button>
                 <button type="button" className="pz-btn pz-btn--sm pz-btn--primary" onClick={() => setMenu(null)}>Show {rows.length.toLocaleString("en-IN")}</button>
               </div>
             )}
           </div>
         )}
+        {sources.length === 1 && sources[0] === "group" && tabGroups.length > 1 && (
+          <div className="pz-chips pz-chips--scroll" style={{ paddingTop: 8 }}>
+            <Chip on={!groupId} onClick={() => setUi({ groupId: "" })}>All groups</Chip>
+            {tabGroups.map((g) => <Chip key={g.id} on={groupId === g.id} onClick={() => setUi({ groupId: g.id })}>{g.name}</Chip>)}
+          </div>
+        )}
       </div>
 
       <div className="pz-pad pz-list">
-        {planActive && !status?.profile?.completed_at && <CompleteProfileCard onDone={reloadStatus} />}
-        {gold && <PremiumCard me={me} status={status} />}
-        <PaymentCheckBanner payment={status?.payment} />
-        <TrialBanner trial={status?.trial} />
-        <TodayPanel />
-        <MoveazyLeadsCard me={me} />
-        <div ref={aiRef}><AiMatcherCard /></div>
+        {inventory && !invError && <p className="pz-meta" style={{ margin: "0 0 2px" }}>{rows.length.toLocaleString("en-IN")} flat{rows.length === 1 ? "" : "s"}</p>}
         {demo && (
           <DemoBanner>Samples from {DEMO_COUNTS.moveazy.toLocaleString("en-IN")} MovEazy, {DEMO_COUNTS.broker} network and {DEMO_COUNTS.group} group listings.</DemoBanner>
         )}
@@ -287,21 +221,7 @@ export default function InventoryHome() {
   );
 }
 
-// The pinned strip: the AI matcher bar, with the search above it while scrolling up.
-const FLOAT_CSS = `
-.ih-float { position: fixed; top: 0; left: 50%; transform: translateX(-50%); width: 100%; max-width: 520px; z-index: 25;
-  padding: 0 12px 8px; background: rgba(14,13,18,.94); backdrop-filter: blur(10px); -webkit-backdrop-filter: blur(10px);
-  border-bottom: 1px solid var(--noir3); animation: ihin .18s ease; }
-.ih-float .aim-bar { margin-top: 8px; }
-.ih-float-search { margin-top: 8px; animation: ihin .18s ease; }
-.ih-float-search input { background: var(--noir2); color: #fff; border-color: transparent; }
-.ih-float-search input::placeholder { color: var(--mute); }
-@keyframes ihin { from { opacity: 0; transform: translate(-50%, -8px); } }
-.ih-float-search { animation-name: ihsearch; }
-@keyframes ihsearch { from { opacity: 0; transform: translateY(-8px); } }
-`;
-
-// The small dropdowns under Source, BHK and Brokerage.
+// The small dropdowns under BHK and Brokerage.
 const FILTER_CSS = `
 .ih-filters { position: relative; }
 .ih-dd { position: absolute; top: calc(100% - 2px); z-index: 30; width: 250px; background: #fff; border: 1px solid var(--line); border-radius: 14px;

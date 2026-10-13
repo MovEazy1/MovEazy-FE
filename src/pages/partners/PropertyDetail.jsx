@@ -136,7 +136,7 @@ export default function PropertyDetail() {
     return (
       <>
         <TopBar title="Property" back />
-        <Empty action={<Link to={pp("/")} className="pz-btn pz-btn--primary">Back to inventory</Link>}>
+        <Empty action={<Link to={pp("/inventory")} className="pz-btn pz-btn--primary">Back to inventory</Link>}>
           This property isn't available to you — it may have been rented, or it's shared in a group you're not in.
         </Empty>
       </>
