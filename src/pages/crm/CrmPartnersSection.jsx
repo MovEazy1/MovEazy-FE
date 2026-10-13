@@ -161,8 +161,24 @@ export default function CrmPartnersSection({ access }) {
                     <div className="crm-mute" style={{ fontSize: 11 }}>{[r.agency, r.email].filter(Boolean).join(" · ")}</div>
                   </td>
                   <td className="crm-num">
-                    {r.phone ? <a href={whatsappUrl(r.phone, `Hi ${r.name?.split(" ")[0] || ""}, this is MovEazy about the partner app.`)}
-                      target="_blank" rel="noreferrer" style={{ color: C.text }}>{formatForDisplay(r.phone)}</a> : "—"}
+                    {(() => {
+                      const two = Boolean(r.alt_phone);
+                      const primary = two && r.contact_primary === "alt" ? r.alt_phone : r.phone;
+                      const secondary = two ? (r.contact_primary === "alt" ? r.phone : r.alt_phone) : "";
+                      const wa = (n) => whatsappUrl(n, `Hi ${r.name?.split(" ")[0] || ""}, this is MovEazy about the partner app.`);
+                      return primary ? (
+                        <>
+                          <a href={wa(primary)} target="_blank" rel="noreferrer" style={{ color: C.text }}>{formatForDisplay(primary)}</a>
+                          {two && <div className="crm-mute" style={{ fontSize: 10.5 }}>primary</div>}
+                          {secondary && (
+                            <div style={{ fontSize: 11.5 }}>
+                              <a href={wa(secondary)} target="_blank" rel="noreferrer" style={{ color: C.textMute }}>{formatForDisplay(secondary)}</a>
+                              <span className="crm-mute" style={{ fontSize: 10.5 }}> · secondary</span>
+                            </div>
+                          )}
+                        </>
+                      ) : "—";
+                    })()}
                   </td>
                   <td>
                     <span style={{ color: STATUS_TONE[r.status], fontWeight: 700, textTransform: "capitalize" }}>{r.status}</span>

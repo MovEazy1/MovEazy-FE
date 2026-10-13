@@ -5,6 +5,7 @@ import { BarChart3, Bookmark, Building2, ChevronRight, Crown, Eye, Gift, HelpCir
 import { useAuth } from "../../context/AuthContext";
 import { usePartner } from "./PartnerApp";
 import { Avatar, Sheet, TopBar, WhatsAppIcon, formatPhone, toast } from "./partnerUi";
+import ContactNumberSheet from "./ContactNumberSheet";
 import { MOVEAZY_TEAM_WHATSAPP } from "../../config/contactChannels";
 import { PUBLIC_ORIGIN, friendlyError, hasPremium, isPartnerHost, pp, registerPartner } from "../../lib/partners";
 
@@ -43,6 +44,7 @@ export default function MorePage() {
   const { logout } = useAuth();
   const { me, reloadMe, inventory, leads, groups, saved, demo, status } = usePartner();
   const [edit, setEdit] = useState(false);
+  const [numbers, setNumbers] = useState(false);
   const p = me?.partner;
   const mine = (inventory ?? []).filter((l) => l.source === "mine");
   const premium = hasPremium(me);
@@ -66,6 +68,20 @@ export default function MorePage() {
             <span className="pz-hint" style={{ display: "block" }}>{p?.email}</span>
           </div>
           <button type="button" className="pz-iconbtn" aria-label="Edit profile" onClick={() => setEdit(true)}><Pencil size={18} /></button>
+        </div>
+
+        <div className="pz-section">
+          <h2 style={{ marginBottom: 6 }}>Mobile numbers
+            <button type="button" className="pz-btn pz-btn--sm" onClick={() => setNumbers(true)}>{p?.alt_phone ? "Change" : "Add another"}</button>
+          </h2>
+          {[[p?.phone, "Sign-in number", (p?.contact_primary || "main") !== "alt" || !p?.alt_phone], ...(p?.alt_phone ? [[p.alt_phone, "Second number", p.contact_primary === "alt"]] : [])]
+            .map(([num, label, primary]) => (
+              <div key={label} className="pz-row" style={{ padding: "6px 0" }}>
+                <span style={{ flex: 1 }}><b>{formatPhone(num) || "—"}</b> <span className="pz-meta">· {label}</span></span>
+                <span className={`pz-pill${primary ? "" : " pz-pill--grey"}`}>{primary ? "Primary" : "Secondary"}</span>
+              </div>
+            ))}
+          <p className="pz-hint" style={{ margin: "4px 0 0" }}>Your primary number goes on your To-Let poster and public page.</p>
         </div>
 
         <div className="pz-section" style={{ display: "grid", gridTemplateColumns: "repeat(3,1fr)", textAlign: "center", padding: 10 }}>
@@ -109,6 +125,7 @@ export default function MorePage() {
         </div>
       </div>
       {edit && <EditProfile partner={p} onClose={() => setEdit(false)} onSaved={reloadMe} />}
+      {numbers && <ContactNumberSheet partner={p} onClose={() => setNumbers(false)} onSaved={reloadMe} />}
     </>
   );
 }

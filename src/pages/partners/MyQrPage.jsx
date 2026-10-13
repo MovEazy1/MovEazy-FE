@@ -13,11 +13,12 @@ import { Link } from "react-router-dom";
 import { BarChart3, Camera, Download, ExternalLink, Heart, MapPin, Phone, Plus, QrCode, Search, Star, Trash2, X } from "lucide-react";
 import { useAuth } from "../../context/AuthContext";
 import { usePartner } from "./PartnerApp";
-import { Avatar, Chip, Loading, TopBar, WhatsAppIcon, toast } from "./partnerUi";
+import { Avatar, Chip, Loading, TopBar, WhatsAppIcon, formatPhone, toast } from "./partnerUi";
 import ShareOptions from "./ShareOptions";
 import { useLocalities } from "./useLocalities";
 import { SmartListingImage } from "./partnerMedia";
-import { friendlyError, inr, pp, telLink, waLink } from "../../lib/partners";
+import { contactPhone, friendlyError, inr, pp, telLink, waLink } from "../../lib/partners";
+import ContactNumberSheet from "./ContactNumberSheet";
 import {
   addPosterSpot, fetchInsights, fetchMyRating, fetchMyStorefront, removePosterSpot, removeStorefrontPhoto, storefrontDisplay, storefrontUrl, uploadStorefrontPhoto,
 } from "../../lib/storefront";
@@ -35,21 +36,15 @@ function ago(iso) {
 
 export default function MyQrPage() {
   const { user } = useAuth();
-  const { me } = usePartner() || {};
+  const { me, reloadMe } = usePartner() || {};
   const partner = me?.partner || {};
   const [sf, setSf] = useState(null);
   const [err, setErr] = useState("");
   const [design, setDesign] = useState("tolet");
   const [shownRating, setShownRating] = useState(null);
-  const contactKey = `pz-tolet-contact:${partner.user_id || ""}`;
-  const [contact, setContact] = useState(() => {
-    try { return localStorage.getItem(contactKey) || ""; } catch { return ""; }
-  });
-  const setPosterContact = (v) => {
-    const clean = v.replace(/[^\d+ ]/g, "").slice(0, 16);
-    setContact(clean);
-    try { if (clean) localStorage.setItem(contactKey, clean); else localStorage.removeItem(contactKey); } catch { /* fine */ }
-  };
+  const [numberOpen, setNumberOpen] = useState(false);
+  // The poster carries their primary contact number (a second one, if they made it primary).
+  const contact = contactPhone(partner);
   const [photoSrc, setPhotoSrc] = useState("");
   const [busy, setBusy] = useState("");
   const canvasRef = useRef(null);
@@ -110,7 +105,7 @@ export default function MyQrPage() {
         // To-Let shows the rating MovEazy sets until 10 tenants have rated; the others, tenants' ratings only.
         rating: design === "tolet" ? shownRating : sf?.rating, ratings: sf?.ratings,
       },
-      contact: contact || partner.phone,
+      contact,
       logoLight,
       url: storefrontUrl(sf.code, { qr: true, spot }),
       displayUrl: storefrontDisplay(sf.code),
@@ -275,12 +270,15 @@ export default function MyQrPage() {
             <canvas ref={canvasRef} aria-label="Poster preview" />
           </div>
           {design === "tolet" && (
-            <label className="pz-label" style={{ display: "block", marginTop: 12 }}>
-              <Phone size={14} style={{ verticalAlign: -2 }} /> Number on the poster
-              <input className="pz-input" style={{ marginTop: 6 }} inputMode="tel" placeholder={partner.phone || "Your mobile number"}
-                value={contact} onChange={(e) => setPosterContact(e.target.value)} aria-label="Number on the poster" />
-              <span className="pz-hint" style={{ display: "block", marginTop: 4, fontWeight: 400 }}>Leave empty to use your profile number.</span>
-            </label>
+            <>
+              <button type="button" className="pz-btn pz-btn--gold pz-btn--block" style={{ marginTop: 12, minHeight: 52, fontSize: 16 }} onClick={download} disabled={busy === "pdf"}>
+                <Download size={19} /> {busy === "pdf" ? "Making your banner…" : `Download my To-Let Banner${currentSpot ? ` · ${currentSpot.area}` : ""}`}
+              </button>
+              <p className="pz-hint" style={{ textAlign: "center", margin: "10px 0 0" }}>
+                {partner.alt_phone && <>Your banner shows {formatPhone(contact)}. </>}
+                <button type="button" className="myqr-link" onClick={() => setNumberOpen(true)}>Want to change your mobile number?</button>
+              </p>
+            </>
           )}
           <div style={{ display: design === "tolet" ? "none" : "flex", gap: 10, marginTop: 10 }}>
             <button type="button" className="pz-btn" style={{ flex: 1 }} onClick={() => fileRef.current?.click()} disabled={busy === "photo"}>
@@ -291,9 +289,11 @@ export default function MyQrPage() {
             )}
             <input ref={fileRef} type="file" accept="image/*" hidden onChange={pickPhoto} />
           </div>
-          <button type="button" className="pz-btn pz-btn--gold pz-btn--block" style={{ marginTop: 10 }} onClick={download} disabled={busy === "pdf"}>
-            <Download size={18} /> {busy === "pdf" ? "Making your PDF…" : `Download A4 PDF${currentSpot ? ` · ${currentSpot.area}` : ""}`}
-          </button>
+          {design !== "tolet" && (
+            <button type="button" className="pz-btn pz-btn--gold pz-btn--block" style={{ marginTop: 10 }} onClick={download} disabled={busy === "pdf"}>
+              <Download size={18} /> {busy === "pdf" ? "Making your PDF…" : `Download A4 PDF${currentSpot ? ` · ${currentSpot.area}` : ""}`}
+            </button>
+          )}
           <Link to={pp("/insights")} className="pz-btn pz-btn--ghost" style={{ width: "100%", marginTop: 6 }}><BarChart3 size={16} /> Scans by area in your leads dashboard</Link>
           <p className="pz-hint" style={{ textAlign: "center", margin: "8px 0 0" }}>Print it and paste it where tenants look — society gates, cafés, PG notice boards.</p>
         </div>
@@ -344,6 +344,7 @@ export default function MyQrPage() {
         </div>
       </div>
       <style>{CSS}</style>
+      {numberOpen && <ContactNumberSheet partner={partner} onClose={() => setNumberOpen(false)} onSaved={reloadMe} />}
     </>
   );
 }
@@ -364,6 +365,7 @@ const CSS = `
 .myqr-thumb { flex: none; display: grid; place-items: center; border-radius: 5px; }
 .myqr-thumb--profile { width: 38px; height: 27px; background: #F7F5EE; border: 1px solid var(--line); color: var(--ink); }
 .myqr-thumb--premium { width: 27px; height: 38px; background: #0A3A2A; color: #E4B659; }
+.myqr-link { border: 0; background: none; padding: 0; font: inherit; font-size: 13px; font-weight: 700; color: var(--g); text-decoration: underline; cursor: pointer; }
 .myqr-thumb--tolet { width: 38px; height: 27px; background: #fff; border: 2px solid #E3141B; color: #E3141B; }
 .myqr-spot { margin-top: 10px; padding: 12px; border-radius: 12px; background: #FBFAF7; border: 1px solid var(--line); }
 .myqr-preview { margin-top: 12px; display: flex; justify-content: center; background: #EEF0EE; border-radius: 12px; padding: 12px; }

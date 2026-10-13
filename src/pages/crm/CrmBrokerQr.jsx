@@ -10,6 +10,7 @@ import { Btn, C } from "./crmUi";
 import { fetchPartnerStorefront } from "../../lib/crmPropertyInternal";
 import { storefrontDisplay, storefrontUrl } from "../../lib/storefront";
 import { POSTER_DESIGNS, designOf, drawPoster, loadImage, posterFontsReady, posterPdf, posterRating } from "../../lib/qrPoster";
+import { contactPhone } from "../../lib/partners";
 import logoOnDark from "../../assets/logo/moveazy-logo-mint-dark.png";
 import logoOnLight from "../../assets/logo/moveazy-logo-mint-light.png";
 
@@ -28,7 +29,7 @@ export default function CrmBrokerQr({ partner, onClose, onToast }) {
     const [photo, logo, logoLight] = await Promise.all([loadImage(sf.photo_url), loadImage(logoOnDark), loadImage(logoOnLight), posterFontsReady()]);
     return {
       broker: {
-        name: sf.name, agency: sf.agency, phone: sf.phone, ratings: sf.ratings,
+        name: sf.name, agency: sf.agency, phone: contactPhone(partner) || sf.phone, ratings: sf.ratings,
         rating: design === "tolet" ? posterRating(partner) ?? sf.rating : sf.rating,
       },
       url: storefrontUrl(sf.code, { qr: true }), displayUrl: storefrontDisplay(sf.code), photo, logo, logoLight,

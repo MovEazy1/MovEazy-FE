@@ -345,6 +345,10 @@ export const adminListPartners = () => rpc("partner_admin_list").then((r) => r ?
 export const adminSetStatus = (userId, status) => rpc("partner_admin_set_status", { p_user: userId, p_status: status });
 export const adminSetAutoApprove = (on) => rpc("partner_admin_set_auto_approve", { p_on: on });
 export const adminSetClientShare = (userId, pct) => rpc("partner_admin_set_client_share", { p_user: userId, p_pct: pct });
+/** Add, change or ("" ) remove the partner's second number; `primary`: "main" | "alt" (partner_contact_phone.sql). */
+export const setContactNumber = (phone, primary = "main") => rpc("partner_set_contact", { p_phone: phone, p_primary: primary });
+/** The number a partner is contacted on: their second one when they made it primary. */
+export const contactPhone = (p) => (p?.contact_primary === "alt" && p?.alt_phone ? p.alt_phone : p?.phone || "");
 /** The rating a partner shows until 10 tenants have rated them (partner_display_rating.sql). */
 export const adminSetRating = (userId, rating) => rpc("crm_partner_set_rating", { p_user: userId, p_rating: rating });
 /** A referrer's lifetime commission, % of rent on direct / shared deals (null = default). */
