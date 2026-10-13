@@ -41,7 +41,7 @@ export default function Storefront() {
   const [data, setData] = useState(undefined); // undefined: loading · null: no such storefront
   const [liked, setLiked] = useState(() => new Set());
   const [myRating, setMyRating] = useState(0);
-  const [rating, setRating] = useState({ rating: null, ratings: 0 });
+  const [rating, setRating] = useState({ rating: null, ratings: 0, fromTenants: false });
   const [filter, setFilter] = useState("all");
   const [note, setNote] = useState("");
   const counted = useRef(false);
@@ -61,7 +61,7 @@ export default function Storefront() {
       if (d) {
         setLiked(new Set(d.liked || []));
         setMyRating(d.my_rating || 0);
-        setRating({ rating: d.broker?.rating, ratings: Number(d.broker?.ratings) || 0 });
+        setRating({ rating: d.broker?.rating, ratings: Number(d.broker?.ratings) || 0, fromTenants: Boolean(d.broker?.from_tenants) });
       }
       return d;
     } catch {
@@ -94,7 +94,7 @@ export default function Storefront() {
           if (pending.stars) {
             const r = await rateStorefront(code, pending.stars);
             setMyRating(pending.stars);
-            setRating({ rating: r?.rating, ratings: Number(r?.ratings) || 0 });
+            setRating({ rating: r?.rating, ratings: Number(r?.ratings) || 0, fromTenants: Boolean(r?.from_tenants) });
             say("Thanks for rating.");
           }
         } catch (e) {
@@ -130,7 +130,7 @@ export default function Storefront() {
     setMyRating(stars);
     try {
       const r = await rateStorefront(code, stars);
-      setRating({ rating: r?.rating, ratings: Number(r?.ratings) || 0 });
+      setRating({ rating: r?.rating, ratings: Number(r?.ratings) || 0, fromTenants: Boolean(r?.from_tenants) });
       say("Thanks for rating.");
     } catch (e) {
       setMyRating(before);
@@ -177,8 +177,8 @@ export default function Storefront() {
               <h1>{b.name}</h1>
               {b.agency && <p className="sf-agency">{b.agency}</p>}
               <p className="sf-rating">
-                {rating.ratings > 0
-                  ? <><Star size={15} fill="#E4B659" color="#E4B659" /> <b>{Number(rating.rating).toFixed(1)}</b> · {rating.ratings} rating{rating.ratings === 1 ? "" : "s"}</>
+                {Number(rating.rating) > 0
+                  ? <><Star size={15} fill="#E4B659" color="#E4B659" /> <b>{Number(rating.rating).toFixed(1)}</b>{rating.fromTenants ? ` · ${rating.ratings} ratings` : ""}</>
                   : <span className="sf-new">New on MovEazy</span>}
               </p>
               <span className="sf-badge"><BadgeCheck size={13} /> Verified MovEazy partner</span>

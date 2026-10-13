@@ -9,13 +9,14 @@ import { Download, ExternalLink, X } from "lucide-react";
 import { Btn, C } from "./crmUi";
 import { fetchPartnerStorefront } from "../../lib/crmPropertyInternal";
 import { storefrontDisplay, storefrontUrl } from "../../lib/storefront";
-import { POSTER_DESIGNS, designOf, drawPoster, loadImage, posterFontsReady, posterPdf } from "../../lib/qrPoster";
+import { POSTER_DESIGNS, designOf, drawPoster, loadImage, posterFontsReady, posterPdf, posterRating } from "../../lib/qrPoster";
 import logoOnDark from "../../assets/logo/moveazy-logo-mint-dark.png";
+import logoOnLight from "../../assets/logo/moveazy-logo-mint-light.png";
 
 export default function CrmBrokerQr({ partner, onClose, onToast }) {
   const [sf, setSf] = useState(null);
   const [err, setErr] = useState("");
-  const [design, setDesign] = useState("profile");
+  const [design, setDesign] = useState("tolet");
   const [busy, setBusy] = useState(false);
   const ref = useRef(null);
 
@@ -24,10 +25,13 @@ export default function CrmBrokerQr({ partner, onClose, onToast }) {
   }, [partner.user_id]);
 
   const data = async () => {
-    const [photo, logo] = await Promise.all([loadImage(sf.photo_url), loadImage(logoOnDark), posterFontsReady()]);
+    const [photo, logo, logoLight] = await Promise.all([loadImage(sf.photo_url), loadImage(logoOnDark), loadImage(logoOnLight), posterFontsReady()]);
     return {
-      broker: { name: sf.name, agency: sf.agency, phone: sf.phone, rating: sf.rating, ratings: sf.ratings },
-      url: storefrontUrl(sf.code, { qr: true }), displayUrl: storefrontDisplay(sf.code), photo, logo,
+      broker: {
+        name: sf.name, agency: sf.agency, phone: sf.phone, ratings: sf.ratings,
+        rating: design === "tolet" ? posterRating(partner) ?? sf.rating : sf.rating,
+      },
+      url: storefrontUrl(sf.code, { qr: true }), displayUrl: storefrontDisplay(sf.code), photo, logo, logoLight,
     };
   };
 

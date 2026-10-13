@@ -62,6 +62,8 @@ export const rateStorefront = (code, stars) => rpc("partner_storefront_rate", { 
 /* ── The broker's side ───────────────────────────────────────────────────── */
 
 export const fetchMyStorefront = () => rpc("partner_my_storefront");
+/** The rating the partner's poster shows: { rating, ratings, from_tenants } (partner_display_rating.sql). */
+export const fetchMyRating = () => rpc("partner_my_rating");
 
 /** A square, at most 720 px JPEG of the middle of `file` — small enough to load fast on a poster page. */
 export async function squarePhoto(file, max = 720) {

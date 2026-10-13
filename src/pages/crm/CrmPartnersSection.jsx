@@ -24,7 +24,8 @@ import { SCOPES } from "../../lib/adminScopes";
 import { whatsappUrl } from "../../lib/crmSettings";
 import { formatForDisplay } from "../../lib/mobile";
 import {
-  adminGrantPremium, adminListPartners, adminSetAutoApprove, adminSetClientShare, adminSetReferralRate, adminSetStatus, fetchProgramSettings,
+  adminGrantPremium, adminListPartners, adminSetAutoApprove, adminSetClientShare, adminSetRating, adminSetReferralRate, adminSetStatus,
+  fetchProgramSettings,
   friendlyError,
 } from "../../lib/partners";
 
@@ -149,7 +150,7 @@ export default function CrmPartnersSection({ access }) {
           <table className="crm-table">
             <thead>
               <tr>
-                <th>Partner</th><th>Mobile</th><th>Status</th><th>Joined</th><th>Listings</th><th>Groups</th><th>Premium</th><th>Client share</th><th title="What this partner earns, % of the rent, on every MovEazy lead closed by partners they referred">Referral commission</th><th />
+                <th>Partner</th><th>Mobile</th><th>Status</th><th>Joined</th><th>Listings</th><th>Groups</th><th>Premium</th><th>Client share</th><th title="What this partner earns, % of the rent, on every MovEazy lead closed by partners they referred">Referral commission</th><th title="Shown on their To-Let poster and public page until 10 tenants have rated them">Rating</th><th />
               </tr>
             </thead>
             <tbody>
@@ -213,6 +214,26 @@ export default function CrmPartnersSection({ access }) {
                         ? `Direct ${r.referral_direct_pct ?? 10}% · Shared ${r.referral_shared_pct ?? 6.67}%`
                         : <span className="crm-mute">Direct 10% · Shared 6.67% (default)</span>}
                       {r.referred_count > 0 && <div className="crm-mute" style={{ fontSize: 10.5 }}>{r.referred_count} referred</div>}
+                    </button>
+                  </td>
+                  <td className="crm-num">
+                    <button type="button" disabled={!canManage || !!busy}
+                      title={canManage ? "Change the rating on their poster and public page" : ""}
+                      style={{ background: "none", border: 0, padding: 0, font: "inherit", color: C.text, cursor: canManage ? "pointer" : "default", textAlign: "left" }}
+                      onClick={() => {
+                        const v = window.prompt(`${r.name}'s rating, 1–5 (one decimal). Shown on their To-Let poster and public page until 10 tenants have rated them.`,
+                          r.display_rating ?? "");
+                        if (v === null || v.trim() === "") return;
+                        const n = Number(v);
+                        if (!(n >= 1 && n <= 5)) { showToast("Enter a rating between 1 and 5", "error"); return; }
+                        act(r.user_id, () => adminSetRating(r.user_id, n), `${r.name} now shows ★ ${n.toFixed(1)}`);
+                      }}>
+                      {r.display_rating != null ? `★ ${Number(r.display_rating).toFixed(1)}` : "—"}
+                      <div className="crm-mute" style={{ fontSize: 10.5 }}>
+                        {Number(r.tenant_ratings) >= 10
+                          ? `Showing tenants' ★ ${Number(r.tenant_rating).toFixed(1)} (${r.tenant_ratings})`
+                          : `${Number(r.tenant_ratings) || 0}/10 tenant ratings`}
+                      </div>
                     </button>
                   </td>
                   <td>

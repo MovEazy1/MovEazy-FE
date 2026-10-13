@@ -1,8 +1,9 @@
 /**
  * My QR — the broker's poster and what it brings in.
  *
- * Two poster designs, both printable as an A4 PDF: their profile beside the
- * QR, or "Looking for a Premium Home?" over a big QR. The photo they upload
+ * Three poster designs, all printable as an A4 PDF: To-Let (the default — the
+ * red street poster with their number, the QR and their rating), their
+ * profile beside the QR, or "Looking for a Premium Home?" over a big QR. The photo they upload
  * goes on both, and on the storefront the QR opens (moveazy.co.in/b/<code>).
  * Below: visitors and QR scans this week, and who liked which flat — with the
  * tenant's number, since the storefront told them it would be shared.
@@ -18,10 +19,11 @@ import { useLocalities } from "./useLocalities";
 import { SmartListingImage } from "./partnerMedia";
 import { friendlyError, inr, pp, telLink, waLink } from "../../lib/partners";
 import {
-  addPosterSpot, fetchInsights, fetchMyStorefront, removePosterSpot, removeStorefrontPhoto, storefrontDisplay, storefrontUrl, uploadStorefrontPhoto,
+  addPosterSpot, fetchInsights, fetchMyRating, fetchMyStorefront, removePosterSpot, removeStorefrontPhoto, storefrontDisplay, storefrontUrl, uploadStorefrontPhoto,
 } from "../../lib/storefront";
 import { POSTER_DESIGNS, drawPoster, loadImage, posterFontsReady, posterPdf } from "../../lib/qrPoster";
 import logoOnDark from "../../assets/logo/moveazy-logo-mint-dark.png";
+import logoOnLight from "../../assets/logo/moveazy-logo-mint-light.png";
 
 function ago(iso) {
   const s = Math.max(0, (Date.now() - new Date(iso).getTime()) / 1000);
@@ -37,7 +39,17 @@ export default function MyQrPage() {
   const partner = me?.partner || {};
   const [sf, setSf] = useState(null);
   const [err, setErr] = useState("");
-  const [design, setDesign] = useState("profile");
+  const [design, setDesign] = useState("tolet");
+  const [shownRating, setShownRating] = useState(null);
+  const contactKey = `pz-tolet-contact:${partner.user_id || ""}`;
+  const [contact, setContact] = useState(() => {
+    try { return localStorage.getItem(contactKey) || ""; } catch { return ""; }
+  });
+  const setPosterContact = (v) => {
+    const clean = v.replace(/[^\d+ ]/g, "").slice(0, 16);
+    setContact(clean);
+    try { if (clean) localStorage.setItem(contactKey, clean); else localStorage.removeItem(contactKey); } catch { /* fine */ }
+  };
   const [photoSrc, setPhotoSrc] = useState("");
   const [busy, setBusy] = useState("");
   const canvasRef = useRef(null);
@@ -57,6 +69,7 @@ export default function MyQrPage() {
 
   useEffect(() => {
     load().then((d) => { if (d?.photo_url) setPhotoSrc((cur) => cur || d.photo_url); });
+    fetchMyRating().then((r) => setShownRating(r?.rating ?? null), () => {});
   }, [load]);
 
   // Poster spots: one QR per place a poster is pasted, so scans can be counted by area.
@@ -90,15 +103,21 @@ export default function MyQrPage() {
   const currentSpot = spots.find((x) => x.code === spot);
 
   const posterData = useCallback(async () => {
-    const [photo, logo] = await Promise.all([loadImage(photoSrc), loadImage(logoOnDark), posterFontsReady()]);
+    const [photo, logo, logoLight] = await Promise.all([loadImage(photoSrc), loadImage(logoOnDark), loadImage(logoOnLight), posterFontsReady()]);
     return {
-      broker: { name: partner.name, agency: partner.agency, phone: partner.phone, rating: sf?.rating, ratings: sf?.ratings },
+      broker: {
+        name: partner.name, agency: partner.agency, phone: partner.phone,
+        // To-Let shows the rating MovEazy sets until 10 tenants have rated; the others, tenants' ratings only.
+        rating: design === "tolet" ? shownRating : sf?.rating, ratings: sf?.ratings,
+      },
+      contact: contact || partner.phone,
+      logoLight,
       url: storefrontUrl(sf.code, { qr: true, spot }),
       displayUrl: storefrontDisplay(sf.code),
       photo,
       logo,
     };
-  }, [photoSrc, partner.name, partner.agency, partner.phone, sf, spot]);
+  }, [photoSrc, partner.name, partner.agency, partner.phone, sf, spot, design, shownRating, contact]);
 
   // The preview: the same drawing the PDF gets, smaller.
   useEffect(() => {
@@ -149,7 +168,7 @@ export default function MyQrPage() {
       const url = URL.createObjectURL(blob);
       const a = document.createElement("a");
       a.href = url;
-      a.download = `MovEazy-QR-${design === "premium" ? "premium-home" : "profile"}-${currentSpot ? currentSpot.area.replace(/\W+/g, "-") : sf.code}.pdf`;
+      a.download = `MovEazy-QR-${design === "premium" ? "premium-home" : design === "tolet" ? "to-let" : "profile"}-${currentSpot ? currentSpot.area.replace(/\W+/g, "-") : sf.code}.pdf`;
       document.body.appendChild(a);
       a.click();
       a.remove();
@@ -255,7 +274,15 @@ export default function MyQrPage() {
           <div className={`myqr-preview myqr-preview--${design}`}>
             <canvas ref={canvasRef} aria-label="Poster preview" />
           </div>
-          <div style={{ display: "flex", gap: 10, marginTop: 10 }}>
+          {design === "tolet" && (
+            <label className="pz-label" style={{ display: "block", marginTop: 12 }}>
+              <Phone size={14} style={{ verticalAlign: -2 }} /> Number on the poster
+              <input className="pz-input" style={{ marginTop: 6 }} inputMode="tel" placeholder={partner.phone || "Your mobile number"}
+                value={contact} onChange={(e) => setPosterContact(e.target.value)} aria-label="Number on the poster" />
+              <span className="pz-hint" style={{ display: "block", marginTop: 4, fontWeight: 400 }}>Leave empty to use your profile number.</span>
+            </label>
+          )}
+          <div style={{ display: design === "tolet" ? "none" : "flex", gap: 10, marginTop: 10 }}>
             <button type="button" className="pz-btn" style={{ flex: 1 }} onClick={() => fileRef.current?.click()} disabled={busy === "photo"}>
               <Camera size={17} /> {busy === "photo" ? "Uploading…" : photoSrc ? "Change photo" : "Add your photo"}
             </button>
@@ -337,6 +364,7 @@ const CSS = `
 .myqr-thumb { flex: none; display: grid; place-items: center; border-radius: 5px; }
 .myqr-thumb--profile { width: 38px; height: 27px; background: #F7F5EE; border: 1px solid var(--line); color: var(--ink); }
 .myqr-thumb--premium { width: 27px; height: 38px; background: #0A3A2A; color: #E4B659; }
+.myqr-thumb--tolet { width: 38px; height: 27px; background: #fff; border: 2px solid #E3141B; color: #E3141B; }
 .myqr-spot { margin-top: 10px; padding: 12px; border-radius: 12px; background: #FBFAF7; border: 1px solid var(--line); }
 .myqr-preview { margin-top: 12px; display: flex; justify-content: center; background: #EEF0EE; border-radius: 12px; padding: 12px; }
 .myqr-preview canvas { display: block; width: 100%; height: auto; border-radius: 4px; box-shadow: 0 8px 24px rgba(0,0,0,.18); background: #fff; }

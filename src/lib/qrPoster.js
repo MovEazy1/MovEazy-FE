@@ -23,6 +23,7 @@ import QRCode from "qrcode";
 import { jpegToPdf } from "./pdfImage";
 
 export const POSTER_DESIGNS = [
+  { id: "tolet", label: "To-Let", orientation: "landscape" },
   { id: "profile", label: "Your profile", orientation: "landscape" },
   { id: "premium", label: "Premium Home", orientation: "portrait" },
 ];
@@ -72,10 +73,30 @@ export function loadImage(src) {
   });
 }
 
+/** The To-Let poster's face, fetched once from Google Fonts (index.html doesn't carry it). */
+const TOLET_FONT = "\"Roboto Condensed\", \"Arial Narrow\", Arial, sans-serif";
+let toLetFont = null;
+function ensureToLetFont() {
+  if (typeof document === "undefined") return Promise.resolve();
+  if (!toLetFont) {
+    toLetFont = new Promise((resolve) => {
+      const link = document.createElement("link");
+      link.rel = "stylesheet";
+      link.href = "https://fonts.googleapis.com/css2?family=Roboto:wght@900&family=Roboto+Condensed:wght@500;600;700;800;900&display=swap";
+      link.onload = resolve;
+      link.onerror = resolve; // draw in the fallback rather than not at all
+      document.head.appendChild(link);
+      setTimeout(resolve, 4000);
+    });
+  }
+  return toLetFont;
+}
+
 /** Wait for the poster's font, so the first draw isn't in a fallback face. */
 export async function posterFontsReady() {
+  await ensureToLetFont();
   try {
-    await Promise.all(["800 40px Manrope", "700 40px Manrope", "600 40px Manrope", "500 40px Manrope", "700 40px \"Playfair Display\"", "italic 600 40px \"Playfair Display\""].map((f) => document.fonts?.load(f)));
+    await Promise.all(["900 40px Roboto", "900 40px \"Roboto Condensed\"", "700 40px \"Roboto Condensed\"", "500 40px \"Roboto Condensed\"", "800 40px Manrope", "700 40px Manrope", "600 40px Manrope", "500 40px Manrope", "700 40px \"Playfair Display\"", "italic 600 40px \"Playfair Display\""].map((f) => document.fonts?.load(f)));
   } catch { /* draw with whatever is there */ }
 }
 
@@ -106,11 +127,11 @@ function text(ctx, s, x, y, { size = 30, weight = 700, color = C.ink, align = "l
   ctx.fillText(t, x, y);
 }
 
-function drawQr(ctx, url, x, y, size) {
+function drawQr(ctx, url, x, y, size, color = "#0B1F17") {
   const { modules } = QRCode.create(url, { errorCorrectionLevel: "Q" });
   const n = modules.size;
   const cell = size / n;
-  ctx.fillStyle = "#0B1F17";
+  ctx.fillStyle = color;
   for (let r = 0; r < n; r++) {
     for (let c = 0; c < n; c++) {
       // A hair of overlap so no seams show between modules when scaled.
@@ -1037,6 +1058,147 @@ function drawClassic(ctx, { headline = {}, url, logo }) {
   ctx.restore();
 }
 
+/* ── To-Let: the red street poster (the default) ─────────────────────────── */
+
+/** The rating a poster shows: the tenants' average once 10+ have rated, the CRM's until then (partner_display_rating.sql). */
+export function posterRating({ display_rating: shown, tenant_ratings: n, tenant_rating: avg } = {}) {
+  const v = Number(n) >= 10 ? Number(avg) : Number(shown);
+  return Number.isFinite(v) && v > 0 ? v : null;
+}
+
+/** "9999999999": the poster's contact, ten digits. */
+export const toLetNumber = (phone) => {
+  const d = String(phone || "").replace(/\D/g, "");
+  return d.length >= 10 ? d.slice(-10) : String(phone || "").trim();
+};
+
+function star(ctx, cx, cy, r, fill) {
+  ctx.beginPath();
+  for (let i = 0; i < 10; i++) {
+    const a = -Math.PI / 2 + (i * Math.PI) / 5;
+    const rr = i % 2 ? r * 0.45 : r;
+    ctx.lineTo(cx + rr * Math.cos(a), cy + rr * Math.sin(a));
+  }
+  ctx.closePath();
+  ctx.fillStyle = fill;
+  ctx.fill();
+}
+
+/**
+ * Text whose capitals fill a box: set by cap height, then squeezed or
+ * stretched (a little) to the width — the poster's heavy condensed lines.
+ */
+function capLine(ctx, s, { x, base, cap, width, weight = 900, color = "#111", align = "left", stretch = [0.72, 1.3], family = TOLET_FONT }) {
+  const size = cap / 0.711;
+  ctx.font = `${weight} ${size}px ${family}`;
+  const w = ctx.measureText(s).width || 1;
+  const k = width ? Math.min(stretch[1], Math.max(stretch[0], width / w)) : 1;
+  const drawn = w * k;
+  const left = align === "center" ? x - drawn / 2 : x;
+  ctx.save();
+  ctx.translate(left, base);
+  ctx.scale(k, 1);
+  ctx.fillStyle = color;
+  ctx.textAlign = "left";
+  ctx.textBaseline = "alphabetic";
+  ctx.fillText(s, 0, 0);
+  ctx.restore();
+  return drawn;
+}
+
+/** The broker's name as the poster can hold it, still big: full, else "First L.", else the first name. */
+function posterName(ctx, name, max) {
+  const words = String(name || "MovEazy Partner").trim().split(/\s+/);
+  const options = [words.join(" "), words.length > 1 ? `${words[0]} ${words[words.length - 1][0]}.` : "", words[0]].filter(Boolean);
+  ctx.font = `700 44px ${TOLET_FONT}`;
+  return options.find((o) => ctx.measureText(o).width <= max) ?? words[0];
+}
+
+/** Plain text at a size, shrunk until it fits `max`. */
+function fitText(ctx, s, x, y, { size, weight = 700, color = "#111", align = "left", max }) {
+  let z = size;
+  ctx.font = `${weight} ${z}px ${TOLET_FONT}`;
+  while (max && z > 16 && ctx.measureText(s).width > max) { z -= 1; ctx.font = `${weight} ${z}px ${TOLET_FONT}`; }
+  ctx.fillStyle = color;
+  ctx.textAlign = align;
+  ctx.textBaseline = "alphabetic";
+  ctx.fillText(s, x, y);
+}
+
+/**
+ * "TO LET · 1, 2, 3 BHK · CONTACT <number>" beside the logo, the QR ("SCAN TO
+ * VIEW FLATS") and "Your Local Broker <name> ★★★★★ 4.8". Drawn in the
+ * design's own 1492 × 1056 frame, scaled onto A4 landscape.
+ * `data`: { broker: { name, phone, rating }, contact, url, logoLight }.
+ */
+function drawToLet(ctx, { broker = {}, contact, url, logoLight }) {
+  const [W, H] = SIZE.landscape;
+  const RED = "#E3141B";
+  const INK = "#111111";
+  ctx.fillStyle = "#FFFFFF";
+  ctx.fillRect(0, 0, W, H);
+  ctx.save();
+  ctx.scale(W / 1492, H / 1056);
+
+  // The frame, and the rule between the two halves.
+  roundRect(ctx, 25, 100, 1442, 882, 26);
+  ctx.lineWidth = 7;
+  ctx.strokeStyle = RED;
+  ctx.stroke();
+  ctx.fillStyle = RED;
+  ctx.fillRect(1021.5, 140, 4, 800);
+
+  // Left: TO LET, the BHKs, a red rule, CONTACT and the number.
+  capLine(ctx, "TO LET", { x: 88, base: 445, cap: 272, width: 890, color: RED, family: "Roboto, Arial, sans-serif" });
+  capLine(ctx, "1, 2, 3 BHK", { x: 90, base: 670, cap: 168, width: 893, color: INK });
+  ctx.fillStyle = RED;
+  ctx.fillRect(90, 716, 890, 4);
+  capLine(ctx, "CONTACT", { x: 530, base: 787, cap: 36, width: 196, weight: 700, color: INK, align: "center" });
+  const num = toLetNumber(contact || broker.phone) || "—";
+  capLine(ctx, num, { x: 532, base: 926, cap: 112, width: num.length >= 10 ? 868 : null, color: INK, align: "center" });
+
+  // Right: the logo.
+  if (logoLight) {
+    const lw = 330;
+    const lh = (logoLight.height / logoLight.width) * lw;
+    ctx.drawImage(logoLight, 1248 - lw / 2, 205 - lh / 2, lw, lh);
+  }
+
+  // The QR in a red-edged card, "SCAN TO VIEW FLATS" under it.
+  roundRect(ctx, 1066, 266, 368, 418, 24);
+  ctx.fillStyle = "#FFFFFF";
+  ctx.fill();
+  ctx.lineWidth = 4.5;
+  ctx.strokeStyle = RED;
+  ctx.stroke();
+  drawQr(ctx, url, 1096, 292, 308, INK);
+  capLine(ctx, "SCAN TO VIEW FLATS", { x: 1250, base: 656, cap: 25, width: 302, weight: 700, color: INK, align: "center" });
+  ctx.fillStyle = RED;
+  ctx.fillRect(1073, 711, 353, 3.5);
+
+  // The broker: "Your Local Broker", their name, five stars and the rating.
+  fitText(ctx, "Your Local Broker", 1078, 779, { size: 36, weight: 500, color: INK, max: 345 });
+  fitText(ctx, posterName(ctx, broker.name, 350), 1076, 846, { size: 62, weight: 700, color: INK, max: 350 });
+  const rating = Number(broker.rating);
+  const gold = "#F2B705";
+  for (let i = 0; i < 5; i++) {
+    const cx = 1103 + i * 55;
+    // Full stars from 4.5 up, as on the design; below that the last ones fill by the rating.
+    const f = rating >= 4.5 ? 1 : Math.max(0, Math.min(1, rating - i));
+    star(ctx, cx, 895, 26, "#E7E2D6");
+    if (f > 0) {
+      ctx.save();
+      ctx.beginPath();
+      ctx.rect(cx - 27, 860, 54 * f, 70);
+      ctx.clip();
+      star(ctx, cx, 895, 26, gold);
+      ctx.restore();
+    }
+  }
+  if (rating > 0) fitText(ctx, rating.toFixed(1), 1356, 915, { size: 46, weight: 700, color: INK });
+  ctx.restore();
+}
+
 /**
  * Draw `design` onto `canvas` at `scale` (1 = 1188 px on the long side).
  * `data`: { broker: {name, agency, phone, rating, ratings}, url, displayUrl, photo, logo } — photo/logo loaded images.
@@ -1050,7 +1212,8 @@ export function drawPoster(canvas, design, data, scale = 1) {
   ctx.imageSmoothingQuality = "high";
   const id = designOf(design).id;
   P = POSTER_PALETTES[data?.palette] || POSTER_PALETTES.emerald;
-  if (id === "premium") drawPremium(ctx, data);
+  if (id === "tolet") drawToLet(ctx, data);
+  else if (id === "premium") drawPremium(ctx, data);
   else if (id === "classic") drawClassic(ctx, data);
   else if (id === "street") drawStreet(ctx, data);
   else if (id === "speed") drawSpeed(ctx, data);
