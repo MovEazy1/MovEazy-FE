@@ -14,6 +14,8 @@
  * the Client share column overrides that default for one broker.
  */
 import { useCallback, useEffect, useMemo, useState } from "react";
+import CrmPartnerLeads, { LeadCountCell } from "./CrmPartnerLeads";
+import { fetchCrmPartnerLeads } from "../../lib/partnerPool";
 import { Btn, C, Chip, Empty, Toast, shortDate } from "./crmUi";
 import CrmProgramSettings from "./CrmProgramSettings";
 import CrmBrokerQr from "./CrmBrokerQr";
@@ -42,6 +44,9 @@ export default function CrmPartnersSection({ access }) {
   const [error, setError] = useState("");
   const [pricing, setPricing] = useState(false);
   const [qrFor, setQrFor] = useState(null);
+  // Each partner's MovEazy leads by status; one partner's list on demand.
+  const [leadStats, setLeadStats] = useState({});
+  const [leadsFor, setLeadsFor] = useState(null);
   const loaded = useLandingSettings();
   const [savedProgram, setSavedProgram] = useState(null);
   const program = savedProgram || loaded;
@@ -53,9 +58,10 @@ export default function CrmPartnersSection({ access }) {
 
   const load = useCallback(async () => {
     try {
-      const [list, s] = await Promise.all([adminListPartners(), fetchProgramSettings()]);
+      const [list, s, ls] = await Promise.all([adminListPartners(), fetchProgramSettings(), fetchCrmPartnerLeads().catch(() => ({}))]);
       setRows(list);
       setSettings(s);
+      setLeadStats(ls || {});
       setError("");
     } catch (e) {
       setRows([]);
@@ -150,7 +156,7 @@ export default function CrmPartnersSection({ access }) {
           <table className="crm-table">
             <thead>
               <tr>
-                <th>Partner</th><th>Mobile</th><th>Status</th><th>Joined</th><th>Listings</th><th>Groups</th><th>Premium</th><th>Client share</th><th title="What this partner earns, % of the rent, on every MovEazy lead closed by partners they referred">Referral commission</th><th title="Shown on their To-Let poster and public page until 10 tenants have rated them">Rating</th><th />
+                <th>Partner</th><th>Mobile</th><th>Status</th><th>Joined</th><th>Listings</th><th title="MovEazy leads given to them (website, milestones, packs); how many they haven't called yet">Leads</th><th>Groups</th><th>Premium</th><th>Client share</th><th title="What this partner earns, % of the rent, on every MovEazy lead closed by partners they referred">Referral commission</th><th title="Shown on their To-Let poster and public page until 10 tenants have rated them">Rating</th><th />
               </tr>
             </thead>
             <tbody>
@@ -186,6 +192,7 @@ export default function CrmPartnersSection({ access }) {
                   </td>
                   <td className="crm-mute crm-num">{shortDate(r.created_at)}</td>
                   <td className="crm-num">{r.listing_count}</td>
+                  <td className="crm-num"><LeadCountCell s={leadStats[r.user_id]} onOpen={() => setLeadsFor(r)} /></td>
                   <td className="crm-num">{r.group_count}</td>
                   <td className="crm-num">
                     {r.premium_until ? `until ${shortDate(r.premium_until)}`
@@ -288,6 +295,7 @@ export default function CrmPartnersSection({ access }) {
         )}
       </div>
       {qrFor && <CrmBrokerQr partner={qrFor} onClose={() => setQrFor(null)} onToast={showToast} />}
+      {leadsFor && <CrmPartnerLeads partner={leadsFor} onClose={() => setLeadsFor(null)} />}
       <Toast {...(toast ?? {})} />
     </div>
   );

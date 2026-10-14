@@ -1,6 +1,6 @@
 /**
  * After the plan: the payment return, the congratulations one-pager (ROI +
- * Refer & Earn), the Wallet's payout card, the profile sheet Home opens, and
+ * Earn Commission), the Wallet's payout card, the profile sheet Home opens, and
  * the logo turned gold for a completed Premium profile.
  */
 import { useEffect, useMemo, useState } from "react";
@@ -113,8 +113,8 @@ export function WelcomePremium() {
         <div className="wp-refer">
           <Gift size={22} />
           <div>
-            <b>Refer & Earn up to {inr(Math.max(0, ...plans.map((p) => Number(p.referral_reward) || 0)) || REFERRAL_REWARD)}</b>
-            <span>For every broker who joins with your link and takes Premium — paid to your bank 30 days later if they keep it.</span>
+            <b>Earn Commission: 10% for life</b>
+            <span>Add as many partners as you want. On every property they close you earn 10%, out of MovEazy's share — nothing is cut from them.</span>
           </div>
         </div>
         <ReferButtons code={ref?.code} name={me?.partner?.name} big />
@@ -137,7 +137,7 @@ export function ReferButtons({ code, name, big = false }) {
   };
   return (
     <div className={`rf-btns${big ? " big" : ""}`}>
-      <button type="button" className="rf-wa" onClick={share}><WhatsAppIcon size={19} /> Refer & Earn on WhatsApp</button>
+      <button type="button" className="rf-wa" onClick={share}><WhatsAppIcon size={19} /> Invite partners on WhatsApp</button>
       <button type="button" className="rf-copy" onClick={copy}><Copy size={16} /> {link.replace(/^https:\/\//, "")}</button>
     </div>
   );

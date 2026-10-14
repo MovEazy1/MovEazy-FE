@@ -14,8 +14,7 @@ import { Btn, C, Chip, Empty, inr, relTime, shortDate } from "./crmUi";
 import { formatForDisplay } from "../../lib/mobile";
 import { friendlyError } from "../../lib/partners";
 import {
-  crmDecidePremiumPayment, crmMarkCommissionPaid, crmMarkReferralPaid, crmPlans, crmPremiumPayments, crmReferralCommissions, crmReferralPayouts,
-  crmSetPlanReward, pctLabel,
+  crmDecidePremiumPayment, crmMarkCommissionPaid, crmMarkReferralPaid, crmPremiumPayments, crmReferralCommissions, crmReferralPayouts, pctLabel,
 } from "../../lib/partnerPlans";
 
 const box = { display: "grid", gap: 10, background: C.bg };
@@ -211,37 +210,17 @@ export function ReferralCommissions({ canManage, onToast }) {
   );
 }
 
-/** For "Prices, shares & landing pages": what each plan earns the partner who referred the buyer. */
-export function PlanRewards({ canManage, onToast }) {
-  const [plans, setPlans] = useState(null);
-  const [draft, setDraft] = useState({});
-  const [busy, setBusy] = useState("");
-  useEffect(() => { crmPlans().then((p) => { setPlans(p); setDraft(Object.fromEntries(p.map((x) => [x.id, String(x.referral_reward)]))); }, () => setPlans([])); }, []);
-  if (!plans) return null;
-  const save = async (p) => {
-    setBusy(p.id);
-    try {
-      await crmSetPlanReward(p.id, draft[p.id]);
-      setPlans((ps) => ps.map((x) => (x.id === p.id ? { ...x, referral_reward: Number(draft[p.id]) } : x)));
-      onToast(`${p.label}: referrer earns ${inr(draft[p.id])}`);
-    } catch (e) { onToast(friendlyError(e), "error"); } finally { setBusy(""); }
-  };
+/**
+ * For "Prices, shares & landing pages": the one-time reward a referrer got per
+ * plan. Retired (partner_pool_milestones.sql) — referrers earn the lifetime 10%
+ * commission instead — so this only says so.
+ */
+export function PlanRewards() {
   return (
-    <div style={{ border: `1px solid ${C.line}`, borderRadius: 10, padding: 12, background: C.bg }}>
-      <div style={{ fontWeight: 700, fontSize: 13, marginBottom: 8 }}>Referral reward per plan</div>
-      <div style={{ display: "grid", gap: 8 }}>
-        {plans.filter((p) => p.active).map((p) => {
-          const changed = String(p.referral_reward) !== draft[p.id];
-          return (
-            <label key={p.id} style={{ display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap" }}>
-              <span className="crm-mute" style={{ fontSize: 11.5, flex: "1 1 160px" }}>{p.label} · {inr(p.price)} — referrer earns (₹)</span>
-              <input className="crm-input crm-num" inputMode="numeric" style={{ width: 100, ...(changed ? { borderColor: C.gold } : {}) }}
-                disabled={!canManage || !!busy} value={draft[p.id] ?? ""} onChange={(e) => setDraft((d) => ({ ...d, [p.id]: e.target.value.replace(/\D/g, "") }))} />
-              {changed && <Btn sm variant="primary" disabled={!!busy || draft[p.id] === ""} onClick={() => save(p)}>Save</Btn>}
-            </label>
-          );
-        })}
-      </div>
+    <div style={{ border: `1px solid ${C.line}`, borderRadius: 10, padding: 12, background: C.bg, fontSize: 12.5 }}>
+      <div style={{ fontWeight: 700, fontSize: 13, marginBottom: 4 }}>Referral reward per plan</div>
+      <span className="crm-mute">Retired: partners who add partners now earn a lifetime 10% commission (out of MovEazy&apos;s share) instead of a one-time reward.</span>
     </div>
   );
 }
+

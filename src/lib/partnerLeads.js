@@ -20,6 +20,9 @@ export const PACKS = {
   free10: { id: "free10", count: 10, title: "10 leads", sub: "Free · once · matched to your flats" },
   paid30: { id: "paid30", count: 30, title: "30 leads", sub: "One payment" },
   premium: { id: "premium", count: 10, title: "Unlimited", sub: "Premium · pay only on closures" },
+  // Given, never asked for: upload milestones and interest on the website.
+  milestone: { id: "milestone", count: 10, title: "Milestone leads", sub: "Unlocked by uploading flats" },
+  website: { id: "website", count: 0, title: "MovEazy Website", sub: "Tenants interested in your flats" },
 };
 
 export const ASSIGNED_STATUS = {
@@ -144,8 +147,8 @@ export function topSets(pairs = [], myAreas = [], limit = 8) {
 
 /** MovEazy's share on a Premium closure: 30% of a month's rent direct with the owner, 20% with other brokers. */
 export function closureDue(rent, deal, pack = "premium") {
-  // Premium leads, and website leads (interest in the partner's own flat on moveazy.co.in).
-  if (pack !== "premium" && pack !== "website") return 0;
+  // Premium leads, website leads (interest in their own flat on moveazy.co.in), and milestone leads.
+  if (pack !== "premium" && pack !== "website" && pack !== "milestone") return 0;
   const r = Number(rent) || 0;
   return Math.round(r * (deal === "direct" ? 0.3 : 0.2));
 }

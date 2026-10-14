@@ -104,7 +104,7 @@ export default function Insights() {
                 </span>
                 <span style={{ flex: 1, textAlign: "left" }}>
                   <strong style={{ display: "block", fontSize: 14 }}>{e.who} {e.kind === "liked" ? "liked" : "disliked"} {[e.flat_type, e.area].filter(Boolean).join(" · ")}</strong>
-                  <span className="pz-meta">{e.via === "qr" ? "on your QR page" : "on your curated list"}{e.phone ? ` · ${e.phone}` : ""}</span>
+                  <span className="pz-meta">{e.via === "qr" ? "on your QR page" : "on your curated list"}</span>
                 </span>
                 <span className="pz-hint">{ago(e.at)}</span>
               </button>

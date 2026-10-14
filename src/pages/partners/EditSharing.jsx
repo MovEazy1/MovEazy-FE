@@ -2,7 +2,8 @@
 import { useEffect, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import { usePartner } from "./PartnerApp";
-import ShareWithForm, { fromSharing, toSharing } from "./ShareWithForm";
+import { fromSharing, toSharing } from "./ShareWithForm";
+import ShareMediums from "./ShareMediums";
 import { Empty, Loading, TopBar, toast } from "./partnerUi";
 import { supabase } from "../../lib/supabase";
 import { normalizeIndianMobile } from "../../lib/mobile";
@@ -66,8 +67,15 @@ export default function EditSharing() {
           <label className="pz-label" htmlFor="es-rent">Rent (₹ per month)</label>
           <input id="es-rent" className="pz-input" inputMode="numeric" value={rent} onChange={(e) => setRent(e.target.value.replace(/\D/g, ""))} />
         </div>
-        <span className="pz-label">Share with</span>
-        <ShareWithForm value={share} onChange={setShare} groups={groups} />
+        {!share.platformOn && (
+          <div className="pz-section" style={{ background: "#FEF7E6", borderColor: "#F1D99B" }}>
+            <strong style={{ display: "block", color: "#5C3F05" }}>This inventory is not shared with other partners.</strong>
+            <span className="pz-meta" style={{ display: "block", margin: "4px 0 10px" }}>Do you want to share it? Partners' AI Matching sends it to their tenants, and you keep your share of the brokerage.</span>
+            <button type="button" className="pz-btn pz-btn--gold pz-btn--sm" onClick={() => setShare({ ...share, platformOn: true, platformPct: 50 })}>Share with all MovEazy partners</button>
+          </div>
+        )}
+        <span className="pz-label">Who can close it</span>
+        <ShareMediums value={share} onChange={setShare} groups={groups ?? []} />
         <div className="pz-section" style={{ marginTop: 12 }}>
           <h2>Private contacts <span className="pz-hint">only you and MovEazy</span></h2>
           {[["owner", "Owner"], ["tenant", "Current tenant"]].map(([k, label]) => (

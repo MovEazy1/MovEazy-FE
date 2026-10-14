@@ -9,7 +9,11 @@
  *                both), floor and amenities (outside parking, pet friendly
  *                and walkable already ticked) — taps, not typing. 1 BHK and
  *                the last locality used are already selected.
- *   Who sees it  only me / all MovEazy brokers at a share / groups — remembered.
+ *   Who sells it every medium — all MovEazy partners and each group — on at
+ *                50% of the brokerage to start (ShareMediums); × on all
+ *                partners asks first. Not remembered: every flat starts shared.
+ *   Done         "It's live!" with the next upload milestone (MilestoneBar) and
+ *                any leads it just unlocked.
  *   More         the property's details pasted from WhatsApp (saved as
  *                written), move-in date, the owner's contact and a name —
  *                all optional.
@@ -27,7 +31,9 @@ import {
 } from "lucide-react";
 import { useAuth } from "../../context/AuthContext";
 import { usePartner } from "./PartnerApp";
-import ShareWithForm, { EMPTY_SHARE, PCT_OPTIONS, shareSummary, toSharing } from "./ShareWithForm";
+import { shareSummary, toSharing } from "./ShareWithForm";
+import ShareMediums, { defaultShare } from "./ShareMediums";
+import MilestoneBar from "./MilestoneBar";
 import { cleanPasted } from "./PropertyDetailsSheet";
 import { Sheet, WhatsAppIcon, toast } from "./partnerUi";
 import { useLocalities } from "./useLocalities";
@@ -41,6 +47,7 @@ import { resolveMapsLink } from "../../lib/mapLink";
 import { normalizeIndianMobile } from "../../lib/mobile";
 import { PUBLIC_ORIGIN, createPartnerListing, friendlyError, inr, pp, saveOwnContacts } from "../../lib/partners";
 import { freeLeadsTopup } from "../../lib/partnerTenants";
+import { fetchUploadProgress, hasPhoto, justAwarded } from "../../lib/partnerPool";
 import PhotoReview from "../../components/PhotoReview";
 import { savedCoverUrl } from "../../lib/photoReview";
 import {
@@ -82,8 +89,15 @@ function PostFlat({ onAnother }) {
   const [link, setLink] = useState("");
   const [linkState, setLinkState] = useState("");
   const [showMap, setShowMap] = useState(false);
-  const [share, setShare] = useState(prefs.share || EMPTY_SHARE);
-  const [shareSheet, setShareSheet] = useState(false);
+  // Every flat starts shared everywhere at 50% — groups too, once they've loaded.
+  const [share, setShare] = useState(() => defaultShare(groups ?? []));
+  const groupsSeeded = useRef((groups ?? []).length > 0);
+  useEffect(() => {
+    if (groupsSeeded.current || !(groups ?? []).length) return;
+    groupsSeeded.current = true;
+    setShare((cur) => ({ ...cur, groupPct: { ...Object.fromEntries(groups.map((g) => [g.id, 50])), ...cur.groupPct } }));
+  }, [groups]);
+  const [progress, setProgress] = useState(null);
   const [more, setMore] = useState(false);
   const [x, setX] = useState({ deposit: "", availableFrom: "", floor: "", ownerName: "", ownerPhone: "", description: "", title: "" });
   const [maintenance, setMaintenance] = useState("");
@@ -248,9 +262,10 @@ function PostFlat({ onAnother }) {
       if (x.ownerName.trim() || x.ownerPhone.trim()) {
         await saveOwnContacts(id, [{ role: "owner", name: x.ownerName.trim(), phone: normalizeIndianMobile(x.ownerPhone) || "" }]).catch(() => {});
       }
-      savePrefs({ area, furnishing, share, areas: [area, ...(prefs.areas || []).filter((a) => a !== area)].slice(0, 5) });
+      savePrefs({ area, furnishing, areas: [area, ...(prefs.areas || []).filter((a) => a !== area)].slice(0, 5) });
       reloadInventory();
-      setDone({ id, images: images.length });
+      setDone({ id, images: images.length, photo: hasPhoto({ images, cover_image_url: coverImageUrl }) });
+      fetchUploadProgress().then(setProgress, () => {});
       freeLeadsTopup().then((n) => { if (n > 0) toast(`${n} MovEazy tenant${n === 1 ? " fits" : "s fit"} your flats — see Leads → MovEazy leads`); });
     } catch (e) {
       setErr(friendlyError(e, "Could not post the flat."));
@@ -266,9 +281,19 @@ function PostFlat({ onAnother }) {
         <style>{CSS}</style>
         <div className="ap-done">
           <span className="ap-done-ic"><Check size={34} /></span>
-          <h1>It's live!</h1>
+          <h1>{done.photo ? "It's live!" : "Saved!"}</h1>
           <p>{typeLabel(type)} in {area} · {inr(rent)}/month{done.images ? ` · ${done.images} photo${done.images === 1 ? "" : "s"}` : ""}</p>
-          <p className="ap-done-who"><Users size={14} /> {shareSummary(share, groups)}</p>
+          <p className="ap-done-who"><Users size={14} /> {done.photo ? "Live on MovEazy Website · " : "Add a photo to go live on the MovEazy Website · "}{shareSummary(share, groups)}</p>
+          {justAwarded(progress).map((m) => (
+            <Link key={m.milestone} to={pp("/leads?tab=moveazy")} className="ap-reward">
+              🎉 <b>{m.given} fresh leads unlocked</b> — you reached {m.milestone} complete flats. See them now →
+            </Link>
+          ))}
+          {progress && <div style={{ textAlign: "left", marginBottom: 12 }}><MilestoneBar progress={progress} /></div>}
+          <div className="ap-pep">
+            <b>Partners who upload 10+ flats a day get far more leads.</b>
+            There's no limit — the more you upload, the more your flats match our clients' requirements, and the more you earn.
+          </div>
           <button type="button" className="pz-btn pz-btn--gold pz-btn--block" onClick={onAnother}>+ Post another flat</button>
           <p className="pz-hint" style={{ margin: "6px 0 16px" }}>Keeps {area}{furnishing ? `, ${furnishing.toLowerCase()}` : ""} and who sees it — just add photos and rent.</p>
           <div className="ap-done-row">
@@ -442,13 +467,12 @@ function PostFlat({ onAnother }) {
 
         <section className="ap-sec">
           <h2>Who can live here</h2>
-          <div className="ap-seg ap-seg--two">
-            {[["Family", "Only Family"], ["Bachelor", "Only Bachelors"]].map(([k, label]) => (
-              <button key={k} type="button" className={tenants === k ? "on" : ""} aria-pressed={tenants === k}
-                onClick={() => setTenants(tenants === k ? "" : k)}>{label}</button>
+          <div className="ap-seg ap-seg--three">
+            {[["", "Both Family and Bachelors"], ["Family", "Only Family"], ["Bachelor", "Only Bachelors"]].map(([k, label]) => (
+              <button key={k || "both"} type="button" className={tenants === k ? "on" : ""} aria-pressed={tenants === k}
+                onClick={() => setTenants(k)}>{label}</button>
             ))}
           </div>
-          <p className="pz-hint" style={{ margin: "6px 0 0" }}>{tenants ? "Tap again to open it to both." : "Open to both families and bachelors."}</p>
         </section>
 
         <section className="ap-sec">
@@ -484,26 +508,11 @@ function PostFlat({ onAnother }) {
           </div>
         </section>
 
-        {/* Who sees it */}
+        {/* Who sells it */}
         <section className="ap-sec">
-          <h2>Who sees it</h2>
-          <div className="ap-seg ap-seg--two">
-            <button type="button" className={!share.platformOn && !Object.keys(share.groupPct).length ? "on" : ""}
-              onClick={() => setShare({ ...share, platformOn: false, groupPct: {} })}>Only me</button>
-            <button type="button" className={share.platformOn ? "on" : ""} onClick={() => setShare({ ...share, platformOn: !share.platformOn })}>All MovEazy brokers</button>
-          </div>
-          {share.platformOn && (
-            <div className="ap-share-pct">
-              <span>Brokerage you share</span>
-              <select className="pz-select" value={share.platformPct} onChange={(e) => setShare({ ...share, platformPct: Number(e.target.value) })} aria-label="Brokerage share">
-                {PCT_OPTIONS.map((p) => <option key={p} value={p}>{p}%</option>)}
-              </select>
-            </div>
-          )}
-          <button type="button" className="ap-link" onClick={() => setShareSheet(true)}>
-            <Users size={14} /> {Object.keys(share.groupPct).length ? `Groups: ${shareSummary({ groupPct: share.groupPct }, groups)}` : groups.length ? "Share with my groups" : "Groups & more options"}
-          </button>
-          <p className="pz-hint" style={{ marginTop: 6 }}>Always live on moveazy.co.in too. Your number is shown only to the brokers you pick.</p>
+          <h2>Who can close it <span>brokerage share</span></h2>
+          <ShareMediums value={share} onChange={setShare} groups={groups ?? []} />
+          <p className="pz-hint" style={{ marginTop: 8 }}>With a photo it's also live on moveazy.co.in. Partners see your name and number only when their tenant likes it.</p>
         </section>
 
         {/* More, optional */}
@@ -562,16 +571,6 @@ function PostFlat({ onAnother }) {
         />
       )}
 
-      {shareSheet && (
-        <Sheet title="Who sees it" onClose={() => setShareSheet(false)}>
-          <div className="pz-pad">
-            <ShareWithForm value={share} onChange={setShare} groups={groups} />
-            <button type="button" className="pz-btn pz-btn--primary pz-btn--block" style={{ marginTop: 12 }} onClick={() => setShareSheet(false)}>
-              <Share2 size={16} /> Done
-            </button>
-          </div>
-        </Sheet>
-      )}
     </div>
   );
 }
@@ -625,6 +624,8 @@ const CSS = `
 .ap-money input { flex: 1; min-width: 0; border: 0; outline: 0; font: inherit; font-size: 34px; font-weight: 800; letter-spacing: -0.02em; background: transparent; color: var(--ink, #16141C); }
 .ap-seg { display: grid; grid-template-columns: repeat(3, 1fr); gap: 0; border: 1.5px solid var(--line, #E7E3DA); border-radius: 12px; overflow: hidden; }
 .ap-seg--two { grid-template-columns: 1fr 1fr; }
+.ap-seg--three { grid-template-columns: 1.3fr 1fr 1fr; }
+.ap-seg--three button { font-size: 13px; line-height: 1.2; padding-left: 6px; padding-right: 6px; }
 .ap-money--sm input { font-size: 24px; }
 .ap-seg button { border: 0; border-left: 1px solid var(--line, #E7E3DA); background: #fff; font: inherit; font-size: 14px; font-weight: 700; padding: 11px 6px; cursor: pointer; color: var(--ink, #16141C); }
 .ap-seg button:first-child { border-left: 0; }
@@ -663,4 +664,9 @@ const CSS = `
 .ap-done p { color: var(--dim, #6B7280); margin: 0 0 8px; }
 .ap-done-who { display: inline-flex; align-items: center; gap: 6px; font-size: 13px; font-weight: 700; color: var(--g2, #08503A) !important; margin-bottom: 20px !important; }
 .ap-done-row { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+.ap-reward { display: block; margin: 0 0 12px; padding: 12px 14px; border-radius: 14px; background: linear-gradient(135deg,#0B6E4F,#08503A); color: #fff;
+  text-decoration: none; font-size: 14px; line-height: 1.45; text-align: left; animation: appop .5s ease; }
+.ap-pep { text-align: left; margin: 0 0 16px; padding: 12px 14px; border-radius: 14px; background: #FEF7E6; border: 1px solid #F1D99B; color: #5C3F05;
+  font-size: 13px; line-height: 1.5; }
+.ap-pep b { display: block; font-size: 14px; margin-bottom: 2px; }
 `;

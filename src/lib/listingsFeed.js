@@ -1,6 +1,7 @@
 import { isFirebaseConfigured } from "./firebase";
 import { getListingsData, isListingPubliclyVisible } from "./firestoreStore";
 import { fetchInventoryAsListings } from "./inventory";
+import { fetchPartnerFlatIds } from "./websiteLeads";
 
 /**
  * The static/verified feed + user-uploaded inventory (Supabase), merged so
@@ -10,13 +11,18 @@ import { fetchInventoryAsListings } from "./inventory";
  * there's one listing pool, not two that can drift apart.
  */
 export async function fetchAllListings({ limit = 500, bhk = null, maxRent = null } = {}) {
-  const [staticRows, inventoryRows] = await Promise.all([
+  const [staticRows, inventoryRows, partnerIds] = await Promise.all([
     isFirebaseConfigured ? getListingsData({ limitCount: limit, bhk, maxRent }) : Promise.resolve([]),
     fetchInventoryAsListings({ limit }).catch(() => []),
+    fetchPartnerFlatIds(),
   ]);
   const feed = staticRows.filter(isListingPubliclyVisible);
   const byId = new Map();
   for (const l of feed) byId.set(String(l.id), l);
-  for (const l of inventoryRows) byId.set(String(l.id), l);
+  // A partner's flat goes live on the site once it has a photo.
+  for (const l of inventoryRows) {
+    if (partnerIds.partner.has(String(l.id)) && !l.image && !(l.images ?? []).length) continue;
+    byId.set(String(l.id), l);
+  }
   return Array.from(byId.values());
 }

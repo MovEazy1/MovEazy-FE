@@ -95,7 +95,7 @@ export default function PartnerHome() {
 
   const counts = useMemo(() => stageCounts(board), [board]);
   const myLive = useMemo(() => (inventory ?? []).filter((l) => l.source === "mine" && l.status === "published").length, [inventory]);
-  const flats = demo ? DEMO_COUNTS.moveazy + DEMO_COUNTS.broker + DEMO_COUNTS.group : (inventory ?? []).length;
+  const flats = demo ? DEMO_COUNTS.moveazy + DEMO_COUNTS.broker + DEMO_COUNTS.group : (inventory ?? []).filter((l) => l.source === "mine").length;
   const strength = profileStrength(p, status, sf?.photo_url);
   const plan = status?.plan?.active ? { label: `Premium · till ${shortDate(status.plan.until)}`, on: true }
     : status?.trial?.active ? { label: `Trial · ${plural(status.trial.days_left, "day")} left`, on: true }
@@ -144,7 +144,7 @@ export default function PartnerHome() {
         </section>
 
         <nav className="ph-grid" aria-label="Everything in the app">
-          <Tile to={pp("/inventory")} icon={<Building2 size={24} />} title="Inventory" sub={plural(flats, "flat")} />
+          <Tile to={pp("/inventory")} icon={<Building2 size={24} />} title="My Inventory" sub={plural(flats, "flat")} />
           <Tile to={pp("/leads")} icon={<UserRound size={24} />} title="My Leads" sub={`${n(counts.open)} in play`} />
           <Tile to={pp("/leads?tab=moveazy")} icon={<Target size={24} />} tone="gold" title="MovEazy Leads"
             sub={leadTotal != null ? plural(leadTotal, "tenant") : "Tenants looking now"} badge={seenMoveazy(p.user_id) ? null : "NEW"} />
@@ -153,7 +153,7 @@ export default function PartnerHome() {
           <Tile to={pp("/groups")} icon={<MessageCircle size={24} />} title="Groups" sub={plural(groups.length, "broker group")} />
           <Tile to={pp("/qr")} icon={<QrCode size={24} />} tone="red" title="To-Let Poster"
             sub={sf ? `${plural(sf.scans_week, "scan")} this week` : "Your QR poster"} />
-          <Tile to={pp("/referrals")} icon={<Wallet size={24} />} tone="gold" title="Refer & Earn" sub="Lifetime 10%" />
+          <Tile to={pp("/referrals")} icon={<Wallet size={24} />} tone="gold" title="Earn Commission" sub="Lifetime 10%" />
           <Tile to={pp("/premium")} icon={<Crown size={24} />} tone="gold" title="Premium"
             sub={status?.plan?.active ? `Till ${shortDate(status.plan.until)}` : status?.trial?.active ? `${plural(status.trial.days_left, "day")} of trial` : "Plans & benefits"} />
         </nav>

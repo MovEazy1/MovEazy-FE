@@ -16,7 +16,7 @@ import { decideSoldOut, markSoldOut } from "../../lib/partnerCurated";
 import { MediaItem, listingMedia } from "./partnerMedia";
 import { useSnapTrack } from "../../hooks/useSnapTrack";
 import { usePhotoViewer } from "../../hooks/usePhotoViewer";
-import { Avatar, BrokeragePill, Empty, Loading, Sheet, TopBar, WhatsAppIcon, sourceLabel, toast } from "./partnerUi";
+import { Avatar, BrokeragePill, Empty, Loading, POOL_TAG, Sheet, TopBar, WhatsAppIcon, sourceLabel, toast } from "./partnerUi";
 import {
   bhkLabel, customerMessage, fetchPropertyContacts, friendlyError, inr, partnerPropertyLink, pp,
   setListingStatus, telLink, waLink,
@@ -244,6 +244,7 @@ export default function PropertyDetail() {
             ? <span className="pz-pill pz-pill--solid">Available</span>
             : <span className="pz-pill pz-pill--grey" style={{ textTransform: "capitalize" }}>{l.status}</span>}
           <BrokeragePill listing={l} />
+          {l.anonymous && <span className="pz-pill" style={{ background: "#0E0D12", color: "#F0CF7C" }}>{POOL_TAG}</span>}
           {l.available_from && <span className="pz-pill pz-pill--grey"><Calendar size={12} /> From {new Date(l.available_from).toLocaleDateString("en-IN", { day: "numeric", month: "short" })}</span>}
         </div>
 
@@ -252,7 +253,16 @@ export default function PropertyDetail() {
           <button type="button" className="pz-btn" onClick={() => setShare(true)}><Share2 size={17} /> Share</button>
         </div>
 
-        {l.locked ? (
+        {l.anonymous && !l.locked ? (
+          <div className="pz-section" style={{ background: "var(--noir)", color: "#fff", borderColor: "var(--noir)" }}>
+            <strong style={{ display: "block", color: "#F0CF7C", fontSize: 15 }}>{POOL_TAG}</strong>
+            <p style={{ margin: "6px 0 0", fontSize: 13.5, lineHeight: 1.5, color: "rgba(255,255,255,.85)" }}>
+              Close it and you get {Number.isFinite(Number(l.brokerage_pct)) && l.brokerage_pct != null ? <b style={{ color: "#fff" }}>{Number(l.brokerage_pct)}% of the brokerage</b> : "a share of the brokerage"}.
+              Send it to your tenants with AI Matching — when one likes it, the listing partner&apos;s name, number and the visit details unlock for you.
+            </p>
+            <Link to={pp("/ai-matcher")} className="pz-btn pz-btn--gold pz-btn--sm" style={{ marginTop: 10 }}>Send to a tenant</Link>
+          </div>
+        ) : l.locked ? (
           <Link to={pp("/premium")} className="pz-lockbar" style={{ textDecoration: "none", marginBottom: 12 }}>
             <Lock size={18} />
             <span style={{ flex: 1 }}><strong>Address and owner contact are locked.</strong><br />Go Premium to unlock 1000+ listings and keep {me?.property_share ?? 50}% of the brokerage.</span>
@@ -301,10 +311,12 @@ export default function PropertyDetail() {
 
         <div className="pz-section">
           <h2>{mine ? "Contacts" : "Contact lister"}
-            {!l.locked && <Link to={pp(`/property/${id}/contacts`)} className="pz-btn pz-btn--ghost">View all</Link>}
+            {!l.locked && !l.anonymous && <Link to={pp(`/property/${id}/contacts`)} className="pz-btn pz-btn--ghost">View all</Link>}
           </h2>
           {l.locked ? (
             <Link to={pp("/premium")} className="pz-btn pz-btn--primary" style={{ width: "100%" }}><Crown size={16} /> Unlock with Premium</Link>
+          ) : l.anonymous ? (
+            <span className="pz-meta">Unlocks when your tenant likes this flat.</span>
           ) : contacts === null ? (
             <span className="pz-meta">Loading…</span>
           ) : primary ? (

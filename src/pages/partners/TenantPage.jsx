@@ -175,7 +175,7 @@ export default function TenantPage() {
                 </span>
               )}
               {tenant.qr_visits > 0 && <span className="pz-hint" style={{ display: "block", color: "#0B6E4F", fontWeight: 700 }}>Asked for a visit from your QR page — see the note below.</span>}
-              {tenant.phone && <span className="pz-hint" style={{ display: "block" }}>{tenant.phone}</span>}
+              {/* No number on screen: WhatsApp and Call below, so every reach-out is logged. */}
             </div>
             {tenant.lead_id && <Link to={pp(`/leads/${tenant.lead_id}/edit`)} className="pz-iconbtn" aria-label="Edit requirement"><Pencil size={17} /></Link>}
           </div>

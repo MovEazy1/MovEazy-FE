@@ -1,18 +1,19 @@
 /**
  * The Wallet (/referrals, the wallet icon on the home bar): what the partner
- * has earned and where it's paid, then Refer & Earn — the lifetime commission
- * up front (10% of the rent on every MovEazy lead their partners close, for
- * life; partner_referral_commission.sql), the one-time Premium reward, and
- * how each partner they brought in is doing.
+ * has earned and where it's paid, then Earn Commission — 10% of the rent on
+ * every MovEazy lead the partners they add close, for life, out of MovEazy's
+ * share (partner_referral_commission.sql) — and how each of those partners is
+ * doing. (The one-time reward on a partner's plan is gone:
+ * partner_pool_milestones.sql.)
  */
 import { useEffect, useMemo, useState } from "react";
 import { Link } from "react-router-dom";
-import { Clock, Crown, Gift, Infinity as InfinityIcon, Minus, Plus, Rocket, Users, Wallet as WalletIcon } from "lucide-react";
+import { Clock, Crown, HandCoins, Infinity as InfinityIcon, Minus, Plus, Rocket, Users, Wallet as WalletIcon } from "lucide-react";
 import { usePartner } from "./PartnerApp";
 import { Loading, TopBar, WhatsAppIcon } from "./partnerUi";
-import { PayoutCard, REF_STATUS, ReferButtons, WP_CSS } from "./PremiumJourney";
+import { PayoutCard, ReferButtons, WP_CSS } from "./PremiumJourney";
 import { friendlyError, inr, pp } from "../../lib/partners";
-import { PARTNER_ORIGIN, REFERRAL_REWARD, fetchMyReferrals, lifetimeEstimate, pctLabel, rewardTimer, walletTotals } from "../../lib/partnerPlans";
+import { PARTNER_ORIGIN, fetchMyReferrals, lifetimeEstimate, pctLabel, walletTotals } from "../../lib/partnerPlans";
 
 /** ₹0 reads as ₹0 here, never a dash. */
 const rs = (n) => `₹${Math.round(Number(n) || 0).toLocaleString("en-IN")}`;
@@ -40,7 +41,6 @@ export default function Wallet() {
   if (err) return <><TopBar title="Wallet" back /><div className="pz-pad"><div className="pz-err">{err}</div></div></>;
   if (!r) return <><TopBar title="Wallet" back /><Loading label="Opening your Wallet…" /></>;
 
-  const top = Math.max(0, ...(r.rewards ?? []).map((x) => Number(x.reward) || 0)) || REFERRAL_REWARD;
   const direct = Number(r.rates?.direct ?? 10);
   const shared = Number(r.rates?.shared ?? 6.67);
   const hasPayout = Boolean(r.payout?.upi || r.payout?.bank_last4);
@@ -69,14 +69,18 @@ export default function Wallet() {
         </section>
         {(hasPayout || t.available > 0 || t.lifetime > 0 || Number(r.paid) > 0) && <PayoutCard payout={r.payout} onSaved={load} />}
 
-        {/* ── Refer & Earn: lifetime first ── */}
-        <h2 className="wl-h">Refer &amp; Earn</h2>
+        {/* ── Earn Commission ── */}
+        <h2 className="wl-h">Earn Commission</h2>
         <section className="wl-life">
-          <span className="wl-badge"><InfinityIcon size={15} /> Lifetime earnings</span>
-          <h3>Earn <em>{pctLabel(direct)}</em> of the rent on every deal your partners close. For life.</h3>
+          <span className="wl-badge"><HandCoins size={15} /> Lifetime commission</span>
+          <h3>Add partners. Earn <em>{pctLabel(direct)}</em> on every property they close. For life.</h3>
           <p>
-            Bring a broker onto MovEazy. Every time they close a MovEazy lead, you earn {pctLabel(direct)} of the month's rent
-            ({pctLabel(shared)} when the deal is shared). It's paid by MovEazy out of its own share, so your partner keeps their full brokerage.
+            Add as many partners as you want. For every partner you add, you earn a lifetime commission of {pctLabel(direct)} on
+            the property closed by that partner ({pctLabel(shared)} when the deal is shared).
+          </p>
+          <p>
+            The {pctLabel(direct)} comes from MovEazy&apos;s share of that closure — nothing is deducted from your associated partner,
+            and you make money without any hassle.
           </p>
           <div className="wl-eg">
             <span>They close a<b>₹40,000 flat</b></span>
@@ -85,7 +89,7 @@ export default function Wallet() {
           </div>
           <ul className="wl-points">
             <li><Rocket size={16} /><span><b>Early mover advantage.</b> Every partner you bring in now keeps earning for you, month after month.</span></li>
-            <li><Users size={16} /><span><b>The more partners on Premium, the bigger your monthly income.</b> There's no limit on how many you can bring.</span></li>
+            <li><Users size={16} /><span><b>No limit.</b> Add as many partners as you want — the more of them close deals, the bigger your monthly income.</span></li>
             <li><InfinityIcon size={16} /><span><b>Zero effort.</b> You don't touch the deal: no calls, no visits, no follow-ups.</span></li>
           </ul>
           <Estimator rate={direct} />
@@ -99,22 +103,11 @@ export default function Wallet() {
           </p>
         </section>
 
-        <section className="wl-once">
-          <Gift size={20} />
-          <div>
-            <b>Plus up to {inr(top)} once</b>, when each partner you bring takes Premium.
-            {(r.rewards ?? []).length > 0 && (
-              <span className="wl-rates">{r.rewards.map((x) => `${inr(x.reward)} on the ${inr(x.price)} plan`).join(" · ")}</span>
-            )}
-          </div>
-        </section>
-
         {/* ── How your partners are doing ── */}
         <h2 className="wl-h">Your partners{r.joined.length ? ` · ${r.joined.length}` : ""}</h2>
         {r.joined.length === 0 ? (
           <p className="pz-meta" style={{ margin: "0 0 14px" }}>Nobody yet. Share your link on your broker WhatsApp groups; every partner you bring keeps earning for you.</p>
         ) : r.joined.map((j, i) => <PartnerCard key={i} j={j} rate={direct} />)}
-        <p className="pz-hint" style={{ textAlign: "center" }}>A one-time reward is cancelled if the broker cancels their plan within its first 30 days.</p>
       </div>
     </>
   );
@@ -171,8 +164,6 @@ function PartnerCard({ j, rate }) {
   const plan = j.premium_until ? ["Premium", `till ${shortDate(j.premium_until)}`, "on"]
     : j.trial_until ? ["Trial", `till ${shortDate(j.trial_until)}`, "on"]
       : ["Free", "no commission until they go Premium", "off"];
-  const [rLabel, rColor] = REF_STATUS[j.status] || REF_STATUS.signed_up;
-  const timer = j.status === "pending" ? rewardTimer(j) : null;
   const first = String(j.name || "").trim().split(/\s+/)[0];
   const nudge = `Hi ${first}, go Premium on MovEazy Partners: MovEazy leads, every broker's inventory and AI matching for your clients. ${PARTNER_ORIGIN}/premium`;
   const phone = String(j.phone || "").replace(/\D/g, "").slice(-10);
@@ -222,11 +213,6 @@ function PartnerCard({ j, rate }) {
           })}
         </>
       )}
-      <div className="wl-once-line">
-        <Gift size={14} />
-        <span style={{ flex: 1 }}>One-time reward</span>
-        <span style={{ color: rColor, fontWeight: 700 }}>{timer ? timer.label : <>{rLabel}{j.amount ? ` · ${inr(j.amount)}` : ""}</>}</span>
-      </div>
     </div>
   );
 }

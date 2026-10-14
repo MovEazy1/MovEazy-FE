@@ -137,7 +137,7 @@ export function MenuDrawer({ open, onClose }) {
 
         <div className="pc-group">
           <span className="pc-gh"><Building2 size={19} /> Flats</span>
-          {sub("/inventory", "Browse inventory")}
+          {sub("/inventory", "My inventory")}
           {sub("/add/property", "Add a flat")}
           {sub("/my-flats", "My flats")}
           {sub("/saved", "Saved flats")}
@@ -157,7 +157,7 @@ export function MenuDrawer({ open, onClose }) {
           {sub("/groups", "Broker groups")}
         </div>
         <div className="pc-group">
-          <Link to={pp("/referrals")} className="pc-main"><Wallet size={19} color="#8A6419" /> Wallet · Refer &amp; Earn</Link>
+          <Link to={pp("/referrals")} className="pc-main"><Wallet size={19} color="#8A6419" /> Wallet · Earn Commission</Link>
           <Link to={pp("/premium")} className="pc-main"><Crown size={19} color="#8A6419" /> Premium plans</Link>
           {install.available && (
             <button type="button" className="pc-main pc-btn" onClick={() => { onClose(); openInstall(); }}><Download size={19} /> Install the app</button>

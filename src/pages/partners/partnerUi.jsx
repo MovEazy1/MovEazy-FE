@@ -275,8 +275,12 @@ export function BrokeragePill({ listing }) {
   return <span className="pz-pill">{pct}% Brokerage</span>;
 }
 
+/** Another partner's (or MovEazy's) flat from the pool, not unlocked yet. */
+export const POOL_TAG = "Different MovEazy Partner Inventory";
+
 export function sourceLabel(l) {
   if (l.source === "mine") return "My listing";
+  if (l.anonymous) return POOL_TAG;
   if (l.source === "moveazy") return "MovEazy";
   return l.lister_name || "Partner broker";
 }
@@ -292,7 +296,8 @@ export function PropertyCard({ listing: l, saved, onToggleSave, onWhatsApp, extr
   const to = detailsTo || pp(`/property/${l.property_id}`);
   // onOpen: something other than the details page (demo mode explains instead).
   const open = (e) => { if (onOpen) { e?.preventDefault?.(); onOpen(); } else navigate(to); };
-  const who = l.source === "moveazy" ? (l.locked ? "MovEazy · contacts with Premium" : "MovEazy inventory")
+  const who = l.anonymous ? POOL_TAG
+    : l.source === "moveazy" ? (l.locked ? "MovEazy · contacts with Premium" : "MovEazy inventory")
     : l.source === "mine" ? "Your listing" : l.lister_name || "Partner broker";
   return (
     <article className="pz-card pz-prop">

@@ -51,7 +51,9 @@ function Row({ l, pid, m, status, onRemove, onSold, onAdd, removeHint }) {
         <span className="sl-tags">
           {m && <span className="sl-score">{m.score}</span>}
           {m?.near && <span className="sl-tag">Near match</span>}
-          {l?.source && <span className="sl-tag">{SOURCE[l.source] || "Broker"}</span>}
+          {l?.anonymous ? <span className="sl-tag" style={{ background: "#0E0D12", color: "#F0CF7C" }}>Different MovEazy Partner Inventory</span>
+            : l?.source && <span className="sl-tag">{SOURCE[l.source] || "Broker"}</span>}
+          {l?.anonymous && l.brokerage_pct != null && <span className="sl-tag">{Number(l.brokerage_pct)}% share</span>}
           {status && ACTION[status] ? <span className={`sl-st ${ACTION[status][2]}`}>{ACTION[status][0]} {ACTION[status][1]}</span>
             : status === "unseen" ? <span className="sl-st">Not seen yet</span> : null}
           {sold && <span className="sl-st sl-st--sold">{l.status === "rented" ? "Let out" : "Marked sold"}</span>}

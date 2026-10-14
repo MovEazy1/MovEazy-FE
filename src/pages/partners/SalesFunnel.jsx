@@ -42,7 +42,7 @@ function nudge(b) {
     case "signed_up": return `Hi ${first}, welcome to MovEazy Partners! Premium unlocks 1000+ verified rental listings with owner contacts, AI matching and your broker groups. See the plans: ${APP}/premium`;
     case "payment_tried": return `Hi ${first}, your MovEazy Premium payment didn't complete. Need a hand? Here's the link again: ${APP}/premium`;
     case "active": return `Hi ${first}, you're on MovEazy Premium! Complete your profile (areas + RERA ID) to get your Gold Partner badge: ${APP}`;
-    default: return `Hi ${first}, thanks for being a MovEazy Gold Partner! Refer brokers and earn ₹1,500 each: ${APP}/referrals`;
+    default: return `Hi ${first}, thanks for being a MovEazy Gold Partner! Add brokers as partners and earn 10% of every deal they close, for life: ${APP}/referrals`;
   }
 }
 

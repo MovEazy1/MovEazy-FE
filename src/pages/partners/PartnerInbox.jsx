@@ -20,7 +20,7 @@ const ago = (iso) => {
   if (s < 86400) return `${Math.round(s / 3600)}h`;
   return `${Math.round(s / 86400)}d`;
 };
-const ICON = { tenant_liked: Heart, storefront_like: Heart, storefront_lead: QrCode, storefront_visit: CalendarCheck, website_lead: Sparkles, website_teaser: Crown, sold_out_request: Home, sold_out_decided: Home, list_opened: Sparkles, list_done: Sparkles,
+const ICON = { tenant_liked: Heart, storefront_like: Heart, storefront_lead: QrCode, storefront_visit: CalendarCheck, website_lead: Sparkles, website_teaser: Crown, pool_unlocked: Sparkles, pool_interest: Users, milestone: Gift, sold_out_request: Home, sold_out_decided: Home, list_opened: Sparkles, list_done: Sparkles,
   building_visit: CalendarCheck, building_assigned: Building2, location_request: MapPin, location_decided: MapPin,
   leads_assigned: Users, lead_request: Users, visit_reminder: CalendarClock, referral: Gift, plan_approved: Crown, plan_rejected: AlertCircle, reminder: AlarmClock };
 
@@ -123,7 +123,7 @@ export function CuratedListPage() {
           {tenant?.phone ? (
             <a className="pz-btn pz-wa pz-btn--block" style={{ marginTop: 12 }} target="_blank" rel="noreferrer"
               href={waLink(tenant.phone, `Hi${tenant.name ? ` ${tenant.name.split(" ")[0]}` : ""}, saw you liked ${liked} of the homes — shall I set up visits?`)}>
-              <WhatsAppIcon /> WhatsApp {tenant.name || tenant.phone}
+              <WhatsAppIcon /> WhatsApp {tenant.name || "them"}
             </a>
           ) : <p className="pz-hint" style={{ margin: "10px 0 0" }}>Not opened yet — the tenant enters their number when they do.</p>}
           <details style={{ marginTop: 12 }}>

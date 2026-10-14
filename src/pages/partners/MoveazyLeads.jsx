@@ -71,7 +71,6 @@ function AssignedLead({ lead, me, onChanged, onClose }) {
       <div className="pz-between" style={{ alignItems: "flex-start", gap: 10 }}>
         <span style={{ minWidth: 0 }}>
           <strong style={{ display: "block", fontSize: 16 }}>{lead.name || "MovEazy client"}</strong>
-          <span className="pz-meta" style={{ display: "block" }}>{lead.phone}</span>
         </span>
         <span className={`pz-pill${lead.status === "closed" ? "" : " pz-pill--grey"}`} style={{ flex: "none" }}>{ASSIGNED_STATUS[lead.status]}</span>
       </div>

@@ -13,19 +13,21 @@ export const EMPTY_SHARE = { platformOn: false, platformPct: 50, groupPct: {} };
 
 /** Form state → the shape partner_set_sharing() takes. */
 export function toSharing(v) {
+  // A percentage left half-typed (empty) saves as the 50% it started at.
+  const pct = (p) => (p === "" || p == null || !Number.isFinite(Number(p)) ? 50 : Number(p));
   return {
-    platformPct: v.platformOn ? Number(v.platformPct) : null,
-    groups: Object.entries(v.groupPct).map(([group_id, pct]) => ({ group_id, pct: Number(pct) })),
+    platformPct: v.platformOn ? pct(v.platformPct) : null,
+    groups: Object.entries(v.groupPct).map(([group_id, p]) => ({ group_id, pct: pct(p) })),
   };
 }
 
-/** Who sees it, in a few words ("All MovEazy brokers · 50% + 2 groups"). */
+/** Who sees it, in a few words ("All MovEazy partners · 50% + 2 groups"). */
 export function shareSummary(share, groups = []) {
   const g = Object.keys(share.groupPct || {});
   const parts = [];
-  if (share.platformOn) parts.push(`All MovEazy brokers · ${share.platformPct}%`);
+  if (share.platformOn) parts.push(`All MovEazy partners · ${share.platformPct}%`);
   if (g.length) parts.push(g.length === 1 ? (groups.find((x) => x.id === g[0])?.name || "1 group") : `${g.length} groups`);
-  return parts.length ? parts.join(" + ") : "Only me";
+  return parts.length ? parts.join(" + ") : "Not shared with other partners";
 }
 
 /** partner_listing_sharing() → form state. */

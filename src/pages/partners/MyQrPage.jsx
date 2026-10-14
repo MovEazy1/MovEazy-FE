@@ -357,7 +357,7 @@ export default function MyQrPage() {
         <div className="pz-section" style={{ padding: 0 }}>
           <h2 style={{ padding: "14px 14px 0" }}>Who liked what</h2>
           {(sf.likes || []).length === 0 ? (
-            <p className="pz-meta" style={{ padding: "0 14px 14px", margin: 0 }}>When a tenant hearts one of your flats, they show up here with their number.</p>
+            <p className="pz-meta" style={{ padding: "0 14px 14px", margin: 0 }}>When a tenant hearts one of your flats, they show up here — WhatsApp or call them in one tap.</p>
           ) : (
             sf.likes.map((l, i) => (
               <div key={`${l.property_id}-${l.at}`} className="pz-row" style={{ padding: "12px 14px", borderTop: i ? "1px solid var(--line)" : "1px solid var(--line)", alignItems: "flex-start" }}>
