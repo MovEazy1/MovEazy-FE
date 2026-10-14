@@ -12,7 +12,7 @@ import { Clock, Crown, HandCoins, Infinity as InfinityIcon, Minus, Plus, Rocket,
 import { usePartner } from "./PartnerApp";
 import { Loading, TopBar, WhatsAppIcon } from "./partnerUi";
 import { PayoutCard, ReferButtons, WP_CSS } from "./PremiumJourney";
-import { friendlyError, inr, pp } from "../../lib/partners";
+import { friendlyError, hasPremium, inr, pp } from "../../lib/partners";
 import { PARTNER_ORIGIN, fetchMyReferrals, lifetimeEstimate, pctLabel, walletTotals } from "../../lib/partnerPlans";
 
 /** ₹0 reads as ₹0 here, never a dash. */
@@ -93,14 +93,7 @@ export default function Wallet() {
             <li><InfinityIcon size={16} /><span><b>Zero effort.</b> You don't touch the deal: no calls, no visits, no follow-ups.</span></li>
           </ul>
           <Estimator rate={direct} />
-          {r.can_refer && r.premium ? (
-            <ReferButtons code={r.code} name={me?.partner?.name} big />
-          ) : (
-            <Link to={pp("/premium")} className="wl-upgrade"><Crown size={18} /> {r.can_refer ? "Renew Premium to keep earning" : "Go Premium to start earning"}</Link>
-          )}
-          <p className="wl-fine">
-            You and your partner both need Premium (Trial counts) when the deal happens. Your commission is due once MovEazy receives its share.
-          </p>
+          <EarnCta r={r} me={me} />
         </section>
 
         {/* ── How your partners are doing ── */}
@@ -109,6 +102,22 @@ export default function Wallet() {
           <p className="pz-meta" style={{ margin: "0 0 14px" }}>Nobody yet. Share your link on your broker WhatsApp groups; every partner you bring keeps earning for you.</p>
         ) : r.joined.map((j, i) => <PartnerCard key={i} j={j} rate={direct} />)}
       </div>
+    </>
+  );
+}
+
+/**
+ * Under the estimator: Premium and trial partners get only their invite
+ * buttons; anyone else is pointed to Premium, with the fine print on why.
+ */
+export function EarnCta({ r, me }) {
+  if (r.premium || hasPremium(me)) return r.can_refer ? <ReferButtons code={r.code} name={me?.partner?.name} big /> : null;
+  return (
+    <>
+      <Link to={pp("/premium")} className="wl-upgrade"><Crown size={18} /> {r.can_refer ? "Renew Premium to keep earning" : "Go Premium to start earning"}</Link>
+      <p className="wl-fine">
+        You and your partner both need Premium (Trial counts) when the deal happens. Your commission is due once MovEazy receives its share.
+      </p>
     </>
   );
 }
