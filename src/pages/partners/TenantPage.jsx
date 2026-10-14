@@ -16,11 +16,12 @@ import { usePartner } from "./PartnerApp";
 import { Avatar, Empty, Loading, Sheet, TopBar, WhatsAppIcon, toast } from "./partnerUi";
 import { SmartListingImage } from "./partnerMedia";
 import { requirementLine } from "./leadBits";
-import { MATCHER_CSS, MzBadge, QrBadge, ShareListSheet, useMatcherRows } from "./AiMatcher";
+import { MATCHER_CSS, MzBadge, QrBadge, ShareListSheet, WebBadge, useMatcherRows } from "./AiMatcher";
 import { useMatcherData } from "./matcherData";
 import { useTenants } from "./tenantData";
 import { KIT_CSS, OutcomeSheet, RemindSheet, StagePill, useReach } from "./TenantKit";
 import { friendlyError, inr, pp } from "../../lib/partners";
+import { KIND_LABEL, fetchMyWebsiteInterest } from "../../lib/websiteLeads";
 import {
   FRESH_COUNT, cancelVisit, flatLine, likedFlats, listsFor, sendCuratedTo, setVisit, slugToKey, visitLabel, visitsMessage,
 } from "../../lib/partnerMatcher";
@@ -91,6 +92,8 @@ export default function TenantPage() {
   const [outcome, setOutcome] = useState(null);
   const [note, setNote] = useState("");
   const [timeline, setTimeline] = useState(null);
+  // A MovEazy Website lead: the partner's flats they showed interest in, and how.
+  const [web, setWeb] = useState(null);
 
   const tenant = useMemo(() => (t ? { ...t, kind: t.kind } : null), [t]);
   const lists = useMemo(() => (tenant ? listsFor(tenant, md.lists) : []), [tenant, md.lists]);
@@ -104,6 +107,10 @@ export default function TenantPage() {
   const mine = useMemo(() => reminders.filter((x) => x.slug === slug), [reminders, slug]);
 
   const loadTimeline = () => { if (tenant) fetchTimeline(tenant).then(setTimeline, () => setTimeline([])); };
+  useEffect(() => {
+    if (tenant?.pack !== "website" || !tenant.assignment_id) return;
+    fetchMyWebsiteInterest().then((m) => setWeb(m.get(tenant.assignment_id) ?? []));
+  }, [tenant?.pack, tenant?.assignment_id]);
   useEffect(() => {
     if (!tenant) return;
     loadTimeline();
@@ -157,7 +164,7 @@ export default function TenantPage() {
             <Avatar name={tenant.name} size="lg" />
             <div style={{ flex: 1, minWidth: 0 }}>
               <strong style={{ display: "flex", alignItems: "center", gap: 6, flexWrap: "wrap", fontSize: 17 }}>
-                {tenant.name}{tenant.kind === "moveazy" && <MzBadge />}{tenant.via === "qr" && <QrBadge />}
+                {tenant.name}{tenant.kind === "moveazy" && <MzBadge />}{tenant.pack === "website" && <WebBadge />}{tenant.via === "qr" && <QrBadge />}
               </strong>
               <span className="pz-meta" style={{ display: "block" }}>
                 {[requirementLine(tenant), (tenant.localities ?? []).join(", ")].filter(Boolean).join(" · ") || "No requirement yet"}
@@ -238,6 +245,41 @@ export default function TenantPage() {
           )}
           {!tenant.phone && <button type="button" className="pz-btn pz-btn--sm" style={{ marginTop: 10 }} onClick={() => setRemind(true)}><AlarmClock size={15} /> Remind me</button>}
         </div>
+
+        {/* ── From the MovEazy website: their interest in your flats ── */}
+        {web && web.length > 0 && (() => {
+          const flats = [...new Map(web.map((w) => [w.property_id, web.filter((x) => x.property_id === w.property_id)])).entries()];
+          return (
+            <>
+              <div className="mt-head"><h2><Sparkles size={16} color="#0B6E4F" /> Interested in your flats · {flats.length}</h2></div>
+              <div className="pz-card" style={{ marginBottom: 14 }}>
+                {flats.map(([pid, acts], i) => {
+                  const l = byId.get(pid);
+                  const v = visits.get(pid);
+                  const what = [...new Set(acts.map((a) => KIND_LABEL[a.kind] || a.kind))].join(" · ");
+                  const detail = acts.find((a) => a.detail && a.kind === "visit")?.detail;
+                  return (
+                    <div key={pid} className="mt-liked" style={{ borderTop: i ? "1px solid var(--line)" : 0 }}>
+                      <Link to={pp(`/property/${pid}`)} className="mt-thumb">{l && <SmartListingImage listing={l} thumb />}</Link>
+                      <span style={{ flex: 1, minWidth: 0 }}>
+                        <strong style={{ display: "block", fontSize: 14.5 }}>{l ? flatLine(l) : [acts[0].flat_type, acts[0].area].filter(Boolean).join(" · ")}</strong>
+                        {v ? <span className="mt-visit"><CalendarClock size={13} /> Visit · {visitLabel(v.visit_at)}</span>
+                          : <span className="pz-hint">{what}{detail ? ` · ${detail}` : ""} · on MovEazy</span>}
+                      </span>
+                      {l && open && (
+                        <span className="mt-acts">
+                          <button type="button" className={`pz-btn pz-btn--sm${v ? "" : " pz-btn--primary"}`} onClick={() => setVisitFor({ listing: l, visit: v })}>
+                            {v ? "Move" : "Fix visit"}
+                          </button>
+                        </span>
+                      )}
+                    </div>
+                  );
+                })}
+              </div>
+            </>
+          );
+        })()}
 
         {/* ── What they liked, and the visits ── */}
         <div className="mt-head">

@@ -5,6 +5,7 @@ import { LoginModalProvider } from "./context/LoginModalContext";
 import { VisitCartProvider } from "./context/VisitCartContext";
 import ErrorBoundary from "./components/ErrorBoundary";
 import RequirePhoneModal from "./components/RequirePhoneModal";
+import ClaimEarlierViews from "./components/ClaimEarlierViews";
 import RequirePhoneForListing from "./components/RequirePhoneForListing";
 import { useSessionTracking } from "./hooks/useSessionTracking";
 
@@ -187,6 +188,7 @@ function SessionTrackerComponent() {
       {/* Sits above every route: a signed-in account with no mobile number
           saved is asked for one before it can use the app. */}
       <RequirePhoneModal />
+      <ClaimEarlierViews />
       <AppRoutes />
     </>
   );

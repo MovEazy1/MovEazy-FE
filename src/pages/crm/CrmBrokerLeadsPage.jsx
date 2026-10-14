@@ -3,27 +3,32 @@
  * curated list or QR page) — unverified, attributed to that broker, and kept
  * out of MovEazy's own Clients list (crm_clients.attributed_to; see
  * partner_launch.sql § 8). Plus the sold-out flags brokers raised on group
- * listings, which MovEazy can confirm or reject (§ 9).
+ * listings, which MovEazy can confirm or reject (§ 9). And "Website → broker":
+ * MovEazy's tenants who showed interest in a partner's flat on the site, sent
+ * to that partner as a MovEazy lead (partner_website_leads.sql).
  */
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { QrCode } from "lucide-react";
 import { Btn, C, Chip, Empty, Loading, inr, relTime } from "./crmUi";
 import { decideSoldOut, fetchBrokerLeads, fetchSoldOutRequests } from "../../lib/partnerCurated";
+import { KIND_LABEL, fetchWebsiteLeads } from "../../lib/websiteLeads";
 import { waLink } from "../../lib/partners";
 
 export default function CrmBrokerLeadsPage() {
   const [tab, setTab] = useState("leads");
   const [leads, setLeads] = useState(null);
   const [sold, setSold] = useState(null);
+  const [web, setWeb] = useState(null);
   const [broker, setBroker] = useState("");
   const [q, setQ] = useState("");
   const [err, setErr] = useState("");
 
   const load = useCallback(async () => {
     try {
-      const [l, s] = await Promise.all([fetchBrokerLeads(), fetchSoldOutRequests()]);
+      const [l, s, w] = await Promise.all([fetchBrokerLeads(), fetchSoldOutRequests(), fetchWebsiteLeads().catch(() => [])]);
       setLeads(l);
       setSold(s);
+      setWeb(w);
       setErr("");
     } catch (e) {
       setErr(e?.message || "Could not load broker leads.");
@@ -61,6 +66,7 @@ export default function CrmBrokerLeadsPage() {
       </p>
       <div style={{ display: "flex", gap: 8, marginBottom: 12, flexWrap: "wrap" }}>
         <Chip on={tab === "leads"} onClick={() => setTab("leads")}>Tenants via brokers {leads ? `(${leads.tenants.length})` : ""}</Chip>
+        <Chip on={tab === "web"} onClick={() => setTab("web")}>Website → broker {web ? `(${web.length})` : ""}</Chip>
         <Chip on={tab === "sold"} onClick={() => setTab("sold")}>Sold-out flags {pending ? `(${pending} to decide)` : ""}</Chip>
         <Btn sm onClick={load}>Refresh</Btn>
       </div>
@@ -95,6 +101,27 @@ export default function CrmBrokerLeadsPage() {
             </div>
           )}
         </>
+      ))}
+
+      {tab === "web" && (!web ? <Loading /> : web.length === 0 ? <Empty>No website leads yet — they come when a tenant likes, opens or asks about a partner&apos;s flat.</Empty> : (
+        <div style={{ overflowX: "auto", border: `1px solid ${C.line}`, borderRadius: 10 }}>
+          <table style={{ width: "100%", borderCollapse: "collapse" }}>
+            <thead><tr><th style={th}>Tenant</th><th style={th}>Did</th><th style={th}>Partner&apos;s flat</th><th style={th}>Partner</th><th style={th}>Lead</th><th style={th}>When</th></tr></thead>
+            <tbody>
+              {web.map((w, i) => (
+                <tr key={i}>
+                  <td style={cell}><b>{w.tenant || "—"}</b><br /><a href={waLink(w.phone, "")} target="_blank" rel="noreferrer" style={{ color: C.wa }}>{w.phone}</a></td>
+                  <td style={cell}>{KIND_LABEL[w.kind] || w.kind}{w.detail ? <><br /><span style={{ color: C.textMute }}>{w.detail}</span></> : null}</td>
+                  <td style={cell}>{[w.flat_type, w.area].filter(Boolean).join(" · ")}{w.rent ? ` · ${inr(w.rent)}` : ""}<br /><span style={{ color: C.textMute }}>{w.property_id}</span></td>
+                  <td style={cell}>{w.broker}<br /><span style={{ color: C.textMute }}>{w.broker_phone}</span></td>
+                  <td style={cell}>{w.held ? <span style={{ color: C.gold, fontWeight: 600 }}>Held — free plan</span>
+                    : <><span style={{ fontWeight: 600 }}>{w.status ? w.status.replace("_", " ") : "—"}</span>{w.last_reach_at ? <><br /><span style={{ color: C.textMute }}>reached {relTime(w.last_reach_at)}</span></> : <><br /><span style={{ color: C.coral }}>not contacted</span></>}</>}</td>
+                  <td style={cell}>{relTime(w.at)}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
       ))}
 
       {tab === "sold" && (!sold ? <Loading /> : sold.length === 0 ? <Empty>No sold-out flags.</Empty> : (

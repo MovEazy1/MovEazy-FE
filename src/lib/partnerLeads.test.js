@@ -31,6 +31,7 @@ describe("closureDue", () => {
     expect(closureDue(30000, "shared")).toBe(6000);
   });
   it("nothing on a pack lead — paid up front", () => expect(closureDue(30000, "direct", "paid30")).toBe(0));
+  it("a website lead (their own flat, found on MovEazy) is shared like Premium", () => expect(closureDue(30000, "shared", "website")).toBe(6000));
 });
 
 describe("topSets", () => {

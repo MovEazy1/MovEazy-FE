@@ -9,6 +9,9 @@
  *   ├ recent lists: each with how many of its flats fit, one tap to add those
  *   └ the feed: every flat that fits, best match first — photos swipe, tap one
  *     for full screen — with Add · Pass · Sold out · Open on each card.
+ *     Partners on trial or Premium have their flats ranked up when they fit
+ *     (lib/websiteLeads.js); "Partner" picks one partner and shows all their
+ *     live flats, fit or not, to add as many as you like.
  *
  * Pass and Sold out leave the card where it is, greyed, with Undo, until the
  * screen closes. "Save" keeps the list on the client as a draft; "Save & send"
@@ -34,6 +37,7 @@ import { useBackClose } from "../../hooks/useBackClose";
 import RequirementFields from "./RequirementFields";
 import PropertyQuickView, { QuickSoldOut } from "./PropertyQuickView";
 import { Btn, C, ScoreRing, inr, relTime } from "./crmUi";
+import { fetchPartnerFlatIds, fetchPartnersWithFlats, rankBoosted } from "../../lib/websiteLeads";
 
 const PAGE = 20;
 
@@ -187,10 +191,24 @@ export default function CurateScreen({
     }
   }, [loaded, draft, recent, ctx, client.name]);
 
-  const feed = useMemo(
-    () => curationFeed({ inventory, req: rank, down, keep }),
-    [inventory, rank, down, keep],
-  );
+  // Partners: whose flats rank up, and one partner's whole stock on demand.
+  const [partners, setPartners] = useState([]);
+  const [boosted, setBoosted] = useState(() => new Set());
+  const [partnerPick, setPartnerPick] = useState("");
+  useEffect(() => {
+    fetchPartnerFlatIds().then((ids) => setBoosted(ids.boosted));
+    fetchPartnersWithFlats().then(setPartners, () => {});
+  }, []);
+  const picked = partners.find((p) => p.broker_id === partnerPick) || null;
+
+  const feed = useMemo(() => {
+    if (picked) {
+      return picked.ids.map((id) => inventoryById.get(id)).filter((l) => l && l.status === "published")
+        .map((l) => ({ listing: l, ...scoreMatch(l, rank) }))
+        .sort((a, b) => b.score - a.score);
+    }
+    return rankBoosted(curationFeed({ inventory, req: rank, down, keep }), boosted, (m) => m.listing.property_id);
+  }, [picked, inventoryById, inventory, rank, down, keep, boosted]);
   const inTray = useMemo(() => new Set(tray), [tray]);
 
   const toggle = (pid) => {
@@ -382,8 +400,19 @@ export default function CurateScreen({
 
         <section className="cs-feed">
           <div className="cs-row" style={{ padding: "0 2px 8px" }}>
-            <span className="crm-label">Flats that fit · {feed.length}</span>
-            <span className="crm-mute" style={{ fontSize: 11 }}>best match first</span>
+            <span className="crm-label">{picked ? `${picked.name}'s live flats · ${feed.length}` : `Flats that fit · ${feed.length}`}</span>
+            {partners.length > 0 && (
+              <select className="crm-input" value={partnerPick} onChange={(e) => { setPartnerPick(e.target.value); setShown(PAGE); }}
+                aria-label="Show one partner's flats" style={{ fontSize: 12, height: 30, maxWidth: 200 }}>
+                <option value="">All flats that fit</option>
+                {partners.map((p) => (
+                  <option key={p.broker_id} value={p.broker_id}>{p.boosted ? "★ " : ""}{p.name} · {p.ids.length} flat{p.ids.length === 1 ? "" : "s"}</option>
+                ))}
+              </select>
+            )}
+          </div>
+          <div className="crm-mute" style={{ fontSize: 11, margin: "-4px 2px 8px" }}>
+            {picked ? "All their live flats, best match first — add as many as you like." : "Best match first; ★ trial/Premium partners' flats are ranked up when they fit."}
           </div>
           {feed.length === 0 && (
             <div className="crm-mute" style={{ fontSize: 12.5, lineHeight: 1.5, padding: "12px 4px" }}>

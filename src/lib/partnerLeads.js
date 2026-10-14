@@ -144,7 +144,8 @@ export function topSets(pairs = [], myAreas = [], limit = 8) {
 
 /** MovEazy's share on a Premium closure: 30% of a month's rent direct with the owner, 20% with other brokers. */
 export function closureDue(rent, deal, pack = "premium") {
-  if (pack !== "premium") return 0;
+  // Premium leads, and website leads (interest in the partner's own flat on moveazy.co.in).
+  if (pack !== "premium" && pack !== "website") return 0;
   const r = Number(rent) || 0;
   return Math.round(r * (deal === "direct" ? 0.3 : 0.2));
 }

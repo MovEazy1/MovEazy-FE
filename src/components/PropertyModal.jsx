@@ -20,6 +20,7 @@ import { findNearbyListings } from "../lib/geo";
 import { isListingSaved, toggleSavedListing } from "../lib/userActivity";
 import { logSavedListingChange } from "../lib/crmSync";
 import { buildBrokerWhatsAppUrl, logBrokerWhatsAppContact } from "../lib/brokerWhatsApp";
+import { fetchPartnerFlatIds, reportContactTap } from "../lib/websiteLeads";
 import { autoDeposit } from "../lib/deposit";
 
 // Full screen, loaded on the first tap of a photo.
@@ -351,6 +352,21 @@ export default function PropertyModal({
   }, [property?.postedAt]);
 
   const [resolvedBrokerPhone, setResolvedBrokerPhone] = useState("");
+
+  // A partner's flat: "Ask the broker to call me" — their website lead, no number shown.
+  const [partnerFlat, setPartnerFlat] = useState(false);
+  const [callbackAsked, setCallbackAsked] = useState(false);
+  useEffect(() => {
+    let alive = true;
+    setCallbackAsked(false);
+    fetchPartnerFlatIds().then((ids) => { if (alive) setPartnerFlat(ids.partner.has(String(property?.id || ""))); });
+    return () => { alive = false; };
+  }, [property?.id]);
+  const askCallback = () => {
+    if (!user) { openLogin?.({ title: "Sign in to get a call", subtitle: "The broker will call you about this flat." }); return; }
+    setCallbackAsked(true);
+    void reportContactTap(property.id, "callback");
+  };
 
   useEffect(() => {
     let cancelled = false;
@@ -1479,6 +1495,14 @@ export default function PropertyModal({
                         </>
                       )}
                     </form>
+                  )}
+
+                  {partnerFlat && !visitRequest && !offMarket && (
+                    <button type="button" onClick={askCallback} disabled={callbackAsked}
+                      style={{ marginTop: 12, width: "100%", padding: "13px", borderRadius: 10, cursor: callbackAsked ? "default" : "pointer",
+                        border: `1.5px solid ${T.teal}`, background: callbackAsked ? T.mintSoft : "#fff", color: T.teal, fontSize: 14.5, fontWeight: 700 }}>
+                      {callbackAsked ? "Done — the broker will call you shortly" : "Ask the broker to call me"}
+                    </button>
                   )}
 
                   {showBrokerDirectLine && brokerCallLine ? (

@@ -97,6 +97,16 @@ export function QrBadge() {
   );
 }
 
+/** "MovEazy Website": a MovEazy lead who showed interest in the partner's flat on the site. */
+export function WebBadge() {
+  return (
+    <span title="Interested in your flat on the MovEazy website" style={{ display: "inline-flex", alignItems: "center", verticalAlign: "middle", marginLeft: 6,
+      padding: "2px 7px", borderRadius: 99, background: "#E4F2EC", color: "#0B6E4F", fontSize: 10.5, fontWeight: 800, flex: "none", whiteSpace: "nowrap" }}>
+      MovEazy Website
+    </span>
+  );
+}
+
 /** The MovEazy mark on a tenant MovEazy gave them. */
 export function MzBadge() {
   // Styled inline: it shows on pages that don't load the matcher's CSS (Leads, Home, flats).

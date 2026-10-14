@@ -8,7 +8,7 @@ import { Link } from "react-router-dom";
 import { AlarmClock, Check, ChevronRight, Heart, Phone, Sparkles } from "lucide-react";
 import { usePartner } from "./PartnerApp";
 import { Avatar, Chip, Sheet, WhatsAppIcon, toast } from "./partnerUi";
-import { MzBadge, QrBadge } from "./AiMatcher";
+import { MzBadge, QrBadge, WebBadge } from "./AiMatcher";
 import VisitsToday from "./VisitsToday";
 import { useTenants } from "./tenantData";
 import { requirementLine } from "./leadBits";
@@ -155,7 +155,7 @@ export function OutcomeSheet({ tenant, kind, flats = [], onClose, onSaved }) {
                   <Chip on={deal === "direct"} onClick={() => setDeal("direct")}>Direct with the owner</Chip>
                   <Chip on={deal === "shared"} onClick={() => setDeal("shared")}>With other brokers</Chip>
                 </div>
-                {tenant.pack === "premium" && Number(rent) >= 1000 && deal && (
+                {(tenant.pack === "premium" || tenant.pack === "website") && Number(rent) >= 1000 && deal && (
                   <span className="pz-hint">MovEazy's share: {inr(Math.round(Number(rent) * (deal === "direct" ? 0.3 : 0.2)))}</span>
                 )}
               </div>
@@ -189,6 +189,7 @@ export function TenantRow({ t, onReach }) {
         <span style={{ display: "flex", alignItems: "center", gap: 6, flexWrap: "wrap" }}>
           <strong style={{ fontSize: 15.5 }}>{t.name || "Tenant"}</strong>
           {t.kind === "moveazy" && <MzBadge />}
+          {t.pack === "website" && <WebBadge />}
           {t.via === "qr" && <QrBadge />}
           <StagePill stage={t.stage} />
           {t.qr_visits > 0 && t.stage !== "done" && t.stage !== "lost" && <span className="tk-pill tk-visitask">Wants a visit</span>}

@@ -3,16 +3,20 @@
  * its details are and who it went to, opened it, liked it; for any flat, the
  * tenants it suits best — their own and MovEazy's — each one tap from getting
  * it as a tracked list (likes and opens come back to the partner).
+ * And from the MovEazy website (lib/websiteLeads.js): how many opened it, and
+ * the tenants who showed interest there — Call, WhatsApp, Fix a visit.
  */
 import { useEffect, useMemo, useState } from "react";
 import { Link } from "react-router-dom";
-import { ClipboardList, Heart, Send, Users } from "lucide-react";
+import { CalendarClock, ClipboardList, Crown, Eye, Heart, Phone, Send, Sparkles, Users } from "lucide-react";
 import { usePartner } from "./PartnerApp";
-import { toast } from "./partnerUi";
+import { WhatsAppIcon, toast } from "./partnerUi";
 import { MzBadge, ShareListSheet } from "./AiMatcher";
 import { useMatcherData } from "./matcherData";
 import { useTenants } from "./tenantData";
-import { friendlyError, pp } from "../../lib/partners";
+import { friendlyError, pp, telLink, waLink } from "../../lib/partners";
+import { logReachOut } from "../../lib/partnerLeads";
+import { KIND_LABEL, fetchFlatLeads } from "../../lib/websiteLeads";
 import { leadsForListing } from "../../lib/partnerMatch";
 import { keyToSlug, matcherTenants, sendCuratedTo } from "../../lib/partnerMatcher";
 import { fetchFlatInterest, flatDetailScore } from "../../lib/partnerTenants";
@@ -30,6 +34,17 @@ export default function FlatCare({ listing: l, mine, onAddDetails }) {
 
   const loadInterest = () => fetchFlatInterest(l.property_id).then(setInterest, () => setInterest(null));
   useEffect(() => { if (mine) loadInterest(); }, [l.property_id, mine]); // eslint-disable-line react-hooks/exhaustive-deps
+  const [web, setWeb] = useState(null);
+  useEffect(() => { if (mine) fetchFlatLeads(l.property_id).then(setWeb, () => setWeb(null)); }, [l.property_id, mine]);
+  const reachWeb = (t, channel) => {
+    const flat = [l.flat_type, l.area].filter(Boolean).join(" in ");
+    if (channel === "whatsapp") {
+      window.open(waLink(t.phone, `Hi ${String(t.name || "").split(" ")[0]}, this is ${me?.partner?.name || "your broker"} — you were looking at my ${flat || "flat"} on MovEazy. When would you like to see it?`), "_blank", "noopener");
+    } else {
+      window.location.href = telLink(t.phone);
+    }
+    if (t.assignment_id) logReachOut(t.assignment_id, channel).catch(() => {});
+  };
 
   const tenants = useMemo(() => matcherTenants(leads, md.assigned), [leads, md.assigned]);
   // The tenants it suits, minus anyone who's already been sent or seen it.
@@ -64,6 +79,31 @@ export default function FlatCare({ listing: l, mine, onAddDetails }) {
               <button type="button" className="pz-btn pz-btn--sm pz-btn--primary" onClick={onAddDetails}>Add details</button>
             </>
           ) : <p className="pz-hint" style={{ margin: "6px 0 0" }}>Every detail is in — it matches as well as it can.</p>}
+        </div>
+      )}
+
+      {mine && web && (
+        <div className="pz-section">
+          <h2><span className="pz-row" style={{ gap: 6 }}><Sparkles size={17} color="#0B6E4F" /> From the MovEazy website</span>
+            <span className="pz-meta"><Eye size={13} style={{ verticalAlign: -2 }} /> {web.views.today} today · {web.views.week} this week</span></h2>
+          {web.held > 0 && (
+            <Link to={pp("/premium")} className="pz-row" style={{ gap: 8, background: "#FEF7E6", borderRadius: 10, padding: 10, color: "#7A5A12", textDecoration: "none", fontSize: 13.5, fontWeight: 700, marginBottom: 8 }}>
+              <Crown size={16} /> {web.held} tenant{web.held === 1 ? " is" : "s are"} interested — go Premium to see who
+            </Link>
+          )}
+          {web.tenants.length === 0 ? (
+            <p className="pz-hint" style={{ margin: 0 }}>Tenants who like, open or ask about this flat on MovEazy show up here as your leads.</p>
+          ) : web.tenants.map((t) => (
+            <div key={t.assignment_id} className="pz-row" style={{ padding: "8px 0", borderTop: "1px solid var(--line)", gap: 8 }}>
+              <Link to={pp(`/tenants/${t.slug}`)} style={{ flex: 1, minWidth: 0, color: "inherit", textDecoration: "none" }}>
+                <strong style={{ display: "block" }}>{t.name}</strong>
+                <span className="pz-meta">{(t.kinds ?? []).map((k) => KIND_LABEL[k] || k).join(" · ")}{t.detail ? ` · ${t.detail}` : ""}</span>
+              </Link>
+              {t.phone && <button type="button" className="pz-iconbtn" aria-label={`WhatsApp ${t.name}`} onClick={() => reachWeb(t, "whatsapp")}><WhatsAppIcon size={17} /></button>}
+              {t.phone && <button type="button" className="pz-iconbtn" aria-label={`Call ${t.name}`} onClick={() => reachWeb(t, "call")}><Phone size={17} /></button>}
+              <Link to={pp(`/tenants/${t.slug}`)} className="pz-btn pz-btn--sm pz-btn--primary"><CalendarClock size={14} /> Visit</Link>
+            </div>
+          ))}
         </div>
       )}
 

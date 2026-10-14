@@ -20,6 +20,7 @@ import Toast from "../components/Toast";
 import { useAuth } from "../context/AuthContext";
 import { fetchAllListings } from "../lib/listingsFeed";
 import { listingForScoring, normalizeRequirement, scoreMatch } from "../lib/inventoryMatch";
+import { fetchPartnerFlatIds, matchedPartnerFlats, rankBoosted, reportMatches } from "../lib/websiteLeads";
 import { fetchUserRequirement, markMatchesSeen, rowToPrefs } from "../lib/userRequirements";
 import { toggleSavedListing } from "../lib/userActivity";
 import { logSavedListingChange } from "../lib/crmSync";
@@ -368,20 +369,36 @@ export default function TopMatches() {
    * and a deal-breaker never blocked anything. listingForScoring is the bridge
    * that exists for exactly this; the map has always used it.
    */
-  const topMatches = useMemo(() => {
+  // Partners' flats (trial/Premium ones float up when they fit) — website_leads.
+  const [partnerIds, setPartnerIds] = useState(null);
+  useEffect(() => { fetchPartnerFlatIds().then(setPartnerIds); }, []);
+
+  const scored = useMemo(() => {
     // Wait for the answered set before dealing anything: showing five cards and
     // then pulling three of them out as it arrives is worse than a beat of
     // loading.
-    if (!prefs || !listings.length || decided === null) return [];
+    if (!prefs || !listings.length || decided === null || !partnerIds) return [];
     const req = normalizeRequirement(prefs);
-    return listings
+    const rows = listings
       .filter((l) => !decided.has(l.id))
       .map((listing) => ({ listing, ...scoreMatch(listingForScoring(listing), req) }))
-      .filter((m) => m.blockers.length === 0)
-      .sort((a, b) => b.score - a.score)
-      .slice(0, TOP_N)
-      .map((r) => ({ ...r.listing, matchScore: r.score, matchReasons: r.reasons }));
-  }, [prefs, listings, decided]);
+      .filter((m) => m.blockers.length === 0);
+    return rankBoosted(rows, partnerIds.boosted, (r) => String(r.listing.id));
+  }, [prefs, listings, decided, partnerIds]);
+
+  const topMatches = useMemo(
+    () => scored.slice(0, TOP_N).map((r) => ({ ...r.listing, matchScore: r.score, matchReasons: r.reasons })),
+    [scored],
+  );
+
+  // A signed-in tenant whose requirement fits a partner's flat at 70+: that
+  // partner hears (once a tab — the server keeps one bell per flat anyway).
+  useEffect(() => {
+    if (!user?.uid || !String(user.phone || "").trim() || !scored.length || !partnerIds) return;
+    const key = `mz_matches_told:${user.uid}`;
+    try { if (sessionStorage.getItem(key)) return; sessionStorage.setItem(key, "1"); } catch { /* fine */ }
+    void reportMatches(matchedPartnerFlats(scored, partnerIds.partner, (r) => String(r.listing.id)));
+  }, [user?.uid, user?.phone, scored, partnerIds]);
 
   /**
    * What the nudge says. Carries their own answers, so the team opens a

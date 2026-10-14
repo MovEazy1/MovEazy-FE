@@ -20,7 +20,7 @@ const ago = (iso) => {
   if (s < 86400) return `${Math.round(s / 3600)}h`;
   return `${Math.round(s / 86400)}d`;
 };
-const ICON = { tenant_liked: Heart, storefront_like: Heart, storefront_lead: QrCode, storefront_visit: CalendarCheck, sold_out_request: Home, sold_out_decided: Home, list_opened: Sparkles, list_done: Sparkles,
+const ICON = { tenant_liked: Heart, storefront_like: Heart, storefront_lead: QrCode, storefront_visit: CalendarCheck, website_lead: Sparkles, website_teaser: Crown, sold_out_request: Home, sold_out_decided: Home, list_opened: Sparkles, list_done: Sparkles,
   building_visit: CalendarCheck, building_assigned: Building2, location_request: MapPin, location_decided: MapPin,
   leads_assigned: Users, lead_request: Users, visit_reminder: CalendarClock, referral: Gift, plan_approved: Crown, plan_rejected: AlertCircle, reminder: AlarmClock };
 

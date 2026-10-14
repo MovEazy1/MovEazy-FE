@@ -78,7 +78,7 @@ function AssignedLead({ lead, me, onChanged, onClose }) {
       {leadNeedLine(lead) && <div style={{ fontSize: 14, marginTop: 6 }}>{leadNeedLine(lead)}</div>}
       <div className="pz-hint" style={{ marginTop: 2 }}>
         Given {ago(lead.assigned_at)}{lead.last_reach_at ? ` · you reached out ${ago(lead.last_reach_at)}` : " · not contacted yet"}
-        {lead.pack === "premium" ? " · Premium" : ""}
+        {lead.pack === "premium" ? " · Premium" : lead.pack === "website" ? " · from the MovEazy Website" : ""}
       </div>
       {lead.status === "closed" ? (
         <div className="pz-hint" style={{ marginTop: 6, color: "var(--g)", fontWeight: 600 }}>
@@ -138,9 +138,9 @@ function CloseSheet({ lead, onDone, onCancel }) {
             </label>
           ))}
         </div>
-        {lead.pack === "premium" && deal && Number(rent) >= 1000 && (
+        {(lead.pack === "premium" || lead.pack === "website") && deal && Number(rent) >= 1000 && (
           <p className="pz-hint" style={{ margin: "0 0 12px" }}>
-            MovEazy's share on a Premium lead: <strong>{inr(due)}</strong> ({deal === "direct" ? "30" : "20"}% of one month's rent). The team will be in touch.
+            MovEazy's share on a {lead.pack === "website" ? "MovEazy Website" : "Premium"} lead: <strong>{inr(due)}</strong> ({deal === "direct" ? "30" : "20"}% of one month's rent). The team will be in touch.
           </p>
         )}
         <button type="button" className="pz-btn pz-btn--primary pz-btn--block" onClick={save} disabled={busy}>{busy ? "Saving…" : "Mark closed"}</button>
