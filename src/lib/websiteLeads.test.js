@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { BOOST, matchedPartnerFlats, rankBoosted } from "./websiteLeads";
+import { BOOST, rankBoosted } from "./websiteLeads";
 
 const id = (r) => r.id;
 
@@ -19,12 +19,5 @@ describe("rankBoosted", () => {
   it("leaves the order alone without a boosted set", () => {
     const rows = [{ id: "A", score: 50 }, { id: "B", score: 90 }];
     expect(rankBoosted(rows, null, id).map(id)).toEqual(["B", "A"]);
-  });
-});
-
-describe("matchedPartnerFlats", () => {
-  it("partner flats at 70+, best first, at most 3", () => {
-    const rows = [{ id: "A", score: 71 }, { id: "B", score: 95 }, { id: "C", score: 69 }, { id: "D", score: 80 }, { id: "E", score: 75 }, { id: "MZ", score: 99 }];
-    expect(matchedPartnerFlats(rows, new Set(["A", "B", "C", "D", "E"]), id)).toEqual(["B", "D", "E"]);
   });
 });

@@ -20,7 +20,7 @@ import Toast from "../components/Toast";
 import { useAuth } from "../context/AuthContext";
 import { fetchAllListings } from "../lib/listingsFeed";
 import { listingForScoring, normalizeRequirement, scoreMatch } from "../lib/inventoryMatch";
-import { fetchPartnerFlatIds, matchedPartnerFlats, rankBoosted, reportMatches } from "../lib/websiteLeads";
+import { fetchPartnerFlatIds, rankBoosted } from "../lib/websiteLeads";
 import { fetchUserRequirement, markMatchesSeen, rowToPrefs } from "../lib/userRequirements";
 import { toggleSavedListing } from "../lib/userActivity";
 import { logSavedListingChange } from "../lib/crmSync";
@@ -391,14 +391,6 @@ export default function TopMatches() {
     [scored],
   );
 
-  // A signed-in tenant whose requirement fits a partner's flat at 70+: that
-  // partner hears (once a tab — the server keeps one bell per flat anyway).
-  useEffect(() => {
-    if (!user?.uid || !String(user.phone || "").trim() || !scored.length || !partnerIds) return;
-    const key = `mz_matches_told:${user.uid}`;
-    try { if (sessionStorage.getItem(key)) return; sessionStorage.setItem(key, "1"); } catch { /* fine */ }
-    void reportMatches(matchedPartnerFlats(scored, partnerIds.partner, (r) => String(r.listing.id)));
-  }, [user?.uid, user?.phone, scored, partnerIds]);
 
   /**
    * What the nudge says. Carries their own answers, so the team opens a

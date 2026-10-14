@@ -4,9 +4,9 @@
  * decides who, when and what; this file only calls it).
  *
  * Most interest is caught where it's already saved (♥, visits, opens). From
- * the browser we add: WhatsApp/Call taps on a flat, the first-5 screen's
- * partner flats that fit at 70+, and — once someone signs in — the partner
- * flats they opened on this phone before. Plus the ranking boost: partners on
+ * the browser we add: "Ask the broker to call me" on a flat, and — once
+ * someone signs in — the partner flats they opened on this phone before. A
+ * requirement that merely fits a flat is never a lead. Plus the ranking boost: partners on
  * trial or Premium have their flats float up when they fit.
  */
 import { supabase, isSupabaseConfigured } from "./supabase";
@@ -40,16 +40,7 @@ export function rankBoosted(rows, boosted, idOf) {
   return [...rows].sort((a, b) => key(b) - key(a));
 }
 
-/** Partner flats among scored rows that fit at 70+, best first, at most 3 — what the first-5 screen tells partners about. */
-export function matchedPartnerFlats(rows, partner, idOf, min = 70) {
-  return rows.filter((r) => partner?.has(idOf(r)) && Number(r.score || 0) >= min)
-    .sort((a, b) => Number(b.score) - Number(a.score)).slice(0, 3).map(idOf);
-}
-
 /* ── The tenant's side ─────────────────────────────────────────────────── */
-export const reportMatches = (propertyIds) =>
-  propertyIds?.length ? rpc("website_match_flats", { p_properties: propertyIds }).catch(() => 0) : Promise.resolve(0);
-
 export const reportContactTap = (propertyId, channel = "whatsapp") =>
   rpc("flat_contact_tap", { p_property: String(propertyId || ""), p_channel: channel === "call" ? "call" : "whatsapp" }).catch(() => {});
 
