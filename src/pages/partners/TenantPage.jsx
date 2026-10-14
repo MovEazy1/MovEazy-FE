@@ -16,7 +16,7 @@ import { usePartner } from "./PartnerApp";
 import { Avatar, Empty, Loading, Sheet, TopBar, WhatsAppIcon, toast } from "./partnerUi";
 import { SmartListingImage } from "./partnerMedia";
 import { requirementLine } from "./leadBits";
-import { MATCHER_CSS, MzBadge, ShareListSheet, useMatcherRows } from "./AiMatcher";
+import { MATCHER_CSS, MzBadge, QrBadge, ShareListSheet, useMatcherRows } from "./AiMatcher";
 import { useMatcherData } from "./matcherData";
 import { useTenants } from "./tenantData";
 import { KIT_CSS, OutcomeSheet, RemindSheet, StagePill, useReach } from "./TenantKit";
@@ -157,11 +157,17 @@ export default function TenantPage() {
             <Avatar name={tenant.name} size="lg" />
             <div style={{ flex: 1, minWidth: 0 }}>
               <strong style={{ display: "flex", alignItems: "center", gap: 6, flexWrap: "wrap", fontSize: 17 }}>
-                {tenant.name}{tenant.kind === "moveazy" && <MzBadge />}
+                {tenant.name}{tenant.kind === "moveazy" && <MzBadge />}{tenant.via === "qr" && <QrBadge />}
               </strong>
               <span className="pz-meta" style={{ display: "block" }}>
                 {[requirementLine(tenant), (tenant.localities ?? []).join(", ")].filter(Boolean).join(" · ") || "No requirement yet"}
               </span>
+              {tenant.tentative && (
+                <span className="pz-hint" style={{ display: "block", color: "#92400E" }}>
+                  Tentative — from the flats they looked at on your QR page{tenant.move_in_raw === "Immediate move-in" ? ", immediate move-in" : ""}. Tap ✎ to confirm it.
+                </span>
+              )}
+              {tenant.qr_visits > 0 && <span className="pz-hint" style={{ display: "block", color: "#0B6E4F", fontWeight: 700 }}>Asked for a visit from your QR page — see the note below.</span>}
               {tenant.phone && <span className="pz-hint" style={{ display: "block" }}>{tenant.phone}</span>}
             </div>
             {tenant.lead_id && <Link to={pp(`/leads/${tenant.lead_id}/edit`)} className="pz-iconbtn" aria-label="Edit requirement"><Pencil size={17} /></Link>}

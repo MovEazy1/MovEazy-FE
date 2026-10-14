@@ -7,10 +7,14 @@
  * goes on both, and on the storefront the QR opens (moveazy.co.in/b/<code>).
  * Below: visitors and QR scans this week, and who liked which flat — with the
  * tenant's number, since the storefront told them it would be shared.
+ *
+ * On top, two lines on what the poster does and "How it works" in five steps;
+ * once they've downloaded a poster, the steps move to the bottom of the page
+ * (partner_storefronts.poster_downloaded_at, partner_qr_leads.sql).
  */
 import { useCallback, useEffect, useRef, useState } from "react";
 import { Link } from "react-router-dom";
-import { BarChart3, Camera, Download, ExternalLink, Heart, MapPin, Phone, Plus, QrCode, Search, Star, Trash2, X } from "lucide-react";
+import { BarChart3, Bell, CalendarCheck, Camera, Download, ExternalLink, Heart, MapPin, Phone, Plus, QrCode, ScanLine, Search, Star, Trash2, UserRound, X } from "lucide-react";
 import { useAuth } from "../../context/AuthContext";
 import { usePartner } from "./PartnerApp";
 import { Avatar, Chip, Loading, TopBar, WhatsAppIcon, formatPhone, toast } from "./partnerUi";
@@ -25,6 +29,32 @@ import {
 import { POSTER_DESIGNS, drawPoster, loadImage, posterFontsReady, posterPdf } from "../../lib/qrPoster";
 import logoOnDark from "../../assets/logo/moveazy-logo-mint-dark.png";
 import logoOnLight from "../../assets/logo/moveazy-logo-mint-light.png";
+import { posterDownloaded } from "../../lib/qrLeads";
+
+const STEPS = [
+  [MapPin, "Stick your poster on hotspots", "Society gates, cafés, PG notice boards, tea stalls — wherever tenants look."],
+  [ScanLine, "Tenants scan your poster", "The QR opens your page with your photo, rating and number."],
+  [UserRound, "You get their contact details", "Everyone who signs in on your page lands in My leads with a QR mark — name, number and what they're looking for."],
+  [CalendarCheck, "They see all your live flats", "Every flat you have live, always up to date — and they can tap Schedule visit on any of them."],
+  [Bell, "You get a notification", "\"A tenant wants to visit your flat\" — with the flat and their number, so you can call straight away."],
+];
+
+/** The five steps, from sticking the poster to the visit request. */
+function HowItWorks() {
+  return (
+    <div className="pz-section">
+      <h2>How it works</h2>
+      <ol className="myqr-steps">
+        {STEPS.map(([Icon, title, body], i) => (
+          <li key={title}>
+            <span className="myqr-step-n" aria-hidden><Icon size={17} /></span>
+            <span><b>Step {i + 1}: {title}</b><span>{body}</span></span>
+          </li>
+        ))}
+      </ol>
+    </div>
+  );
+}
 
 function ago(iso) {
   const s = Math.max(0, (Date.now() - new Date(iso).getTime()) / 1000);
@@ -43,6 +73,9 @@ export default function MyQrPage() {
   const [design, setDesign] = useState("tolet");
   const [shownRating, setShownRating] = useState(null);
   const [numberOpen, setNumberOpen] = useState(false);
+  // Has a poster been downloaded? "How it works" sits on top until then. undefined while checking.
+  const [downloadedAt, setDownloadedAt] = useState(undefined);
+  useEffect(() => { posterDownloaded(false).then((at) => setDownloadedAt(at || null), () => setDownloadedAt(null)); }, []);
   // The poster carries their primary contact number (a second one, if they made it primary).
   const contact = contactPhone(partner);
   const [photoSrc, setPhotoSrc] = useState("");
@@ -160,6 +193,7 @@ export default function MyQrPage() {
     setBusy("pdf");
     try {
       const blob = await posterPdf(design, await posterData());
+      if (!downloadedAt) posterDownloaded(true).then((at) => setDownloadedAt(at || new Date().toISOString()), () => {});
       const url = URL.createObjectURL(blob);
       const a = document.createElement("a");
       a.href = url;
@@ -193,6 +227,12 @@ export default function MyQrPage() {
     <>
       <TopBar title="My QR poster" back />
       <div className="pz-pad">
+        <div className="myqr-intro">
+          <b>Stick your AI-managed To-Let posters.</b>
+          <span>Tenants scan the poster and see all your live inventory — and you get their number.</span>
+        </div>
+        {downloadedAt === null && <HowItWorks />}
+
         <div className="pz-section" style={{ display: "grid", gridTemplateColumns: "repeat(3,1fr)", textAlign: "center", padding: 10 }}>
           {[["Visitors", sf.visitors_week, "this week"], ["QR scans", sf.scans_week, "this week"], ["Likes", sf.likes_total, "all time"]].map(([k, v, s]) => (
             <div key={k}><div style={{ fontSize: 22, fontWeight: 800 }}>{v ?? 0}</div><div className="pz-meta">{k}<span style={{ display: "block", fontSize: 11 }}>{s}</span></div></div>
@@ -342,6 +382,7 @@ export default function MyQrPage() {
             ))
           )}
         </div>
+        {downloadedAt && <HowItWorks />}
       </div>
       <style>{CSS}</style>
       {numberOpen && <ContactNumberSheet partner={partner} onClose={() => setNumberOpen(false)} onSaved={reloadMe} />}
@@ -365,6 +406,14 @@ const CSS = `
 .myqr-thumb { flex: none; display: grid; place-items: center; border-radius: 5px; }
 .myqr-thumb--profile { width: 38px; height: 27px; background: #F7F5EE; border: 1px solid var(--line); color: var(--ink); }
 .myqr-thumb--premium { width: 27px; height: 38px; background: #0A3A2A; color: #E4B659; }
+.myqr-intro { background: var(--noir); color: #fff; border-radius: 16px; padding: 14px 16px; margin-bottom: 12px; }
+.myqr-intro b { display: block; font-size: 16px; font-weight: 800; color: #F0CF7C; }
+.myqr-intro span { display: block; font-size: 13.5px; line-height: 1.45; color: rgba(255,255,255,.82); margin-top: 3px; }
+.myqr-steps { list-style: none; margin: 4px 0 0; padding: 0; display: grid; gap: 12px; }
+.myqr-steps li { display: flex; gap: 12px; align-items: flex-start; }
+.myqr-steps li > span:last-child { display: grid; gap: 2px; font-size: 13px; color: var(--dim); line-height: 1.45; }
+.myqr-steps b { font-size: 14.5px; color: var(--ink); }
+.myqr-step-n { flex: none; width: 34px; height: 34px; border-radius: 99px; background: var(--gl); color: var(--g); display: grid; place-items: center; }
 .myqr-link { border: 0; background: none; padding: 0; font: inherit; font-size: 13px; font-weight: 700; color: var(--g); text-decoration: underline; cursor: pointer; }
 .myqr-thumb--tolet { width: 38px; height: 27px; background: #fff; border: 2px solid #E3141B; color: #E3141B; }
 .myqr-spot { margin-top: 10px; padding: 12px; border-radius: 12px; background: #FBFAF7; border: 1px solid var(--line); }

@@ -17,7 +17,7 @@
  */
 import { useEffect, useMemo, useRef, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
-import { Bell, CalendarClock, Check, ChevronRight, Crown, Heart, MapPin, RefreshCw, Sparkles, WandSparkles, X } from "lucide-react";
+import { Bell, CalendarClock, Check, ChevronRight, Crown, Heart, MapPin, QrCode, RefreshCw, Sparkles, WandSparkles, X } from "lucide-react";
 import { usePartner } from "./PartnerApp";
 import { Avatar, Empty, Loading, Sheet, TopBar, toast } from "./partnerUi";
 import { SmartListingImage } from "./partnerMedia";
@@ -85,6 +85,16 @@ export function useMatcherRows(seed = 0) {
       md,
     };
   }, [tenants, inventory, md, seed]); // eslint-disable-line react-hooks/exhaustive-deps
+}
+
+/** The QR mark on a tenant who came from the broker's MovEazy QR poster. */
+export function QrBadge() {
+  return (
+    <span title="Came from your MovEazy QR poster" style={{ display: "inline-flex", alignItems: "center", gap: 3, verticalAlign: "middle", marginLeft: 6,
+      padding: "2px 7px", borderRadius: 99, background: "#0B6E4F", color: "#fff", fontSize: 10.5, fontWeight: 800, letterSpacing: ".02em", flex: "none" }}>
+      <QrCode size={11} strokeWidth={2.6} /> QR
+    </span>
+  );
 }
 
 /** The MovEazy mark on a tenant MovEazy gave them. */

@@ -114,6 +114,12 @@ export default function PropertyPage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [listing]);
 
+  // Opened from a broker's QR page (/b/<code>): their visit request, not the slots.
+  const sfCode = useMemo(() => (new URLSearchParams(location.search).get("sf") || "").toUpperCase().replace(/[^A-Z0-9]/g, ""), [location.search]);
+  const visitRequest = useMemo(() => (sfCode ? {
+    note: "Ask the broker for a visit — they'll call you to fix a time.",
+    onRequest: () => navigate(`/b/${sfCode}?visit=${encodeURIComponent(propertyId)}`),
+  } : null), [sfCode, navigate, propertyId]);
   const openVisitForm = useMemo(
     () => new URLSearchParams(location.search).get("visit") === "1",
     [location.search],
@@ -184,6 +190,7 @@ export default function PropertyPage() {
         property={listing}
         onClose={close}
         initialShowVisitForm={openVisitForm}
+        visitRequest={visitRequest}
         manageHistory={false}
         onVisitBooked={(message) => setToast(message)}
         banner={

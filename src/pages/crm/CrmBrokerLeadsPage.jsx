@@ -6,6 +6,7 @@
  * listings, which MovEazy can confirm or reject (§ 9).
  */
 import { useCallback, useEffect, useMemo, useState } from "react";
+import { QrCode } from "lucide-react";
 import { Btn, C, Chip, Empty, Loading, inr, relTime } from "./crmUi";
 import { decideSoldOut, fetchBrokerLeads, fetchSoldOutRequests } from "../../lib/partnerCurated";
 import { waLink } from "../../lib/partners";
@@ -55,7 +56,7 @@ export default function CrmBrokerLeadsPage() {
     <div style={{ padding: 20, maxWidth: 1200 }}>
       <h1 style={{ margin: "0 0 4px", fontSize: 20, color: C.text }}>Broker leads</h1>
       <p style={{ margin: "0 0 14px", color: C.textDim, fontSize: 13 }}>
-        Tenants who came through a partner broker. They are the broker’s, not MovEazy’s: they never appear under Clients
+        Tenants who came through a partner broker. They are the broker’s, not MovEazy’s: apart from those from a QR poster (marked QR there), they never appear under Clients
         {leads ? ` (${leads.attributed_clients} sign-up${Number(leads.attributed_clients) === 1 ? "" : "s"} kept out so far)` : ""}.
       </p>
       <div style={{ display: "flex", gap: 8, marginBottom: 12, flexWrap: "wrap" }}>
@@ -83,7 +84,7 @@ export default function CrmBrokerLeadsPage() {
                     <tr key={t.id}>
                       <td style={cell}><b>{t.name || "—"}</b><br /><a href={waLink(t.phone, "")} target="_blank" rel="noreferrer" style={{ color: C.wa }}>{t.phone}</a></td>
                       <td style={cell}>{t.broker}<br /><span style={{ color: C.textMute }}>{t.broker_agency || t.broker_phone}</span></td>
-                      <td style={cell}>{t.source === "curated" ? "Curated list" : "QR page"}</td>
+                      <td style={cell}>{t.source === "curated" ? "Curated list" : t.source === "building" ? "Building QR" : <span style={{ display: "inline-flex", alignItems: "center", gap: 4, color: C.accent, fontWeight: 600 }}><QrCode size={13} /> QR poster</span>}</td>
                       <td style={cell}>{t.likes}</td>
                       <td style={cell}><span style={{ color: C.gold, fontWeight: 600 }}>{t.status}</span></td>
                       <td style={cell}>{relTime(t.last_seen_at)}</td>

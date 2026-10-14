@@ -44,6 +44,8 @@ const RAIL = [
   { to: "/crm/brokers",    code: "BR", label: "Brokers" },
   // Tenants partner brokers brought — theirs, never in Clients.
   { to: "/crm/broker-leads", code: "BL", label: "Broker leads" },
+  // Partners' To-Let poster scans: top brokers, hotspot areas, the map.
+  { to: "/crm/qr-scans", code: "QS", label: "QR scans" },
   // Brokers asking for MovEazy leads: check payments, pick and give.
   { to: "/crm/lead-requests", code: "LR", label: "Lead requests", scope: SCOPES.PARTNERS_MANAGE },
   // Owners' buildings with a QR: assign the partner, work the visit requests.
@@ -201,6 +203,7 @@ const NEEDS = {
   properties: ["inventory", "requirements", "clients", "marketingChannels"],
   brokers: ["inventory", "clients", "requirements"],
   "broker-leads": [],
+  "qr-scans": [],
   "lead-requests": [],
   "owner-qr": [],
   societies: [],

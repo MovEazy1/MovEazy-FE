@@ -190,6 +190,9 @@ function MediaElement({ src, alt, style, firstImage }) {
 /**
  * @param {boolean} initialShowVisitForm Opened by "Schedule a Visit" rather than
  *   by tapping the card — land on the booking panel instead of the photos.
+ * @param {{ note: string, onRequest: (property) => void }} visitRequest Visits
+ *   go to someone else than the lister's slots — a broker's QR page: one
+ *   "Request a visit" button instead of the booking form.
  * @param {React.ReactNode} banner A strip above the photos, for context the
  *   surface that opened this knows and the listing doesn't ("3 of 23 homes we
  *   shortlisted for you").
@@ -212,7 +215,7 @@ function bookingErrorMessage(err, fallback) {
 
 export default function PropertyModal({
   property, onClose, listings = [], onSelectListing, onSavedChange, onVisitBooked,
-  initialShowVisitForm = false, banner = null, manageHistory = true,
+  initialShowVisitForm = false, banner = null, manageHistory = true, visitRequest = null,
 }) {
   const { user } = useAuth();
   const { openLogin } = useLoginModal();
@@ -1324,146 +1327,159 @@ export default function PropertyModal({
                     </div>
                   ) : null}
 
-                  <form onSubmit={submitVisit} style={{ display: "flex", flexDirection: "column", gap: "12px", opacity: offMarket ? 0.6 : 1, pointerEvents: offMarket ? "none" : "auto" }}>
-                    <h3 style={{ margin: "0 0 8px", fontSize: "16px" }}>Schedule a Visit</h3>
-                    {visitSuccess ? (
-                      <div style={{ background: T.mintSoft, color: T.teal, padding: "12px", borderRadius: "8px", fontWeight: 600, textAlign: "center", fontSize: "13px" }}>
-                        {visitSuccess}
-                      </div>
-                    ) : myBookingLoading || slotsLoading ? (
-                      <p style={{ margin: 0, fontSize: 13, color: T.textMute }}>Loading visit times…</p>
-                    ) : myBooking ? (
-                      <div style={{ display: "flex", alignItems: "center", gap: 8, background: T.mintSoft, color: T.teal, padding: "14px", borderRadius: "10px", fontWeight: 700, textAlign: "center", fontSize: "13.5px", lineHeight: 1.4, justifyContent: "center" }}>
-                        <CalendarCheck size={17} strokeWidth={2.2} style={{ flexShrink: 0 }} />
-                        {myBookingLabel}
-                      </div>
-                    ) : visitSlots.length > 0 ? (
-                      <>
-                        <p style={{ margin: "0 0 2px", fontSize: 13, color: T.textDim, lineHeight: 1.5 }}>
-                          {openDay ? "Now pick a time:" : "Pick a day the lister has opened up:"}
-                        </p>
-                        <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
-                          {visitDays.map((day) => {
-                            const expanded = openDay === day.key;
-                            const chosenHere = day.slots.some((sl) => sl.slot_at === chosenSlot);
-                            return (
-                              <div key={day.key}>
-                                <button
-                                  type="button"
-                                  aria-expanded={expanded}
-                                  onClick={() => {
-                                    // Collapsing a day drops a time chosen inside it —
-                                    // leaving it selected but hidden is how someone
-                                    // books a slot they can no longer see.
-                                    if (expanded) { setOpenDay(""); if (chosenHere) setChosenSlot(""); }
-                                    else setOpenDay(day.key);
-                                  }}
-                                  style={{
-                                    width: "100%",
-                                    display: "flex", alignItems: "center", justifyContent: "space-between",
-                                    gap: 10, padding: "12px 14px", borderRadius: 10, cursor: "pointer",
-                                    background: chosenHere ? T.mintSoft : "#fff",
-                                    border: `1.5px solid ${expanded || chosenHere ? T.teal : T.line}`,
-                                    color: T.text, textAlign: "left",
-                                  }}
-                                >
-                                  <span style={{ fontSize: 13.5, fontWeight: 700 }}>{dayLabel(day.key)}</span>
-                                  <span style={{ display: "flex", alignItems: "center", gap: 8 }}>
-                                    <span style={{ fontSize: 13, fontWeight: chosenHere ? 800 : 600, color: chosenHere ? T.teal : T.textDim }}>
-                                      {chosenHere
-                                        ? timeOnly(chosenSlot)
-                                        : `${day.slots.length} time${day.slots.length === 1 ? "" : "s"}`}
-                                    </span>
-                                    <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke={T.textMute} strokeWidth="2.6" strokeLinecap="round" strokeLinejoin="round"
-                                      style={{ transform: expanded ? "rotate(180deg)" : "none", transition: "transform .15s" }} aria-hidden>
-                                      <path d="M6 9l6 6 6-6" />
-                                    </svg>
-                                  </span>
-                                </button>
-
-                                {expanded && (
-                                  <div style={{ display: "flex", flexWrap: "wrap", gap: 7, padding: "9px 2px 2px" }}>
-                                    {day.slots.map((sl) => {
-                                      const on = chosenSlot === sl.slot_at;
-                                      return (
-                                        <button
-                                          key={sl.id}
-                                          type="button"
-                                          onClick={() => setChosenSlot(sl.slot_at)}
-                                          style={{
-                                            padding: "8px 13px", borderRadius: 999, cursor: "pointer",
-                                            fontSize: 13, fontWeight: on ? 800 : 600,
-                                            background: on ? T.teal : "#fff",
-                                            color: on ? "#fff" : T.textDim,
-                                            border: `1.5px solid ${on ? T.teal : T.line}`,
-                                          }}
-                                        >
-                                          {timeOnly(sl.slot_at)}
-                                        </button>
-                                      );
-                                    })}
-                                  </div>
-                                )}
-                              </div>
-                            );
-                          })}
+                  {visitRequest ? (
+                    <div style={{ display: "flex", flexDirection: "column", gap: "10px", opacity: offMarket ? 0.6 : 1 }}>
+                      <h3 style={{ margin: "0 0 2px", fontSize: "16px" }}>Schedule a Visit</h3>
+                      <p style={{ margin: 0, fontSize: 13, color: T.textDim, lineHeight: 1.5 }}>{visitRequest.note}</p>
+                      <button type="button" disabled={offMarket} onClick={() => visitRequest.onRequest(property)}
+                        style={{ padding: "14px", borderRadius: "12px", border: "none", background: offMarket ? T.line : T.coral, color: "#fff",
+                          fontSize: "15px", fontWeight: 700, cursor: offMarket ? "not-allowed" : "pointer",
+                          display: "flex", alignItems: "center", justifyContent: "center", gap: 8 }}>
+                        <CalendarCheck size={18} strokeWidth={2.1} /> {offMarket ? "Off market" : "Request a visit"}
+                      </button>
+                    </div>
+                  ) : (
+                    <form onSubmit={submitVisit} style={{ display: "flex", flexDirection: "column", gap: "12px", opacity: offMarket ? 0.6 : 1, pointerEvents: offMarket ? "none" : "auto" }}>
+                      <h3 style={{ margin: "0 0 8px", fontSize: "16px" }}>Schedule a Visit</h3>
+                      {visitSuccess ? (
+                        <div style={{ background: T.mintSoft, color: T.teal, padding: "12px", borderRadius: "8px", fontWeight: 600, textAlign: "center", fontSize: "13px" }}>
+                          {visitSuccess}
                         </div>
-                        <button
-                          type="button"
-                          onClick={confirmSlot}
-                          disabled={!chosenSlot || booking}
-                          style={{
-                            width: "100%", padding: "12px", marginTop: "4px", borderRadius: "8px", border: "none", fontWeight: 700,
-                            background: chosenSlot ? T.teal : T.line,
-                            color: chosenSlot ? "white" : T.textMute,
-                            cursor: chosenSlot && !booking ? "pointer" : "not-allowed",
-                          }}
-                        >
-                          {booking ? "Booking…" : chosenSlot ? "Confirm visit" : openDay ? "Pick a time" : "Pick a day"}
-                        </button>
-                      </>
-                    ) : (
-                      <>
-                        {/* No published slots. Rather than invent times nobody
-                            agreed to, fall back to asking for one. */}
-                        <p style={{ margin: "0 0 2px", fontSize: 13, color: T.textDim, lineHeight: 1.5 }}>
-                          The lister hasn&apos;t published visit times for this home yet.
-                        </p>
-                        <button
-                          type="button"
-                          onClick={bookNextAvailable}
-                          disabled={booking}
-                          style={{
-                            width: "100%", padding: "14px", borderRadius: 10, border: "none",
-                            background: T.teal, color: "#fff", fontSize: 15, fontWeight: 700,
-                            cursor: booking ? "not-allowed" : "pointer",
-                          }}
-                        >
-                          {booking ? "Sending…" : "Book the next available slot"}
-                        </button>
-                        <p style={{ margin: "2px 0 0", fontSize: 12, color: T.textMute, lineHeight: 1.45 }}>
-                          We&apos;ll ask them to open a time and confirm it with you. Or suggest one yourself:
-                        </p>
-                        <SuggestDateTime
-                          tokens={T}
-                          value={visitForm.time}
-                          onChange={(time, timeISO) => setVisitForm({ ...visitForm, time, timeISO })}
-                        />
-                        <button
-                          type="submit"
-                          disabled={!visitForm.time}
-                          style={{
-                            width: "100%", padding: "12px", marginTop: "4px", borderRadius: "8px", border: "none", fontWeight: 700,
-                            background: visitForm.time ? T.teal : T.line,
-                            color: visitForm.time ? "white" : T.textMute,
-                            cursor: visitForm.time ? "pointer" : "not-allowed",
-                          }}
-                        >
-                          {visitForm.time ? "Request" : "Pick a time"}
-                        </button>
-                      </>
-                    )}
-                  </form>
+                      ) : myBookingLoading || slotsLoading ? (
+                        <p style={{ margin: 0, fontSize: 13, color: T.textMute }}>Loading visit times…</p>
+                      ) : myBooking ? (
+                        <div style={{ display: "flex", alignItems: "center", gap: 8, background: T.mintSoft, color: T.teal, padding: "14px", borderRadius: "10px", fontWeight: 700, textAlign: "center", fontSize: "13.5px", lineHeight: 1.4, justifyContent: "center" }}>
+                          <CalendarCheck size={17} strokeWidth={2.2} style={{ flexShrink: 0 }} />
+                          {myBookingLabel}
+                        </div>
+                      ) : visitSlots.length > 0 ? (
+                        <>
+                          <p style={{ margin: "0 0 2px", fontSize: 13, color: T.textDim, lineHeight: 1.5 }}>
+                            {openDay ? "Now pick a time:" : "Pick a day the lister has opened up:"}
+                          </p>
+                          <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+                            {visitDays.map((day) => {
+                              const expanded = openDay === day.key;
+                              const chosenHere = day.slots.some((sl) => sl.slot_at === chosenSlot);
+                              return (
+                                <div key={day.key}>
+                                  <button
+                                    type="button"
+                                    aria-expanded={expanded}
+                                    onClick={() => {
+                                      // Collapsing a day drops a time chosen inside it —
+                                      // leaving it selected but hidden is how someone
+                                      // books a slot they can no longer see.
+                                      if (expanded) { setOpenDay(""); if (chosenHere) setChosenSlot(""); }
+                                      else setOpenDay(day.key);
+                                    }}
+                                    style={{
+                                      width: "100%",
+                                      display: "flex", alignItems: "center", justifyContent: "space-between",
+                                      gap: 10, padding: "12px 14px", borderRadius: 10, cursor: "pointer",
+                                      background: chosenHere ? T.mintSoft : "#fff",
+                                      border: `1.5px solid ${expanded || chosenHere ? T.teal : T.line}`,
+                                      color: T.text, textAlign: "left",
+                                    }}
+                                  >
+                                    <span style={{ fontSize: 13.5, fontWeight: 700 }}>{dayLabel(day.key)}</span>
+                                    <span style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                                      <span style={{ fontSize: 13, fontWeight: chosenHere ? 800 : 600, color: chosenHere ? T.teal : T.textDim }}>
+                                        {chosenHere
+                                          ? timeOnly(chosenSlot)
+                                          : `${day.slots.length} time${day.slots.length === 1 ? "" : "s"}`}
+                                      </span>
+                                      <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke={T.textMute} strokeWidth="2.6" strokeLinecap="round" strokeLinejoin="round"
+                                        style={{ transform: expanded ? "rotate(180deg)" : "none", transition: "transform .15s" }} aria-hidden>
+                                        <path d="M6 9l6 6 6-6" />
+                                      </svg>
+                                    </span>
+                                  </button>
+
+                                  {expanded && (
+                                    <div style={{ display: "flex", flexWrap: "wrap", gap: 7, padding: "9px 2px 2px" }}>
+                                      {day.slots.map((sl) => {
+                                        const on = chosenSlot === sl.slot_at;
+                                        return (
+                                          <button
+                                            key={sl.id}
+                                            type="button"
+                                            onClick={() => setChosenSlot(sl.slot_at)}
+                                            style={{
+                                              padding: "8px 13px", borderRadius: 999, cursor: "pointer",
+                                              fontSize: 13, fontWeight: on ? 800 : 600,
+                                              background: on ? T.teal : "#fff",
+                                              color: on ? "#fff" : T.textDim,
+                                              border: `1.5px solid ${on ? T.teal : T.line}`,
+                                            }}
+                                          >
+                                            {timeOnly(sl.slot_at)}
+                                          </button>
+                                        );
+                                      })}
+                                    </div>
+                                  )}
+                                </div>
+                              );
+                            })}
+                          </div>
+                          <button
+                            type="button"
+                            onClick={confirmSlot}
+                            disabled={!chosenSlot || booking}
+                            style={{
+                              width: "100%", padding: "12px", marginTop: "4px", borderRadius: "8px", border: "none", fontWeight: 700,
+                              background: chosenSlot ? T.teal : T.line,
+                              color: chosenSlot ? "white" : T.textMute,
+                              cursor: chosenSlot && !booking ? "pointer" : "not-allowed",
+                            }}
+                          >
+                            {booking ? "Booking…" : chosenSlot ? "Confirm visit" : openDay ? "Pick a time" : "Pick a day"}
+                          </button>
+                        </>
+                      ) : (
+                        <>
+                          {/* No published slots. Rather than invent times nobody
+                              agreed to, fall back to asking for one. */}
+                          <p style={{ margin: "0 0 2px", fontSize: 13, color: T.textDim, lineHeight: 1.5 }}>
+                            The lister hasn&apos;t published visit times for this home yet.
+                          </p>
+                          <button
+                            type="button"
+                            onClick={bookNextAvailable}
+                            disabled={booking}
+                            style={{
+                              width: "100%", padding: "14px", borderRadius: 10, border: "none",
+                              background: T.teal, color: "#fff", fontSize: 15, fontWeight: 700,
+                              cursor: booking ? "not-allowed" : "pointer",
+                            }}
+                          >
+                            {booking ? "Sending…" : "Book the next available slot"}
+                          </button>
+                          <p style={{ margin: "2px 0 0", fontSize: 12, color: T.textMute, lineHeight: 1.45 }}>
+                            We&apos;ll ask them to open a time and confirm it with you. Or suggest one yourself:
+                          </p>
+                          <SuggestDateTime
+                            tokens={T}
+                            value={visitForm.time}
+                            onChange={(time, timeISO) => setVisitForm({ ...visitForm, time, timeISO })}
+                          />
+                          <button
+                            type="submit"
+                            disabled={!visitForm.time}
+                            style={{
+                              width: "100%", padding: "12px", marginTop: "4px", borderRadius: "8px", border: "none", fontWeight: 700,
+                              background: visitForm.time ? T.teal : T.line,
+                              color: visitForm.time ? "white" : T.textMute,
+                              cursor: visitForm.time ? "pointer" : "not-allowed",
+                            }}
+                          >
+                            {visitForm.time ? "Request" : "Pick a time"}
+                          </button>
+                        </>
+                      )}
+                    </form>
+                  )}
 
                   {showBrokerDirectLine && brokerCallLine ? (
                     <div style={{ display: "flex", flexDirection: "column", gap: "12px", marginTop: "12px" }}>
@@ -1544,7 +1560,7 @@ export default function PropertyModal({
                 <button
                   type="button"
                   disabled={offMarket}
-                  onClick={() => { if (!offMarket) scrollTo("book"); }}
+                  onClick={() => { if (offMarket) return; if (visitRequest) visitRequest.onRequest(property); else scrollTo("book"); }}
                   style={{
                     flex: 1, padding: "15px", borderRadius: "12px", border: "none",
                     display: "flex", alignItems: "center", justifyContent: "center", gap: "10px",

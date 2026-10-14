@@ -7,6 +7,7 @@
  */
 import { Suspense, lazy, useCallback, useEffect, useMemo, useState } from "react";
 import { useSearchParams } from "react-router-dom";
+import { QrCode } from "lucide-react";
 import { useCrm } from "./CrmShell";
 import ClientRecord from "./ClientRecord";
 import MatchesPane from "./MatchesPane";
@@ -16,7 +17,7 @@ import { useClientReactions } from "./PropertyQuickView";
 const CurateScreen = lazy(() => import("./CurateScreen"));
 import {
   TEMPERATURES, createClient, fetchShortlists, markContacted,
-  saveClientRequirement, resetClientRequirement, statusLabel, tempColor, syncClientsFromSignups,
+  saveClientRequirement, resetClientRequirement, statusLabel, tempColor, syncClientsFromSignups, fetchPartnerNames,
 } from "../../lib/crmClients";
 import { formatDuration } from "../../lib/sessionSync";
 import {
@@ -199,6 +200,17 @@ function ClientFactsLine({ facts, basis }) {
   );
 }
 
+/** A tenant who came from a partner's QR poster, and whose poster. */
+function QrMark({ broker }) {
+  return (
+    <span title={`From ${broker || "a partner"}'s QR poster`} style={{ flex: "none", display: "inline-flex", alignItems: "center", gap: 3,
+      fontSize: 10, fontWeight: 700, color: "#fff", background: "#0B6E4F", borderRadius: 99, padding: "1px 6px", whiteSpace: "nowrap", maxWidth: 130,
+      overflow: "hidden", textOverflow: "ellipsis" }}>
+      <QrCode size={10} strokeWidth={2.6} /> QR{broker ? ` · ${broker}` : ""}
+    </span>
+  );
+}
+
 export default function CrmClientsPage() {
   const crm = useCrm();
   const {
@@ -207,6 +219,11 @@ export default function CrmClientsPage() {
 
   const [params, setParams] = useSearchParams();
   const selectedId = params.get("client") || "";
+
+  // Tenants from a partner's QR poster carry a QR mark with the partner's name.
+  const anyQr = useMemo(() => (clients ?? []).some((c) => c.via === "qr"), [clients]);
+  const [partnerNames, setPartnerNames] = useState(() => new Map());
+  useEffect(() => { if (anyQr) fetchPartnerNames().then(setPartnerNames, () => {}); }, [anyQr]);
 
   const [q, setQ] = useState("");
   /**
@@ -649,6 +666,7 @@ export default function CrmClientsPage() {
                   <span style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
                     {c.name || c.email || "Unnamed"}
                   </span>
+                  {c.via === "qr" && <QrMark broker={partnerNames.get(c.via_broker)} />}
                 </span>
                 <span className="crm-mute crm-num" style={{ fontSize: 11, flex: "none" }}>
                   {req?.move_in ? shortDate(req.move_in) === "—" ? req.move_in : shortDate(req.move_in) : "—"}

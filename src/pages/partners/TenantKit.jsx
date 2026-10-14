@@ -8,7 +8,7 @@ import { Link } from "react-router-dom";
 import { AlarmClock, Check, ChevronRight, Heart, Phone, Sparkles } from "lucide-react";
 import { usePartner } from "./PartnerApp";
 import { Avatar, Chip, Sheet, WhatsAppIcon, toast } from "./partnerUi";
-import { MzBadge } from "./AiMatcher";
+import { MzBadge, QrBadge } from "./AiMatcher";
 import VisitsToday from "./VisitsToday";
 import { useTenants } from "./tenantData";
 import { requirementLine } from "./leadBits";
@@ -21,7 +21,7 @@ import {
 
 export const KIT_CSS = `
 .tk-pill { display: inline-flex; align-items: center; gap: 4px; padding: 2px 8px; border-radius: 99px; font-size: 11.5px; font-weight: 700; white-space: nowrap; }
-.tk-new { background: #EEF2FF; color: #3730A3; } .tk-contacted { background: #F1F5F9; color: #334155; }
+.tk-new { background: #EEF2FF; color: #3730A3; } .tk-visitask { background: #FEF3C7; color: #92400E; } .tk-contacted { background: #F1F5F9; color: #334155; }
 .tk-list_sent { background: #FEF3C7; color: #92400E; } .tk-liked { background: #FFE4E6; color: #BE123C; }
 .tk-visit { background: #DCFCE7; color: #166534; } .tk-done { background: #166534; color: #fff; } .tk-lost { background: #F3F4F6; color: #6B7280; }
 .tk-row { display: flex; gap: 12px; align-items: flex-start; padding: 12px 14px; border-top: 1px solid var(--line); color: inherit; text-decoration: none; }
@@ -189,12 +189,15 @@ export function TenantRow({ t, onReach }) {
         <span style={{ display: "flex", alignItems: "center", gap: 6, flexWrap: "wrap" }}>
           <strong style={{ fontSize: 15.5 }}>{t.name || "Tenant"}</strong>
           {t.kind === "moveazy" && <MzBadge />}
+          {t.via === "qr" && <QrBadge />}
           <StagePill stage={t.stage} />
+          {t.qr_visits > 0 && t.stage !== "done" && t.stage !== "lost" && <span className="tk-pill tk-visitask">Wants a visit</span>}
           {t.new_actions > 0 && <span className="tk-newbadge"><Heart size={10} fill="currentColor" /> {t.new_actions} new</span>}
         </span>
-        <span className="tk-meta">{[requirementLine(t), (t.localities ?? []).slice(0, 2).join(", ")].filter(Boolean).join(" · ") || "No requirement yet"}</span>
+        <span className="tk-meta">{[requirementLine(t), (t.localities ?? []).slice(0, 2).join(", ")].filter(Boolean).join(" · ") || "No requirement yet"}{t.tentative ? " (tentative)" : ""}</span>
         <span className="tk-meta">
           {r ? <span className={overdue ? "tk-due" : ""}><AlarmClock size={11} /> {whenLabel(r.due_at)}{r.note ? ` · ${r.note}` : ""}</span>
+            : t.move_in_raw === "Immediate move-in" && t.stage !== "done" && t.stage !== "lost" ? "Immediate move-in"
             : t.move_in && t.stage !== "done" && t.stage !== "lost" ? `Moving in ${new Date(t.move_in).toLocaleDateString("en-IN", { day: "numeric", month: "short" })}`
               : t.liked ? `♥ ${t.liked} liked` : t.lists ? `${t.lists} list${t.lists === 1 ? "" : "s"} sent` : ""}
         </span>

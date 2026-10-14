@@ -6,20 +6,37 @@
  * lets a tenant like a flat — which the broker sees, with the tenant's name
  * and number, and the page says so next to the hearts — and rate the broker.
  * A heart tapped while signed out is remembered through the Google round trip.
+ *
+ * QR leads (lib/qrLeads.js, partner_qr_leads.sql): signed in with a mobile
+ * number, the tenant checks in — asked once for their location — and becomes
+ * the broker's lead, with a tentative requirement from what they looked at
+ * here. "Schedule visit" on a flat (here, or on the flat's own page opened from
+ * here, which comes back with ?visit=<id>) asks the broker for a visit and
+ * shows "you'll be contacted soon" with WhatsApp / Call / their other flats.
  */
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Link, useParams, useSearchParams } from "react-router-dom";
-import { BadgeCheck, Heart, MapPin, Phone, Star } from "lucide-react";
+import { BadgeCheck, CalendarCheck, CheckCircle2, Heart, LocateFixed, MapPin, Phone, Star } from "lucide-react";
 import { useAuth } from "../context/AuthContext";
 import { SmartListingImage } from "./partners/partnerMedia";
 import { WhatsAppIcon } from "./partners/partnerUi";
 import { inr, telLink, waLink } from "../lib/partners";
 import { fetchStorefront, likeStorefrontHome, rateStorefront, recordStorefrontView, storefrontDisplay } from "../lib/storefront";
 import { formatMobile } from "../lib/qrPoster";
+import { checkinStorefront, currentPosition, noteBrowse, readBrowse, requestStorefrontVisit, visitMessage } from "../lib/qrLeads";
 import logoOnDark from "../assets/logo/moveazy-logo-mint-dark.png";
 import logoOnLight from "../assets/logo/moveazy-logo-mint-light.png";
 
 const PENDING_KEY = "mz_storefront_pending";
+const FROM_KEY = (code) => `mz_qr_from:${code}`;
+const LOC_KEY = (code) => `mz_qr_loc:${code}`;
+const sGet = (k) => { try { return sessionStorage.getItem(k); } catch { return null; } };
+const sSet = (k, v) => { try { sessionStorage.setItem(k, v); } catch { /* private tab */ } };
+
+/** Location already allowed for this site: read it without asking again. */
+async function locationGranted() {
+  try { return (await navigator.permissions?.query({ name: "geolocation" }))?.state === "granted"; } catch { return false; }
+}
 
 const firstName = (n) => String(n || "").trim().split(/\s+/)[0] || "The broker";
 const initials = (n) => String(n || "").trim().split(/\s+/).slice(0, 2).map((w) => w[0] || "").join("").toUpperCase() || "M";
@@ -46,6 +63,21 @@ export default function Storefront() {
   const [note, setNote] = useState("");
   const counted = useRef(false);
   const uid = user?.id || "";
+  const hasPhone = Boolean(String(user?.phone || "").trim());
+  const [visitDone, setVisitDone] = useState(null); // the thank-you page: { broker, home }
+  const [locAsk, setLocAsk] = useState(false);
+  const [requested, setRequested] = useState(() => new Set(readBrowse(code).visits));
+  const locAnswer = useRef(null);
+  const queue = useRef(null); // a flat to ask a visit for, once signed in with a number
+  const checked = useRef(false);
+  const running = useRef(false);
+
+  // Where they came from (the QR, which poster spot) outlives the Google round trip.
+  const [from] = useState(() => {
+    const s = params.get("s"), p = params.get("p");
+    if (s || p) { sSet(FROM_KEY(code), JSON.stringify({ s: s || "", p: p || "" })); return { s: s || "", p: p || "" }; }
+    try { return JSON.parse(sGet(FROM_KEY(code)) || "null") || { s: "", p: "" }; } catch { return { s: "", p: "" }; }
+  });
 
   const noteTimer = useRef(0);
   const say = useCallback((t) => {
@@ -81,10 +113,11 @@ export default function Storefront() {
         counted.current = true;
         recordStorefrontView(code, params.get("s"), params.get("p"));
       }
-      // A heart or rating tapped before signing in, finished now.
+      // A heart, rating or visit tapped before signing in, finished now.
       const pending = uid ? readPending(code) : null;
       if (pending) {
         try { sessionStorage.removeItem(PENDING_KEY); } catch { /* ignore */ }
+        if (pending.visit) queue.current = pending.visit;
         try {
           if (pending.like) {
             await likeStorefrontHome(code, pending.like, true);
@@ -117,7 +150,11 @@ export default function Storefront() {
     setLiked((s) => { const n = new Set(s); if (on) n.add(pid); else n.delete(pid); return n; });
     try {
       await likeStorefrontHome(code, pid, on);
-      if (on) say(`Liked. ${firstName(data?.broker?.name)} will reach out.`);
+      if (on) {
+        say(`Liked. ${firstName(data?.broker?.name)} will reach out.`);
+        const browse = noteBrowse(code, "opened", pid);
+        if (hasPhone) checkinStorefront(code, { spot: from.p, source: from.s, browse }).catch(() => {});
+      }
     } catch (e) {
       setLiked((s) => { const n = new Set(s); if (on) n.delete(pid); else n.add(pid); return n; });
       say(e?.message || "Could not save that. Please try again.");
@@ -136,6 +173,75 @@ export default function Storefront() {
       setMyRating(before);
       say(e?.message || "Could not save your rating.");
     }
+  };
+
+  /** Asks once (this tab) before the browser's own location prompt. → { lat, lng, accuracy } or null */
+  const askLocation = useCallback(async () => {
+    if (sGet(LOC_KEY(code))) return (await locationGranted()) ? currentPosition() : null;
+    sSet(LOC_KEY(code), "1");
+    if (await locationGranted()) return currentPosition();
+    setLocAsk(true);
+    return new Promise((resolve) => { locAnswer.current = resolve; });
+  }, [code]);
+  const answerLocation = async (allow) => {
+    setLocAsk(false);
+    const done = locAnswer.current;
+    locAnswer.current = null;
+    done?.(allow ? await currentPosition() : null);
+  };
+
+  const sendVisit = useCallback(async (pid) => {
+    const browse = noteBrowse(code, "visits", pid);
+    try {
+      const r = await requestStorefrontVisit(code, pid, browse);
+      setRequested(new Set(browse.visits));
+      setVisitDone(r);
+      window.scrollTo(0, 0);
+    } catch (e) {
+      say(e?.message || "That didn't go through. Please try again.");
+    }
+  }, [code, say]);
+
+  // Signed in with a number: check in once (their lead), then any visit waiting.
+  const ready = Boolean(data && !data.is_mine && uid && hasPhone);
+  const pump = useCallback(async () => {
+    if (!ready || running.current) return;
+    running.current = true;
+    try {
+      if (!checked.current) {
+        checked.current = true;
+        const position = await askLocation();
+        await checkinStorefront(code, { spot: from.p, source: from.s, position, browse: readBrowse(code) }).catch(() => {});
+      }
+      while (queue.current) {
+        const pid = queue.current;
+        queue.current = null;
+        await sendVisit(pid);
+      }
+    } finally {
+      running.current = false;
+    }
+  }, [ready, askLocation, code, from, sendVisit]);
+  useEffect(() => { pump(); }, [pump]);
+
+  // Back from a flat's own page with "Schedule visit" tapped there.
+  const visitParam = params.get("visit") || "";
+  const visitParamDone = useRef(false);
+  useEffect(() => {
+    if (!visitParam || visitParamDone.current || authLoading || !data) return;
+    visitParamDone.current = true;
+    window.history.replaceState(null, "", window.location.pathname);
+    if (data.is_mine) return;
+    if (!uid) signInFor({ visit: visitParam });
+    else { queue.current = visitParam; pump(); }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [visitParam, authLoading, data]);
+
+  const scheduleVisit = (pid) => {
+    if (!uid) { signInFor({ visit: pid }); return; }
+    queue.current = pid;
+    if (!hasPhone) return; // the mobile-number screen is up; the visit goes once it's saved
+    pump();
   };
 
   const homes = useMemo(() => data?.homes ?? [], [data]);
@@ -195,11 +301,13 @@ export default function Storefront() {
       </header>
 
       <main className="sf-col sf-main">
-        {homes.length > 0 ? (
+        {visitDone ? (
+          <VisitRequested result={visitDone} fallbackPhone={b.phone} onBack={() => { setVisitDone(null); window.scrollTo(0, 0); }} />
+        ) : homes.length > 0 ? (
           <>
             <div className="sf-chips" role="tablist" aria-label="Filter by size">
               {[["all", `All ${homes.length}`], ...types.map((t) => [t, t])].map(([v, l]) => (
-                <button key={v} type="button" role="tab" aria-selected={filter === v} className={`sf-chip${filter === v ? " on" : ""}`} onClick={() => setFilter(v)}>{l}</button>
+                <button key={v} type="button" role="tab" aria-selected={filter === v} className={`sf-chip${filter === v ? " on" : ""}`} onClick={() => { setFilter(v); noteBrowse(code, "filters", v); }}>{l}</button>
               ))}
             </div>
             <p className="sf-disclose"><Heart size={13} fill="#E11D48" color="#E11D48" /> Like a home and {firstName(b.name)} sees your name and number, so they can call you.</p>
@@ -208,17 +316,22 @@ export default function Storefront() {
                 const on = liked.has(h.property_id);
                 return (
                   <article key={h.property_id} className="sf-card">
-                    <Link to={`/property/${h.property_id}`} className="sf-img" aria-label={`${h.flat_type || "Home"} in ${h.area || "Bengaluru"}`}>
+                    <Link to={`/property/${h.property_id}?sf=${code}`} onClick={() => noteBrowse(code, "opened", h.property_id)} className="sf-img" aria-label={`${h.flat_type || "Home"} in ${h.area || "Bengaluru"}`}>
                       <SmartListingImage listing={h} />
                     </Link>
                     <button type="button" className={`sf-heart${on ? " on" : ""}`} aria-pressed={on} aria-label={on ? "Unlike" : "Like"} onClick={() => toggleLike(h.property_id)}>
                       <Heart size={19} fill={on ? "#E11D48" : "none"} color={on ? "#E11D48" : "#111827"} />
                     </button>
-                    <Link to={`/property/${h.property_id}`} className="sf-body">
+                    <Link to={`/property/${h.property_id}?sf=${code}`} onClick={() => noteBrowse(code, "opened", h.property_id)} className="sf-body">
                       <div className="sf-rent">{inr(h.rent)} <small>/ month</small></div>
                       <div className="sf-line">{[h.flat_type, h.area].filter(Boolean).join(" · ")}</div>
                       <div className="sf-meta">{[h.furnishing, h.property_type].filter(Boolean).join(" · ")}</div>
                     </Link>
+                    {!data.is_mine && (
+                      <button type="button" className={`sf-visit${requested.has(h.property_id) ? " on" : ""}`} onClick={() => scheduleVisit(h.property_id)}>
+                        {requested.has(h.property_id) ? <><CheckCircle2 size={17} /> Visit requested</> : <><CalendarCheck size={17} /> Schedule visit</>}
+                      </button>
+                    )}
                   </article>
                 );
               })}
@@ -253,7 +366,45 @@ export default function Storefront() {
       </main>
 
       {note && <div className="sf-toast" role="status">{note}</div>}
+      {locAsk && (
+        <div className="sf-sheet-bg" role="presentation">
+          <div className="sf-sheet" role="dialog" aria-modal="true" aria-label="Share your location">
+            <span className="sf-sheet-icon" aria-hidden><LocateFixed size={26} /></span>
+            <h2>Find homes near you</h2>
+            <p>Share where you are so {firstName(b.name)} can suggest flats close by. It&apos;s only used to find you nearby homes.</p>
+            <button type="button" className="sf-btn sf-btn--deep" onClick={() => answerLocation(true)}>Allow location</button>
+            <button type="button" className="sf-btn sf-btn--plain" onClick={() => answerLocation(false)}>Not now</button>
+          </div>
+        </div>
+      )}
     </div>
+  );
+}
+
+/** "You'll be contacted soon" — after asking for a visit. */
+function VisitRequested({ result, fallbackPhone, onBack }) {
+  const broker = result?.broker || {};
+  const home = result?.home || {};
+  const phone = broker.phone || fallbackPhone;
+  const first = firstName(broker.name);
+  const flat = [home.flat_type, home.area].filter(Boolean).join(" in ");
+  return (
+    <section className="sf-done" aria-live="polite">
+      <span className="sf-done-icon" aria-hidden><CheckCircle2 size={34} /></span>
+      <h2>Visit requested</h2>
+      <p>
+        {first} will contact you soon to fix a time{flat ? <> for the <b>{flat}</b>{Number(home.rent) > 0 ? <> · {inr(home.rent)}/month</> : null}</> : null}.
+      </p>
+      {phone && (
+        <div className="sf-done-actions">
+          <a className="sf-btn sf-btn--wa" href={waLink(phone, visitMessage(broker.name, home, inr))} target="_blank" rel="noreferrer">
+            <WhatsAppIcon /> WhatsApp {first} about this flat
+          </a>
+          <a className="sf-btn sf-btn--line" href={telLink(phone)}><Phone size={17} /> Call {formatMobile(phone)}</a>
+        </div>
+      )}
+      <button type="button" className="sf-btn sf-btn--plain" onClick={onBack}>See {first}&apos;s other flats</button>
+    </section>
   );
 }
 
@@ -314,6 +465,23 @@ const CSS = `
 .sf-missing { min-height: 100dvh; display: flex; flex-direction: column; justify-content: center; align-items: flex-start; }
 .sf-missing h1 { font-size: 30px; margin: 22px 0 6px; letter-spacing: -0.02em; }
 .sf-missing p { color: var(--dim); margin: 0; }
+.sf-visit { display: flex; width: calc(100% - 28px); margin: 0 14px 14px; align-items: center; justify-content: center; gap: 8px; min-height: 46px;
+  border-radius: 12px; border: 0; background: var(--deep); color: #fff; font: inherit; font-size: 15px; font-weight: 800; cursor: pointer; }
+.sf-visit.on { background: #E7F3EC; color: var(--deep); }
+.sf-btn--deep { background: var(--deep); color: #fff; width: 100%; }
+.sf-btn--plain { background: transparent; color: var(--deep); width: 100%; }
+.sf-btn--line { background: #fff; color: var(--ink); border-color: var(--line); }
+.sf-done { background: #fff; border: 1px solid var(--line); border-radius: 18px; padding: 26px 18px 14px; text-align: center; }
+.sf-done-icon { display: inline-grid; place-items: center; width: 62px; height: 62px; border-radius: 99px; background: #E7F3EC; color: #15803D; }
+.sf-done h2 { margin: 12px 0 4px; font-size: 22px; font-weight: 800; letter-spacing: -0.01em; }
+.sf-done p { margin: 0 auto; max-width: 420px; color: var(--dim); font-size: 15px; line-height: 1.5; }
+.sf-done p b { color: var(--ink); }
+.sf-done-actions { display: grid; gap: 10px; margin: 18px 0 6px; }
+.sf-sheet-bg { position: fixed; inset: 0; z-index: 60; background: rgba(5,36,26,.55); display: flex; align-items: flex-end; justify-content: center; }
+.sf-sheet { width: 100%; max-width: 480px; background: #fff; border-radius: 22px 22px 0 0; padding: 22px 18px calc(16px + env(safe-area-inset-bottom)); text-align: center; }
+.sf-sheet-icon { display: inline-grid; place-items: center; width: 56px; height: 56px; border-radius: 99px; background: #E7F3EC; color: var(--deep); }
+.sf-sheet h2 { margin: 10px 0 4px; font-size: 20px; font-weight: 800; }
+.sf-sheet p { margin: 0 0 16px; color: var(--dim); font-size: 14.5px; line-height: 1.5; }
 .sf-toast { position: fixed; left: 50%; bottom: calc(20px + env(safe-area-inset-bottom)); transform: translateX(-50%); background: var(--ink); color: #fff;
   padding: 12px 16px; border-radius: 14px; font-size: 14px; font-weight: 700; box-shadow: 0 14px 30px rgba(0,0,0,.25); z-index: 50; max-width: calc(100% - 32px); }
 `;
