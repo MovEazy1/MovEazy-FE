@@ -47,8 +47,9 @@ export default function RequirePhoneModal() {
   const partnerPending = (isPartnerHost() || pathname.startsWith("/partners")) && Boolean(pendingSignupPhone());
   // The same for MovEazy Society: the number typed on its login screen is saved by its gate.
   const societyPending = (isSocietyHost() || pathname.startsWith("/society")) && Boolean(pendingSocietyPhone());
+  // A profile that couldn't be read (AuthContext's profileUnread) says nothing about the number.
   const needsPhone =
-    !loading && !!user?.uid && !String(user.phone || "").trim() && !pathname.startsWith("/auth") && !partnerPending && !societyPending;
+    !loading && !!user?.uid && !user.profileUnread && !String(user.phone || "").trim() && !pathname.startsWith("/auth") && !partnerPending && !societyPending;
 
   // The modal owns the scroll lock while it's up, so the page behind can't be
   // scrolled past a gate the visitor can't dismiss.

@@ -7,8 +7,33 @@ const anonKey =
 
 export const isSupabaseConfigured = Boolean(url && anonKey);
 
+/**
+ * A request the server turned away with "JWT expired" is refreshed and sent
+ * once more. The client only sends a token its own clock says is still good,
+ * so this happens when that clock runs behind the server's, or when a laptop
+ * wakes with an old token: the visitor used to see "JWT expired" on whatever
+ * they were saving, and a failed profile read put up the phone gate for a
+ * number that was already saved.
+ */
+let refreshing = null;
+export async function fetchRefreshingExpired(input, init) {
+  const res = await fetch(input, init);
+  // Auth's own calls are left alone: they run inside its lock, which a refresh would wait on.
+  if (res.status !== 401 || !supabase || String(input?.url ?? input).includes("/auth/v1/")) return res;
+  let body = "";
+  try { body = await res.clone().text(); } catch { return res; }
+  if (!/jwt expired/i.test(body)) return res;
+  refreshing ||= supabase.auth.refreshSession().finally(() => { refreshing = null; });
+  const token = (await refreshing.catch(() => null))?.data?.session?.access_token;
+  if (!token) return res;
+  const headers = new Headers(init?.headers);
+  headers.set("Authorization", `Bearer ${token}`);
+  return fetch(input, { ...init, headers });
+}
+
 export const supabase = isSupabaseConfigured
   ? createClient(url, anonKey, {
+      global: { fetch: fetchRefreshingExpired },
       auth: {
         persistSession: true,
         autoRefreshToken: true,

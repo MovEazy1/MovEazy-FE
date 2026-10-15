@@ -276,12 +276,18 @@ export function AuthProvider({ children }) {
       cacheSessionUser(u);
       if (u.role === "admin") loadPendingSellerBadgeApplications();
     } catch {
-      const fallback = buildUserFromSupabase(sbUser);
+      // The profile couldn't be read (offline, or a token the server turned
+      // away). What this device last knew of them stands; failing that, a
+      // stand-in from the sign-in itself, marked unread so nothing — the phone
+      // gate above all — takes its missing number as "they have none". Neither
+      // is written back, so the next page load reads the real profile.
+      const known = getCachedSessionUser();
+      if (known?.uid === sbUser.id) { setUser(known); return; }
+      const fallback = { ...buildUserFromSupabase(sbUser), profileUnread: true };
       const allowed = await isEmailAdminAllowed(fallback.email).catch(() => false);
       setAdminAllowed(allowed);
       if (allowed) fallback.role = "admin";
       setUser(fallback);
-      cacheSessionUser(fallback);
     }
   };
 
