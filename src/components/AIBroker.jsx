@@ -20,7 +20,7 @@ import { useAuth } from "../context/AuthContext";
 import { saveUserRequirement, fetchUserRequirement, rowToPrefs } from "../lib/userRequirements";
 import { leadSnapshot, loadLead, saveLead } from "../lib/leadIntake";
 import { useLoginModal } from "../context/LoginModalContext";
-import { LOCALITIES, ALL_LOCALITIES, FLAT_TYPES, OFFICE_CHIPS, PRIORITIES, reconcilePriority } from "../data/preferenceOptions";
+import { ABOUT_ME, LOCALITIES, ALL_LOCALITIES, FLAT_TYPES, OFFICE_CHIPS, PRIORITIES, cleanAboutMe, reconcilePriority } from "../data/preferenceOptions";
 import MovEazyLogo from "./branding/MovEAZYLogo";
 
 // MovEazy's own palette (ink + mint), the same pairing used on the nav/hero —
@@ -129,6 +129,10 @@ const STEPS = [
   // a conversation rather than a form — and because a lead in the CRM with a
   // number but no name is a cold call.
   { id: "name", type: "text", q: "First up — what should we call you?", sub: "So our team knows who they're helping.", placeholder: "Your name", max: 60 },
+  // Straight after their name (and the number they gave before starting): what
+  // matters most shapes everything we show them, so it comes before the details.
+  { id: "priority", type: "rank", q: "Stack your priority",
+    sub: "The most important question for our ML model to figure out the right flat. Drag to reorder, with your top priority at the top." },
   { id: "profile", type: "choice", scalar: true, required: true, options: PROFILE_OPTIONS,
     q: "What best describes you?", sub: "It changes what we look for, and how quickly." },
   // `when` is what makes this one conditional; see stepsFor() below.
@@ -145,8 +149,6 @@ const STEPS = [
   { id: "flatTypes", type: "cards", single: false, q: "What type of home are you looking for?", sub: "Select all that work for you.", options: FLAT_TYPE_CARDS },
   { id: "moveInDate", type: "cards", single: true, scalar: true, q: "When are you looking to move in?", sub: "This helps us prioritize the right homes for you.", options: MOVE_IN_OPTIONS },
   { id: "budget", type: "budget", q: "Enter the maximum budget", sub: "Drag to set the most you'd like to pay per month." },
-  { id: "priority", type: "rank", q: "Stack your priority",
-    sub: "The most important question for our ML model to figure out the right flat. Drag to reorder, with your top priority at the top." },
 ];
 
 /**
@@ -171,7 +173,7 @@ function stepsFor(prefs) {
  */
 function restore(prefs) {
   const p = prefs && typeof prefs === "object" ? prefs : {};
-  return { ...p, priority: reconcilePriority(p.priority) };
+  return { ...p, priority: reconcilePriority(p.priority), aboutMe: cleanAboutMe(p.aboutMe) };
 }
 
 const emptyPrefs = () => ({
@@ -192,6 +194,7 @@ const emptyPrefs = () => ({
   stretch: true,
   mustHaves: [], lifestyle: [], dealBreakers: [],
   priority: [...PRIORITIES],
+  aboutMe: [],
   notes: {},
 });
 
@@ -262,7 +265,14 @@ export default function AIBroker({ open, onClose, startFresh = false }) {
       if (!alive) return;
       if (lead.prefs) setPrefs((p) => ({ ...p, ...restore(lead.prefs) }));
       if (lead.name) setPrefs((p) => ({ ...p, name: lead.name }));
-      if (!startFresh && lead.step > 0 && !lead.completed) setStepIdx(Math.min(lead.step, stepsFor({ ...emptyPrefs(), ...(lead.prefs || {}) }).length - 1));
+      if (!startFresh && lead.step > 0 && !lead.completed) {
+        const resumed = stepsFor({ ...emptyPrefs(), ...(lead.prefs || {}) });
+        // The ranking used to be the last question. Someone part-way through
+        // from before it moved up hasn't ranked yet: resume them there, not past it.
+        const rankAt = resumed.findIndex((s) => s.id === "priority");
+        const at = Math.min(lead.step, resumed.length - 1);
+        setStepIdx(lead.prefs?.priorityAsked ? at : Math.min(at, rankAt));
+      }
     })();
 
     return () => { alive = false; };
@@ -356,10 +366,12 @@ export default function AIBroker({ open, onClose, startFresh = false }) {
   const advance = () => {
     // Leaving the flat-type step for the first time: seed the budget range
     // from whatever's still selected there, biggest type wins.
-    const seeded = step.id === "flatTypes"
+    let seeded = step.id === "flatTypes"
       ? { ...prefs, ...computeBudgetDefaults(prefs.flatTypes) }
       : prefs;
-    if (step.id === "flatTypes") setPrefs(seeded);
+    // Past the ranking: remembered, so a resumed lead is never sent around it.
+    if (step.id === "priority" && !prefs.priorityAsked) seeded = { ...seeded, priorityAsked: true };
+    if (seeded !== prefs) setPrefs(seeded);
 
     if (idx + 1 >= steps.length) {
       finish(seeded);
@@ -608,14 +620,24 @@ function StepBody({ step, prefs, set, toggle, selectCard }) {
     );
   }
   if (step.type === "rank") {
+    const about = prefs.aboutMe || [];
+    const toggle = (o) => set({ aboutMe: cleanAboutMe(about.includes(o) ? about.filter((x) => x !== o) : [...about, o]) });
     return (
-      // "Budget Deals" shows the number they actually set, so the row reads as
-      // their budget rather than an abstraction. The label is swapped back on
-      // reorder, because the stored string is what gets scored against.
-      <RankList
-        items={prefs.priority.map((p) => (p === "Budget Deals" ? `Budget Deals — under ${fmtINR(prefs.budgetMax)}` : p))}
-        onReorder={(labels) => set({ priority: labels.map((l) => (l.startsWith("Budget Deals") ? "Budget Deals" : l)) })}
-      />
+      // Plain "Budget Deals": this comes before the budget question now, so
+      // there is no amount of theirs to show yet.
+      <>
+        <RankList items={prefs.priority} onReorder={(labels) => set({ priority: labels })} />
+        <div className="brk-about">
+          <div className="brk-about-h">Anything else? Tick what applies to you</div>
+          {ABOUT_ME.map((o) => (
+            <label key={o} className="brk-check">
+              <input type="checkbox" checked={about.includes(o)} onChange={() => toggle(o)} />
+              <span className="brk-check-box" aria-hidden="true">{about.includes(o) && <Check size={12} strokeWidth={3} />}</span>
+              <span className="brk-check-label">{o}</span>
+            </label>
+          ))}
+        </div>
+      </>
     );
   }
   return null;
@@ -1075,6 +1097,10 @@ function Styles() {
       .brk-check-box { flex:none; width:19px; height:19px; border-radius:6px; border:1.5px solid ${B.line};
         background:#fff; display:flex; align-items:center; justify-content:center; color:#fff; margin-top:1px; }
       .brk-check input:checked ~ .brk-check-box { background:${B.accent}; border-color:${B.accent}; }
+      /* the "Anything else?" ticks under the priority ranking: two to a row */
+      .brk-about { margin-top:22px; display:grid; grid-template-columns:1fr 1fr; gap:8px; }
+      .brk-about-h { grid-column:1 / -1; font-size:14px; font-weight:700; color:${B.ink}; }
+      .brk-about .brk-check { margin-top:0; align-items:center; }
       .brk-check input:focus-visible ~ .brk-check-box { outline:2px solid ${B.accent}; outline-offset:2px; }
       .brk-check-label { font-size:13.5px; line-height:1.45; color:${B.ink}; font-weight:600; }
 

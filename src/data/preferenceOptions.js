@@ -72,6 +72,16 @@ export const PRIORITIES = [
 ];
 
 /**
+ * Ticked under the ranking ("Anything else?"), not ranked: facts about the
+ * tenant that decide which flats will have them. Stored verbatim in
+ * user_requirements.notes.aboutMe; the CRM shows them on the client.
+ */
+export const ABOUT_ME = ["I have a cat", "I have a dog", "I have a car", "I have a bike"];
+
+/** Only the offered ticks, each once, in the offered order. */
+export const cleanAboutMe = (list) => ABOUT_ME.filter((o) => Array.isArray(list) && list.includes(o));
+
+/**
  * Earlier wording, kept so a saved ranking survives the rename.
  *
  * Someone who ranked these last month has their order stored as the old

@@ -1,5 +1,5 @@
 import { supabase, isSupabaseConfigured } from "./supabase";
-import { reconcilePriority } from "../data/preferenceOptions";
+import { cleanAboutMe, reconcilePriority } from "../data/preferenceOptions";
 
 /**
  * Per-user requirement profile — the demand side, one row per user_id in the
@@ -53,6 +53,8 @@ export function prefsToRow(prefs, user, extra = {}) {
       // the CRM can group on them; neither has a column of its own.
       profile: p.profile || "",
       moveReason: p.moveReason || "",
+      // The "Anything else?" ticks under the ranking: a pet, a car, a bike.
+      aboutMe: cleanAboutMe(p.aboutMe),
       ...(String(p.name || "").trim() ? { name: String(p.name).trim().slice(0, 60) } : {}),
     },
     updated_at: new Date().toISOString(),
@@ -70,6 +72,7 @@ export function rowToPrefs(row) {
     name: row.notes?.name || "",
     profile: row.notes?.profile || "",
     moveReason: row.notes?.moveReason || "",
+    aboutMe: cleanAboutMe(row.notes?.aboutMe),
     // Defaults to true for rows saved before the question existed, matching
     // the checkbox's own default rather than silently narrowing their search.
     commuteFlexible: row.notes?.commuteFlexible !== false,

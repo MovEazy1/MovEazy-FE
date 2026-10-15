@@ -235,6 +235,7 @@ function WhatTheyToldUs({ ownAnswers }) {
     ["Lifestyle", (ownAnswers.lifestyle ?? []).join(", ")],
     ["Deal breakers", (ownAnswers.deal_breakers ?? []).join(", ")],
     ["Priority", (ownAnswers.priority ?? []).join(", ")],
+    ["Also told us", (Array.isArray(notes.aboutMe) ? notes.aboutMe : []).join(", ")],
   ].filter(([, v]) => v);
 
   if (!rows.length) return null;
