@@ -63,8 +63,18 @@ async function fetchInventory() {
 
   // Through inventory_full(): the poster's contact columns aren't readable off
   // the table by a signed-in account, staff included (lib/inventory.js).
-  const run = (c) =>
-    supabase.rpc("inventory_full").select(c).order("created_at", { ascending: false }).limit(3000);
+  // A page at a time, up to 3,000 flats: the API returns at most 1,000 rows per request.
+  const run = async (c) => {
+    const rows = [];
+    while (rows.length < 3000) {
+      const { data, error } = await supabase.rpc("inventory_full").select(c)
+        .order("created_at", { ascending: false }).order("property_id").range(rows.length, Math.min(rows.length + 1000, 3000) - 1);
+      if (error) return { data: rows.length ? rows : null, error: rows.length ? null : error };
+      if (!data?.length) break;
+      rows.push(...data);
+    }
+    return { data: rows, error: null };
+  };
 
   let { data, error } = await run(cols);
   if (error && isMissingColumn(error)) {

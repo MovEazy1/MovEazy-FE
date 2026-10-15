@@ -669,6 +669,9 @@ export default function ClientRecord({
     setBusy(true);
     try {
       onPatch(await setClientStatus(client, status, { actorEmail, ...extra }));
+      // setClientStatus logged a staff "status" activity; fold it in so the
+      // client leaves Fresh now, not after the next reload.
+      onContactLogged(client.id, "status");
       setPendingClose(null);
       refreshActivities();
     } catch (e) {

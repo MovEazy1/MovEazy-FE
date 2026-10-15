@@ -208,7 +208,10 @@ export function summariseClients(clients = [], sources = {}, now = Date.now()) {
  */
 export function bucketOf(summary) {
   if (!summary) return "no_number";
-  if (summary.contacted) return "contacted";
+  // A closed client is never a fresh lead, whatever the activity shows: an
+  // imported closed deal, or one closed a moment ago, may carry no contact yet.
+  // They sit under Contacted's "Closed" filter.
+  if (summary.contacted || summary.closed) return "contacted";
   if (summary.hasPhone) return "fresh";
   return "no_number";
 }

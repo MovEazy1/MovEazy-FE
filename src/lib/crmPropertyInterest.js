@@ -43,9 +43,15 @@ export const SIGNAL_LABEL = {
 export async function fetchPropertyInterest() {
   if (!isSupabaseConfigured || !supabase) return [];
   try {
-    const { data, error } = await supabase.rpc("crm_client_property_interest");
-    if (error) return [];
-    return data ?? [];
+    // A page at a time: the API returns at most 1,000 rows per request.
+    const out = [];
+    for (;;) {
+      const { data, error } = await supabase.rpc("crm_client_property_interest")
+        .order("client_id").order("property_id").order("at").range(out.length, out.length + 999);
+      if (error) return out;
+      if (!data?.length) return out;
+      out.push(...data);
+    }
   } catch {
     return [];
   }

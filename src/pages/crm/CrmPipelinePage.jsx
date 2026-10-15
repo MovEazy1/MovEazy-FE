@@ -109,6 +109,11 @@ export default function CrmPipelinePage() {
       }
       try {
         crm.patchClient(await setClientStatus(client, status, { actorEmail: access.email }));
+        // The staff "status" activity it logged, so the Clients tabs re-sort without a reload.
+        crm.setData((d) => ({
+          ...d,
+          touches: [{ client_id: client.id, actor_email: access.email, type: "status", created_at: new Date().toISOString() }, ...(d.touches ?? [])],
+        }));
       } catch (e) {
         showToast(e?.message || "Could not move the card", "error");
       }

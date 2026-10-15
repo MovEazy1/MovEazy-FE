@@ -42,6 +42,16 @@ describe("which tab a client is in", () => {
     }
   });
 
+  it("a closed client is never a fresh lead, even with no contact on record", () => {
+    // Closed a moment ago (its status activity not loaded yet), or imported as closed.
+    for (const status of ["closed_by_us", "closed_outside"]) {
+      const s = one(client({ status }));
+      expect(bucketOf(s), status).toBe("contacted");
+      expect(s.closed).toBe(true);
+    }
+    expect(bucketOf(one(client({ status: "closed_by_us", phone: "" })))).toBe("contacted");
+  });
+
   it("a note, a temperature or a system entry is not contact", () => {
     for (const type of ["note", "temperature", "system"]) {
       const s = one(client(), { activities: [{ client_id: "c1", actor_email: STAFF, type, created_at: hoursAgo(1) }] });

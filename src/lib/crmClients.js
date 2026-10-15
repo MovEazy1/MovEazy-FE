@@ -38,6 +38,31 @@ export const tempLabel = (id) => TEMPERATURES.find((t) => t.id === id)?.label ??
 
 /* ── Reads ────────────────────────────────────────────────────────────────── */
 
+/**
+ * Every row, a page at a time. The API hands back at most 1,000 rows per
+ * request whatever .limit() asks for, so one request quietly drops the rest:
+ * past 1,000 activities, older calls fell off and contacted leads slid back
+ * under Fresh. Pages are read in order until one comes back empty or `max`.
+ */
+async function safeSelectAll(table, columns, shape = (q) => q, max = 20000) {
+  if (!isSupabaseConfigured || !supabase) return [];
+  const out = [];
+  try {
+    while (out.length < max) {
+      const { data, error } = await shape(supabase.from(table).select(columns)).range(out.length, Math.min(out.length + 1000, max) - 1);
+      if (error) {
+        console.warn(`[crm] ${table}: ${error.message}`);
+        return out;
+      }
+      if (!data?.length) break;
+      out.push(...data);
+    }
+  } catch (e) {
+    console.warn(`[crm] ${table} threw: ${e?.message}`);
+  }
+  return out;
+}
+
 async function safeSelect(table, columns, shape = (q) => q) {
   if (!isSupabaseConfigured || !supabase) return [];
   try {
@@ -54,7 +79,7 @@ async function safeSelect(table, columns, shape = (q) => q) {
 }
 
 export const fetchClients = () =>
-  safeSelect(
+  safeSelectAll(
     "crm_clients",
     "id,user_id,name,phone,email,source,status,temperature,note,note_by,note_at,dnp_count," +
       "assigned_to,next_follow_up_at,tags,closed_property_id,closed_rent,closed_reason,closed_at," +
@@ -64,7 +89,7 @@ export const fetchClients = () =>
     // partner_qr_leads.sql), which both MovEazy and the broker follow up. Any
     // other number that first came through a partner broker is theirs
     // (crm_clients.attributed_to) and lives under Broker leads only.
-    (q) => q.or("attributed_to.eq.moveazy,via.eq.qr").order("updated_at", { ascending: false }).limit(4000),
+    (q) => q.or("attributed_to.eq.moveazy,via.eq.qr").order("updated_at", { ascending: false }).order("id"),
   );
 
 /** user_id → partner name, for the QR mark on clients from a partner's poster. */
@@ -75,13 +100,14 @@ export async function fetchPartnerNames() {
 }
 
 export const fetchClientRequirements = () =>
-  safeSelect(
+  safeSelectAll(
     "crm_client_requirements",
     "client_id,localities,budget_min,budget_max,flat_types,furnishing,must_haves,deal_breakers,occupants,move_in,min_score,updated_by,updated_at",
+    (q) => q.order("client_id"),
   );
 
 export const fetchEngagement = () =>
-  safeSelect("user_engagement", "user_id,session_count,total_seconds,longest_seconds,last_seen_at");
+  safeSelectAll("user_engagement", "user_id,session_count,total_seconds,longest_seconds,last_seen_at", (q) => q.order("user_id"));
 
 /**
  * Every answer the client gave themselves in the "Find My Flat" wizard, read
@@ -92,7 +118,7 @@ export const fetchEngagement = () =>
  * columns did, so there's no reason to keep trimming it as more of the
  * wizard's answers become worth showing.
  */
-export const fetchClientOwnAnswers = () => safeSelect("user_requirements", "*");
+export const fetchClientOwnAnswers = () => safeSelectAll("user_requirements", "*", (q) => q.order("user_id"));
 
 /**
  * Every property a client has swiped on themselves — from the first five
@@ -104,11 +130,11 @@ export const fetchClientListingReactions = (userId) =>
   safeSelect("listing_reactions", "property_id,reaction,updated_at", (q) => q.eq("user_id", userId));
 
 export const fetchShortlists = () =>
-  safeSelect(
+  safeSelectAll(
     "crm_shortlists",
     "id,client_id,property_id,status,score_at_share,shared_by,shared_at,created_at,"
       + "share_token,opened_at,last_opened_at,open_count,curated_share_id,reacted_at",
-    (q) => q.order("created_at", { ascending: false }).limit(6000),
+    (q) => q.order("created_at", { ascending: false }).order("id"),
   );
 
 export const fetchActivities = (clientId) =>
@@ -124,8 +150,8 @@ export const fetchActivities = (clientId) =>
  * reaching out. The Fresh / Contacted tabs are built from exactly that split.
  */
 export const fetchLastTouch = () =>
-  safeSelect("crm_activities", "client_id,actor_email,type,created_at", (q) =>
-    q.order("created_at", { ascending: false }).limit(8000),
+  safeSelectAll("crm_activities", "client_id,actor_email,type,created_at", (q) =>
+    q.order("created_at", { ascending: false }).order("id"),
   );
 
 /**
@@ -134,8 +160,8 @@ export const fetchLastTouch = () =>
  * caller so lead_intake's staff-only policy still applies.
  */
 export const fetchLeadActivity = () =>
-  safeSelect("crm_lead_intake", "crm_client_id,step,completed,prefs,created_at,updated_at", (q) =>
-    q.not("crm_client_id", "is", null).order("updated_at", { ascending: false }).limit(6000),
+  safeSelectAll("crm_lead_intake", "crm_client_id,step,completed,prefs,created_at,updated_at", (q) =>
+    q.not("crm_client_id", "is", null).order("updated_at", { ascending: false }).order("crm_client_id"),
   );
 
 /** "Mark as contacted": a staff activity, so it records who and when. */
