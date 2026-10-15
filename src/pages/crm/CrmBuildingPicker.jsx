@@ -62,7 +62,7 @@ export default function CrmBuildingPicker({ listing, buildings, onDone, onToast 
         <Building2 size={13} /> {current ? "Change property" : "Add to property / society"}
       </button>
       {open && (
-        <div role="dialog" aria-label="Add to a property or society"
+        <div role="dialog" aria-label="Add to a property or society" className="crm-pop"
           style={{ position: "absolute", right: 0, top: "calc(100% + 4px)", zIndex: 40, width: 300, background: "#fff",
             border: `1px solid ${C.line}`, borderRadius: 10, boxShadow: "0 14px 34px rgba(16,34,30,.18)", padding: 10, display: "grid", gap: 8 }}>
           <div style={{ display: "grid", gridTemplateColumns: "1fr 96px", gap: 6 }}>

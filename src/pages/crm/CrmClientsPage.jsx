@@ -252,7 +252,8 @@ export default function CrmClientsPage() {
   const [importing, setImporting] = useState(false);
   const [syncing, setSyncing] = useState(false);
   const [toast, setToast] = useState(null);
-  const [mobileTab, setMobileTab] = useState("list");
+  // Opened at one client (?client=, e.g. from the phone's Notifications): straight to their record.
+  const [mobileTab, setMobileTab] = useState(() => (params.get("client") ? "record" : "list"));
   const [localShortlists, setLocalShortlists] = useState(shortlists);
   const [reqDraft, setReqDraft] = useState(null);
 

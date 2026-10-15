@@ -12,7 +12,7 @@
  * one address is the argument for doing it now.
  */
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { Link } from "react-router-dom";
+import { Link, useSearchParams } from "react-router-dom";
 import { useCrm } from "./CrmShell";
 import { SCOPES } from "../../lib/adminScopes";
 import { Btn, C, Chip, Empty, inr, shortDate } from "./crmUi";
@@ -27,6 +27,7 @@ import CrmDailyTasks from "./CrmDailyTasks";
 import CrmPropertyFollowUp from "./CrmPropertyFollowUp";
 import CrmContactMessages from "./CrmContactMessages";
 import { crmContactMessages } from "../../lib/contactMessages";
+import PhoneAlerts from "./mobile/PhoneAlerts";
 
 /** A tenant with no number can't be messaged, only called back by email. */
 function WaitingRow({ person, group, nameFor, onMessaged }) {
@@ -197,12 +198,13 @@ const SECTIONS = [
 ];
 
 export default function CrmNotificationsPage() {
-  const { inventory, clients, access } = useCrm();
+  const { inventory, clients, access, phone } = useCrm();
   const canWrite = access.has(SCOPES.PROPERTIES_WRITE);
+  const [params] = useSearchParams();
 
   // Daily tasks first: it is the one with somebody waiting on a reply, and a
-  // queue nobody opens is a queue nobody clears.
-  const [section, setSection] = useState("tasks");
+  // queue nobody opens is a queue nobody clears. ?tab= opens another (the phone's Home).
+  const [section, setSection] = useState(() => (SECTIONS.some((s) => s.id === params.get("tab")) ? params.get("tab") : "tasks"));
 
   const [requests, setRequests] = useState([]);
   const [slots, setSlots] = useState(new Map());
@@ -263,10 +265,13 @@ export default function CrmNotificationsPage() {
   const waitingCount = groups.reduce((n, g) => n + g.waiting.length, 0);
 
   return (
-    <div style={{ display: "flex", flex: 1, minHeight: 0 }}>
+    <div style={{ display: "flex", flexDirection: "column", flex: 1, minHeight: 0 }}>
+      {/* On a phone: today's visits, likes with no visit, leads not called — above the queues. */}
+      {phone && <PhoneAlerts onQueue={(id) => { setSection(id); document.getElementById("crm-queues")?.scrollIntoView({ behavior: "smooth" }); }} />}
+    <div id="crm-queues" style={{ display: "flex", flex: 1, minHeight: 0 }}>
       <div className="crm-col" style={{ flex: 1 }}>
         <div
-          className="crm-colhead"
+          className="crm-colhead crm-wrap"
           style={{ gap: 6, justifyContent: "flex-start" }}
         >
           {SECTIONS.map((s) => (
@@ -300,7 +305,7 @@ export default function CrmNotificationsPage() {
           ) : groups.length === 0 ? (
             <Empty>Nobody is waiting on a visit time.</Empty>
           ) : (
-            <div style={{
+            <div className="crm-stack" style={{
               display: "grid", gap: 11,
               gridTemplateColumns: "repeat(auto-fill, minmax(330px, 1fr))",
             }}>
@@ -319,6 +324,7 @@ export default function CrmNotificationsPage() {
         </>
         )}
       </div>
+    </div>
     </div>
   );
 }

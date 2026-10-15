@@ -742,7 +742,7 @@ export default function CrmPropertyForm() {
       </div>
 
       <div className="crm-scroll" style={{ flex: 1 }}>
-        <div style={{ display: "grid", gridTemplateColumns: "minmax(260px,1fr) minmax(260px,1fr) minmax(240px,300px)" }}>
+        <div className="crm-stack" style={{ display: "grid", gridTemplateColumns: "minmax(260px,1fr) minmax(260px,1fr) minmax(240px,300px)" }}>
           {/* ── where ── */}
           <Column title="Where it is">
             {isEdit ? (

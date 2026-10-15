@@ -1,0 +1,17 @@
+{
+  "id": "/crm/",
+  "name": "MovEazy CRM",
+  "short_name": "MovEazy CRM",
+  "description": "MovEazy's CRM for the team: payments, notifications, partner usage and clients.",
+  "start_url": "/crm/home",
+  "scope": "/crm/",
+  "display": "standalone",
+  "orientation": "portrait",
+  "background_color": "#FFFFFF",
+  "theme_color": "#0E7C68",
+  "icons": [
+    { "src": "/crm-icon-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any" },
+    { "src": "/crm-icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any" },
+    { "src": "/crm-icon-maskable-512.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable" }
+  ]
+}

@@ -8,6 +8,7 @@ import RequirePhoneModal from "./components/RequirePhoneModal";
 import ClaimEarlierViews from "./components/ClaimEarlierViews";
 import RequirePhoneForListing from "./components/RequirePhoneForListing";
 import { useSessionTracking } from "./hooks/useSessionTracking";
+import { isPhoneNow } from "./pages/crm/mobile/phoneQuery";
 
 // Lazy like every page: the tenant home pulls in the map, the swipe deck and
 // the landing kit, and the CRM, owner and partner apps were downloading all of
@@ -88,6 +89,9 @@ const SocietyPage = lazy(() => import("./pages/societies/SocietyPage"));
 // The owner app: /owners here, the root of owners.moveazy.co.in.
 const OwnerApp = lazy(() => import("./pages/owners/OwnerApp"));
 const CrmInventoryOpsPage = lazy(() => import("./pages/crm/CrmInventoryOpsPage"));
+const CrmHome = lazy(() => import("./pages/crm/mobile/CrmHome"));
+const CrmPartnerPayments = lazy(() => import("./pages/crm/mobile/CrmPartnerPayments"));
+const CrmPartnerUsage = lazy(() => import("./pages/crm/mobile/CrmPartnerUsage"));
 /**
  * The CRM page being opened, fetched at start-up beside sign-in and the CRM's
  * data. As a lazy route it only began downloading once the workspace had
@@ -97,7 +101,10 @@ const CrmInventoryOpsPage = lazy(() => import("./pages/crm/CrmInventoryOpsPage")
 function prefetchCrmPage(path) {
   const [, , seg = "", rest = ""] = path.split("/");
   const page = {
-    "": () => import("./pages/crm/CrmClientsPage"),
+    "": () => (isPhoneNow() ? import("./pages/crm/mobile/CrmHome") : import("./pages/crm/CrmClientsPage")),
+    home: () => import("./pages/crm/mobile/CrmHome"),
+    "partner-payments": () => import("./pages/crm/mobile/CrmPartnerPayments"),
+    "partner-usage": () => import("./pages/crm/mobile/CrmPartnerUsage"),
     clients: () => import("./pages/crm/CrmClientsPage"),
     pipeline: () => import("./pages/crm/CrmPipelinePage"),
     properties: () => (rest ? import("./pages/crm/CrmPropertyForm") : import("./pages/crm/CrmPropertiesPage")),
@@ -296,7 +303,12 @@ function AppRoutes() {
         </Route>
         {/* Internal CRM. Access is gated inside CrmShell (staff roles), not here. */}
         <Route path="/crm" element={<CrmShell />}>
-          <Route index element={<Navigate to="/crm/clients" replace />} />
+          {/* A phone opens on Home (pages/crm/mobile); a computer on Clients, as always. */}
+          <Route index element={<Navigate to={isPhoneNow() ? "/crm/home" : "/crm/clients"} replace />} />
+          <Route path="home" element={<CrmHome />} />
+          <Route path="partner-payments" element={<CrmPartnerPayments />} />
+          <Route path="partner-usage" element={<CrmPartnerUsage />} />
+          <Route path="partner-usage/:brokerId" element={<CrmPartnerUsage />} />
           <Route path="clients" element={<CrmClientsPage />} />
           <Route path="pipeline" element={<CrmPipelinePage />} />
           <Route path="properties" element={<CrmPropertiesPage />} />

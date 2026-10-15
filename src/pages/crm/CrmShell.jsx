@@ -17,7 +17,6 @@ import { createContext, useCallback, useContext, useEffect, useMemo, useRef, use
 import { Link, NavLink, Navigate, Outlet, useLocation } from "react-router-dom";
 import { useAuth } from "../../context/AuthContext";
 import { useCrmAccess } from "../../hooks/useCrmAccess";
-import { SCOPES } from "../../lib/adminScopes";
 import {
   fetchClients, fetchClientRequirements, fetchEngagement, fetchShortlists, fetchLastTouch, fetchLeadActivity,
   fetchClientOwnAnswers,
@@ -30,36 +29,12 @@ import { C, CrmStyles, Empty, Loading } from "./crmUi";
 import TopProgress from "../../components/TopProgress";
 import { DAY_MS, dropCache, readCache, writeCache } from "../../lib/localCache";
 import { prefetchWhenIdle } from "../../lib/prefetch";
+import { RAIL } from "./crmSections";
+import { PHONE_CSS, PhoneNav, PhoneTopBar, usePhone } from "./mobile/phoneUi";
+import { REFRESH_MS, fetchMobileSummary, waitingTotal } from "../../lib/crmMobile";
 
 const CrmContext = createContext(null);
 export const useCrm = () => useContext(CrmContext);
-
-const RAIL = [
-  { to: "/crm/clients",    code: "CL", label: "Clients" },
-  // Before Pipeline: it is the tab with work waiting on somebody, and a queue
-  // nobody walks past is a queue nobody clears.
-  { to: "/crm/notifications", code: "NF", label: "Notifications" },
-  { to: "/crm/pipeline",   code: "PI", label: "Pipeline" },
-  { to: "/crm/properties", code: "PR", label: "Properties" },
-  { to: "/crm/brokers",    code: "BR", label: "Brokers" },
-  // Tenants partner brokers brought — theirs, never in Clients.
-  { to: "/crm/broker-leads", code: "BL", label: "Broker leads" },
-  // Partners' To-Let poster scans: top brokers, hotspot areas, the map.
-  { to: "/crm/qr-scans", code: "QS", label: "QR scans" },
-  // Brokers asking for MovEazy leads: check payments, pick and give.
-  { to: "/crm/lead-requests", code: "LR", label: "Lead requests", scope: SCOPES.PARTNERS_MANAGE },
-  // Owners' buildings with a QR: assign the partner, work the visit requests.
-  { to: "/crm/owner-qr", code: "QR", label: "Owner QR" },
-  { to: "/crm/societies", code: "SO", label: "Societies", scope: SCOPES.PROPERTIES_WRITE },
-  // The owner app's queue: repairs, service bookings, designer calls, owners.
-  { to: "/crm/ops",        code: "IO", label: "Inventory Ops" },
-  { to: "/crm/visits",     code: "VS", label: "Visits" },
-  { to: "/crm/payments",   code: "PY", label: "Payments" },
-  // Partners and owners in their apps: time spent, last sign-in, every button pressed.
-  { to: "/crm/app-analytics", code: "AN", label: "App analytics", scope: SCOPES.ANALYTICS_READ },
-  { to: "/crm/team",       code: "TM", label: "Team", scope: SCOPES.ROLES_WRITE },
-  { to: "/crm/settings",   code: "ST", label: "Settings" },
-];
 
 /** One retry without the optional columns — see lib/inventory.js for why. */
 /**
@@ -202,6 +177,10 @@ const NEEDS = {
   pipeline: ["clients", "requirements", "engagement", "touches"],
   properties: ["inventory", "requirements", "clients", "marketingChannels"],
   brokers: ["inventory", "clients", "requirements"],
+  // The phone's own screens read their own RPCs (crm_mobile.sql).
+  home: [],
+  "partner-payments": [],
+  "partner-usage": [],
   "broker-leads": [],
   "qr-scans": [],
   "lead-requests": [],
@@ -304,10 +283,50 @@ export default function CrmShell() {
   const reload = useCallback(() => load(), [load]);
   const ready = needsFor(pathname).every((k) => k in data);
 
+  // On a phone: Home's numbers (and the Alerts badge), read on open and every
+  // hour after, or when pulled again.
+  const phone = usePhone();
+  const [summary, setSummary] = useState(null);
+  const [summaryBusy, setSummaryBusy] = useState(false);
+  const loadSummary = useCallback(async () => {
+    setSummaryBusy(true);
+    try { setSummary(await fetchMobileSummary()); } catch { /* the screens say so themselves */ }
+    finally { setSummaryBusy(false); }
+  }, []);
+  useEffect(() => {
+    if (!phone || access.loading || !access.isStaff) return undefined;
+    loadSummary();
+    const t = setInterval(loadSummary, REFRESH_MS);
+    return () => clearInterval(t);
+  }, [phone, access.loading, access.isStaff, loadSummary]);
+
   const value = useMemo(
-    () => ({ ...PENDING, ...data, access, user, reload, patchClient, setData }),
-    [data, access, user, reload, patchClient],
+    () => ({ ...PENDING, ...data, access, user, reload, patchClient, setData, phone, summary, summaryBusy, loadSummary }),
+    [data, access, user, reload, patchClient, phone, summary, summaryBusy, loadSummary],
   );
+
+  if (phone) {
+    return (
+      <Gate>
+        <div className="crm crm--phone" style={{ display: "flex", flexDirection: "column", height: "100dvh", minHeight: 0, overflow: "hidden" }}>
+          <CrmStyles />
+          <style>{PHONE_CSS}</style>
+          <TopProgress active={refreshing} color={C.accent} />
+          <PhoneTopBar />
+          <main className="crm-ph-main">
+            {!ready && !error && <Loading label="Loading the workspace…" />}
+            {!ready && error && <Empty>{error}</Empty>}
+            {ready && (
+              <CrmContext.Provider value={value}>
+                <Outlet />
+              </CrmContext.Provider>
+            )}
+          </main>
+          <PhoneNav badge={waitingTotal(summary)} />
+        </div>
+      </Gate>
+    );
+  }
 
   return (
     <Gate>

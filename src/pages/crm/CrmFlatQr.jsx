@@ -54,7 +54,7 @@ export default function CrmFlatQr({ flat, building, onToast }) {
   const bldPoster = building ? { code: building.code, name: building.name, area: flat.area, landmark: flat.landmark, photo: flat.cover_image_url } : null;
 
   return (
-    <div style={{ display: "grid", gridTemplateColumns: "minmax(240px, 300px) 1fr", gap: 20, alignItems: "start" }}>
+    <div className="crm-stack" style={{ display: "grid", gridTemplateColumns: "minmax(240px, 300px) 1fr", gap: 20, alignItems: "start" }}>
       <div>
         {building && (
           <div style={{ display: "flex", gap: 6, marginBottom: 8 }}>

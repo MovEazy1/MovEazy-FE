@@ -103,7 +103,7 @@ export default function CrmAppAnalyticsPage() {
 
       {err && <Empty>{err}</Empty>}
       {!people ? <Loading /> : shown.length === 0 ? <Empty>{people.length ? "Nobody matches." : `No ${meta.label.toLowerCase()} yet.`}</Empty> : (
-        <div style={{ display: "grid", gridTemplateColumns: pick ? "minmax(0, 1.25fr) minmax(320px, 1fr)" : "1fr", gap: 14, alignItems: "start" }}>
+        <div className="crm-stack" style={{ display: "grid", gridTemplateColumns: pick ? "minmax(0, 1.25fr) minmax(320px, 1fr)" : "1fr", gap: 14, alignItems: "start" }}>
           <div style={{ overflow: "auto", border: `1px solid ${C.line}`, borderRadius: 10, maxHeight: "70vh" }}>
             <table style={{ width: "100%", borderCollapse: "collapse" }}>
               <thead><tr>

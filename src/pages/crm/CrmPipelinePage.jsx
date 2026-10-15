@@ -68,6 +68,7 @@ export default function CrmPipelinePage() {
   const [dragging, setDragging] = useState(null);
   const [over, setOver] = useState("");
   const [mineOnly, setMineOnly] = useState(false);
+  const [phoneStage, setPhoneStage] = useState("fresh");
 
   const canWrite = access.has(SCOPES.CLIENTS_WRITE);
   const showToast = (message, tone = "ok") => {
@@ -122,9 +123,22 @@ export default function CrmPipelinePage() {
         <Chip on={mineOnly} onClick={() => setMineOnly((v) => !v)}>Mine</Chip>
       </div>
 
+      {/* A phone shows one stage at a time, picked here; cards move on the record (no dragging by thumb). */}
+      {crm.phone && (
+        <div className="crm-ph-chips" style={{ padding: "10px 14px 0" }}>
+          {STATUSES.map((s) => (
+            <button key={s.id} type="button" className={phoneStage === s.id ? "crm-ph-chip crm-ph-chip--on" : "crm-ph-chip"}
+              onClick={() => setPhoneStage(s.id)}>
+              {s.label} <b>{(byStatus.get(s.id) ?? []).length}</b>
+            </button>
+          ))}
+        </div>
+      )}
+
       <div style={{ flex: 1, overflow: "auto", padding: 14 }}>
-        <div style={{ display: "grid", gridTemplateColumns: `repeat(${STATUSES.length}, 190px)`, gap: 10, minWidth: "max-content" }}>
-          {STATUSES.map((s) => {
+        <div style={crm.phone ? { display: "grid", gap: 10 }
+          : { display: "grid", gridTemplateColumns: `repeat(${STATUSES.length}, 190px)`, gap: 10, minWidth: "max-content" }}>
+          {STATUSES.filter((s) => !crm.phone || s.id === phoneStage).map((s) => {
             const list = byStatus.get(s.id) ?? [];
             const isWin = s.id === "closed_by_us";
             const isOut = s.id === "closed_outside";

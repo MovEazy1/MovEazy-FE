@@ -117,7 +117,7 @@ export default function CrmSettingsPage() {
           {canEdit && <Chip onClick={addTemplate}>+ New</Chip>}
         </div>
 
-        <div style={{ display: "grid", gridTemplateColumns: "minmax(320px,1fr) minmax(260px,320px)", gap: 16 }}>
+        <div className="crm-stack" style={{ display: "grid", gridTemplateColumns: "minmax(320px,1fr) minmax(260px,320px)", gap: 16 }}>
           <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
             <label style={{ display: "flex", flexDirection: "column", gap: 4 }}>
               <span className="crm-label">Name</span>

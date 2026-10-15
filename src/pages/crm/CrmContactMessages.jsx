@@ -71,7 +71,7 @@ export default function CrmContactMessages({ onCount }) {
           : rows === null ? <Empty>Loading…</Empty>
             : rows.length === 0 ? <Empty>{tab === "new" ? "No new messages from the website." : "Nothing marked done yet."}</Empty>
               : (
-                <div style={{ display: "grid", gap: 10, gridTemplateColumns: "repeat(auto-fill, minmax(320px, 1fr))" }}>
+                <div className="crm-stack" style={{ display: "grid", gap: 10, gridTemplateColumns: "repeat(auto-fill, minmax(320px, 1fr))" }}>
                   {rows.map((m) => <MessageRow key={m.id} m={m} onChanged={load} />)}
                 </div>
               )}

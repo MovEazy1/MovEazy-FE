@@ -254,7 +254,7 @@ export default function CrmBuildingEditor() {
         </div>
       </div>
       <div className="crm-scroll" style={{ flex: 1, padding: 16 }}>
-        <div style={{ display: "grid", gridTemplateColumns: "minmax(300px, 1fr) minmax(360px, 1.3fr)", gap: 16, alignItems: "start", maxWidth: 1240 }}>
+        <div className="crm-stack" style={{ display: "grid", gridTemplateColumns: "minmax(300px, 1fr) minmax(360px, 1.3fr)", gap: 16, alignItems: "start", maxWidth: 1240 }}>
           <div style={{ display: "grid", gap: 14 }}>
             <div style={card}>
               <Field label="Name"><input className="crm-input" value={b.name} onChange={(e) => set({ name: e.target.value })} placeholder="Sunrise Residency" /></Field>
@@ -373,7 +373,7 @@ export default function CrmBuildingEditor() {
               {flats.map((f, i) => {
                 const l = byId.get(f.property_id) || f;
                 return (
-                  <div key={f.property_id} style={{ display: "grid", gridTemplateColumns: "auto 48px 1fr 92px 92px auto", gap: 8, alignItems: "center",
+                  <div key={f.property_id} className="crm-flatrow" style={{ display: "grid", gridTemplateColumns: "auto 48px 1fr 92px 92px auto", gap: 8, alignItems: "center",
                     padding: "6px 0", borderTop: i ? `1px solid ${C.lineSoft}` : 0 }}>
                     <div style={{ display: "grid", gap: 2 }}>
                       <button type="button" className="crm-btn crm-btn--sm" disabled={i === 0} onClick={() => move(i, -1)} aria-label="Move up" style={{ padding: "2px 5px" }}><ArrowUp size={12} /></button>

@@ -56,6 +56,23 @@
         window.addEventListener("beforeinstallprompt", function (e) { e.preventDefault(); window.__pzInstall = e; window.dispatchEvent(new Event("pz-install-ready")); });
         window.addEventListener("appinstalled", function () { window.__pzInstall = null; window.__pzInstalled = true; window.dispatchEvent(new Event("pz-install-ready")); });
       })();
+      // The CRM installs as "MovEazy CRM" from moveazy.co.in/crm (scope /crm/),
+      // its offer kept for CRM Home's install card (pages/crm/mobile/crmInstall.js).
+      (function () {
+        if (/^partners\./i.test(location.hostname) || !/^\/crm(\/|$)/.test(location.pathname)) return;
+        var h = document.head;
+        function add(tag, attrs) { var el = document.createElement(tag); for (var k in attrs) el.setAttribute(k, attrs[k]); h.appendChild(el); }
+        add("link", { rel: "manifest", href: "/crm.webmanifest" });
+        add("link", { rel: "apple-touch-icon", href: "/crm-apple-touch-icon.png" });
+        add("meta", { name: "apple-mobile-web-app-title", content: "MovEazy CRM" });
+        add("meta", { name: "apple-mobile-web-app-capable", content: "yes" });
+        add("meta", { name: "mobile-web-app-capable", content: "yes" });
+        add("meta", { name: "apple-mobile-web-app-status-bar-style", content: "default" });
+        var theme = document.querySelector('meta[name="theme-color"]');
+        if (theme) theme.setAttribute("content", "#FFFFFF");
+        window.addEventListener("beforeinstallprompt", function (e) { e.preventDefault(); window.__crmInstall = e; window.dispatchEvent(new Event("crm-install-ready")); });
+        window.addEventListener("appinstalled", function () { window.__crmInstall = null; window.__crmInstalled = true; window.dispatchEvent(new Event("crm-install-ready")); });
+      })();
     </script>
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />

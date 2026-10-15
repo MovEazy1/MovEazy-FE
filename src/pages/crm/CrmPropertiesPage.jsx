@@ -186,6 +186,7 @@ function ColumnFilter({ column, values, picked, onChange }) {
 
       {open && (
         <span
+          className="crm-pop"
           style={{
             position: "absolute", top: "calc(100% + 4px)", left: 0, zIndex: 60,
             width: 218, maxHeight: 280, overflow: "auto", padding: 8,
@@ -420,6 +421,7 @@ function SoldOut({ listing, canEdit, onDone, onToast }) {
           <span
             role="dialog"
             aria-label={`Mark ${listing.property_id} sold out`}
+            className="crm-pop"
             style={{
               position: "absolute", top: "calc(100% + 4px)", right: 0, zIndex: 41, width: 230,
               background: C.bg, border: `1px solid ${C.line}`, borderRadius: 10, padding: 10,
@@ -512,6 +514,7 @@ function SocialShare({ listing }) {
                   style={{ position: "fixed", inset: 0, zIndex: 40 }}
                 />
                 <span
+                  className="crm-pop"
                   style={{
                     position: "absolute", top: "calc(100% + 4px)", right: 0, zIndex: 41,
                     // C.bg, not C.card — there is no C.card, and an undefined
@@ -560,7 +563,7 @@ function SocialShare({ listing }) {
 }
 
 export default function CrmPropertiesPage() {
-  const { inventory, requirements, clients, access, reload, setData } = useCrm();
+  const { inventory, requirements, clients, access, reload, setData, phone } = useCrm();
   const navigate = useNavigate();
 
   const canEdit = access.has(SCOPES.PROPERTIES_WRITE);
@@ -670,10 +673,34 @@ export default function CrmPropertiesPage() {
     [openListing, requirements],
   );
 
+  /** A row's buttons: in the table's last column, and under each card on a phone. */
+  const rowActions = (l) => (
+    <div style={{ display: "flex", gap: 5, flexWrap: "wrap" }}>
+      <SoldOut listing={l} canEdit={canEdit} onToast={say} onDone={(patch) => patchListing(l.property_id, patch)} />
+      <Btn sm onClick={() => { setOpenId(l.property_id); if (phone) document.querySelector(".crm-ph-main")?.scrollTo({ top: 0, behavior: "smooth" }); }}>Who fits</Btn>
+      {canEdit && (
+        <Link to={`/crm/properties/${l.property_id}/edit`}
+              className="crm-btn crm-btn--sm" style={{ textDecoration: "none" }}>Edit</Link>
+      )}
+      <a className="crm-btn crm-btn--sm" href={propertyLink(l.property_id)}
+         target="_blank" rel="noopener noreferrer" style={{ textDecoration: "none" }}>Open</a>
+      <PocMessage
+        listing={l}
+        internal={internalMap[l.property_id]}
+        canEdit={canEdit}
+      />
+      <SocialShare listing={l} />
+      {canEdit && (
+        <CrmBuildingPicker listing={l} buildings={buildings} onToast={say}
+          onDone={() => Promise.all([reload?.(), loadBuildings()])} />
+      )}
+    </div>
+  );
+
   return (
-    <div style={{ display: "flex", flex: 1, minHeight: 0 }}>
+    <div className="crm-stack" style={{ display: "flex", flex: 1, minHeight: 0 }}>
       <div className="crm-col" style={{ flex: 1 }}>
-        <div className="crm-colhead">
+        <div className="crm-colhead crm-wrap">
           <span className="crm-label">Properties · {rows.length}</span>
           <div style={{ display: "flex", gap: 6 }}>
             <Link to="/crm/owner-qr?tab=buildings" className="crm-btn crm-btn--sm" style={{ textDecoration: "none" }}>
@@ -726,6 +753,35 @@ export default function CrmPropertiesPage() {
         <div className="crm-scroll" style={{ flex: 1 }}>
           {rows.length === 0 ? (
             <Empty>No listings match that.</Empty>
+          ) : phone ? (
+            /* A phone gets a card per flat: the same facts and buttons, no sideways table. */
+            <div style={{ padding: "4px 12px 12px" }}>
+              {rows.map((l) => (
+                <div key={l.property_id} className="crm-ph-card" style={picked.has(l.property_id) ? { background: C.accentSoft } : undefined}>
+                  <div style={{ display: "flex", gap: 10, alignItems: "flex-start" }}>
+                    <PropertyThumbs listing={l} onOpen={() => setPreviewId(l.property_id)} />
+                    <div style={{ minWidth: 0, flex: 1 }}>
+                      <b style={{ fontSize: 14 }}>{[l.flat_type, l.area].filter(Boolean).join(" · ") || l.property_id}</b>
+                      <div className="crm-ph-meta crm-num">{inr(l.rent)}{l.furnishing ? ` · ${l.furnishing}` : ""} · {shortDate(l.created_at)}</div>
+                      <div className="crm-ph-meta">{l.poster_name || "—"}{l.phone ? ` · ${l.phone}` : ""}{l.source ? ` · ${l.source}` : ""}</div>
+                      {partnerMap[l.property_id] && (
+                        <div style={{ fontSize: 11.5, color: C.accent }}>Partner app · {describeSharing(partnerMap[l.property_id])}</div>
+                      )}
+                      {l.building_id && (
+                        <Link to={`/crm/buildings/${l.building_id}`} style={{ display: "block", fontSize: 11.5, color: C.gold, textDecoration: "none" }}>
+                          {buildingById.get(l.building_id)?.kind === "society" ? "Society" : "Building"} · {buildingById.get(l.building_id)?.name || "…"}{l.unit_no ? ` · #${l.unit_no}` : ""}
+                        </Link>
+                      )}
+                    </div>
+                    {canEdit && (
+                      <input type="checkbox" checked={picked.has(l.property_id)} onChange={() => togglePick(l.property_id)}
+                        aria-label={`Tick ${l.property_id}`} style={{ width: 20, height: 20, flex: "none" }} />
+                    )}
+                  </div>
+                  {rowActions(l)}
+                </div>
+              ))}
+            </div>
           ) : (
             <table className="crm-table">
               <thead>
@@ -787,26 +843,7 @@ export default function CrmPropertiesPage() {
                     <td className="crm-mute">{l.source || "—"}</td>
                     <td className="crm-mute crm-num">{shortDate(l.created_at)}</td>
                     <td>
-                      <div style={{ display: "flex", gap: 5, flexWrap: "wrap" }}>
-                        <SoldOut listing={l} canEdit={canEdit} onToast={say} onDone={(patch) => patchListing(l.property_id, patch)} />
-                        <Btn sm onClick={() => setOpenId(l.property_id)}>Who fits</Btn>
-                        {canEdit && (
-                          <Link to={`/crm/properties/${l.property_id}/edit`}
-                                className="crm-btn crm-btn--sm" style={{ textDecoration: "none" }}>Edit</Link>
-                        )}
-                        <a className="crm-btn crm-btn--sm" href={propertyLink(l.property_id)}
-                           target="_blank" rel="noopener noreferrer" style={{ textDecoration: "none" }}>Open</a>
-                        <PocMessage
-                          listing={l}
-                          internal={internalMap[l.property_id]}
-                          canEdit={canEdit}
-                        />
-                        <SocialShare listing={l} />
-                        {canEdit && (
-                          <CrmBuildingPicker listing={l} buildings={buildings} onToast={say}
-                            onDone={() => Promise.all([reload?.(), loadBuildings()])} />
-                        )}
-                      </div>
+                      {rowActions(l)}
                     </td>
                   </tr>
                 ))}
@@ -817,7 +854,7 @@ export default function CrmPropertiesPage() {
       </div>
 
       {openListing && (
-        <div className="crm-col" style={{ width: 300, flex: "none" }}>
+        <div className="crm-col crm-fill crm-first" style={{ width: 300, flex: "none" }}>
           <div className="crm-colhead">
             <span className="crm-label">Who fits · {matches.length}</span>
             <Btn sm onClick={() => setOpenId("")}>Close</Btn>

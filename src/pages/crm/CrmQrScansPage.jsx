@@ -75,7 +75,7 @@ export default function CrmQrScansPage() {
             {data.points.length === 0 ? " No located scans in this period yet." : ""}
           </p>
 
-          <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(340px, 1fr))", gap: 16 }}>
+          <div className="crm-stack" style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(340px, 1fr))", gap: 16 }}>
             <section>
               <h2 style={{ fontSize: 15, margin: "0 0 8px", color: C.text }}>Brokers with the most scans</h2>
               {data.brokers.length === 0 ? <Empty pad={20}>No scans yet.</Empty> : (

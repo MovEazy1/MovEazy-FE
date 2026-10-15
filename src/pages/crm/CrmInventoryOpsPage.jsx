@@ -191,7 +191,7 @@ function RequestsView({ data, listingById, canWrite, reload, onToast }) {
   const open = data.requests.find((r) => r.id === openId);
 
   return (
-    <div style={{ display: "flex", flex: 1, minHeight: 0 }}>
+    <div className="crm-stack" style={{ display: "flex", flex: 1, minHeight: 0 }}>
       <div style={{ flex: 1, minWidth: 0, display: "flex", flexDirection: "column" }}>
         <div style={{ padding: "10px 12px", display: "flex", gap: 6, flexWrap: "wrap", flex: "none" }}>
           {[["active", "Active"], ["awaiting_approval", "Awaiting owner"], ["resolved", "Resolved"], ["all", "All"]].map(([k, l]) => (
@@ -211,7 +211,8 @@ function RequestsView({ data, listingById, canWrite, reload, onToast }) {
                   const o = ownerBy.get(r.owner_id);
                   const st = REQUEST_STATUS[r.status];
                   return (
-                    <tr key={r.id} onClick={() => setOpenId(r.id)} style={{ cursor: "pointer", background: r.id === openId ? C.surfaceAlt : undefined }}>
+                    <tr key={r.id} onClick={() => { setOpenId(r.id); document.querySelector(".crm-ph-main")?.scrollTo({ top: 0, behavior: "smooth" }); }}
+                      style={{ cursor: "pointer", background: r.id === openId ? C.surfaceAlt : undefined }}>
                       <td className="crm-mute crm-num">{shortDate(r.created_at)}</td>
                       <td>{KIND_LABEL[r.kind]}</td>
                       <td style={{ fontWeight: 600 }}>{r.title}</td>
@@ -228,7 +229,7 @@ function RequestsView({ data, listingById, canWrite, reload, onToast }) {
         </div>
       </div>
       {open && (
-        <div className="crm-col" style={{ width: 380, flex: "none" }}>
+        <div className="crm-col crm-fill crm-first" style={{ width: 380, flex: "none" }}>
           <div className="crm-colhead"><span className="crm-label">Request</span><Btn sm onClick={() => setOpenId("")}>Close</Btn></div>
           <div className="crm-scroll" style={{ flex: 1 }}>
             <RequestPanel req={open} owner={ownerBy.get(open.owner_id)} listingById={listingById} tenants={data.tenants}
