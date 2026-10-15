@@ -90,6 +90,7 @@ const SocietyPage = lazy(() => import("./pages/societies/SocietyPage"));
 const OwnerApp = lazy(() => import("./pages/owners/OwnerApp"));
 const CrmInventoryOpsPage = lazy(() => import("./pages/crm/CrmInventoryOpsPage"));
 const CrmHome = lazy(() => import("./pages/crm/mobile/CrmHome"));
+const CrmPriorityPage = lazy(() => import("./pages/crm/CrmPriorityPage"));
 const CrmPartnerPayments = lazy(() => import("./pages/crm/mobile/CrmPartnerPayments"));
 const CrmPartnerUsage = lazy(() => import("./pages/crm/mobile/CrmPartnerUsage"));
 /**
@@ -103,6 +104,7 @@ function prefetchCrmPage(path) {
   const page = {
     "": () => (isPhoneNow() ? import("./pages/crm/mobile/CrmHome") : import("./pages/crm/CrmClientsPage")),
     home: () => import("./pages/crm/mobile/CrmHome"),
+    priority: () => import("./pages/crm/CrmPriorityPage"),
     "partner-payments": () => import("./pages/crm/mobile/CrmPartnerPayments"),
     "partner-usage": () => import("./pages/crm/mobile/CrmPartnerUsage"),
     clients: () => import("./pages/crm/CrmClientsPage"),
@@ -306,6 +308,7 @@ function AppRoutes() {
           {/* A phone opens on Home (pages/crm/mobile); a computer on Clients, as always. */}
           <Route index element={<Navigate to={isPhoneNow() ? "/crm/home" : "/crm/clients"} replace />} />
           <Route path="home" element={<CrmHome />} />
+          <Route path="priority" element={<CrmPriorityPage />} />
           <Route path="partner-payments" element={<CrmPartnerPayments />} />
           <Route path="partner-usage" element={<CrmPartnerUsage />} />
           <Route path="partner-usage/:brokerId" element={<CrmPartnerUsage />} />

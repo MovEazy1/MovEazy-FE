@@ -30,6 +30,7 @@ import TopProgress from "../../components/TopProgress";
 import { DAY_MS, dropCache, readCache, writeCache } from "../../lib/localCache";
 import { prefetchWhenIdle } from "../../lib/prefetch";
 import { RAIL } from "./crmSections";
+import { fetchPriority } from "../../lib/crmPriority";
 import { PHONE_CSS, PhoneNav, PhoneTopBar, usePhone } from "./mobile/phoneUi";
 import { REFRESH_MS, fetchMobileSummary, waitingTotal } from "../../lib/crmMobile";
 
@@ -175,6 +176,8 @@ const LOADERS = {
   // [] until crm_client_property_interest.sql is run.
   interest: fetchPropertyInterest,
   leads: fetchLeadActivity,
+  // Who is in Priority closures, and from when (crm_priority.sql).
+  priority: fetchPriority,
 };
 const ALL = Object.keys(LOADERS);
 
@@ -187,6 +190,7 @@ const NEEDS = {
   pipeline: ["clients", "requirements", "engagement", "touches"],
   properties: ["inventory", "requirements", "clients", "marketingChannels"],
   brokers: ["inventory", "clients", "requirements"],
+  priority: ["clients", "requirements", "inventory", "shortlists", "touches", "ownAnswers", "interest", "settings", "priority"],
   // The phone's own screens read their own RPCs (crm_mobile.sql).
   home: [],
   "partner-payments": [],

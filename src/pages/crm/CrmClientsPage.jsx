@@ -30,6 +30,7 @@ import {
 import { SCOPES } from "../../lib/adminScopes";
 import { buildTemplateCsv, downloadCsv, parseCsv, planImport, runImport } from "../../lib/crmImport";
 import { Btn, C, Chip, Empty, TempDot, Toast, deadlineLabel, shortDate } from "./crmUi";
+import { addToPriority, fetchPriority } from "../../lib/crmPriority";
 
 const EMPTY_REQ = {
   localities: [], budget_min: null, budget_max: null, flat_types: [], furnishing: "",
@@ -492,6 +493,25 @@ export default function CrmClientsPage() {
 
   const isNarrow = typeof window !== "undefined" && window.innerWidth < 900;
 
+  // Ticking several clients to add to Priority closures (now, or from a day).
+  const [ticking, setTicking] = useState(false);
+  const [ticked, setTicked] = useState(() => new Set());
+  const [tickFrom, setTickFrom] = useState("");
+  const inPriority = useMemo(() => new Set((crm.priority ?? []).map((p) => p.client_id)), [crm.priority]);
+  const toggleTick = (id) => setTicked((t) => { const n = new Set(t); if (n.has(id)) n.delete(id); else n.add(id); return n; });
+  const addTicked = async () => {
+    try {
+      const from = tickFrom ? new Date(`${tickFrom}T08:00:00`) : null;
+      const n = await addToPriority([...ticked], from);
+      const rows = await fetchPriority();
+      crm.setData((d) => ({ ...d, priority: rows }));
+      showToast(from ? `${n} will join Priority closures on ${shortDate(from)}` : `${n} added to Priority closures`);
+      setTicked(new Set()); setTicking(false); setTickFrom("");
+    } catch (e) {
+      showToast(e?.message || "Couldn't add them", "error");
+    }
+  };
+
   /* ── Panes ─────────────────────────────────────────────────────────────── */
 
   const listPane = (
@@ -499,7 +519,7 @@ export default function CrmClientsPage() {
       <div className="crm-colhead">
         <span className="crm-label">Clients · {clients.length}</span>
         {access.has(SCOPES.CLIENTS_WRITE) && (
-          <div style={{ display: "flex", gap: 5 }}>
+          <div style={{ display: "flex", gap: 5, flexWrap: "wrap", justifyContent: "flex-end" }}>
             <Btn sm onClick={() => { setAdding((v) => !v); setImporting(false); }}>
               {adding ? "Close" : "+ New"}
             </Btn>
@@ -509,9 +529,23 @@ export default function CrmClientsPage() {
             <Btn sm onClick={handleSync} disabled={syncing} title="Add any signed-up user with a mobile number who is not already in the CRM">
               {syncing ? "Syncing…" : "Sync users"}
             </Btn>
+            <Btn sm variant={ticking ? "primary" : undefined} onClick={() => { setTicking((v) => !v); setTicked(new Set()); }}
+              title="Tick clients to add them to Priority closures">
+              {ticking ? "Cancel" : "Select"}
+            </Btn>
           </div>
         )}
       </div>
+      {ticking && (
+        <div style={{ padding: "8px 12px", borderBottom: `1px solid ${C.line}`, background: C.accentSoft, display: "flex", flexDirection: "column", gap: 6 }}>
+          <span style={{ fontSize: 12, fontWeight: 600 }}>{ticked.size} ticked — add to Priority closures</span>
+          <div style={{ display: "flex", gap: 6, alignItems: "center", flexWrap: "wrap" }}>
+            <input type="date" className="crm-input" value={tickFrom} onChange={(e) => setTickFrom(e.target.value)} style={{ width: 140 }}
+              aria-label="From this day (empty for now)" />
+            <Btn sm variant="primary" disabled={!ticked.size} onClick={addTicked}>{tickFrom ? "Add from this day" : "Add now"}</Btn>
+          </div>
+        </div>
+      )}
 
       {adding && (
         <NewClientForm
@@ -659,11 +693,13 @@ export default function CrmClientsPage() {
           const req = reqByClient.get(c.id);
           const deadline = deadlineLabel(ownAnswersByUser.get(c.user_id)?.notes);
           return (
-            <button key={c.id} type="button" onClick={() => select(c.id)}
-              className={c.id === selected?.id ? "crm-lead crm-lead--on" : "crm-lead"}>
+            <button key={c.id} type="button" onClick={() => (ticking ? toggleTick(c.id) : select(c.id))}
+              className={(ticking ? ticked.has(c.id) : c.id === selected?.id) ? "crm-lead crm-lead--on" : "crm-lead"}>
               <span style={{ display: "flex", alignItems: "baseline", justifyContent: "space-between", gap: 8 }}>
                 <span style={{ fontSize: 13, fontWeight: 600, color: C.text, display: "flex", alignItems: "center", gap: 6, minWidth: 0 }}>
+                  {ticking && <input type="checkbox" readOnly checked={ticked.has(c.id)} tabIndex={-1} aria-hidden="true" style={{ margin: 0 }} />}
                   <TempDot color={c.temperature ? tempColor(c.temperature) : C.line} />
+                  {inPriority.has(c.id) && <span title="In Priority closures" style={{ color: C.accent, fontSize: 11, fontWeight: 800 }}>P</span>}
                   <span style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
                     {c.name || c.email || "Unnamed"}
                   </span>

@@ -3,13 +3,15 @@
  * and top-bar titles. `scope` hides a section from whoever lacks it.
  */
 import {
-  BarChart3, Bell, Briefcase, Building2, CalendarCheck, Columns3, CreditCard, House, Inbox, Landmark,
+  BarChart3, Bell, Briefcase, Target, Building2, CalendarCheck, Columns3, CreditCard, House, Inbox, Landmark,
   QrCode, ScanLine, Settings, ShieldCheck, Smartphone, UserPlus, Users, Wallet, Wrench,
 } from "lucide-react";
 import { SCOPES } from "../../lib/adminScopes";
 
 export const RAIL = [
   { to: "/crm/clients", code: "CL", label: "Clients", icon: Users, group: "Tenants" },
+  // The clients worked hardest: pools by flat type and budget, beside the flats that fit.
+  { to: "/crm/priority", code: "PC", label: "Priority closures", icon: Target, group: "Tenants" },
   // Before Pipeline: it is the tab with work waiting on somebody, and a queue
   // nobody walks past is a queue nobody clears.
   { to: "/crm/notifications", code: "NF", label: "Notifications", icon: Bell, group: "Tenants" },

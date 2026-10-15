@@ -17,6 +17,7 @@ import { SCOPES } from "../../lib/adminScopes";
 import { SIGNAL_LABEL, basisLabel, effectiveFacts, rentSeenLabel } from "../../lib/crmPropertyInterest";
 import { Btn, C, Chip, Empty, TempDot, deadlineLabel, inr, relTime } from "./crmUi";
 import RequirementFields from "./RequirementFields";
+import PriorityControl from "./PriorityControl";
 import PropertyQuickView from "./PropertyQuickView";
 import { ASSIGNED_STATUS, crmClientBrokers } from "../../lib/partnerLeads";
 
@@ -744,6 +745,8 @@ export default function ClientRecord({
             Curate a list for {client.name?.split(" ")[0] || "them"}
           </Btn>
         )}
+
+        <PriorityControl client={client} onToast={onToast} />
 
         <HeaderFacts req={requirement} ownAnswers={ownAnswers} inferred={inferred} />
         {client.phone && (

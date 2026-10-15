@@ -125,6 +125,7 @@ function Card({ match, inList, passed, canWrite, onAdd, onPass, onUndoPass, onOp
 export default function CurateScreen({
   client, requirement, onRequirementChange, office, inventory, shortlists, reactions, access, settings,
   actorEmail, agentName, onShortlistsChanged, onPatchListing, onToast, onClose, rankBy = null, inferredBasis = "",
+  initialPicks = null, initialLabel = "",
 }) {
   // What the flats are ranked and pre-selected by: their requirement, or — with
   // nothing stated — what the flats they opened imply, same as Matches.
@@ -172,9 +173,19 @@ export default function CurateScreen({
         setPasses(ps);
         const d = mine.find((s) => s.status === "draft");
         if (d) { setDraft(d); setTray(d.property_ids ?? []); setOrigin(`Your saved draft from ${relTime(d.updated_at || d.created_at)}`); }
+        // Opened with flats already picked (Priority closures: new flats, this
+        // morning's picks): those go in, on top of any draft.
+        if (initialPicks?.length) {
+          seeded.current = true;
+          setTray((t) => [...new Set([...(d?.property_ids ?? t), ...initialPicks])]);
+          setDirty(true);
+          setOrigin(initialLabel || `${initialPicks.length} picked for ${client.name || "this client"}`);
+        }
         setLoaded(true);
       });
     return () => { alive = false; };
+    // Once per client: the picks are only the opening tray.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [client.id]);
   useEffect(() => {
     if (!loaded || seeded.current || draft) return;
