@@ -73,7 +73,7 @@ function MyInventory({ inventory, query }) {
                 <span className="pz-hint">{ok ? "All details in" : `${sc.done}/${sc.total} details · add ${sc.missing.slice(0, 2).join(", ").toLowerCase()}`}</span>
               </Link>
               {!ok
-                ? <Link to={pp(`/property/${l.property_id}?details=1`)} className="pz-btn pz-btn--sm pz-btn--gold" style={{ flex: "none" }}>Add details</Link>
+                ? <Link to={pp(`/property/${l.property_id}/edit`)} className="pz-btn pz-btn--sm pz-btn--gold" style={{ flex: "none" }}>Add details</Link>
                 : <CheckCircle2 size={20} color="var(--g)" style={{ flex: "none" }} aria-label="All details in" />}
             </div>
           ))}

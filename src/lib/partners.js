@@ -191,12 +191,23 @@ export async function createPartnerListing(draft, user, sharing) {
   return propertyId;
 }
 
-/** Edit a partner's own listing (RLS: poster only). */
+/**
+ * Edit one of the partner's flats — posted by them, or given to them (the
+ * flats MovEazy uploaded from the CRM for them). Only the flat's own fields;
+ * keys left out stay as they are (partner_listing_edit.sql).
+ */
 export async function updatePartnerListing(propertyId, patch) {
   need();
-  const { error } = await supabase.from("inventory").update({ ...patch, updated_at: new Date().toISOString() })
-    .eq("property_id", propertyId).select("property_id").single();
+  const { error } = await supabase.rpc("partner_listing_update", { p_property: propertyId, p: patch });
   if (error) throw error;
+}
+
+/** Everything "Modify details" shows for one of the partner's flats. */
+export async function fetchListingForEdit(propertyId) {
+  need();
+  const { data, error } = await supabase.rpc("partner_listing_for_edit", { p_property: propertyId });
+  if (error) throw error;
+  return data;
 }
 
 /**

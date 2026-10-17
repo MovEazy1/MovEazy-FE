@@ -23,33 +23,43 @@
  * One Publish at the bottom, live as soon as type, rent and locality are set.
  * "Post another" keeps the locality, furnishing and sharing: brokers post
  * several flats from the same area in a row.
+ *
+ * Edit (/property/:id/edit, "Modify details" on the flat's page): the same
+ * form, filled with what's saved — add, remove and reorder photos, frame the
+ * cover ("Adjust cover & order"), change any detail, the sharing and the
+ * owner — and Save changes. Any flat that is theirs, including the ones
+ * MovEazy uploaded for them (partner_listing_edit.sql).
  */
 import { useEffect, useMemo, useRef, useState } from "react";
-import { Link, useNavigate } from "react-router-dom";
+import { Link, useNavigate, useParams } from "react-router-dom";
 import {
-  Camera, Check, ChevronDown, ChevronLeft, ClipboardPaste, Link2, Lock, MapPin, RotateCcw, Search, Share2, Sparkles, Users, X,
+  Camera, Check, ChevronDown, ChevronLeft, ClipboardPaste, Crop, Link2, Lock, MapPin, RotateCcw, Search, Share2, Sparkles, Users, X,
 } from "lucide-react";
 import { useAuth } from "../../context/AuthContext";
 import { usePartner } from "./PartnerApp";
-import { shareSummary, toSharing } from "./ShareWithForm";
+import { fromSharing, shareSummary, toSharing } from "./ShareWithForm";
 import ShareMediums, { defaultShare } from "./ShareMediums";
 import MilestoneBar from "./MilestoneBar";
 import { cleanPasted } from "./PropertyDetailsSheet";
-import { Sheet, WhatsAppIcon, toast } from "./partnerUi";
+import { Empty, Loading, Sheet, TopBar, WhatsAppIcon, toast } from "./partnerUi";
 import { useLocalities } from "./useLocalities";
 import ListingMapPicker from "../../components/ListingMapPicker";
 import { FURNISHING_CHIPS, HOUSE_TYPES, POPULAR_LOCATIONS, ROOM_LABEL } from "../../lib/partnerFilters";
 import { bedroomsOf } from "../../lib/partnerMatch";
 import { geocodePlace } from "../../lib/geocode";
 import { generatePropertyId, mediaRejectionReason, uploadInventoryPhotos } from "../../lib/inventory";
-import { isVideoFile, orderListingMedia } from "../../lib/listingMedia";
+import { coverPhoto, isVideoFile, isVideoUrl, orderListingMedia } from "../../lib/listingMedia";
 import { resolveMapsLink } from "../../lib/mapLink";
 import { normalizeIndianMobile } from "../../lib/mobile";
-import { PUBLIC_ORIGIN, createPartnerListing, friendlyError, inr, pp, saveOwnContacts } from "../../lib/partners";
+import {
+  PUBLIC_ORIGIN, createPartnerListing, fetchListingForEdit, friendlyError, inr, pp, saveOwnContacts, saveSharing, updatePartnerListing,
+} from "../../lib/partners";
+import { supabase } from "../../lib/supabase";
+import { withParentArea } from "../../data/preferenceOptions";
 import { freeLeadsTopup } from "../../lib/partnerTenants";
 import { fetchUploadProgress, hasPhoto, justAwarded } from "../../lib/partnerPool";
 import PhotoReview from "../../components/PhotoReview";
-import { savedCoverUrl } from "../../lib/photoReview";
+import { initialCoverFor, keptCover, photosChanged, savedCoverUrl } from "../../lib/photoReview";
 import {
   DEFAULT_PARTNER_AMENITIES, FLOOR_CHIPS, POSTING_AMENITIES, depositOptions, maintenanceValue, occupantsFor,
 } from "../../lib/postingDetails";
@@ -57,6 +67,15 @@ import {
 const RENT_CHIPS = [15000, 20000, 25000, 30000, 40000, 50000];
 const PREFS_KEY = "mz_partner_post";
 const typeLabel = (t) => (t === ROOM_LABEL ? "Room in a shared flat" : t);
+/** A photo's kind: a fresh pick has its file, a saved one only its address. */
+const isVid = (p) => (p.file ? isVideoFile(p.file) : isVideoUrl(p.url));
+/** occupants_allowed back to the form's choice: "" is both. */
+function tenantsOf(list) {
+  const l = list ?? [];
+  if (l.includes("Family") && !l.includes("Bachelor")) return "Family";
+  if (l.includes("Bachelor") && !l.includes("Family")) return "Bachelor";
+  return "";
+}
 
 function readPrefs() {
   try { return JSON.parse(localStorage.getItem(PREFS_KEY) || "null") || {}; } catch { return {}; }
@@ -65,44 +84,83 @@ function savePrefs(p) {
   try { localStorage.setItem(PREFS_KEY, JSON.stringify(p)); } catch { /* private tab */ }
 }
 
+/** "Modify details": the flat as saved, its sharing and owner, into the same form. */
+export function EditProperty() {
+  const { id } = useParams();
+  const [edit, setEdit] = useState(null);
+  const [err, setErr] = useState("");
+  useEffect(() => {
+    let alive = true;
+    (async () => {
+      try {
+        const [listing, { data: sharing }, { data: contacts }] = await Promise.all([
+          fetchListingForEdit(id),
+          supabase.rpc("partner_listing_sharing", { p_property: id }),
+          supabase.from("partner_property_contacts").select("role,name,phone").eq("property_id", id),
+        ]);
+        if (!alive) return;
+        if (!listing) { setErr("This flat isn't there any more."); return; }
+        const owner = (contacts ?? []).find((c) => c.role === "owner") ?? {};
+        setEdit({ listing, share: fromSharing(sharing), owner: { name: owner.name || "", phone: owner.phone || "" } });
+      } catch (e) {
+        if (alive) setErr(friendlyError(e, "Couldn't open this flat."));
+      }
+    })();
+    return () => { alive = false; };
+  }, [id]);
+  if (err) return <><TopBar title="Modify details" back /><Empty>{err}</Empty></>;
+  if (!edit) return <><TopBar title="Modify details" back /><Loading label="Opening the flat…" /></>;
+  return <PostFlat edit={edit} />;
+}
+
 /** A fresh form each time "Post another" is tapped, carrying the area, furnishing and sharing. */
 export default function AddProperty() {
   const [n, setN] = useState(0);
   return <PostFlat key={n} onAnother={() => { setN((x) => x + 1); window.scrollTo(0, 0); }} />;
 }
 
-function PostFlat({ onAnother }) {
+function PostFlat({ onAnother, edit = null }) {
   const navigate = useNavigate();
   const { user } = useAuth();
   const { groups, reloadInventory } = usePartner();
   const localities = useLocalities();
   const [prefs] = useState(readPrefs);
-  const [pid] = useState(() => generatePropertyId());
+  const ed = edit?.listing ?? null;
+  const [pid] = useState(() => ed?.property_id || generatePropertyId());
+  // What was saved, to tell whether the photos changed.
+  const [savedSrcs] = useState(() => orderListingMedia(ed?.images ?? []));
 
-  const [photos, setPhotos] = useState([]); // { key, file, preview, status, url, why }
-  const [type, setType] = useState("1 BHK");
-  const [rent, setRent] = useState("");
-  const [furnishing, setFurnishing] = useState(prefs.furnishing || "");
-  const [area, setArea] = useState(prefs.area || "HSR Layout");
+  // { key, file, preview, status, url, why } — a saved photo has no file, only its url.
+  const [photos, setPhotos] = useState(() => savedSrcs.map((url) => ({ key: url, url, preview: url, status: "done", file: null })));
+  const [type, setType] = useState(ed?.flat_type || "1 BHK");
+  const [rent, setRent] = useState(ed ? String(Number(ed.rent) || "") : "");
+  const [furnishing, setFurnishing] = useState(ed ? ed.furnishing || "" : prefs.furnishing || "");
+  const [area, setArea] = useState(ed?.area || prefs.area || "HSR Layout");
   const [areaQ, setAreaQ] = useState("");
-  const [pin, setPin] = useState(null);
+  const [pin, setPin] = useState(() => (ed && ed.latitude != null && ed.longitude != null ? [Number(ed.latitude), Number(ed.longitude)] : null));
   const [link, setLink] = useState("");
   const [linkState, setLinkState] = useState("");
   const [showMap, setShowMap] = useState(false);
   // Every flat starts shared everywhere at 50% — groups too, once they've loaded.
-  const [share, setShare] = useState(() => defaultShare(groups ?? []));
-  const groupsSeeded = useRef((groups ?? []).length > 0);
+  const [share, setShare] = useState(() => edit?.share ?? defaultShare(groups ?? []));
+  const groupsSeeded = useRef(Boolean(edit) || (groups ?? []).length > 0);
   useEffect(() => {
     if (groupsSeeded.current || !(groups ?? []).length) return;
     groupsSeeded.current = true;
     setShare((cur) => ({ ...cur, groupPct: { ...Object.fromEntries(groups.map((g) => [g.id, 50])), ...cur.groupPct } }));
   }, [groups]);
   const [progress, setProgress] = useState(null);
-  const [more, setMore] = useState(false);
-  const [x, setX] = useState({ deposit: "", availableFrom: "", floor: "", ownerName: "", ownerPhone: "", description: "", title: "" });
-  const [maintenance, setMaintenance] = useState("");
-  const [tenants, setTenants] = useState(""); // "" (both) | "Family" | "Bachelor"
-  const [amenities, setAmenities] = useState(DEFAULT_PARTNER_AMENITIES);
+  const [more, setMore] = useState(Boolean(ed));
+  const [x, setX] = useState(() => (ed ? {
+    deposit: Number(ed.deposit) > 0 ? String(Number(ed.deposit)) : "",
+    availableFrom: ed.available_from || "",
+    floor: ed.floor_number == null ? "" : String(ed.floor_number),
+    ownerName: edit.owner.name, ownerPhone: edit.owner.phone,
+    description: ed.description || "", title: ed.title || "",
+  } : { deposit: "", availableFrom: "", floor: "", ownerName: "", ownerPhone: "", description: "", title: "" }));
+  const [maintenance, setMaintenance] = useState(ed && Number(ed.maintenance) > 0 ? String(Number(ed.maintenance)) : "");
+  const [tenants, setTenants] = useState(ed ? tenantsOf(ed.occupants_allowed) : ""); // "" (both) | "Family" | "Bachelor"
+  const [amenities, setAmenities] = useState(ed ? ed.amenities ?? [] : DEFAULT_PARTNER_AMENITIES);
   const [floorMore, setFloorMore] = useState(false);
   const [saving, setSaving] = useState(false);
   const [missing, setMissing] = useState([]);
@@ -112,7 +170,7 @@ function PostFlat({ onAnother }) {
   const rentRef = useRef(null);
   const photosRef = useRef(photos);
   photosRef.current = photos;
-  useEffect(() => () => photosRef.current.forEach((p) => URL.revokeObjectURL(p.preview)), []);
+  useEffect(() => () => photosRef.current.forEach((p) => { if (p.file) URL.revokeObjectURL(p.preview); }), []);
 
   const setMoreField = (patch) => setX((cur) => ({ ...cur, ...patch }));
   const uploading = photos.some((p) => p.status === "uploading");
@@ -178,7 +236,7 @@ function PostFlat({ onAnother }) {
 
   const removePhoto = (k) => setPhotos((cur) => {
     const hit = cur.find((p) => p.key === k);
-    if (hit) URL.revokeObjectURL(hit.preview);
+    if (hit?.file) URL.revokeObjectURL(hit.preview);
     return cur.filter((p) => p.key !== k);
   });
 
@@ -203,12 +261,15 @@ function PostFlat({ onAnother }) {
   /* ── Publish ────────────────────────────────────────────────────────────── */
   // The review screen (swipe, reorder, frame the cover) opens before the first
   // publish whenever there are photos; `rev` is what it settled.
-  const [reviewing, setReviewing] = useState(false);
+  const [reviewing, setReviewing] = useState(""); // "" | "save" | "adjust"
+  // Editing: the order and framed cover set with "Adjust cover & order", used on Save.
+  const [settled, setSettled] = useState(null);
   const reviewItems = useMemo(
-    () => photos.filter((p) => p.status === "done").map((p) => ({ key: p.key, src: p.preview || p.url, isVideo: isVideoFile(p.file) })),
+    () => photos.filter((p) => p.status === "done").map((p) => ({ key: p.key, src: p.preview || p.url, isVideo: isVid(p), file: p.file })),
     [photos],
   );
   const publish = async (rev) => {
+    if (ed) return saveEdit(rev);
     const need = [];
     if (!(Number(rent) >= 1000)) need.push("rent");
     if (!area) need.push("area");
@@ -220,7 +281,7 @@ function PostFlat({ onAnother }) {
     }
     if (uploading) { setErr("Photos are still uploading — a few seconds."); return; }
     if (x.ownerPhone && !normalizeIndianMobile(x.ownerPhone)) { setMore(true); setErr("The owner's mobile should be 10 digits."); return; }
-    if (!rev && reviewItems.some((m) => !m.isVideo)) { setReviewing(true); return; }
+    if (!rev && reviewItems.some((m) => !m.isVideo)) { setReviewing("save"); return; }
     setSaving(true);
     setErr("");
     try {
@@ -273,6 +334,71 @@ function PostFlat({ onAnother }) {
     }
   };
 
+  /** Edit: the flat, its photos and cover, its sharing and owner — saved and live at once. */
+  async function saveEdit(revArg) {
+    const need = [];
+    if (!(Number(rent) >= 1000)) need.push("rent");
+    if (!area) need.push("area");
+    setMissing(need);
+    if (need.length) {
+      document.getElementById(`pf-${need[0]}`)?.scrollIntoView({ behavior: "smooth", block: "center" });
+      return;
+    }
+    if (uploading) { setErr("Photos are still uploading — a few seconds."); return; }
+    if (x.ownerPhone && !normalizeIndianMobile(x.ownerPhone)) { setMore(true); setErr("The owner's mobile should be 10 digits."); return; }
+    const rev = revArg ?? settled;
+    // New or removed photos with no cover chosen yet: frame it first, as when posting.
+    if (!rev && photosChanged(reviewItems, savedSrcs) && reviewItems.some((m) => !m.isVideo)) { setReviewing("save"); return; }
+    setSaving(true);
+    setErr("");
+    try {
+      let [latitude, longitude] = pin || [null, null];
+      if (latitude == null) {
+        const g = await geocodePlace(`${area}, Bengaluru`).catch(() => null);
+        if (g?.ok) { latitude = g.lat; longitude = g.lng; }
+      }
+      const done = photos.filter((p) => p.status === "done");
+      const ordered = rev
+        ? [...rev.order.map((k) => done.find((p) => p.key === k)).filter(Boolean), ...done.filter((p) => !rev.order.includes(p.key))]
+        : done;
+      const images = orderListingMedia(ordered.map((p) => p.url));
+      const chosen = rev?.cover ? done.find((p) => p.key === rev.cover.key) : null;
+      const coverImageUrl = chosen
+        ? (await savedCoverUrl({ cover: rev.cover, source: chosen.file || chosen.url, finalUrl: chosen.url, folder: pid, existingCoverUrl: ed.cover_image_url || "" }))
+          || coverPhoto(images)
+        : keptCover(ed.cover_image_url || "", images);
+      const room = type === ROOM_LABEL;
+      await updatePartnerListing(pid, {
+        flat_type: type,
+        property_type: room ? "Shared Room" : (ed.property_type || "Apartment"),
+        bedrooms: room ? 1 : Math.max(1, Math.floor(bedroomsOf(type) || 1)),
+        rent: Number(rent),
+        deposit: Number(x.deposit) || 0,
+        maintenance: maintenanceValue(maintenance),
+        furnishing,
+        area,
+        ...(area !== ed.area ? { nearby_areas: withParentArea(area, []) } : {}),
+        latitude, longitude,
+        occupants_allowed: occupantsFor(tenants),
+        amenities,
+        available_from: x.availableFrom || null,
+        floor_number: x.floor === "" ? null : Number(x.floor),
+        title: x.title.trim() || `${type} in ${area}`,
+        description: cleanPasted(x.description),
+        images,
+        cover_image_url: coverImageUrl,
+      });
+      await saveSharing(pid, toSharing(share));
+      await saveOwnContacts(pid, [{ role: "owner", name: x.ownerName.trim(), phone: normalizeIndianMobile(x.ownerPhone) || "" }]);
+      await reloadInventory();
+      toast(hasPhoto({ images, cover_image_url: coverImageUrl }) ? "Saved — your changes are live" : "Saved");
+      navigate(pp(`/property/${pid}`), { replace: true });
+    } catch (e) {
+      setErr(friendlyError(e, "Could not save the changes."));
+      setSaving(false);
+    }
+  }
+
   if (done) {
     const url = `${PUBLIC_ORIGIN}/property/${done.id}`;
     const msg = `${typeLabel(type)} in ${area} — ${inr(rent)}/month${furnishing ? `, ${furnishing.toLowerCase()}` : ""}. Photos and details: ${url}`;
@@ -312,8 +438,8 @@ function PostFlat({ onAnother }) {
       <header className="ap-top">
         <button type="button" className="pz-iconbtn" aria-label="Back" onClick={() => navigate(-1)}><ChevronLeft size={24} /></button>
         <div style={{ flex: 1, minWidth: 0 }}>
-          <h1>Post a flat</h1>
-          <span>Takes under a minute · live on MovEazy at once</span>
+          <h1>{ed ? "Modify details" : "Post a flat"}</h1>
+          <span>{ed ? `${pid} · changes go live as soon as you save` : "Takes under a minute · live on MovEazy at once"}</span>
         </div>
       </header>
 
@@ -332,7 +458,7 @@ function PostFlat({ onAnother }) {
                 {photos.map((p, i) => (
                   <figure key={p.key} data-photo={p.key} className={`ap-thumb ap-drag ${p.status}${dragKey === p.key ? " dragging" : ""}`}
                     onPointerDown={(e) => onThumbDown(e, p.key)} onPointerMove={onThumbMove} onPointerUp={onThumbUp} onPointerCancel={onThumbUp}>
-                    {isVideoFile(p.file) ? <video src={p.preview} muted playsInline /> : <img src={p.preview} alt="" />}
+                    {isVid(p) ? <video src={p.preview} muted playsInline /> : <img src={p.preview} alt="" />}
                     {i === 0 && <span className="ap-cover">Cover</span>}
                     <span className="ap-state" aria-label={p.status}>
                       {p.status === "uploading" && <i className="ap-spin" />}
@@ -347,6 +473,11 @@ function PostFlat({ onAnother }) {
                 )}
               </div>
               {photos.length > 1 && <p className="ap-drag-hint">Drag photos to change the order — the first one is the cover.</p>}
+              {ed && reviewItems.some((m) => !m.isVideo) && (
+                <button type="button" className="pz-btn pz-btn--sm" style={{ marginTop: 8 }} onClick={() => setReviewing("adjust")} disabled={uploading}>
+                  <Crop size={14} /> Adjust cover & order{settled ? " · set" : ""}
+                </button>
+              )}
               <p className={`ap-photo-state${photos.some((p) => p.status === "failed") ? " bad" : ""}`}>
                 {uploading ? <><i className="ap-spin" /> Uploading {uploaded}/{photos.length}…</>
                   : photos.some((p) => p.status === "failed") ? "Some didn't upload — tap ↻ to retry, or remove them."
@@ -361,7 +492,7 @@ function PostFlat({ onAnother }) {
         <section className="ap-sec">
           <h2>Type</h2>
           <div className="ap-chips">
-            {HOUSE_TYPES.map((t) => (
+            {(HOUSE_TYPES.includes(type) ? HOUSE_TYPES : [type, ...HOUSE_TYPES]).map((t) => (
               <button key={t} type="button" className={`ap-chip${type === t ? " on" : ""}`} onClick={() => setType(t)}>{t === ROOM_LABEL ? "Room (shared flat)" : t}</button>
             ))}
           </div>
@@ -511,6 +642,13 @@ function PostFlat({ onAnother }) {
         {/* Who sells it */}
         <section className="ap-sec">
           <h2>Who can close it <span>brokerage share</span></h2>
+          {ed && !share.platformOn && (
+            <div style={{ background: "#FEF7E6", border: "1px solid #F1D99B", borderRadius: 12, padding: 10, marginBottom: 10 }}>
+              <strong style={{ display: "block", color: "#5C3F05", fontSize: 13.5 }}>This inventory is not shared with other partners.</strong>
+              <span className="pz-meta" style={{ display: "block", margin: "4px 0 8px" }}>Do you want to share it? Partners&apos; AI Matching sends it to their tenants, and you keep your share of the brokerage.</span>
+              <button type="button" className="pz-btn pz-btn--gold pz-btn--sm" onClick={() => setShare({ ...share, platformOn: true, platformPct: 50 })}>Share with all MovEazy partners</button>
+            </div>
+          )}
           <ShareMediums value={share} onChange={setShare} groups={groups ?? []} />
           <p className="pz-hint" style={{ marginTop: 8 }}>With a photo it's also live on moveazy.co.in. Partners see your name and number only when their tenant likes it.</p>
         </section>
@@ -553,20 +691,28 @@ function PostFlat({ onAnother }) {
           <span>{area || "Pick a locality"}{furnishing ? ` · ${furnishing.replace(" Furnished", "")}` : ""} · {photos.length ? `${uploaded} photo${uploaded === 1 ? "" : "s"}` : "no photos"}</span>
         </div>
         <button type="button" className={`pz-btn ${ready ? "pz-btn--gold" : "pz-btn--primary"} ap-publish`} onClick={() => publish()} disabled={saving}>
-          {saving ? "Posting…" : uploading && ready ? "Uploading…" : ready ? "Publish" : !(Number(rent) >= 1000) ? "Add rent" : "Publish"}
+          {saving ? (ed ? "Saving…" : "Posting…") : uploading && ready ? "Uploading…" : !(Number(rent) >= 1000) ? "Add rent" : ed ? "Save changes" : "Publish"}
         </button>
       </footer>
 
       {reviewing && (
         <PhotoReview
           items={reviewItems}
-          confirmLabel="Publish"
+          initialCover={ed ? (settled?.cover ?? initialCoverFor(reviewItems, ed.cover_image_url || "")) : undefined}
+          confirmLabel={reviewing === "adjust" ? "Done" : ed ? "Save changes" : "Publish"}
           busy={saving}
-          onCancel={() => setReviewing(false)}
+          onCancel={() => setReviewing("")}
           onConfirm={async (rev) => {
             setPhotos((cur) => [...rev.order.map((k) => cur.find((p) => p.key === k)).filter(Boolean), ...cur.filter((p) => !rev.order.includes(p.key))]);
+            if (reviewing === "adjust") {
+              setSettled(rev);
+              setReviewing("");
+              toast("Cover and order set — tap Save changes");
+              return;
+            }
+            if (ed) setSettled(rev);
             await publish(rev);
-            setReviewing(false);
+            setReviewing("");
           }}
         />
       )}

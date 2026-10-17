@@ -54,6 +54,7 @@ const InventoryHome = lazy(() => import("./InventoryHome"));
 const PropertyDetail = lazy(() => import("./PropertyDetail"));
 const PropertyContacts = lazy(() => import("./PropertyContacts"));
 const AddProperty = lazy(() => import("./AddProperty"));
+const EditProperty = lazy(() => import("./AddProperty").then((m) => ({ default: m.EditProperty })));
 const EditSharing = lazy(() => import("./EditSharing"));
 const LeadsList = lazy(() => import("./LeadsList"));
 const LeadForm = lazy(() => import("./LeadForm"));
@@ -119,7 +120,7 @@ function teamWa(text) {
 
 /** Everything after the gate: shared data, nav, routes. */
 // Screens where the sticky Join Premium button would be in the way.
-const NO_BAR = /^\/(premium|welcome|referrals|add|leads\/new|leads\/[^/]+\/edit|property\/[^/]+\/(sharing|contacts))/;
+const NO_BAR = /^\/(premium|welcome|referrals|add|leads\/new|leads\/[^/]+\/edit|property\/[^/]+\/(sharing|contacts|edit))/;
 
 function PartnerWorkspace({ me, reloadMe }) {
   // The screens a broker opens next, fetched while the phone is idle.
@@ -285,6 +286,7 @@ function PartnerWorkspace({ me, reloadMe }) {
             <Route path="property/:id/contacts" element={<PropertyContacts />} />
             <Route path="property/:id/sharing" element={<EditSharing />} />
             <Route path="add/property" element={<AddProperty />} />
+            <Route path="property/:id/edit" element={<EditProperty />} />
             <Route path="leads" element={<LeadsList />} />
             <Route path="leads/new" element={<LeadForm />} />
             <Route path="leads/:id" element={<LeadRedirect />} />

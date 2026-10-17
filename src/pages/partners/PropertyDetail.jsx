@@ -6,7 +6,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { Link, useNavigate, useParams, useSearchParams } from "react-router-dom";
 import {
-  Archive, Calendar, Check, ChevronRight, ClipboardList, Crown, ExternalLink, Heart, Lock, MapPin, MoreVertical, Pencil, Phone, Share2, Users, X,
+  Archive, Calendar, Check, ChevronRight, Crown, ExternalLink, Heart, Lock, MapPin, MoreVertical, Pencil, Phone, Share2, Users, X,
 } from "lucide-react";
 import { usePartner } from "./PartnerApp";
 import ShareSheet from "./ShareSheet";
@@ -252,6 +252,12 @@ export default function PropertyDetail() {
           <a className="pz-btn pz-wa" href={waLink("", customerMessage(l))} target="_blank" rel="noreferrer"><WhatsAppIcon /> WhatsApp</a>
           <button type="button" className="pz-btn" onClick={() => setShare(true)}><Share2 size={17} /> Share</button>
         </div>
+        {/* Theirs: every detail, photo and the sharing, editable on one screen. */}
+        {mine && (
+          <Link to={pp(`/property/${id}/edit`)} className="pz-btn pz-btn--gold pz-btn--block" style={{ marginBottom: 12, textDecoration: "none" }}>
+            <Pencil size={16} /> Modify details
+          </Link>
+        )}
 
         {l.anonymous && !l.locked ? (
           <div className="pz-section" style={{ background: "var(--noir)", color: "#fff", borderColor: "var(--noir)" }}>
@@ -375,7 +381,7 @@ export default function PropertyDetail() {
           </div>
         )}
 
-        <FlatCare listing={l} mine={mine} onAddDetails={() => setDetails(true)} />
+        <FlatCare listing={l} mine={mine} onAddDetails={() => navigate(pp(`/property/${id}/edit`))} />
         <p className="pz-hint" style={{ textAlign: "center" }}>{l.property_id}</p>
       </div>
 
@@ -410,13 +416,8 @@ export default function PropertyDetail() {
       {menu && (
         <Sheet title="Property actions" onClose={() => setMenu(false)}>
           {mine && (
-            <button type="button" className="pz-menurow" onClick={() => navigate(pp(`/property/${id}/sharing`))}>
-              <Pencil size={18} /> <span>Edit sharing, brokerage & contacts</span>
-            </button>
-          )}
-          {mine && (
-            <button type="button" className="pz-menurow" onClick={() => { setMenu(false); setDetails(true); }}>
-              <ClipboardList size={18} /> <span>Add more details</span>
+            <button type="button" className="pz-menurow" onClick={() => navigate(pp(`/property/${id}/edit`))}>
+              <Pencil size={18} /> <span>Modify details — photos, rent, sharing, everything</span>
             </button>
           )}
           {mine && l.status !== "rented" && (
