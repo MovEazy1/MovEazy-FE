@@ -17,7 +17,7 @@ import { useClientReactions } from "./PropertyQuickView";
 const CurateScreen = lazy(() => import("./CurateScreen"));
 import {
   TEMPERATURES, createClient, fetchShortlists, markContacted,
-  saveClientRequirement, resetClientRequirement, statusLabel, tempColor, syncClientsFromSignups, fetchPartnerNames,
+  saveClientRequirement, resetClientRequirement, statusLabel, tempColor, syncClientsFromSignups, fetchPartnerNames, CLOSED_STATUSES,
 } from "../../lib/crmClients";
 import { formatDuration } from "../../lib/sessionSync";
 import {
@@ -221,6 +221,25 @@ export default function CrmClientsPage() {
   const [params, setParams] = useSearchParams();
   const selectedId = params.get("client") || "";
 
+  // "Hide" filters on every tab and on search: closed clients, and those being
+  // worked in Priority closures. Remembered on this device.
+  const HIDE_KEY = "crm-clients-hide";
+  const [hide, setHide] = useState(() => {
+    try { return new Set(JSON.parse(localStorage.getItem(HIDE_KEY) || "[]")); } catch { return new Set(); }
+  });
+  const toggleHide = (id) => setHide((cur) => {
+    const next = new Set(cur);
+    if (next.has(id)) next.delete(id); else next.add(id);
+    try { localStorage.setItem(HIDE_KEY, JSON.stringify([...next])); } catch { /* private tab: not remembered */ }
+    return next;
+  });
+  const [clockAt] = useState(() => Date.now());
+  /** In Priority closures now (not those joining on a later day). */
+  const activePriority = useMemo(
+    () => new Set((crm.priority ?? []).filter((p) => new Date(p.active_from).getTime() <= clockAt).map((p) => p.client_id)),
+    [crm.priority, clockAt],
+  );
+
   // Tenants from a partner's QR poster carry a QR mark with the partner's name.
   const anyQr = useMemo(() => (clients ?? []).some((c) => c.via === "qr"), [clients]);
   const [partnerNames, setPartnerNames] = useState(() => new Map());
@@ -343,6 +362,11 @@ export default function CrmClientsPage() {
     // A search spans every tab: someone typing a phone number wants that
     // person wherever they are, not only if they happen to be under this tab.
     let rows = needle ? clients : clients.filter((c) => bucketOf(summaries.get(c.id)) === tab);
+    // Asking for Contacted's "Closed" filter is asking to see them, whatever Hide says.
+    if (hide.has("closed") && !(tab === "contacted" && extras.has("closed") && !needle)) {
+      rows = rows.filter((c) => !CLOSED_STATUSES.includes(c.status));
+    }
+    if (hide.has("priority")) rows = rows.filter((c) => !activePriority.has(c.id));
 
     if (needle) {
       rows = rows.filter((c) => {
@@ -378,7 +402,7 @@ export default function CrmClientsPage() {
       due: (c) => shortlistDueTs(ownAnswersByUser.get(c.user_id)?.notes),
     });
   }, [clients, q, tab, freshSort, contactedSort, stageFilter, tempFilter, extras, summaries, reqByClient, actorEmail,
-    ownAnswersByUser, inferredByClient]);
+    ownAnswersByUser, inferredByClient, hide, activePriority]);
 
   const selected = useMemo(
     () => clients.find((c) => c.id === selectedId) ?? visible[0] ?? null,
@@ -573,6 +597,15 @@ export default function CrmClientsPage() {
       <div style={{ padding: "9px 12px 6px", display: "flex", flexDirection: "column", gap: 7, flex: "none" }}>
         <input className="crm-input" placeholder="Search every tab: name, phone, area…" value={q}
           onChange={(e) => setQ(e.target.value)} />
+        <div style={{ display: "flex", gap: 5, alignItems: "center", flexWrap: "wrap" }}>
+          <span className="crm-label" style={{ flex: "none" }}>Hide</span>
+          <Chip on={hide.has("closed")} onClick={() => toggleHide("closed")} title="Leave out clients closed by us or elsewhere, on every tab and in search">
+            Closed
+          </Chip>
+          <Chip on={hide.has("priority")} onClick={() => toggleHide("priority")} title="Leave out clients in Priority closures, on every tab and in search">
+            Priority closures · {activePriority.size}
+          </Chip>
+        </div>
 
         {/* The three buckets. Counts are always the whole bucket, so a filter
             below never makes it look as if leads have gone missing. */}
