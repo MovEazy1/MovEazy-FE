@@ -9,7 +9,7 @@
  * never renders blank or with a wrong price flashing in.
  */
 import { useEffect, useState } from "react";
-import { supabase, isSupabaseConfigured } from "./supabase";
+import { supabase, supabasePublic, isSupabaseConfigured } from "./supabase";
 
 export const LANDING_DEFAULTS = {
   // Broker Premium, per month
@@ -44,11 +44,18 @@ try { saved = JSON.parse(localStorage.getItem(SAVED_KEY) || "null"); } catch { s
 
 const merge = (data) => ({ ...LANDING_DEFAULTS, ...Object.fromEntries(Object.entries(data).filter(([, v]) => v !== null && v !== "")) });
 
-export async function fetchLandingSettings({ fresh = false } = {}) {
-  if (cached && !fresh) return cached;
-  if (!isSupabaseConfigured || !supabase) return LANDING_DEFAULTS;
+let inflight = null;
+export function fetchLandingSettings({ fresh = false } = {}) {
+  if (cached && !fresh) return Promise.resolve(cached);
+  // One request at a time: App.jsx starts it as the page opens, the page asks again.
+  if (!fresh) return (inflight ??= loadLandingSettings().finally(() => { inflight = null; }));
+  return loadLandingSettings();
+}
+async function loadLandingSettings() {
+  if (!isSupabaseConfigured || !supabasePublic) return LANDING_DEFAULTS;
   try {
-    const { data, error } = await supabase.rpc("landing_settings");
+    // Public settings: the session-free client, so it needn't wait for sign-in to restore.
+    const { data, error } = await supabasePublic.rpc("landing_settings");
     if (error || !data || typeof data !== "object") return cached || LANDING_DEFAULTS;
     cached = merge(data);
     try { localStorage.setItem(SAVED_KEY, JSON.stringify(cached)); } catch { /* ignore */ }

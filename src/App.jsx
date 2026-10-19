@@ -9,6 +9,7 @@ import ClaimEarlierViews from "./components/ClaimEarlierViews";
 import RequirePhoneForListing from "./components/RequirePhoneForListing";
 import { useSessionTracking } from "./hooks/useSessionTracking";
 import { isPhoneNow } from "./pages/crm/mobile/phoneQuery";
+import { hasStoredSession } from "./lib/supabase";
 
 // Lazy like every page: the tenant home pulls in the map, the swipe deck and
 // the landing kit, and the CRM, owner and partner apps were downloading all of
@@ -129,6 +130,18 @@ function prefetchCrmPage(path) {
   page?.().catch(() => {});
 }
 if (typeof window !== "undefined" && /^\/crm(\/|$)/.test(window.location.pathname)) prefetchCrmPage(window.location.pathname);
+
+/**
+ * A first-time visitor on the home page: its flats and settings are asked for
+ * now, while the home page's own code is still on its way, instead of after it
+ * has arrived and drawn. Public reads (lib/inventory, lib/landingSettings), and
+ * the page picks up these same requests.
+ */
+if (typeof window !== "undefined" && window.location.pathname === "/"
+  && !/^(partners|owners?|society|tenant)\./i.test(window.location.hostname) && !hasStoredSession()) {
+  import("./lib/inventory").then((m) => m.fetchShowcaseInventory()).catch(() => {});
+  import("./lib/landingSettings").then((m) => m.fetchLandingSettings()).catch(() => {});
+}
 
 const IS_OWNER_HOST = typeof window !== "undefined" && /^owners?\./i.test(window.location.hostname);
 const IS_PARTNER_HOST = typeof window !== "undefined" && /^partners\./i.test(window.location.hostname);

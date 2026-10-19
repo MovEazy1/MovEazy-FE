@@ -12,7 +12,8 @@ import {
   ShieldCheck, Sparkles, Users, Wallet,
 } from "lucide-react";
 import SwipeDeck from "../../components/SwipeDeck";
-import { fetchInventoryAsListings } from "../../lib/inventory";
+import { fetchShowcaseInventory } from "../../lib/inventory";
+import { thumbUrl } from "../../lib/imageShrink";
 import { listingForScoring, scoreMatch } from "../../lib/inventoryMatch";
 import { isVideoUrl } from "../../lib/listingMedia";
 import logoOnLight from "../../assets/logo/moveazy-logo-mint-light.png";
@@ -24,6 +25,12 @@ export const T = {
 };
 
 const loads = (src) => new Promise((res) => { const i = new Image(); i.onload = () => res(true); i.onerror = () => res(false); i.src = src; });
+/** The photo to show in a phone mock-up: its 480 px thumbnail (~35 KB), else the full photo, else none. */
+const shown = async (src) => {
+  const small = thumbUrl(src);
+  if (small !== src && await loads(small)) return small;
+  return (await loads(src)) ? src : null;
+};
 
 /**
  * Up to five real, published homes with a photo that loads, each scored by the
@@ -36,17 +43,19 @@ export function useShowcaseMatches() {
     let alive = true;
     (async () => {
       let rows = [];
-      try { rows = await fetchInventoryAsListings({ limit: 120 }); } catch { rows = []; }
+      // Started by App.jsx as the page opened; this picks up the same request.
+      try { rows = await fetchShowcaseInventory(); } catch { rows = []; }
       const withPhoto = rows
         .map((l) => ({ l, src: [l.image, ...(l.images ?? [])].find((u) => u && !isVideoUrl(u)) }))
         .filter((x) => x.src && x.l.monthlyRent && x.l.bhk)
         .sort((a, b) => (b.l.images?.length ?? 0) - (a.l.images?.length ?? 0))
         .slice(0, 18);
       const good = [];
-      for (let i = 0; i < withPhoto.length && good.length < 12; i += 6) {
+      // Six that load is plenty for five cards: one round of six, rarely two.
+      for (let i = 0; i < withPhoto.length && good.length < 6; i += 6) {
         const batch = withPhoto.slice(i, i + 6);
-        const ok = await Promise.all(batch.map((x) => loads(x.src)));
-        batch.forEach((x, j) => { if (ok[j] && good.length < 12) good.push({ ...x.l, image: x.src, images: [x.src] }); });
+        const ok = await Promise.all(batch.map((x) => shown(x.src)));
+        batch.forEach((x, j) => { if (ok[j] && good.length < 6) good.push({ ...x.l, image: ok[j], images: [ok[j]] }); });
       }
       if (!alive || !good.length) return;
       // The requirement a real renter could have had: the area and home size

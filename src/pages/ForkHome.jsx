@@ -14,14 +14,13 @@
  * asks for a number (or not, for a signed-in or known visitor), then opens the
  * AI broker, or goes straight to saved matches; "List my flat" is auth-gated.
  */
-import { Fragment, useEffect, useRef, useState } from "react";
+import { Fragment, Suspense, lazy, useEffect, useRef, useState } from "react";
 import { Link, useNavigate, useSearchParams } from "react-router-dom";
 import {
   ArrowRight, BadgeCheck, CalendarCheck, ClipboardList, Globe, Home, Megaphone, MessageCircle, ShieldCheck, Sparkles, UserRound, Zap,
 } from "lucide-react";
 import { useAuth } from "../context/AuthContext";
 import { useLoginModal } from "../context/LoginModalContext";
-import AIBroker from "../components/AIBroker";
 import RequirePhoneFirst from "../components/RequirePhoneFirst";
 import MovEazyNav from "../components/layout/MovEazyNav";
 import { fetchUserRequirement } from "../lib/userRequirements";
@@ -32,10 +31,16 @@ import { prefetchWhenIdle } from "../lib/prefetch";
 import { HighlightScene, Phone, SITE_CSS, SiteFooter, clamp, ease, reduced, useScrollScene } from "./home/homeKit";
 import { PerfectHomeScreen, SwipeScreen, useSteps } from "./home/homeScreens";
 import logoOnDark from "../assets/logo/moveazy-logo-mint-dark.png";
-import TenantHome from "./tenant/TenantHome";
-import TenantSignIn from "./tenant/TenantSignIn";
 import { hasOwnerListing } from "../lib/inventory";
 import { fetchMyTenantProfile, loadTenantProfile } from "../lib/tenantProfile";
+
+// Not on a first visit's path: the questionnaire (and its map) loads when it's
+// opened, the tenant home and sign-in when someone signed in or on the tenant
+// app gets here. They used to come with the landing page, before it could draw.
+const AIBroker = lazy(() => import("../components/AIBroker"));
+const TenantHome = lazy(() => import("./tenant/TenantHome"));
+const TenantSignIn = lazy(() => import("./tenant/TenantSignIn"));
+const Cream = () => <div style={{ minHeight: "100vh", background: "#F4F2ED" }} />;
 
 /* ── copy: kept to the bone ─────────────────────────────────────────────── */
 const STORY = [
@@ -130,6 +135,9 @@ export default function ForkHome({ tenantEntry = false }) {
   const { openLogin } = useLoginModal();
   const navigate = useNavigate();
   const [showChatbot, setShowChatbot] = useState(false);
+  // Once opened, the questionnaire stays mounted so it can close the way it opened.
+  const [brokerUsed, setBrokerUsed] = useState(false);
+  useEffect(() => { if (showChatbot) setBrokerUsed(true); }, [showChatbot]);
   const [showPhoneGate, setShowPhoneGate] = useState(false);
   const [checkingPrefs, setCheckingPrefs] = useState(false);
   const [pendingMatchCheck, setPendingMatchCheck] = useState(false);
@@ -248,12 +256,14 @@ export default function ForkHome({ tenantEntry = false }) {
         onClose={() => setShowPhoneGate(false)}
         onDone={() => { setShowPhoneGate(false); setShowChatbot(true); }}
       />
-      <AIBroker open={showChatbot} onClose={() => setShowChatbot(false)} />
+      {(showChatbot || brokerUsed) && (
+        <Suspense fallback={null}><AIBroker open={showChatbot} onClose={() => setShowChatbot(false)} /></Suspense>
+      )}
     </>
   );
 
   if (tenantEntry && !user) {
-    return authLoading ? <div style={{ minHeight: "100vh", background: "#F4F2ED" }} /> : <TenantSignIn />;
+    return authLoading ? <Cream /> : <Suspense fallback={<Cream />}><TenantSignIn /></Suspense>;
   }
 
   if (user && (tenantEntry || ownerAccount !== true)) {
@@ -261,14 +271,14 @@ export default function ForkHome({ tenantEntry = false }) {
     return (
       <div style={{ background: "#F4F2ED", minHeight: "100vh" }}>
         <MovEazyNav active="home" onFindFlat={startFlatSearch} />
-        <TenantHome
+        <Suspense fallback={<Cream />}><TenantHome
           underNav
           name={user.name}
           profile={{ name: user.name, phone: user.phone, ...tenantProfile }}
           onFind={() => startFlatSearch()}
           onList={() => listMyFlat()}
           onProfile={() => navigate("/tenant-profile")}
-        />
+        /></Suspense>
         {flows}
       </div>
     );

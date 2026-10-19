@@ -45,6 +45,17 @@ export const supabase = isSupabaseConfigured
   : null;
 
 /**
+ * For public reads only — the landing page's flats and settings. It carries
+ * the anon key and no session, so its first request doesn't wait for the
+ * signed-in client to restore its session (about 0.4 s on a first visit,
+ * before the page could ask for anything). Never for anything a signed-in
+ * person's own access decides.
+ */
+export const supabasePublic = isSupabaseConfigured
+  ? createClient(url, anonKey, { accessToken: async () => anonKey })
+  : null;
+
+/**
  * Fetch which auth providers are enabled on this Supabase project.
  * Returns a cached promise so it's only called once.
  */

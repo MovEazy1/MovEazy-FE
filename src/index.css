@@ -2,11 +2,14 @@
 
 /* Google fonts load from index.html — one request, off the critical path. */
 
-@import "@fontsource/inter/400.css";
-@import "@fontsource/inter/500.css";
-@import "@fontsource/inter/600.css";
-@import "@fontsource/inter/700.css";
-@import "@fontsource/inter/800.css";
+/* Inter, the Latin letters only: the full files also carry Latin Extended,
+   which every page pulled down (~35 KB a weight, ~140 KB in all) for the ₹
+   sign alone. ₹ now comes from the system font beside it. */
+@import "@fontsource/inter/latin-400.css";
+@import "@fontsource/inter/latin-500.css";
+@import "@fontsource/inter/latin-600.css";
+@import "@fontsource/inter/latin-700.css";
+@import "@fontsource/inter/latin-800.css";
 
 @tailwind base;
 @tailwind components;

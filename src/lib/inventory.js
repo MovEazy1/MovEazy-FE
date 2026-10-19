@@ -1,4 +1,4 @@
-import { supabase, isSupabaseConfigured } from "./supabase";
+import { supabase, supabasePublic, isSupabaseConfigured } from "./supabase";
 import { coverMedia, coverPhoto, isVideoFile, orderListingMedia } from "./listingMedia";
 import { withParentArea } from "../data/preferenceOptions";
 import { STORAGE_LIMIT_BYTES, VIDEO_TARGET_BYTES, shrinkVideo } from "./videoShrink";
@@ -287,8 +287,8 @@ export function withoutOptionalColumns(row) {
  * Run a select, and if the database is missing one of the optional columns,
  * run it once more without them rather than returning nothing.
  */
-async function selectTolerantly(table, cols, shape = (q) => q) {
-  const attempt = (columns) => shape(supabase.from(table).select(columns));
+async function selectTolerantly(table, cols, shape = (q) => q, client = supabase) {
+  const attempt = (columns) => shape(client.from(table).select(columns));
   const { data, error } = await attempt(cols);
   if (!error) return { data, error: null };
   if (!isMissingColumn(error)) return { data: null, error };
@@ -324,6 +324,30 @@ export const PUBLIC_INVENTORY_COLS =
 export const fullInventory = (columns = "*", options) => supabase.rpc("inventory_full", undefined, options).select(columns);
 
 /** All published inventory (for matching / listings) — public, no poster PII. */
+/**
+ * The home page's showcase: the newest live flats, only the columns its phone
+ * screens draw, through the public client. One request however many callers —
+ * App.jsx starts it as the page opens, before the home page's own code has
+ * even arrived, and the showcase picks up the same answer.
+ */
+const SHOWCASE_COLS =
+  "property_id, posted_by, area, nearby_areas, latitude, longitude, rent, deposit, maintenance, available_from, " +
+  "flat_type, bedrooms, furnishing, occupants_allowed, amenities, floor_number, title, images, cover_image_url, status, created_at";
+let showcase = null;
+export function fetchShowcaseInventory() {
+  if (!isSupabaseConfigured || !supabasePublic) return Promise.resolve([]);
+  showcase ??= selectTolerantly(
+    "inventory",
+    SHOWCASE_COLS,
+    (q) => q.eq("status", "published").order("created_at", { ascending: false }).limit(80),
+    supabasePublic,
+  ).then(
+    ({ data, error }) => (error ? [] : (data || []).map(mapInventoryToListing).filter((l) => l && Number.isFinite(l.lat) && Number.isFinite(l.lng))),
+    () => [],
+  ).then((rows) => { if (!rows.length) showcase = null; return rows; });
+  return showcase;
+}
+
 export async function fetchPublishedInventory({ limit = 500 } = {}) {
   if (!isSupabaseConfigured || !supabase) return [];
   const { data, error } = await selectTolerantly(
