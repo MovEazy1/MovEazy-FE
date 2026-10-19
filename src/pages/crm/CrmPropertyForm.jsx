@@ -483,7 +483,8 @@ export default function CrmPropertyForm() {
         available_from: f.available_from || null,
         flat_type: f.flat_type,
         bedrooms: Number(f.bedrooms) || 1,
-        bathrooms: Number(f.bathrooms) || 1,
+        // Left blank: one per bedroom.
+        bathrooms: Number(f.bathrooms) || Math.max(1, Number(f.bedrooms) || 1),
         // Null, not 0 — the ground floor is a real answer.
         floor_number: String(f.floor_number).trim() === "" ? null : Number(f.floor_number),
         total_floors: String(f.total_floors).trim() === "" ? null : Number(f.total_floors),

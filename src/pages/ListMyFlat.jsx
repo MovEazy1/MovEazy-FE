@@ -143,7 +143,9 @@ export default function ListMyFlat() {
   const [flatType, setFlatType] = useState("2 BHK");
   const [bedrooms, setBedrooms] = useState(2);
   const [bedroomsTouched, setBedroomsTouched] = useState(false);
-  const [bathrooms, setBathrooms] = useState(1);
+  // One bathroom per bedroom until it's picked by hand.
+  const [bathroomsPicked, setBathrooms] = useState(null);
+  const bathrooms = bathroomsPicked ?? bedrooms;
   // "" rather than 0 — the ground floor is a real answer.
   const [floorNumber, setFloorNumber] = useState("");
   const [totalFloors, setTotalFloors] = useState("");
@@ -809,7 +811,7 @@ export default function ListMyFlat() {
                   <div>
                     <Label>Bathrooms</Label>
                     <select value={bathrooms} onChange={(e) => setBathrooms(Number(e.target.value))} className={inp}>
-                      {[1, 2, 3, 4].map((n) => <option key={n} value={n}>{n}</option>)}
+                      {[1, 2, 3, 4, 5].map((n) => <option key={n} value={n}>{n}</option>)}
                     </select>
                   </div>
                 </div>

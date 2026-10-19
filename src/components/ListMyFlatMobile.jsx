@@ -205,7 +205,9 @@ export default function ListMyFlatMobile({ user, onPublished }) {
   const [flatType, setFlatType] = useState("2 BHK");
   const [bedrooms, setBedrooms] = useState(2);
   const [bedroomsTouched, setBedroomsTouched] = useState(false);
-  const [bathrooms, setBathrooms] = useState(1);
+  // One bathroom per bedroom until it's picked by hand.
+  const [bathroomsPicked, setBathrooms] = useState(null);
+  const bathrooms = bathroomsPicked ?? bedrooms;
   // "" rather than 0 — the ground floor is a real answer, so 0 cannot also
   // mean "didn't say".
   const [floorNumber, setFloorNumber] = useState("");
@@ -572,7 +574,7 @@ export default function ListMyFlatMobile({ user, onPublished }) {
                   {[1, 2, 3, 4, 5].map((n) => <option key={n} value={n} style={optionStyle}>{n}</option>)}
                 </SelectField>
                 <SelectField label="Bathrooms" value={String(bathrooms)} onChange={(v) => setBathrooms(Number(v))}>
-                  {[1, 2, 3, 4].map((n) => <option key={n} value={n} style={optionStyle}>{n}</option>)}
+                  {[1, 2, 3, 4, 5].map((n) => <option key={n} value={n} style={optionStyle}>{n}</option>)}
                 </SelectField>
                 <SelectField label="Floor" value={floorNumber} onChange={setFloorNumber} placeholder="Not sure">
                   <option value="0" style={optionStyle}>Ground</option>

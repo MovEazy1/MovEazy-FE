@@ -180,7 +180,9 @@ export function buildInventoryRow(draft, poster) {
 
     flat_type: String(draft.flatType || "").trim(),
     bedrooms: num(draft.bedrooms, 1),
-    bathrooms: num(draft.bathrooms, 1),
+    // Not stated: one per bedroom (1 BHK 1, 2 BHK 2, …) — the trigger in
+    // inventory_bathrooms.sql applies the same rule to anything saved elsewhere.
+    bathrooms: num(draft.bathrooms, 0) || Math.max(1, num(draft.bedrooms, 1)),
     furnishing: String(draft.furnishing || "Unfurnished").trim(),
     max_flatmates: num(draft.maxFlatmates, 0),
     gender_pref: String(draft.genderPref || "any").trim(),
