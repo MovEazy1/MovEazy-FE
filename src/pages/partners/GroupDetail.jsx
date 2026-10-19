@@ -102,7 +102,7 @@ export default function GroupDetail() {
         <p className="pz-hint" style={{ margin: "8px 0 0" }}>Each invite link works once and expires in 7 days.</p>
       </div>
       <div className="pz-tabs" role="tablist">
-        {[["inventory", `Inventory (${listings.length})`], ["members", `Members (${members?.length ?? group.member_count})`]].map(([k, label]) => (
+        {[["inventory", `Inventory (${listings.length})`], ["members", `Members (${group.member_count})`]].map(([k, label]) => (
           <button key={k} type="button" role="tab" aria-selected={tab === k} className={`pz-tab${tab === k ? " pz-tab--on" : ""}`} onClick={() => setTab(k)}>{label}</button>
         ))}
       </div>
@@ -119,6 +119,15 @@ export default function GroupDetail() {
       ) : (
         <div className="pz-pad">
           {members === null ? <Loading /> : (
+            <>
+            {/* Members don't see each other: the owner and admins see everyone,
+                the rest only themselves and partners they referred (partner_group_privacy.sql). */}
+            {!canManage && (
+              <p className="pz-hint" style={{ margin: "0 0 10px" }}>
+                {group.member_count} member{group.member_count === 1 ? "" : "s"} in this group. Names and numbers are private:
+                you see yourself and the partners you brought in with your referral link.
+              </p>
+            )}
             <div className="pz-card">
               {members.map((m, i) => (
                 <div key={m.user_id} className="pz-row" style={{ padding: 12, borderTop: i ? "1px solid var(--line)" : 0 }}>
@@ -139,6 +148,7 @@ export default function GroupDetail() {
                 </div>
               ))}
             </div>
+            </>
           )}
           <button type="button" className="pz-btn" style={{ width: "100%", marginTop: 12 }} onClick={() => invite("wa")} disabled={inviting}>
             <UserPlus size={17} /> Invite another broker
