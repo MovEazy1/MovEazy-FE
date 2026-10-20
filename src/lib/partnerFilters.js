@@ -5,6 +5,7 @@
  * may see is already settled before anything here runs; this only narrows it.
  */
 import { bedroomsOf } from "./partnerMatch";
+import { expandAreas } from "../data/preferenceOptions";
 
 // The site-wide name for it (FLAT_TYPES, tenant search, the CRM importer).
 export const ROOM_LABEL = "Room in Preoccupied flat";
@@ -68,7 +69,8 @@ export function matchesSearch(l, q) {
 }
 
 export function applyFilters(rows, f = EMPTY_FILTERS, q = "") {
-  const locs = f.locations.map(norm);
+  // A wider area takes in the ones inside it (HSR Extension → Kudlu Gate …).
+  const locs = expandAreas(f.locations).map(norm);
   const lo = num(f.rentMin);
   const hi = num(f.rentMax);
   return rows.filter((l) => {

@@ -37,6 +37,7 @@ import { hasStoredSession } from "../../lib/supabase";
 import { prefetchWhenIdle } from "../../lib/prefetch";
 import { DAY_MS, readCache, writeCache } from "../../lib/localCache";
 import TopProgress from "../../components/TopProgress";
+import { loadAreas } from "../../lib/areas";
 
 // What the broker saw last time stays on the device for 30 days, so the app
 // opens on it at once and refreshes underneath (lib/localCache.js).
@@ -273,6 +274,9 @@ function PartnerWorkspace({ me, reloadMe }) {
   }), [me, reloadMe, inventory, invError, reloadInventory, byId, groups, reloadGroups, leads, reloadLeads, saved,
     toggleSave, ui, setUi, status, reloadStatus, demo, explain, unread, openMenu]);
   const showBar = demo && !NO_BAR.test(rel);
+
+  // The areas list, so lead matching counts a wider area's flats (lib/areas.js).
+  useEffect(() => { loadAreas(); }, []);
 
   return (
     <PartnerContext.Provider value={value}>

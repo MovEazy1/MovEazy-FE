@@ -4,7 +4,7 @@
  */
 import {
   BarChart3, Bell, Briefcase, Target, Building2, CalendarCheck, Columns3, CreditCard, House, Inbox, Landmark,
-  QrCode, ScanLine, Settings, ShieldCheck, Smartphone, UserPlus, Users, Wallet, Wrench,
+  MapPin, QrCode, ScanLine, Settings, ShieldCheck, Smartphone, UserPlus, Users, Wallet, Wrench,
 } from "lucide-react";
 import { SCOPES } from "../../lib/adminScopes";
 
@@ -17,6 +17,8 @@ export const RAIL = [
   { to: "/crm/notifications", code: "NF", label: "Notifications", icon: Bell, group: "Tenants" },
   { to: "/crm/pipeline", code: "PI", label: "Pipeline", icon: Columns3, group: "Tenants" },
   { to: "/crm/properties", code: "PR", label: "Properties", icon: Building2, group: "Flats" },
+  // The one list of areas every picker shows (tenants, owners, partners, CRM).
+  { to: "/crm/areas", code: "AR", label: "Areas", icon: MapPin, group: "Flats" },
   { to: "/crm/brokers", code: "BR", label: "Brokers", icon: Briefcase, group: "Partners" },
   // Tenants partner brokers brought — theirs, never in Clients.
   { to: "/crm/broker-leads", code: "BL", label: "Broker leads", icon: UserPlus, group: "Partners" },

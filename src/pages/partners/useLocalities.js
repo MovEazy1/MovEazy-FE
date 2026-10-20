@@ -1,20 +1,15 @@
-import { useMemo } from "react";
-import { usePartner } from "./PartnerApp";
-import { ALL_LOCALITIES } from "../../data/preferenceOptions";
+import { useAreas } from "../../lib/areas";
 
 /**
- * Every locality we know: the curated list plus every area in the inventory
- * this partner can see. Pickers offer only these (no free text), so a lead's
- * "HSR" and a listing's "HSR Layout" can't drift apart.
+ * Every locality a partner can pick: the CRM's list of areas (lib/areas.js),
+ * A–Z. Pickers offer only these (no free text), so a lead's "HSR" and a
+ * listing's "HSR Layout" can't drift apart.
  */
 export function useLocalities() {
-  const { inventory } = usePartner() || {};
-  return useMemo(() => {
-    const seen = new Map();
-    for (const a of [...ALL_LOCALITIES, ...(inventory ?? []).map((l) => l.area)]) {
-      const name = String(a || "").trim();
-      if (name && !seen.has(name.toLowerCase())) seen.set(name.toLowerCase(), name);
-    }
-    return [...seen.values()].sort((x, y) => x.localeCompare(y));
-  }, [inventory]);
+  return useAreas().names;
+}
+
+/** The first few of the CRM's quick chips: the areas offered before any search. */
+export function usePopularAreas(n = 5) {
+  return useAreas().chips.slice(0, n);
 }

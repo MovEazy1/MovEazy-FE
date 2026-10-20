@@ -22,9 +22,10 @@ import { matchListingToRequirements } from "../lib/inventoryMatch";
 import { fetchSlotsForProperty, addVisitSlot, deleteVisitSlot } from "../lib/visits";
 import { fetchMyListingStats, fetchPropertyVisits } from "../lib/ownerDashboard";
 import {
-  ALL_LOCALITIES, DEFAULT_POSTING_AMENITIES, FLAT_TYPES, FURNISHINGS, OCCUPANTS, OCCUPANT_OPTIONS,
+  DEFAULT_POSTING_AMENITIES, FLAT_TYPES, FURNISHINGS, OCCUPANTS, OCCUPANT_OPTIONS,
   MUST_HAVES, LIFESTYLE,
 } from "../data/preferenceOptions";
+import { useAreas, withCurrent } from "../lib/areas";
 
 const BRAND_RED = "#ff3131";
 const RULE_OPTIONS = [
@@ -121,6 +122,8 @@ const SUCCESS = {
 const STEPS = ["Who & Where", "The Home", "Publish"];
 
 export default function ListMyFlat() {
+  // The CRM's list of areas (lib/areas.js): pick one, never type.
+  const { names: areaNames } = useAreas();
   const { user } = useAuth();
   const navigate = useNavigate();
   const isPhone = useIsPhone();
@@ -727,8 +730,7 @@ export default function ListMyFlat() {
                   <Label required>Area</Label>
                   <select value={area} onChange={(e) => setArea(e.target.value)} className={inp}>
                     <option value="">Select a locality…</option>
-                    {ALL_LOCALITIES.map((a) => <option key={a}>{a}</option>)}
-                    <option value="Other">Other</option>
+                    {withCurrent(areaNames, area).map((a) => <option key={a}>{a}</option>)}
                   </select>
                   {errors.area && <p className="text-[11px] text-red-500 mt-1 font-semibold">{errors.area}</p>}
                 </div>

@@ -11,6 +11,7 @@
  */
 import { useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
+import { closestArea, useAreas, withCurrent } from "../../lib/areas";
 import { Camera, Check, Clock, KeyRound, Link2, MapPin, Plus, Star, X } from "lucide-react";
 import { useAuth } from "../../context/AuthContext";
 import { mediaRejectionReason, uploadInventoryPhotos } from "../../lib/inventory";
@@ -76,7 +77,8 @@ function GoogleStep({ f, set, onNext }) {
       place_id: found.place_id || "",
       name: found.name || f.name,
       full_address: found.address || f.full_address,
-      area: found.area || f.area,
+      // Google's name for the area, as the list names it (or left to pick).
+      area: closestArea(found.area) || f.area,
       latitude: found.lat ?? f.latitude,
       longitude: found.lng ?? f.longitude,
     });
@@ -118,6 +120,7 @@ function GoogleStep({ f, set, onNext }) {
 
 export default function Setup({ editing = false, onDone }) {
   const ctx = useSociety();
+  const { names: areaNames } = useAreas();
   const { user } = useAuth();
   const navigate = useNavigate();
   const [f, setF] = useState(() => ({ ...fromSociety(editing ? ctx?.society : null), manager_name: user?.name || "" }));
@@ -134,7 +137,7 @@ export default function Setup({ editing = false, onDone }) {
   const detailsOk = () => {
     const e = {};
     if (f.name.trim().length < 2) e.name = "Enter the society's name.";
-    if (!f.area.trim()) e.area = "Enter the area (e.g. HSR Layout).";
+    if (!f.area.trim()) e.area = "Pick the area.";
     if (f.total_flats !== "" && !(Number(f.total_flats) >= 1 && Number(f.total_flats) <= 20000)) e.total_flats = "A number of flats.";
     if (f.total_floors !== "" && !(Number(f.total_floors) >= 1 && Number(f.total_floors) <= 120)) e.total_floors = "A number of floors.";
     if (f.year_built !== "" && !(Number(f.year_built) >= 1950 && Number(f.year_built) <= new Date().getFullYear() + 3)) e.year_built = "A year like 2016.";
@@ -227,7 +230,12 @@ export default function Setup({ editing = false, onDone }) {
       {step === 1 && (
         <>
           <Field label="Society name" error={errs.name}><input className="sx-input" value={f.name} onChange={(e) => set({ name: e.target.value })} placeholder="Sunrise Residency" /></Field>
-          <Field label="Area / locality" error={errs.area}><input className="sx-input" value={f.area} onChange={(e) => set({ area: e.target.value })} placeholder="HSR Layout" /></Field>
+          <Field label="Area / locality" error={errs.area}>
+            <select className="sx-select" value={f.area} onChange={(e) => set({ area: e.target.value })}>
+              <option value="">Pick the area</option>
+              {withCurrent(areaNames, f.area).map((a) => <option key={a} value={a}>{a}</option>)}
+            </select>
+          </Field>
           <Field label="Full address" hint="Only MovEazy sees the full address."><textarea className="sx-textarea" value={f.full_address} onChange={(e) => set({ full_address: e.target.value })} placeholder="27th Main, Sector 2, HSR Layout, Bengaluru" /></Field>
           <Field label="Landmark (optional)"><input className="sx-input" value={f.landmark} onChange={(e) => set({ landmark: e.target.value })} placeholder="Near Agara Lake" /></Field>
           <h2 className="sx-h2">Towers / blocks</h2>

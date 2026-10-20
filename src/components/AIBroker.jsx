@@ -20,7 +20,8 @@ import { useAuth } from "../context/AuthContext";
 import { saveUserRequirement, fetchUserRequirement, rowToPrefs } from "../lib/userRequirements";
 import { leadSnapshot, loadLead, saveLead } from "../lib/leadIntake";
 import { useLoginModal } from "../context/LoginModalContext";
-import { ABOUT_ME, LOCALITIES, ALL_LOCALITIES, FLAT_TYPES, OFFICE_CHIPS, PRIORITIES, cleanAboutMe, reconcilePriority } from "../data/preferenceOptions";
+import { ABOUT_ME, LOCALITIES, FLAT_TYPES, OFFICE_CHIPS, PRIORITIES, cleanAboutMe, reconcilePriority } from "../data/preferenceOptions";
+import { useAreas } from "../lib/areas";
 import MovEazyLogo from "./branding/MovEAZYLogo";
 
 // MovEazy's own palette (ink + mint), the same pairing used on the nav/hero —
@@ -665,11 +666,13 @@ function CardGrid({ step, prefs, onSelect }) {
 }
 
 /* ── Locality chips (with a filter search box) ──────────────────────────────── */
-function LocalityChips({ step, prefs, toggle }) {
+function LocalityChips({ prefs, toggle }) {
   const [query, setQuery] = useState("");
+  // The CRM's list: its quick chips, and every area when searching (lib/areas.js).
+  const { chips, names } = useAreas();
   const selected = prefs.localities || [];
   const q = query.trim().toLowerCase();
-  const list = q ? ALL_LOCALITIES.filter((l) => l.toLowerCase().includes(q)) : step.options;
+  const list = q ? names.filter((l) => l.toLowerCase().includes(q)) : chips;
   return (
     <>
       <div className="brk-search-box">

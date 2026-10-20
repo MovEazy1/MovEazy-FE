@@ -10,7 +10,7 @@ import { Camera, Check, Loader2, RotateCw, X } from "lucide-react";
 import { useOwner } from "./OwnerApp";
 import { Chip, Empty, Loading, TopBar, toast } from "./ownerUi";
 import ListingMapPicker from "../../components/ListingMapPicker";
-import { ALL_LOCALITIES } from "../../data/preferenceOptions";
+import { useAreas, withCurrent } from "../../lib/areas";
 import { mediaRejectionReason, uploadInventoryPhotos } from "../../lib/inventory";
 import { geocodePlace } from "../../lib/geocode";
 import { saveBuilding } from "../../lib/buildings";
@@ -35,6 +35,7 @@ export default function BuildingForm() {
 
 function BuildingFormInner({ existing }) {
   const navigate = useNavigate();
+  const { names: areaNames } = useAreas();
   const { reloadBuildings } = useOwner();
   const [f, setF] = useState(() => ({
     name: existing?.name || "",
@@ -152,8 +153,10 @@ function BuildingFormInner({ existing }) {
           <div className="oz-grid2">
             <div className="oz-field">
               <label className="oz-label" htmlFor="bf-area">Locality</label>
-              <input id="bf-area" className="oz-input" list="bf-localities" placeholder="HSR Layout" value={f.area} onChange={(e) => set({ area: e.target.value })} />
-              <datalist id="bf-localities">{ALL_LOCALITIES.map((a) => <option key={a} value={a} />)}</datalist>
+              <select id="bf-area" className="oz-select" value={f.area} onChange={(e) => set({ area: e.target.value })}>
+                <option value="">Pick the locality</option>
+                {withCurrent(areaNames, f.area).map((a) => <option key={a} value={a}>{a}</option>)}
+              </select>
               {err("area")}
             </div>
             <div className="oz-field">

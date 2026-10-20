@@ -33,6 +33,7 @@ import { RAIL } from "./crmSections";
 import { fetchPriority } from "../../lib/crmPriority";
 import { PHONE_CSS, PhoneNav, PhoneTopBar, usePhone } from "./mobile/phoneUi";
 import { REFRESH_MS, fetchMobileSummary, waitingTotal } from "../../lib/crmMobile";
+import { loadAreas } from "../../lib/areas";
 
 const CrmContext = createContext(null);
 export const useCrm = () => useContext(CrmContext);
@@ -260,6 +261,9 @@ export default function CrmShell() {
       if (round.current === mine) setRefreshing(false);
     }
   }, [user?.uid]);
+
+  // The areas list, so matching counts a wider area's flats (lib/areas.js).
+  useEffect(() => { loadAreas(); }, []);
 
   // Open: the saved copy if there is one, then the fresh data either way.
   const opened = useRef(false);

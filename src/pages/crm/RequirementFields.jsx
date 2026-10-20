@@ -8,8 +8,9 @@
  */
 import { useMemo, useState } from "react";
 import {
-  ALL_LOCALITIES, DEALBREAKERS, FLAT_TYPES, FURNISHINGS, MUST_HAVES, OCCUPANTS,
+  DEALBREAKERS, FLAT_TYPES, FURNISHINGS, MUST_HAVES, OCCUPANTS,
 } from "../../data/preferenceOptions";
+import { useAreas } from "../../lib/areas";
 import { DEFAULT_RADIUS_KM } from "../../lib/curation";
 import { C, Chip } from "./crmUi";
 
@@ -28,11 +29,12 @@ export function ChipRow({ options, selected, onToggle, disabled }) {
 
 function LocalityPicker({ selected = [], onToggle, disabled }) {
   const [q, setQ] = useState("");
+  const { names } = useAreas();
   const hits = useMemo(() => {
     const s = q.trim().toLowerCase();
     if (!s) return [];
-    return ALL_LOCALITIES.filter((l) => l.toLowerCase().includes(s) && !selected.includes(l)).slice(0, 12);
-  }, [q, selected]);
+    return names.filter((l) => l.toLowerCase().includes(s) && !selected.includes(l)).slice(0, 12);
+  }, [q, selected, names]);
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
       {selected.length > 0 && (

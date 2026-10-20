@@ -14,6 +14,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import { useCrm } from "./CrmShell";
+import { useAreas, withCurrent } from "../../lib/areas";
 import PropertyVisitSlots from "../../components/PropertyVisitSlots";
 import { InternalDetails, VisitWindow } from "./CrmPropertyInternalFields";
 import CrmPartnerFields from "./CrmPartnerFields";
@@ -21,7 +22,7 @@ import CrmOwnerFields from "./CrmOwnerFields";
 import CrmFlatQr from "./CrmFlatQr";
 import { fetchPartnerListingMap } from "../../lib/partners";
 import {
-  ALL_LOCALITIES, DEFAULT_POSTING_AMENITIES, FLAT_TYPES, FURNISHINGS, LIFESTYLE, MUST_HAVES, OCCUPANT_OPTIONS,
+  DEFAULT_POSTING_AMENITIES, FLAT_TYPES, FURNISHINGS, LIFESTYLE, MUST_HAVES, OCCUPANT_OPTIONS,
   parentAreaOf, withParentArea,
 } from "../../data/preferenceOptions";
 import { cleanSourceUrl, detectSource, parseListingText } from "../../lib/listingImport";
@@ -137,6 +138,8 @@ function Column({ title, children }) {
 
 export default function CrmPropertyForm() {
   const crm = useCrm();
+  // The CRM's own list of areas (Areas page; lib/areas.js).
+  const { names: areaNames } = useAreas();
   const { access, user, requirements, reload, inventory } = crm;
   const navigate = useNavigate();
   const { propertyId: editId } = useParams();
@@ -782,7 +785,7 @@ export default function CrmPropertyForm() {
             <Field label="Locality">
               <select className="crm-input" value={f.area} onChange={(e) => set({ area: e.target.value })}>
                 <option value="">Select…</option>
-                {ALL_LOCALITIES.map((l) => <option key={l} value={l}>{l}</option>)}
+                {withCurrent(areaNames, f.area).map((l) => <option key={l} value={l}>{l}</option>)}
               </select>
             </Field>
 
@@ -795,7 +798,7 @@ export default function CrmPropertyForm() {
 
             <Field label="Also maps to">
               <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
-                {ALL_LOCALITIES.filter((l) => l !== f.area).map((l) => (
+                {[...new Set([...areaNames, ...(f.nearby_areas ?? [])])].filter((l) => l !== f.area).map((l) => (
                   <Chip key={l} on={(f.nearby_areas ?? []).includes(l)} onClick={() => toggle("nearby_areas", l)}>
                     {l}
                   </Chip>

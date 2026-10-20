@@ -2,9 +2,9 @@
 import { useMemo, useState } from "react";
 import { Search } from "lucide-react";
 import {
-  BHK_CHIPS, BROKERAGE_CHIPS, EMPTY_FILTERS, FURNISHING_CHIPS, POPULAR_LOCATIONS, PROPERTY_TYPES, applyFilters,
+  BHK_CHIPS, BROKERAGE_CHIPS, EMPTY_FILTERS, FURNISHING_CHIPS, PROPERTY_TYPES, applyFilters,
 } from "../../lib/partnerFilters";
-import { ALL_LOCALITIES } from "../../data/preferenceOptions";
+import { useLocalities, usePopularAreas } from "./useLocalities";
 import { Chip, Sheet } from "./partnerUi";
 
 const toggle = (list, v) => (list.includes(v) ? list.filter((x) => x !== v) : [...list, v]);
@@ -12,15 +12,17 @@ const toggle = (list, v) => (list.includes(v) ? list.filter((x) => x !== v) : [.
 export default function FilterSheet({ value, rows, query = "", onApply, onClose }) {
   const [f, setF] = useState({ ...EMPTY_FILTERS, ...(value || {}) });
   const [loc, setLoc] = useState("");
+  const localities = useLocalities();
+  const popularAreas = usePopularAreas();
   const set = (patch) => setF((cur) => ({ ...cur, ...patch }));
 
   const count = useMemo(() => applyFilters(rows ?? [], f, query).length, [rows, f, query]);
   const suggestions = useMemo(() => {
     const q = loc.trim().toLowerCase();
     if (q.length < 2) return [];
-    return ALL_LOCALITIES.filter((a) => a.toLowerCase().includes(q) && !f.locations.includes(a)).slice(0, 6);
-  }, [loc, f.locations]);
-  const chipsFor = [...new Set([...POPULAR_LOCATIONS, ...f.locations])];
+    return localities.filter((a) => a.toLowerCase().includes(q) && !f.locations.includes(a)).slice(0, 6);
+  }, [loc, f.locations, localities]);
+  const chipsFor = [...new Set([...popularAreas, ...f.locations])];
 
   return (
     <Sheet title="Filters" onClose={onClose}

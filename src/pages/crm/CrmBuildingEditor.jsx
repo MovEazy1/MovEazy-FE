@@ -16,7 +16,7 @@ import { ArrowDown, ArrowUp, Camera, Film, Loader2, Star, Trash2, X } from "luci
 import { useCrm } from "./CrmShell";
 import { Btn, C, Empty, Toast, inr } from "./crmUi";
 import QrPosterBlock from "../../components/QrPosterBlock";
-import { ALL_LOCALITIES } from "../../data/preferenceOptions";
+import { useAreas, withCurrent } from "../../lib/areas";
 import { mediaRejectionReason, uploadInventoryPhotos } from "../../lib/inventory";
 import { isVideoFile } from "../../lib/listingMedia";
 import { fetchCrmBuilding, saveCrmBuilding, setBuildingUnits, setCrmFlatBuilding } from "../../lib/crmPropertyInternal";
@@ -49,6 +49,7 @@ export default function CrmBuildingEditor() {
   const [params] = useSearchParams();
   const navigate = useNavigate();
   const { inventory, access, reload } = useCrm();
+  const { names: areaNames } = useAreas();
   const canEdit = access.has(SCOPES.PROPERTIES_WRITE);
   const isNew = !id;
 
@@ -273,8 +274,10 @@ export default function CrmBuildingEditor() {
               </div>
               <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10 }}>
                 <Field label="Locality">
-                  <input className="crm-input" list="cbe-loc" value={b.area} onChange={(e) => set({ area: e.target.value })} placeholder="HSR Layout" />
-                  <datalist id="cbe-loc">{ALL_LOCALITIES.map((a) => <option key={a} value={a} />)}</datalist>
+                  <select className="crm-input" value={b.area} onChange={(e) => set({ area: e.target.value })}>
+                    <option value="">Select…</option>
+                    {withCurrent(areaNames, b.area).map((a) => <option key={a} value={a}>{a}</option>)}
+                  </select>
                 </Field>
                 <Field label="Floors above ground"><input className="crm-input" inputMode="numeric" value={b.total_floors}
                   onChange={(e) => set({ total_floors: e.target.value.replace(/\D/g, "").slice(0, 2) })} /></Field>

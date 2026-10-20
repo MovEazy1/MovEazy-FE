@@ -42,9 +42,9 @@ import ShareMediums, { defaultShare } from "./ShareMediums";
 import MilestoneBar from "./MilestoneBar";
 import { cleanPasted } from "./PropertyDetailsSheet";
 import { Empty, Loading, Sheet, TopBar, WhatsAppIcon, toast } from "./partnerUi";
-import { useLocalities } from "./useLocalities";
+import { useLocalities, usePopularAreas } from "./useLocalities";
 import ListingMapPicker from "../../components/ListingMapPicker";
-import { FURNISHING_CHIPS, HOUSE_TYPES, POPULAR_LOCATIONS, ROOM_LABEL } from "../../lib/partnerFilters";
+import { FURNISHING_CHIPS, HOUSE_TYPES, ROOM_LABEL } from "../../lib/partnerFilters";
 import { bedroomsOf } from "../../lib/partnerMatch";
 import { geocodePlace } from "../../lib/geocode";
 import { generatePropertyId, mediaRejectionReason, uploadInventoryPhotos } from "../../lib/inventory";
@@ -124,6 +124,7 @@ function PostFlat({ onAnother, edit = null }) {
   const { user } = useAuth();
   const { groups, reloadInventory } = usePartner();
   const localities = useLocalities();
+  const popularAreas = usePopularAreas();
   const [prefs] = useState(readPrefs);
   const ed = edit?.listing ?? null;
   const [pid] = useState(() => ed?.property_id || generatePropertyId());
@@ -175,7 +176,8 @@ function PostFlat({ onAnother, edit = null }) {
   const setMoreField = (patch) => setX((cur) => ({ ...cur, ...patch }));
   const uploading = photos.some((p) => p.status === "uploading");
   const uploaded = photos.filter((p) => p.status === "done").length;
-  const recentAreas = useMemo(() => [...new Set([area, ...(prefs.areas || []), ...POPULAR_LOCATIONS])].filter(Boolean).slice(0, 7), [area, prefs.areas]);
+  // Their recent areas still on the list, then the CRM's first chips.
+  const recentAreas = useMemo(() => [...new Set([area, ...(prefs.areas || []).filter((a) => localities.includes(a)), ...popularAreas])].filter(Boolean).slice(0, 7), [area, prefs.areas, localities, popularAreas]);
   const areaMatches = useMemo(() => {
     const q = areaQ.trim().toLowerCase();
     return q.length < 2 ? [] : localities.filter((a) => a.toLowerCase().includes(q)).slice(0, 8);

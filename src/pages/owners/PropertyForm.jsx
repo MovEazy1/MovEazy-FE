@@ -13,7 +13,8 @@ import { useAuth } from "../../context/AuthContext";
 import { useOwner } from "./OwnerApp";
 import { Chip, Empty, Loading, Switch, TopBar, toast } from "./ownerUi";
 import ListingMapPicker from "../../components/ListingMapPicker";
-import { ALL_LOCALITIES, FURNISHINGS, withParentArea } from "../../data/preferenceOptions";
+import { FURNISHINGS, withParentArea } from "../../data/preferenceOptions";
+import { useAreas, withCurrent } from "../../lib/areas";
 import { BHK_OPTIONS } from "../../lib/partnerFilters";
 import { bedroomsOf } from "../../lib/partnerMatch";
 import { geocodePlace } from "../../lib/geocode";
@@ -62,6 +63,7 @@ export default function PropertyForm() {
 
 function PropertyFormInner({ existing }) {
   const navigate = useNavigate();
+  const { names: areaNames } = useAreas();
   const { user } = useAuth();
   const { reloadProperties, buildings, reloadBuildings } = useOwner();
   const [params] = useSearchParams();
@@ -233,9 +235,10 @@ function PropertyFormInner({ existing }) {
           <h2 className="oz-h2">Location</h2>
           <div className="oz-field">
             <label className="oz-label" htmlFor="pf-area">Locality</label>
-            <input id="pf-area" className="oz-input" list="pf-localities" placeholder="HSR Layout" value={f.area}
-              onChange={(e) => set({ area: e.target.value })} />
-            <datalist id="pf-localities">{ALL_LOCALITIES.map((a) => <option key={a} value={a} />)}</datalist>
+            <select id="pf-area" className="oz-select" value={f.area} onChange={(e) => set({ area: e.target.value })}>
+              <option value="">Pick the locality</option>
+              {withCurrent(areaNames, f.area).map((a) => <option key={a} value={a}>{a}</option>)}
+            </select>
             {err("area")}
           </div>
           <ListingMapPicker height={170} focusQuery={f.area ? `${f.area}, Bengaluru` : ""} markerPosition={pin}

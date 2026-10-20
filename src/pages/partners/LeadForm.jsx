@@ -9,8 +9,8 @@ import { useNavigate, useParams } from "react-router-dom";
 import { ChevronDown, ChevronUp, Search, X } from "lucide-react";
 import { usePartner } from "./PartnerApp";
 import { Chip, Empty, Loading, TopBar, toast } from "./partnerUi";
-import { useLocalities } from "./useLocalities";
-import { BHK_OPTIONS, POPULAR_LOCATIONS } from "../../lib/partnerFilters";
+import { useLocalities, usePopularAreas } from "./useLocalities";
+import { BHK_OPTIONS } from "../../lib/partnerFilters";
 import { FURNISHINGS } from "../../data/preferenceOptions";
 import { normalizeIndianMobile } from "../../lib/mobile";
 import { deleteLead, friendlyError, pp, saveLead } from "../../lib/partners";
@@ -35,6 +35,7 @@ function LeadFormInner({ existing }) {
   const navigate = useNavigate();
   const { setLeads, inventory } = usePartner();
   const localities = useLocalities();
+  const popularAreas = usePopularAreas();
   const [f, setF] = useState(() => ({
     name: existing?.no_name ? "" : existing?.name || "", phone: existing?.phone || "",
     household: existing?.household || "", gender_pref: existing?.gender_pref || "",
@@ -141,7 +142,7 @@ function LeadFormInner({ existing }) {
             <div className="pz-field">
               <span className="pz-label">Preferred Locations</span>
               <div className="pz-chips" style={{ marginBottom: 8 }}>
-                {[...new Set([...f.localities, ...POPULAR_LOCATIONS])].map((a) => (
+                {[...new Set([...f.localities, ...popularAreas])].map((a) => (
                   <Chip key={a} on={f.localities.includes(a)} onClick={() => toggleLoc(a)}>
                     {a}{f.localities.includes(a) && <X size={14} />}
                   </Chip>

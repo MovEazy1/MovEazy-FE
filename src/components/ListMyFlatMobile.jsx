@@ -30,8 +30,9 @@ import MovEazyLogo from "./branding/MovEAZYLogo";
 import { fetchAllUserRequirements } from "../lib/userRequirements";
 import { matchListingToRequirements } from "../lib/inventoryMatch";
 import {
-  ALL_LOCALITIES, DEFAULT_POSTING_AMENITIES, FLAT_TYPES, FURNISHINGS, OCCUPANTS, OCCUPANT_OPTIONS, MUST_HAVES, LIFESTYLE,
+  DEFAULT_POSTING_AMENITIES, FLAT_TYPES, FURNISHINGS, OCCUPANTS, OCCUPANT_OPTIONS, MUST_HAVES, LIFESTYLE,
 } from "../data/preferenceOptions";
+import { useAreas, withCurrent } from "../lib/areas";
 
 const MINT = "#5EEAD4";
 const GOLD = "#E8A33D";
@@ -177,6 +178,8 @@ function SelectField({ label, value, onChange, children, disabled, placeholder }
 /* ── page ──────────────────────────────────────────────────────────────────── */
 
 export default function ListMyFlatMobile({ user, onPublished }) {
+  // The CRM's list of areas (lib/areas.js): pick one, never type.
+  const { names: areaNames } = useAreas();
   const [step, setStep] = useState(1);
   const [saving, setSaving] = useState(false);
   const [uploadMsg, setUploadMsg] = useState("");
@@ -517,8 +520,7 @@ export default function ListMyFlatMobile({ user, onPublished }) {
                   </Field>
                 </div>
                 <SelectField label="Area *" value={area} onChange={setArea} placeholder="Select…">
-                  {ALL_LOCALITIES.map((a) => <option key={a} value={a} style={optionStyle}>{a}</option>)}
-                  <option value="Other" style={optionStyle}>Other</option>
+                  {withCurrent(areaNames, area).map((a) => <option key={a} value={a} style={optionStyle}>{a}</option>)}
                 </SelectField>
               </div>
 

@@ -11,7 +11,8 @@
  * Everything returned is a *suggestion* — the form marks each filled field so
  * an agent can see what was guessed and correct it before publishing.
  */
-import { ALL_LOCALITIES, FLAT_TYPES, FURNISHINGS, MUST_HAVES, OCCUPANTS } from "../data/preferenceOptions";
+import { FLAT_TYPES, FURNISHINGS, MUST_HAVES, OCCUPANTS } from "../data/preferenceOptions";
+import { areaNames } from "./areas";
 
 const lower = (s) => String(s || "").toLowerCase();
 
@@ -69,7 +70,7 @@ function parseFurnishing(text) {
 
 function parseLocalities(text) {
   const t = lower(text);
-  return ALL_LOCALITIES.filter((loc) => t.includes(lower(loc)));
+  return areaNames().filter((loc) => t.includes(lower(loc)));
 }
 
 function parseAmenities(text) {

@@ -1,6 +1,7 @@
 import { useState, useEffect } from "react";
 import { useAuth } from "../context/AuthContext";
 import { useNavigate, useSearchParams } from "react-router-dom";
+import { useAreas } from "../lib/areas";
 import { motion, AnimatePresence } from "framer-motion";
 import MovEazyLogo from "../components/branding/MovEAZYLogo";
 
@@ -16,10 +17,6 @@ const PRIORITIES = [
 
 const FLAT_TYPES = ["1 BHK", "2 BHK", "3 BHK", "4 BHK", "Villa", "PG / Hostel", "Studio"];
 
-const POPULAR_AREAS = [
-  "HSR Layout", "Koramangala", "Bellandur", "Whitefield", "Marathalli",
-  "Indiranagar", "BTM Layout", "Hebbal", "Electronic City", "Hoodi",
-];
 
 function FieldLabel({ children, required }) {
   return (
@@ -77,6 +74,8 @@ const slide = {
 };
 
 export default function Login() {
+  // The CRM's list of areas (lib/areas.js).
+  const { names: areaNames } = useAreas();
   const { user, login, signup, loginWithGoogle, forgotPassword, resendVerificationEmail } = useAuth();
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
@@ -391,8 +390,7 @@ export default function Login() {
                             <FieldLabel>Preferred Area</FieldLabel>
                             <select value={area} onChange={(e) => setArea(e.target.value)} disabled={busy} className={inputCls} style={{ height: 40 }}>
                               <option value="">Select area…</option>
-                              {POPULAR_AREAS.map((a) => <option key={a}>{a}</option>)}
-                              <option value="Other">Other</option>
+                              {areaNames.map((a) => <option key={a}>{a}</option>)}
                             </select>
                           </div>
 

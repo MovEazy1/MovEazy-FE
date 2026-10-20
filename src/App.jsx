@@ -81,6 +81,7 @@ const CrmNotificationsPage = lazy(() => import("./pages/crm/CrmNotificationsPage
 const CrmTeamPage = lazy(() => import("./pages/crm/CrmTeamPage"));
 const CrmPaymentsPage = lazy(() => import("./pages/crm/CrmPaymentsPage"));
 const CrmSettingsPage = lazy(() => import("./pages/crm/CrmSettingsPage"));
+const CrmAreasPage = lazy(() => import("./pages/crm/CrmAreasPage"));
 // The broker app. Its own route tree: at /partners here, and at the root of
 // partners.moveazy.co.in (same deployment, same bundle — see lib/partners.js).
 const PartnerApp = lazy(() => import("./pages/partners/PartnerApp"));
@@ -125,6 +126,7 @@ function prefetchCrmPage(path) {
     "app-analytics": () => import("./pages/crm/CrmAppAnalyticsPage"),
     team: () => import("./pages/crm/CrmTeamPage"),
     settings: () => import("./pages/crm/CrmSettingsPage"),
+    areas: () => import("./pages/crm/CrmAreasPage"),
   }[seg];
   import("./pages/crm/CrmShell").catch(() => {});
   page?.().catch(() => {});
@@ -346,6 +348,7 @@ function AppRoutes() {
           <Route path="app-analytics" element={<CrmAppAnalyticsPage />} />
           <Route path="team" element={<CrmTeamPage />} />
           <Route path="settings" element={<CrmSettingsPage />} />
+          <Route path="areas" element={<CrmAreasPage />} />
         </Route>
         <Route
           path="/visits"

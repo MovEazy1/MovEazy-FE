@@ -122,7 +122,10 @@ export function reconcilePriority(saved) {
 export const AGES = ["18–24", "25–30", "31–35", "36–45", "46+"];
 export const FURNISHINGS = ["Fully Furnished", "Semi Furnished", "Unfurnished"];
 
-/** Every locality, in one flat list (for List my Flat dropdowns). */
+/**
+ * Every locality, in one flat list. The pickers read the CRM's list
+ * (lib/areas.js useAreas); these are its defaults until it loads.
+ */
 export const ALL_LOCALITIES = [...LOCALITIES, ...LOCALITIES_MORE];
 
 /**
@@ -145,12 +148,22 @@ export const AREA_GROUPS = {
   "HSR Extension": ["Kudlu Gate", "Kudlu Road", "Harlur Road", "Silver County Road", "ITI Layout"],
 };
 
+/*
+ * The groups in use: the CRM's list once lib/areas.js has loaded it (it calls
+ * setAreaGroups), these defaults until then.
+ */
+let liveGroups = AREA_GROUPS;
+/** lib/areas.js hands over the groups from the CRM's list. */
+export function setAreaGroups(groups) {
+  liveGroups = groups ?? AREA_GROUPS;
+}
+
 const norm = (a) => String(a || "").trim().toLowerCase();
 
 /** The wider area this one sits inside, or "" if it isn't inside one. */
 export function parentAreaOf(area) {
   const a = norm(area);
-  for (const [parent, children] of Object.entries(AREA_GROUPS)) {
+  for (const [parent, children] of Object.entries(liveGroups)) {
     if (children.some((c) => norm(c) === a)) return parent;
   }
   return "";
@@ -159,7 +172,7 @@ export function parentAreaOf(area) {
 /** The areas this one contains, itself included. A leaf expands to just itself. */
 export function expandArea(area) {
   const a = norm(area);
-  for (const [parent, children] of Object.entries(AREA_GROUPS)) {
+  for (const [parent, children] of Object.entries(liveGroups)) {
     if (norm(parent) === a) return [parent, ...children];
   }
   return area ? [area] : [];
