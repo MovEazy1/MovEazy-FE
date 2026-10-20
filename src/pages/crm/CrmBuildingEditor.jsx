@@ -413,9 +413,11 @@ export default function CrmBuildingEditor() {
                 {stats && <span style={{ fontSize: 12 }}>{stats.scans} scans · {stats.numbers} mobiles · {stats.scheduled} visits asked · {stats.booked} booked</span>}
                 <div style={{ maxWidth: 300 }}>
                   <QrPosterBlock key={`${code}-${b.photos?.[0] || ""}`} flat={flats[0] || { property_id: "" }}
-                    building={{ code, name: b.name, area: b.area, landmark: b.landmark, photo: b.photos?.[0] || flats[0]?.cover_image_url || "",
+                    building={{ id, code, name: b.name, area: b.area, landmark: b.landmark, photo: b.photos?.[0] || flats[0]?.cover_image_url || "",
                       // The classic poster's "Premium 2BHK": the flats' type when they share one.
                       bhk: (() => { const t = [...new Set(flats.map((f) => (byId.get(f.property_id) || f).flat_type).filter(Boolean))]; return t.length === 1 ? t[0] : ""; })(),
+                      // The To-Let's "TO-LET 2BHK FLAT" (or "1, 2 BHK FLATS"): every flat's type.
+                      bhks: flats.map((f) => (byId.get(f.property_id) || f).flat_type).filter(Boolean),
                       available: flats.filter((f) => f.status === "published").length,
                       rentFrom: (() => { const r = flats.map((f) => Number(f.rent) || 0).filter(Boolean); return r.length ? inr(Math.min(...r)) : ""; })() }}
                     btnClass="crm-btn crm-btn--primary" softClass="crm-btn" onToast={say} previewWidth={240} />

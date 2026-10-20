@@ -9,6 +9,7 @@
  */
 import { useCallback, useEffect, useState } from "react";
 import QrPosterBlock from "../../components/QrPosterBlock";
+import { useCrm } from "./CrmShell";
 import { Btn, C, relTime } from "./crmUi";
 import {
   FEEDBACK_SOURCES, PRICE_VIEWS, addFlatFeedback, deleteFlatFeedback, fetchCrmFlatInsights, priceViewLabel,
@@ -19,6 +20,7 @@ const BLANK = { renter_name: "", price_view: "", rating: 0, comment: "", source:
 const TONE = { red: C.coral, amber: C.gold, green: C.accent, champ: C.gold };
 
 export default function CrmFlatQr({ flat, building, onToast }) {
+  const { inventory } = useCrm();
   const [d, setD] = useState(null);
   const [which, setWhich] = useState("flat");
   const [fb, setFb] = useState(BLANK);
@@ -51,7 +53,11 @@ export default function CrmFlatQr({ flat, building, onToast }) {
     padding: "5px 10px", borderRadius: 999, fontSize: 12, fontWeight: 600, cursor: "pointer", font: "inherit",
     border: `1px solid ${on ? C.accent : C.line}`, background: on ? C.accentSoft : "#fff", color: on ? C.accent : C.text,
   });
-  const bldPoster = building ? { code: building.code, name: building.name, area: flat.area, landmark: flat.landmark, photo: flat.cover_image_url } : null;
+  const bldPoster = building ? {
+    id: building.id, code: building.code, name: building.name, area: flat.area, landmark: flat.landmark, photo: flat.cover_image_url,
+    // Every flat's type in the building, for the To-Let's "TO-LET 2BHK FLAT".
+    bhks: (inventory ?? []).filter((l) => l.building_id === building.id).map((l) => l.flat_type).concat(flat.flat_type || []).filter(Boolean),
+  } : null;
 
   return (
     <div className="crm-stack" style={{ display: "grid", gridTemplateColumns: "minmax(240px, 300px) 1fr", gap: 20, alignItems: "start" }}>

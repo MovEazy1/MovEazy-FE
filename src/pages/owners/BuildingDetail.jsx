@@ -8,22 +8,21 @@
  * Instant visit: the owner can let tenants who scan walk in right away, with
  * a POC who shows the flats. Tenants get the POC only after signing in.
  */
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { Link, useNavigate, useParams } from "react-router-dom";
 import {
-  BadgeCheck, CalendarCheck, Check, ChevronRight, Copy, Download, ExternalLink, Eye, KeyRound, Layers, MapPin, Pencil, Phone,
+  BadgeCheck, CalendarCheck, Check, ChevronRight, Copy, ExternalLink, Eye, KeyRound, Layers, MapPin, Pencil, Phone,
   Plus, QrCode, ScanLine, ShieldCheck, Smartphone, UserCheck, X, Zap,
 } from "lucide-react";
 import { useOwner } from "./OwnerApp";
 import { Avatar, Empty, Loading, Pill, Sheet, TopBar, WhatsAppIcon, toast } from "./ownerUi";
 import { MediaItem, listingCover } from "../partners/partnerMedia";
 import {
-  VISIT_STATUS, buildingDisplay, buildingUrl, fetchBuildingDetail, floorLabel, isInstant, markFlatBooked, setFlatBuilding,
+  VISIT_STATUS, buildingUrl, fetchBuildingDetail, floorLabel, isInstant, markFlatBooked, setFlatBuilding,
   setInstantVisit, updateBuildingLead, visitWhen,
 } from "../../lib/buildings";
-import { BUILDING_POSTER, drawPoster, loadImage, posterFontsReady, posterPdf } from "../../lib/qrPoster";
+import QrPosterBlock from "../../components/QrPosterBlock";
 import { friendlyError, inr, op } from "../../lib/owners";
-import logoOnDark from "../../assets/logo/moveazy-logo-mint-dark.png";
 
 const bhk = (f) => f?.flat_type || (f?.bedrooms ? `${f.bedrooms} BHK` : "Flat");
 const FLOORS = [-1, ...Array.from({ length: 31 }, (_, i) => i)];
@@ -306,48 +305,16 @@ function Funnel({ s, byDay }) {
 }
 
 function PosterCard({ d, available, flats }) {
-  const canvasRef = useRef(null);
-  const [busy, setBusy] = useState(false);
-  const url = buildingUrl(d.code, { qr: true });
   const link = buildingUrl(d.code);
-  const rentFrom = useMemo(() => {
+  const building = useMemo(() => {
     const rents = flats.filter((f) => f.available).map((f) => Number(f.rent) || 0).filter(Boolean);
-    return rents.length ? inr(Math.min(...rents)) : "";
-  }, [flats]);
-
-  const posterData = useCallback(async () => {
-    const coverSrc = (d.photos ?? [])[0] || flats.map((f) => listingCover(f)).find(Boolean) || "";
-    const [photo, logo] = await Promise.all([loadImage(coverSrc), loadImage(logoOnDark), posterFontsReady()]);
     return {
-      building: { name: d.name, area: d.area, landmark: d.landmark, available, rentFrom },
-      url, displayUrl: buildingDisplay(d.code), photo, logo,
+      id: d.id, code: d.code, name: d.name, area: d.area, landmark: d.landmark, available,
+      photo: (d.photos ?? [])[0] || flats.map((f) => listingCover(f)).find(Boolean) || "",
+      rentFrom: rents.length ? inr(Math.min(...rents)) : "",
+      bhks: flats.map((f) => f.flat_type || (f.bedrooms ? `${f.bedrooms} BHK` : "")).filter(Boolean),
     };
-  }, [d, flats, available, rentFrom, url]);
-
-  useEffect(() => {
-    let alive = true;
-    posterData().then((data) => { if (alive && canvasRef.current) drawPoster(canvasRef.current, BUILDING_POSTER.id, data, 0.6); });
-    return () => { alive = false; };
-  }, [posterData]);
-
-  const download = async () => {
-    setBusy(true);
-    try {
-      const blob = await posterPdf(BUILDING_POSTER.id, await posterData());
-      const href = URL.createObjectURL(blob);
-      const a = document.createElement("a");
-      a.href = href;
-      a.download = `MovEazy-QR-${d.name.replace(/\W+/g, "-")}.pdf`;
-      document.body.appendChild(a);
-      a.click();
-      a.remove();
-      setTimeout(() => URL.revokeObjectURL(href), 30000);
-    } catch (e) {
-      toast(friendlyError(e, "Could not make the PDF."), "error");
-    } finally {
-      setBusy(false);
-    }
-  };
+  }, [d, flats, available]);
   const copy = async () => {
     try { await navigator.clipboard.writeText(link); toast("Link copied"); } catch { toast(link); }
   };
@@ -355,15 +322,13 @@ function PosterCard({ d, available, flats }) {
 
   return (
     <div className="oz-section">
-      <h2 className="oz-h2"><span><QrCode size={17} style={{ verticalAlign: -3, color: "var(--em)" }} /> QR poster</span><Pill tone="champ">A4</Pill></h2>
-      <div className="bd-poster"><canvas ref={canvasRef} aria-label="Poster preview" /></div>
+      <h2 className="oz-h2"><span><QrCode size={17} style={{ verticalAlign: -3, color: "var(--em)" }} /> QR poster</span></h2>
+      <QrPosterBlock key={`${d.id}-${building.photo}`} flat={{ property_id: "" }} building={building} styles={["photo", "redtolet"]} showLinks={false}
+        btnClass="oz-btn oz-btn--primary oz-btn--block" softClass="oz-btn oz-btn--soft" onToast={toast} previewWidth={260} />
       <p className="oz-hint" style={{ margin: "10px 0 12px" }}>
-        Print it and paste it at the gate, in the lift and at the nearest tea stall. Tenants see your flats and book a visit — your number is never on it.
+        Print it and paste it at the gate, in the lift and at the nearest tea stall. Tenants see your flats and book a visit. The photo poster has no number on it; the To-Let shows only the number you save for it.
       </p>
-      <button type="button" className="oz-btn oz-btn--primary oz-btn--block" onClick={download} disabled={busy}>
-        <Download size={18} /> {busy ? "Making the PDF…" : "Download A4 poster (PDF)"}
-      </button>
-      <div className="oz-grid3" style={{ marginTop: 10 }}>
+      <div className="oz-grid3">
         <a className="oz-btn oz-btn--soft" href={wa} target="_blank" rel="noreferrer"><WhatsAppIcon size={16} /> Share</a>
         <button type="button" className="oz-btn oz-btn--soft" onClick={copy}><Copy size={16} /> Copy</button>
         <a className="oz-btn oz-btn--soft" href={link} target="_blank" rel="noreferrer"><ExternalLink size={16} /> Open</a>
@@ -529,8 +494,6 @@ const CSS = `
 .bd-legend i { display: inline-block; width: 8px; height: 8px; border-radius: 2px; margin-right: 4px; }
 .bd-legend i.a { background: var(--champ); }
 .bd-legend i.b { background: rgba(255,255,255,.35); }
-.bd-poster { display: grid; place-items: center; background: var(--cream); border-radius: 14px; padding: 14px; }
-.bd-poster canvas { display: block; width: min(100%, 260px); height: auto; border-radius: 4px; box-shadow: 0 8px 24px rgba(0,0,0,.18); background: #fff; }
 .bd-floor + .bd-floor { margin-top: 12px; }
 .bd-floor-h { display: flex; justify-content: space-between; font-size: 12px; font-weight: 700; text-transform: uppercase; letter-spacing: .06em;
   color: var(--champ3); margin: 0 2px 6px; }

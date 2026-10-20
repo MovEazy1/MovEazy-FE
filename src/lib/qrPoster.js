@@ -15,6 +15,10 @@
  *   classic   A4 landscape, white. "Premium 2BHK for Rent" in a serif, one QR
  *             in a green-edged card, "Scan to View Property" — for a building
  *             or a flat, chosen in the CRM next to the photo poster.
+ *   redtolet  A1 landscape, white. "TO-LET 2BHK FLAT" in bold red, one big QR,
+ *             the poster's phone number (poster_phone.sql), the logo, and
+ *             "MovEazy Assured Property | India's first Speed Renting
+ *             Platform" faded across the whole sheet.
  *
  * Layout is in a fixed 1188 × 840 space (840 × 1188 for portrait) — 4 units a
  * millimetre — and scaled to whatever resolution is asked for.
@@ -40,9 +44,13 @@ export const FLAT_POSTER = { id: "flat", label: "Flat", orientation: "portrait" 
 /** The white landscape poster: headline, QR, "Scan to View Property". For a building or a flat. */
 export const CLASSIC_POSTER = { id: "classic", label: "Classic", orientation: "landscape" };
 
-/** The two looks a building's or flat's poster comes in. */
+/** The red To-Let poster for a building's gate or a flat's door: headline, QR, the poster's number. */
+export const RED_TOLET_POSTER = { id: "redtolet", label: "To-Let", orientation: "landscape", paper: "A1" };
+
+/** The looks a building's or flat's poster comes in. */
 export const PROPERTY_POSTER_STYLES = [
   { id: "photo", label: "Photo poster", hint: "A4 portrait · photo & QR" },
+  { id: "redtolet", label: "To-Let", hint: "A1 landscape · red, QR & number" },
   { id: "classic", label: "Classic", hint: "A4 landscape · headline & QR" },
   { id: "street", label: "Street Tape", hint: "A1 landscape · big type, tape" },
   { id: "speed", label: "Speed Lane", hint: "A1 landscape · bold brand" },
@@ -58,7 +66,7 @@ export const STREET_POSTERS = [
   { id: "key", label: "The Key", orientation: "landscape", paper: "A1" },
 ];
 
-export const designOf = (id) => [...POSTER_DESIGNS, BUILDING_POSTER, FLAT_POSTER, CLASSIC_POSTER, ...STREET_POSTERS].find((d) => d.id === id) || POSTER_DESIGNS[0];
+export const designOf = (id) => [...POSTER_DESIGNS, BUILDING_POSTER, FLAT_POSTER, CLASSIC_POSTER, RED_TOLET_POSTER, ...STREET_POSTERS].find((d) => d.id === id) || POSTER_DESIGNS[0];
 export const posterSize = (id) => SIZE[designOf(id).orientation];
 
 /** An image, loaded; null if it can't be (the poster then draws initials). */
@@ -1199,6 +1207,109 @@ function drawToLet(ctx, { broker = {}, contact, url, logoLight }) {
   ctx.restore();
 }
 
+/* ── The red To-Let poster (A1 landscape) ────────────────────────────────── */
+
+/** The BHK a flat's type says: "2 BHK" → 2; null for "1 RK", a studio or nothing. */
+const bhkCount = (t) => {
+  const m = /^\s*(\d+(?:\.5)?)\s*BHK\b/i.exec(String(t || ""));
+  return m ? Number(m[1]) : null;
+};
+
+/**
+ * The poster's headline from the flats' types: "TO-LET 2BHK FLAT",
+ * "TO-LET 1, 2 BHK FLATS" when they differ, "TO-LET 1RK FLAT", or
+ * "TO-LET FLAT" when no type is known.
+ */
+export function toLetHeadline(types = []) {
+  const list = [...new Set((types ?? []).map((t) => String(t || "").trim()).filter(Boolean))];
+  if (!list.length) return "TO-LET FLAT";
+  const ns = list.map(bhkCount);
+  if (ns.every((n) => n != null)) {
+    const u = [...new Set(ns)].sort((a, b) => a - b);
+    return u.length === 1 ? `TO-LET ${u[0]}BHK FLAT` : `TO-LET ${u.join(", ")} BHK FLATS`;
+  }
+  return list.length === 1 ? `TO-LET ${headlineBhk(list[0]).toUpperCase()} FLAT` : "TO-LET FLATS";
+}
+
+/** "MovEazy Assured Property | India's first Speed Renting Platform", small and faded, in tilted rows over the sheet. */
+function watermark(ctx, W, H) {
+  const line = "MovEazy Assured Property  |  India’s first Speed Renting Platform";
+  ctx.save();
+  ctx.font = `600 15px ${FONT}`;
+  ctx.fillStyle = "rgba(17,17,17,.075)";
+  ctx.textBaseline = "middle";
+  ctx.textAlign = "left";
+  const step = ctx.measureText(line).width + 44;
+  ctx.translate(W / 2, H / 2);
+  ctx.rotate(-0.38);
+  const span = Math.hypot(W, H) / 2 + step;
+  for (let y = -span, row = 0; y <= span; y += 40, row++) {
+    for (let x = -span - (row % 2 ? step / 2 : 0); x <= span; x += step) ctx.fillText(line, x, y);
+  }
+  ctx.restore();
+}
+
+/**
+ * "TO-LET 2BHK FLAT" in red across the top, the QR big in the middle, the
+ * number under it, the logo bottom right, the line faded behind it all.
+ * `data`: { headline, phone, url, logoLight }.
+ */
+function drawRedToLet(ctx, { headline, phone, url, logoLight }) {
+  const [W, H] = SIZE.landscape;
+  const RED = "#E3141B";
+  const INK = "#111111";
+  ctx.fillStyle = "#FFFFFF";
+  ctx.fillRect(0, 0, W, H);
+  watermark(ctx, W, H);
+
+  // The red frame.
+  roundRect(ctx, 18, 18, W - 36, H - 36, 20);
+  ctx.lineWidth = 6;
+  ctx.strokeStyle = RED;
+  ctx.stroke();
+
+  // The headline, as wide as the sheet allows, never stretched past 1.15.
+  const head = String(headline || "TO-LET FLAT").trim().toUpperCase();
+  ctx.font = `900 ${126 / 0.711}px ${TOLET_FONT}`;
+  const natural = ctx.measureText(head).width || 1;
+  const maxW = W - 120;
+  const cap = natural > maxW / 0.72 ? 126 * (maxW / 0.72 / natural) : 126;
+  capLine(ctx, head, { x: W / 2, base: 54 + cap, cap, width: maxW, color: RED, align: "center", stretch: [0.72, 1.15] });
+
+  // The QR, big, on a white card with a red edge so the watermark never runs into it.
+  const card = 452;
+  const qx = (W - card) / 2;
+  const qy = 214;
+  roundRect(ctx, qx, qy, card, card, 26);
+  ctx.fillStyle = "#FFFFFF";
+  ctx.fill();
+  ctx.lineWidth = 5;
+  ctx.strokeStyle = RED;
+  ctx.stroke();
+  drawQr(ctx, url, qx + 30, qy + 30, card - 60, INK);
+
+  // The number, in a white band.
+  const num = formatMobile(toLetNumber(phone));
+  if (num) {
+    ctx.font = `900 ${80 / 0.711}px ${TOLET_FONT}`;
+    const nw = Math.min(W - 520, ctx.measureText(num).width + 60);
+    roundRect(ctx, (W - nw) / 2, 690, nw, 104, 18);
+    ctx.fillStyle = "#FFFFFF";
+    ctx.fill();
+    capLine(ctx, num, { x: W / 2, base: 782, cap: 80, width: nw - 60, color: INK, align: "center", stretch: [0.72, 1] });
+  }
+
+  // The logo, small, bottom right.
+  if (logoLight) {
+    const lw = 150;
+    const lh = (logoLight.height / logoLight.width) * lw;
+    roundRect(ctx, W - 58 - lw - 14, H - 52 - lh - 10, lw + 28, lh + 20, 10);
+    ctx.fillStyle = "#FFFFFF";
+    ctx.fill();
+    ctx.drawImage(logoLight, W - 58 - lw, H - 52 - lh, lw, lh);
+  }
+}
+
 /**
  * Draw `design` onto `canvas` at `scale` (1 = 1188 px on the long side).
  * `data`: { broker: {name, agency, phone, rating, ratings}, url, displayUrl, photo, logo } — photo/logo loaded images.
@@ -1213,6 +1324,7 @@ export function drawPoster(canvas, design, data, scale = 1) {
   const id = designOf(design).id;
   P = POSTER_PALETTES[data?.palette] || POSTER_PALETTES.emerald;
   if (id === "tolet") drawToLet(ctx, data);
+  else if (id === "redtolet") drawRedToLet(ctx, data);
   else if (id === "premium") drawPremium(ctx, data);
   else if (id === "classic") drawClassic(ctx, data);
   else if (id === "street") drawStreet(ctx, data);

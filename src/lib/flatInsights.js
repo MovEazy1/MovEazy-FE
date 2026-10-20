@@ -9,7 +9,7 @@
 import { supabase, isSupabaseConfigured } from "./supabase";
 import { PUBLIC_ORIGIN } from "./partners";
 import { visitorId } from "./storefront";
-import { BUILDING_POSTER, CLASSIC_POSTER, FLAT_POSTER, STREET_POSTERS, headlineBhk, loadImage, posterFontsReady, posterPdf } from "./qrPoster";
+import { BUILDING_POSTER, CLASSIC_POSTER, FLAT_POSTER, RED_TOLET_POSTER, STREET_POSTERS, headlineBhk, loadImage, posterFontsReady, posterPdf, toLetHeadline } from "./qrPoster";
 import { buildingDisplay, buildingUrl } from "./buildings";
 
 async function rpc(fn, args) {
@@ -60,6 +60,20 @@ export const EMPTY_STATS = { scans: 0, opens: 0, likes: 0, visits: 0, feedback: 
 
 /* ── Posters ─────────────────────────────────────────────────────────────── */
 
+/**
+ * The number printed on the red To-Let poster (poster_phone.sql): set on a
+ * flat or on its building, by the CRM or the owner. `{ flat, building }`.
+ */
+export const fetchPosterPhone = ({ propertyId = null, buildingId = null }) =>
+  rpc("poster_phone_get", { p_property: propertyId || null, p_building: buildingId || null }).then((r) => r ?? {});
+/** Save it on the flat (a propertyId) or else on the building; "" clears it. Returns the ten digits saved. */
+export const savePosterPhone = ({ propertyId = null, buildingId = null }, phone) =>
+  rpc("poster_phone_set", { p_property: propertyId || null, p_building: buildingId || null, p_phone: String(phone ?? "") });
+
+/** "TO-LET 2BHK FLAT" for a flat, or for a building from its flats' types (`building.bhks`). */
+export const defaultToLetHeadline = ({ flat, building }) =>
+  toLetHeadline(building ? (building.bhks ?? [building.bhk]) : [flat?.flat_type || (flat?.bedrooms ? `${flat.bedrooms} BHK` : "")]);
+
 const bhk = (p) => p?.flat_type || (p?.bedrooms ? `${p.bedrooms} BHK` : "Flat");
 const rupees = (n) => (Number(n) > 0 ? `₹${Number(n).toLocaleString("en-IN")}` : "");
 
@@ -67,8 +81,22 @@ const rupees = (n) => (Number(n) > 0 ? `₹${Number(n).toLocaleString("en-IN")}`
  * What a poster needs, for one flat or for the building it is in.
  * `flat`: an inventory-shaped row (property_id, flat_type, area, rent, images…).
  * `building`: { code, name, area, landmark, photo, available, rentFrom } to print the building's poster instead.
+ * The red To-Let also takes `headline` (else "TO-LET 2BHK FLAT" from the types) and `phone`.
  */
-export async function posterData({ flat, building, logoSrc, style = "photo", lightLogoSrc }) {
+export async function posterData({ flat, building, logoSrc, style = "photo", lightLogoSrc, headline, phone }) {
+  if (style === RED_TOLET_POSTER.id) {
+    // The red To-Let: the headline (as edited), the QR, the poster's number.
+    const [logoLight] = await Promise.all([loadImage(lightLogoSrc || logoSrc), posterFontsReady()]);
+    return {
+      design: RED_TOLET_POSTER.id,
+      data: {
+        headline: String(headline ?? "").trim() || defaultToLetHeadline({ flat, building }),
+        phone: phone || "",
+        url: building ? buildingUrl(building.code, { qr: true }) : flatUrl(flat.property_id, { qr: true }),
+        logoLight,
+      },
+    };
+  }
   if (STREET_POSTERS.some((d) => d.id === style)) {
     // The A1 street posters: the type, the rent, how many — big.
     const [logo, logoDark] = await Promise.all([loadImage(lightLogoSrc || logoSrc), loadImage(logoSrc), posterFontsReady()]);
