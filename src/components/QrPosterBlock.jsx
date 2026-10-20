@@ -8,7 +8,7 @@ import QRCode from "qrcode";
 import { Copy, Download, ExternalLink } from "lucide-react";
 import { defaultToLetHeadline, downloadPoster, fetchPosterPhone, flatUrl, posterData, savePosterPhone } from "../lib/flatInsights";
 import { buildingUrl } from "../lib/buildings";
-import { PROPERTY_POSTER_STYLES, RED_TOLET_POSTER, designOf, drawPoster, formatMobile } from "../lib/qrPoster";
+import { PROPERTY_POSTER_STYLES, RED_TOLET_POSTER, designOf, drawPoster } from "../lib/qrPoster";
 import logoOnDark from "../assets/logo/moveazy-logo-mint-dark.png";
 import logoOnLight from "../assets/logo/moveazy-logo-mint-light.png";
 
@@ -28,8 +28,9 @@ export function QrImage({ url, size = 96, title }) {
 /**
  * `flat`: an inventory-shaped row. `building`: { id, code, name, area, landmark, photo, available, rentFrom, bhk, bhks } to show the building's poster.
  * The looks to pick from: PROPERTY_POSTER_STYLES, or only the ids in `styles`.
- * The red To-Let prints a phone number saved on the flat or on the building
- * (poster_phone.sql) under an editable headline.
+ * The red To-Let prints two phone numbers, one per line, saved on the flat or
+ * on the building — each its own pair (poster_phone.sql) — under an editable
+ * headline.
  * `onToast(message, kind)`: how the caller says things. `showLinks`: the copy / open row.
  */
 export default function QrPosterBlock({ flat, building, btnClass = "", softClass = "", onToast = () => {}, previewWidth = 230, styles, showLinks = true }) {
@@ -41,37 +42,37 @@ export default function QrPosterBlock({ flat, building, btnClass = "", softClass
   const toLet = style === RED_TOLET_POSTER.id;
   const link = building ? buildingUrl(building.code) : flatUrl(flat.property_id);
 
-  // The To-Let's number: this flat's own (else its building's), or the building's.
+  // The To-Let's two numbers: the flat's own pair, or the building's.
   const buildingId = building?.id || null;
   const propertyId = building ? null : flat?.property_id || null;
-  const [saved, setSaved] = useState(null); // { flat, building } once loaded
-  const [phone, setPhone] = useState("");
+  const [saved, setSaved] = useState(null); // { phone, phone2 } once loaded
+  const [phones, setPhones] = useState(["", ""]);
   const [savingPhone, setSavingPhone] = useState(false);
   const [headline, setHeadline] = useState(() => defaultToLetHeadline({ flat, building }));
   useEffect(() => {
     if (!toLet || saved || !(buildingId || propertyId)) return undefined;
     let alive = true;
     fetchPosterPhone({ buildingId, propertyId })
-      .then((r) => { if (alive) { setSaved(r); setPhone((buildingId ? r.building : r.flat) || ""); } })
-      .catch((e) => { if (alive) { setSaved({}); onToast(e?.message || "Couldn't load the poster's number", "error"); } });
+      .then((r) => { if (alive) { setSaved(r); setPhones([r.phone || "", r.phone2 || ""]); } })
+      .catch((e) => { if (alive) { setSaved({}); onToast(e?.message || "Couldn't load the poster's numbers", "error"); } });
     return () => { alive = false; };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [toLet, buildingId, propertyId]);
-  const own = (buildingId ? saved?.building : saved?.flat) || "";
-  const inherited = !buildingId && !digits(phone) ? saved?.building || "" : "";
-  const printed = digits(phone) || inherited;
-  const dirty = Boolean(saved) && digits(phone) !== own;
+  const typed = phones.map(digits);
+  const ready = typed.every((d) => d.length >= 10);
+  const dirty = Boolean(saved) && (typed[0] !== (saved.phone || "") || typed[1] !== (saved.phone2 || ""));
+  const setPhone = (k, v) => setPhones((cur) => cur.map((p, i) => (i === k ? v : p)));
 
   const savePhone = async () => {
     setSavingPhone(true);
     try {
-      const d = await savePosterPhone({ buildingId, propertyId }, phone);
-      setSaved((cur) => ({ ...cur, [buildingId ? "building" : "flat"]: d }));
-      setPhone(d);
-      onToast(d ? "Poster number saved" : "Poster number removed");
+      const r = await savePosterPhone({ buildingId, propertyId }, phones[0], phones[1]);
+      setSaved(r);
+      setPhones([r.phone || "", r.phone2 || ""]);
+      onToast(r.phone ? "Poster numbers saved" : "Poster numbers removed");
       return true;
     } catch (e) {
-      onToast(e?.message || "Couldn't save the number", "error");
+      onToast(e?.message || "Couldn't save the numbers", "error");
       return false;
     } finally {
       setSavingPhone(false);
@@ -79,10 +80,10 @@ export default function QrPosterBlock({ flat, building, btnClass = "", softClass
   };
 
   const key = useMemo(
-    () => JSON.stringify([flat?.property_id, flat?.rent, flat?.cover_image_url, flat?.flat_type, building?.code, building?.available, building?.bhk, style, toLet ? headline : "", toLet ? printed : ""]),
-    [flat, building, style, toLet, headline, printed],
+    () => JSON.stringify([flat?.property_id, flat?.rent, flat?.cover_image_url, flat?.flat_type, building?.code, building?.available, building?.bhk, style, toLet ? headline : "", toLet ? typed.join("|") : ""]),
+    [flat, building, style, toLet, headline, typed],
   );
-  const dataFor = () => posterData({ flat, building, logoSrc: logoOnDark, lightLogoSrc: logoOnLight, style, headline, phone: printed });
+  const dataFor = () => posterData({ flat, building, logoSrc: logoOnDark, lightLogoSrc: logoOnLight, style, headline, phones: typed });
 
   useEffect(() => {
     let alive = true;
@@ -133,22 +134,18 @@ export default function QrPosterBlock({ flat, building, btnClass = "", softClass
             <input value={headline} onChange={(e) => setHeadline(e.target.value)} maxLength={40} style={FIELD} />
           </label>
           <div style={LABEL}>
-            <label htmlFor={`poster-phone-${buildingId || propertyId}`}>Poster phone no.</label>
-            <span style={{ display: "flex", gap: 6 }}>
-              <input id={`poster-phone-${buildingId || propertyId}`} type="tel" inputMode="numeric" value={phone} onChange={(e) => setPhone(e.target.value)} maxLength={16}
-                placeholder={inherited ? formatMobile(inherited) : "10-digit number"} disabled={!saved} style={{ ...FIELD, flex: 1, minWidth: 0 }} />
+            <span>Poster phone numbers</span>
+            {[0, 1].map((k) => (
+              <input key={k} type="tel" inputMode="numeric" value={phones[k]} onChange={(e) => setPhone(k, e.target.value)} maxLength={16}
+                placeholder={`${k ? "Second" : "First"} 10-digit number`} disabled={!saved} style={FIELD} aria-label={`Poster phone number ${k + 1}`} />
+            ))}
+            <span style={{ display: "flex", gap: 8, alignItems: "center" }}>
+              <span style={{ flex: 1, fontSize: 11, fontWeight: 500, color: "#6B7570", lineHeight: 1.4 }}>
+                {!saved ? "Loading the saved numbers…" : `Both print on the poster, one per line. Saved on this ${buildingId ? "building's" : "flat's"} poster only.`}
+              </span>
               <button type="button" className={softClass} onClick={savePhone} disabled={!dirty || savingPhone} style={{ justifyContent: "center", flexShrink: 0 }}>
                 {savingPhone ? "Saving…" : "Save"}
               </button>
-            </span>
-            <span style={{ fontSize: 11, fontWeight: 500, color: "#6B7570", lineHeight: 1.4 }}>
-              {!saved
-                ? "Loading the saved number…"
-                : inherited
-                  ? "Using the building's number. Type one to give this flat its own."
-                  : buildingId
-                    ? "Saved on the building. Its flats' posters use it unless a flat has its own."
-                    : "Saved on this flat, for its poster."}
             </span>
           </div>
         </div>
@@ -156,8 +153,8 @@ export default function QrPosterBlock({ flat, building, btnClass = "", softClass
       <div style={{ display: "grid", placeItems: "center", background: "#F3F0E8", borderRadius: 14, padding: 12 }}>
         <canvas ref={ref} aria-label="Poster preview" style={{ display: "block", width: `min(100%, ${previewWidth}px)`, height: "auto", borderRadius: 4, boxShadow: "0 8px 24px rgba(0,0,0,.18)", background: "#fff" }} />
       </div>
-      <button type="button" className={btnClass} onClick={download} disabled={busy || savingPhone || (toLet && !printed)} style={{ width: "100%", marginTop: 10, justifyContent: "center" }}>
-        <Download size={17} /> {busy ? "Making the PDF…" : toLet && !printed ? "Add the poster phone no. first" : `Download ${designOf(design).paper || "A4"} poster (PDF)`}
+      <button type="button" className={btnClass} onClick={download} disabled={busy || savingPhone || (toLet && !ready)} style={{ width: "100%", marginTop: 10, justifyContent: "center" }}>
+        <Download size={17} /> {busy ? "Making the PDF…" : toLet && !ready ? "Add both poster numbers first" : `Download ${designOf(design).paper || "A4"} poster (PDF)`}
       </button>
       {showLinks && (
         <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8, marginTop: 8 }}>

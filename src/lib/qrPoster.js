@@ -16,7 +16,7 @@
  *             in a green-edged card, "Scan to View Property" — for a building
  *             or a flat, chosen in the CRM next to the photo poster.
  *   redtolet  A1 landscape, white. "TO-LET 2BHK FLAT" in bold red, one big QR,
- *             the poster's phone number (poster_phone.sql), the logo, and
+ *             the poster's two phone numbers (poster_phone.sql), the logo, and
  *             "MovEazy Assured Property | India's first Speed Renting
  *             Platform" faded across the whole sheet.
  *
@@ -50,7 +50,7 @@ export const RED_TOLET_POSTER = { id: "redtolet", label: "To-Let", orientation: 
 /** The looks a building's or flat's poster comes in. */
 export const PROPERTY_POSTER_STYLES = [
   { id: "photo", label: "Photo poster", hint: "A4 portrait · photo & QR" },
-  { id: "redtolet", label: "To-Let", hint: "A1 landscape · red, QR & number" },
+  { id: "redtolet", label: "To-Let", hint: "A1 landscape · red, QR & 2 numbers" },
   { id: "classic", label: "Classic", hint: "A4 landscape · headline & QR" },
   { id: "street", label: "Street Tape", hint: "A1 landscape · big type, tape" },
   { id: "speed", label: "Speed Lane", hint: "A1 landscape · bold brand" },
@@ -1251,10 +1251,10 @@ function watermark(ctx, W, H) {
 
 /**
  * "TO-LET 2BHK FLAT" in red across the top, the QR big in the middle, the
- * number under it, the logo bottom right, the line faded behind it all.
- * `data`: { headline, phone, url, logoLight }.
+ * numbers under it one per line, the logo bottom right, the line faded
+ * behind it all. `data`: { headline, phones: [first, second], url, logoLight }.
  */
-function drawRedToLet(ctx, { headline, phone, url, logoLight }) {
+function drawRedToLet(ctx, { headline, phones = [], url, logoLight }) {
   const [W, H] = SIZE.landscape;
   const RED = "#E3141B";
   const INK = "#111111";
@@ -1277,9 +1277,9 @@ function drawRedToLet(ctx, { headline, phone, url, logoLight }) {
   capLine(ctx, head, { x: W / 2, base: 54 + cap, cap, width: maxW, color: RED, align: "center", stretch: [0.72, 1.15] });
 
   // The QR, big, on a white card with a red edge so the watermark never runs into it.
-  const card = 452;
+  const card = 384;
   const qx = (W - card) / 2;
-  const qy = 214;
+  const qy = 204;
   roundRect(ctx, qx, qy, card, card, 26);
   ctx.fillStyle = "#FFFFFF";
   ctx.fill();
@@ -1288,16 +1288,17 @@ function drawRedToLet(ctx, { headline, phone, url, logoLight }) {
   ctx.stroke();
   drawQr(ctx, url, qx + 30, qy + 30, card - 60, INK);
 
-  // The number, in a white band.
-  const num = formatMobile(toLetNumber(phone));
-  if (num) {
-    ctx.font = `900 ${80 / 0.711}px ${TOLET_FONT}`;
-    const nw = Math.min(W - 520, ctx.measureText(num).width + 60);
-    roundRect(ctx, (W - nw) / 2, 690, nw, 104, 18);
+  // The numbers, one per line, each in a white band, the same size.
+  const nums = phones.map((p) => formatMobile(toLetNumber(p))).filter(Boolean).slice(0, 2);
+  ctx.font = `900 ${70 / 0.711}px ${TOLET_FONT}`;
+  const nw = Math.min(W - 520, Math.max(0, ...nums.map((n) => ctx.measureText(n).width)) + 60);
+  nums.forEach((num, k) => {
+    const top = 606 + k * 104;
+    roundRect(ctx, (W - nw) / 2, top, nw, 92, 16);
     ctx.fillStyle = "#FFFFFF";
     ctx.fill();
-    capLine(ctx, num, { x: W / 2, base: 782, cap: 80, width: nw - 60, color: INK, align: "center", stretch: [0.72, 1] });
-  }
+    capLine(ctx, num, { x: W / 2, base: top + 81, cap: 70, width: nw - 60, color: INK, align: "center", stretch: [0.72, 1] });
+  });
 
   // The logo, small, bottom right.
   if (logoLight) {

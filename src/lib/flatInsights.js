@@ -61,14 +61,15 @@ export const EMPTY_STATS = { scans: 0, opens: 0, likes: 0, visits: 0, feedback: 
 /* ── Posters ─────────────────────────────────────────────────────────────── */
 
 /**
- * The number printed on the red To-Let poster (poster_phone.sql): set on a
- * flat or on its building, by the CRM or the owner. `{ flat, building }`.
+ * The two numbers printed on the red To-Let poster (poster_phone.sql): a
+ * flat's own pair, or a building's — set by the CRM or the owner, never
+ * carried from one to the other. `{ phone, phone2 }`.
  */
 export const fetchPosterPhone = ({ propertyId = null, buildingId = null }) =>
   rpc("poster_phone_get", { p_property: propertyId || null, p_building: buildingId || null }).then((r) => r ?? {});
-/** Save it on the flat (a propertyId) or else on the building; "" clears it. Returns the ten digits saved. */
-export const savePosterPhone = ({ propertyId = null, buildingId = null }, phone) =>
-  rpc("poster_phone_set", { p_property: propertyId || null, p_building: buildingId || null, p_phone: String(phone ?? "") });
+/** Save the pair on the flat (a propertyId) or else on the building; both "" clears it. Returns `{ phone, phone2 }` as saved. */
+export const savePosterPhone = ({ propertyId = null, buildingId = null }, phone, phone2) =>
+  rpc("poster_phone_set", { p_property: propertyId || null, p_building: buildingId || null, p_phone: String(phone ?? ""), p_phone2: String(phone2 ?? "") });
 
 /** "TO-LET 2BHK FLAT" for a flat, or for a building from its flats' types (`building.bhks`). */
 export const defaultToLetHeadline = ({ flat, building }) =>
@@ -81,17 +82,17 @@ const rupees = (n) => (Number(n) > 0 ? `₹${Number(n).toLocaleString("en-IN")}`
  * What a poster needs, for one flat or for the building it is in.
  * `flat`: an inventory-shaped row (property_id, flat_type, area, rent, images…).
  * `building`: { code, name, area, landmark, photo, available, rentFrom } to print the building's poster instead.
- * The red To-Let also takes `headline` (else "TO-LET 2BHK FLAT" from the types) and `phone`.
+ * The red To-Let also takes `headline` (else "TO-LET 2BHK FLAT" from the types) and `phones`, one per line.
  */
-export async function posterData({ flat, building, logoSrc, style = "photo", lightLogoSrc, headline, phone }) {
+export async function posterData({ flat, building, logoSrc, style = "photo", lightLogoSrc, headline, phones }) {
   if (style === RED_TOLET_POSTER.id) {
-    // The red To-Let: the headline (as edited), the QR, the poster's number.
+    // The red To-Let: the headline (as edited), the QR, the poster's two numbers.
     const [logoLight] = await Promise.all([loadImage(lightLogoSrc || logoSrc), posterFontsReady()]);
     return {
       design: RED_TOLET_POSTER.id,
       data: {
         headline: String(headline ?? "").trim() || defaultToLetHeadline({ flat, building }),
-        phone: phone || "",
+        phones: (phones ?? []).filter(Boolean),
         url: building ? buildingUrl(building.code, { qr: true }) : flatUrl(flat.property_id, { qr: true }),
         logoLight,
       },
