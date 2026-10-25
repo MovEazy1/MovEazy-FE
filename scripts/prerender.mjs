@@ -28,9 +28,14 @@ const root = join(dirname(fileURLToPath(import.meta.url)), "..");
 const dist = join(root, "dist");
 const out = join(root, ".prerender");
 
+// Each page's first-screen faces (measured on a phone-sized screen): they
+// load with the CSS instead of after it, so the text draws once in its own
+// font. The first is the headline's — the page's largest paint.
 const PAGES = [
-  { page: "home", file: "home.html", host: "www.moveazy.co.in" },
-  { page: "partners", file: "partners-home.html", host: "partners.moveazy.co.in" },
+  { page: "home", file: "home.html", host: "www.moveazy.co.in",
+    fonts: ["sora-latin-800", "manrope-latin-600", "manrope-latin-700", "manrope-latin-800", "inter-latin-700"] },
+  { page: "partners", file: "partners-home.html", host: "partners.moveazy.co.in",
+    fonts: ["sora-latin-700", "sora-latin-800", "inter-latin-600", "inter-latin-700"] },
 ];
 
 // In <head>, so it runs before the first paint: a signed-in visitor
@@ -63,12 +68,19 @@ function browser(host) {
   return dom;
 }
 
-// The landing pages are set in Inter: its regular, bold and extra-bold faces
-// load with the CSS, so the page lays out once rather than once per font.
-const fonts = readdirSync(join(dist, "assets"))
-  .filter((f) => /^inter-latin-(400|700|800)-normal-[\w-]+\.woff2$/.test(f))
-  .map((f) => `<link rel="preload" as="font" type="font/woff2" crossorigin href="/assets/${f}">`)
-  .join("");
+const assets = readdirSync(join(dist, "assets"));
+function fontPreloads(names) {
+  return names.map((name, i) => {
+    const file = assets.find((f) => f.startsWith(`${name}-normal-`) && f.endsWith(".woff2"));
+    return file ? `<link rel="preload" as="font" type="font/woff2" crossorigin href="/assets/${file}"${i === 0 ? ' fetchpriority="high"' : ""}>` : "";
+  }).join("");
+}
+
+// The page shows without JavaScript, so its scripts come after its fonts and
+// styles: still fetched at once, at low priority.
+const lowPriorityScripts = (html) => html
+  .replace(/<link rel="modulepreload"/g, '<link rel="modulepreload" fetchpriority="low"')
+  .replace(/<script type="module" crossorigin/g, '<script type="module" fetchpriority="low" crossorigin');
 
 const shell = readFileSync(join(dist, "index.html"), "utf8");
 let rendered = {};
@@ -91,7 +103,7 @@ try {
 for (const p of PAGES) {
   const html = rendered[p.page];
   const page = html
-    ? shell.replace("</head>", `${HEAD}${fonts}
+    ? lowPriorityScripts(shell).replace("</head>", `${HEAD}${fontPreloads(p.fonts)}
 </head>`).replace('<div id="root"></div>', `<div id="prerender">${html}</div><div id="root"></div>`)
     : shell;
   writeFileSync(join(dist, p.file), page);

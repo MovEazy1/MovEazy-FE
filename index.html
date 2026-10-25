@@ -74,6 +74,9 @@
         window.addEventListener("appinstalled", function () { window.__crmInstall = null; window.__crmInstalled = true; window.dispatchEvent(new Event("crm-install-ready")); });
       })();
     </script>
+    <!-- Every page talks to the database within its first second: open that
+         connection now, alongside the page's own files. -->
+    <link rel="preconnect" href="%VITE_SUPABASE_URL%" crossorigin />
     <!-- Fonts come with the app's CSS from our own domain (src/styles/fonts.css):
          no request to Google before the page can draw, and each page
          downloads only the faces its text uses. -->
