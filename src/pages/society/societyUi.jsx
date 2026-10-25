@@ -6,6 +6,7 @@ import { useEffect, useState } from "react";
 import { Link, useLocation, useNavigate } from "react-router-dom";
 import { ArrowLeft, Building2, ChevronLeft, ChevronRight, Home, Users, Wallet } from "lucide-react";
 import { sp } from "../../lib/society";
+import { coverPhoto } from "../../lib/listingMedia";
 import logoLight from "../../assets/logo/moveazy-logo-mint-light.png";
 import logoDark from "../../assets/logo/moveazy-logo-mint-dark.png";
 
@@ -129,7 +130,8 @@ export function StatusPill({ occupancy }) {
 }
 
 export function FlatThumb({ flat, className = "sx-thumb" }) {
-  const src = flat?.cover_image_url || flat?.images?.[0];
+  // A photo — a video as the first file would draw as a broken image.
+  const src = coverPhoto([flat?.cover_image_url, ...(flat?.images ?? [])]);
   return <span className={className}>{src ? <img src={src} alt="" loading="lazy" /> : <Building2 size={24} />}</span>;
 }
 

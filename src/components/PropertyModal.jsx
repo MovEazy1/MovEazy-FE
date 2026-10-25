@@ -1222,7 +1222,8 @@ export default function PropertyModal({
                     </p>
                     <div style={{ display: "flex", gap: "12px", overflowX: "auto", paddingBottom: "6px", WebkitOverflowScrolling: "touch" }}>
                       {nearbyListings.map((n) => {
-                        const img = n.image || n.images?.[0];
+                        // A photo — a video as the first file would draw as a broken image.
+                        const img = coverPhoto([n.image, ...(n.images ?? [])]);
                         const km = typeof n._distanceKm === "number" ? n._distanceKm.toFixed(1) : "?";
                         return (
                           <button

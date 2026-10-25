@@ -11,6 +11,10 @@ import { useAuth } from "../../context/AuthContext";
 import { fetchBuildingPage } from "../../lib/buildings";
 import { commuteMinutes, formatCommute } from "../../lib/commute";
 import { fetchSocietyPublic, rupees } from "../../lib/society";
+import { coverPhoto } from "../../lib/listingMedia";
+
+// A flat's photo — a video as its first file would draw as a broken image.
+const flatPhoto = (f) => coverPhoto([f.cover_image_url, ...(f.images ?? [])]);
 import { fetchUserRequirement, rowToPrefs } from "../../lib/userRequirements";
 import { CSS as EX_CSS, societyPhotos, useGoogle } from "./ExploreSocieties";
 
@@ -45,7 +49,7 @@ export default function SocietyPage() {
   }
 
   const flats = (b.flats ?? []).filter((f) => f.available);
-  const { urls, google } = societyPhotos({ photos: b.photos, flat_photos: flats.map((f) => f.cover_image_url || f.images?.[0]).filter(Boolean) }, g);
+  const { urls, google } = societyPhotos({ photos: b.photos, flat_photos: flats.map(flatPhoto).filter(Boolean) }, g);
   const commute = office?.lat != null ? commuteMinutes(office, { lat: b.latitude, lng: b.longitude }) : null;
   const r = extra?.rules || {};
   const facts = [
@@ -86,7 +90,7 @@ export default function SocietyPage() {
           <div className="sp-flats">
             {flats.map((f) => (
               <Link key={f.property_id} to={`/property/${f.property_id}`} className="sp-flat">
-                <span className="sp-fimg">{(f.cover_image_url || f.images?.[0]) ? <img src={f.cover_image_url || f.images[0]} alt="" loading="lazy" /> : (urls[0] ? <img src={urls[0]} alt="" /> : <Building2 size={28} />)}</span>
+                <span className="sp-fimg">{flatPhoto(f) ? <img src={flatPhoto(f)} alt="" loading="lazy" /> : (urls[0] ? <img src={urls[0]} alt="" /> : <Building2 size={28} />)}</span>
                 <span className="sp-fbody">
                   <b>{rupees(f.rent)}<em>/month</em></b>
                   <span>{[f.flat_type, f.furnishing, f.area_sqft ? `${f.area_sqft} sq ft` : ""].filter(Boolean).join(" · ")}</span>

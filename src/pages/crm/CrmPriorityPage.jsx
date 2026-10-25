@@ -26,6 +26,7 @@ import { useCrm } from "./CrmShell";
 import { useClientReactions } from "./PropertyQuickView";
 import { Btn, C, Chip, Empty, TempDot, Toast, inr, relTime, shortDate } from "./crmUi";
 import { SCOPES } from "../../lib/adminScopes";
+import { coverPhoto } from "../../lib/listingMedia";
 import { fetchShortlists, logActivity, saveClientRequirement, tempColor } from "../../lib/crmClients";
 import { buildTemplateVars, renderTemplate, whatsappUrl } from "../../lib/crmSettings";
 import { effectiveFacts, groupInterestByClient, inferRequirement, requirementForMatching } from "../../lib/crmPropertyInterest";
@@ -452,7 +453,8 @@ function ClientCard({ p, on, now, canWrite, onPick, onContact, onCurate, onFresh
 }
 
 function FlatRow({ l, reach, partner, forClient, sentToThem, inTray, onTray, now }) {
-  const cover = l.cover_image_url || (l.images ?? [])[0];
+  // A photo: a flat whose first file is a video drew a broken image here.
+  const cover = coverPhoto([l.cover_image_url, ...(l.images ?? [])]);
   const fresh = now - ts(l.created_at) < DAY;
   return (
     <div className="crm-card" style={{ marginBottom: 8, padding: 8, display: "flex", gap: 10, alignItems: "center",

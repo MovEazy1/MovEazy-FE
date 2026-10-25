@@ -12,13 +12,15 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Btn, C, Empty, inr } from "./crmUi";
 import { whatsappUrl } from "../../lib/crmSettings";
+import { coverPhoto } from "../../lib/listingMedia";
 import {
   FOLLOW_UP_OUTCOMES, STALE_AFTER_DAYS, ageInDays, availabilityMessage, checkedLabel,
   fetchDueForFollowUp, recordFollowUp,
 } from "../../lib/crmPropertyFollowUp";
 
 function FollowUpRow({ listing, onAnswer, busy }) {
-  const cover = listing.cover_image_url || (listing.images ?? [])[0] || "";
+  // A photo, never a video drawn as a broken image.
+  const cover = coverPhoto([listing.cover_image_url, ...(listing.images ?? [])]);
   const age = ageInDays(listing.created_at);
   const href = whatsappUrl(
     listing.phone,

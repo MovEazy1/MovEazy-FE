@@ -123,8 +123,12 @@
     max-width: 100%;
   }
 
-  img:not([class~="h-full"]):not([height]),
-  video:not([class~="h-full"]):not([height]) { height: auto; }
+  /* A default, not a rule: :where() keeps it at the weight of a bare `img`, so
+     any class that gives an image a height wins. Written plainly it outranked
+     every one-class height — the CRM phone logo drew at full width, the
+     Storefront photo out of its circle — and only h-full had been exempted. */
+  img:where(:not([class~="h-full"]):not([height])),
+  video:where(:not([class~="h-full"]):not([height])) { height: auto; }
 
   button {
     cursor: pointer;
