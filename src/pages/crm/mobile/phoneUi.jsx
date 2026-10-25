@@ -10,6 +10,9 @@ import { C } from "../crmUi";
 import { PHONE_TABS, sectionFor } from "../crmSections";
 import { telLink, waLink } from "../../../lib/partners";
 import { PHONE_QUERY, isPhoneNow } from "./phoneQuery";
+// The official wordmark drawn for light grounds: the bar is white, and
+// /logo-moveazy-bar.png carries a black plate that showed as a box on it.
+import logoOnLight from "../../../assets/logo/moveazy-logo-mint-light.png";
 
 export { PHONE_QUERY, isPhoneNow };
 
@@ -42,7 +45,7 @@ export function PhoneTopBar({ onRefresh, refreshing }) {
   return (
     <header className="crm-ph-top">
       {root ? (
-        <img src="/logo-moveazy-bar.png" alt="MovEazy" className="crm-ph-logo" />
+        <img src={logoOnLight} alt="MovEazy" className="crm-ph-logo" />
       ) : (
         <button type="button" className="crm-ph-icon" onClick={back} aria-label="Back"><ChevronLeft size={22} /></button>
       )}
