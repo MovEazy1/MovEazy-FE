@@ -186,10 +186,9 @@ export async function persistRequestedMoreFlats(uid) {
 /** Every user's requirement (for the List my Flat "who does this match" step). */
 export async function fetchAllUserRequirements({ limit = 1000 } = {}) {
   if (!isSupabaseConfigured || !supabase) return [];
-  const { data, error } = await supabase
-    .from("user_requirements")
-    .select("*")
-    .limit(limit);
+  // Preferences and a short handle only — never a seeker's contact
+  // (user_requirements_privacy.sql). The handle stands in for user_id.
+  const { data, error } = await supabase.rpc("requirements_for_matching", { p_limit: limit });
   if (error) return [];
-  return data || [];
+  return (data || []).map((r) => ({ ...r, user_id: r.handle, label: `Seeker #${r.handle}` }));
 }
