@@ -31,7 +31,9 @@ const out = join(root, ".prerender");
 
 // Each page's first-screen faces (measured on a phone-sized screen): they
 // load with the CSS instead of after it, so the text draws once in its own
-// font. The first is the headline's — the page's largest paint.
+// font. The first is the headline's — the page's largest paint — and loads
+// first. (Embedding it in the page was measured: the bigger page cost more
+// than the request it saved.)
 const PAGES = [
   { page: "home", file: "home.html", host: "www.moveazy.co.in",
     fonts: ["sora-latin-800", "manrope-latin-600", "manrope-latin-700", "manrope-latin-800", "inter-latin-700"] },
@@ -70,9 +72,10 @@ function browser(host) {
 }
 
 const assets = readdirSync(join(dist, "assets"));
+const fontFile = (name) => assets.find((f) => f.startsWith(`${name}-normal-`) && f.endsWith(".woff2"));
 function fontPreloads(names) {
   return names.map((name, i) => {
-    const file = assets.find((f) => f.startsWith(`${name}-normal-`) && f.endsWith(".woff2"));
+    const file = fontFile(name);
     return file ? `<link rel="preload" as="font" type="font/woff2" crossorigin href="/assets/${file}"${i === 0 ? ' fetchpriority="high"' : ""}>` : "";
   }).join("");
 }
