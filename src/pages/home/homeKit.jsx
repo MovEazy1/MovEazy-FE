@@ -33,6 +33,18 @@ export function useScrollScene(ref, onProgress) {
   }, [ref]);
 }
 
+/** Adds th-paused to the element while it is scrolled out of view (its looping animations stop). */
+export function usePauseOffscreen(ref) {
+  useEffect(() => {
+    const el = ref.current;
+    if (!el || typeof IntersectionObserver === "undefined") return undefined;
+    el.classList.add("th-paused");
+    const io = new IntersectionObserver(([e]) => el.classList.toggle("th-paused", !e.isIntersecting), { rootMargin: "100px 0px" });
+    io.observe(el);
+    return () => io.disconnect();
+  }, [ref]);
+}
+
 /** A phone whose screen is laid out at a true 375px and scaled to fit. */
 export function Phone({ children, className = "" }) {
   return (
@@ -133,6 +145,9 @@ export const SITE_CSS = `
   transform: scale(var(--s, .8)); transform-origin: 0 0; overflow: hidden; }
 .th-screen { position: absolute; inset: 0; opacity: 0; transform: translateY(18px) scale(.98); transition: opacity .45s ease, transform .55s cubic-bezier(.16,1,.3,1); }
 .th-screen.on { opacity: 1; transform: none; }
+/* A screen that isn't showing, or a scene scrolled out of view, holds its
+   looping animations still: they would otherwise cost every frame. */
+.th-screen:not(.on), .th-screen:not(.on) *, .th-paused, .th-paused * { animation-play-state: paused !important; }
 .th-h2 { font-size: clamp(38px, 5vw, 66px); line-height: 1; letter-spacing: -.04em; font-weight: 800; color: #04211D; margin: 0 0 34px; }
 .th-h2 span { color: var(--acc); }
 .th-story { height: 300vh; background: #fff; margin-top: 70px; }

@@ -87,7 +87,8 @@ export default async function handler(req) {
   const url = new URL(req.url);
   const kind = url.searchParams.get("kind") || "";
   const id = url.searchParams.get("id") || "";
-  const page = await fetch(`${url.origin}/index.html`);
+  // The app's shell (dist/app.html; "/" itself may be a pre-built landing page).
+  const page = await fetch(`${url.origin}/app.html`);
   let html = await page.text();
   // A person (a QR scan, a tap on a shared link) gets the app at once; the
   // lookup below only writes the preview card robots read.

@@ -6,7 +6,7 @@
  * PropertyVisitSlots and the shortlist, so what the page shows is what a
  * tenant gets.
  */
-import { useEffect, useMemo, useState } from "react";
+import { startTransition, useEffect, useMemo, useState } from "react";
 import {
   BadgeCheck, Building2, CalendarCheck, Check, CheckCircle2, ChevronLeft, ChevronRight, Clock, Globe, Home, MapPin, MessageCircle,
   ShieldCheck, Sparkles, Users, Wallet,
@@ -75,7 +75,9 @@ export function useShowcaseMatches() {
       const strong = scored.filter((x) => x.m.score >= 50);
       const matches = (strong.length >= 3 ? strong : scored.slice(0, 3)).slice(0, 5)
         .map(({ l, m }) => ({ ...l, matchScore: m.score, matchReasons: m.reasons, isVerified: true }));
-      setState({ matches, requirement });
+      // Every mock-up redraws with these homes: a transition, so React does it
+      // in slices between frames rather than one long block.
+      startTransition(() => setState({ matches, requirement }));
     })();
     return () => { alive = false; };
   }, []);

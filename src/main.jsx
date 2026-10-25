@@ -1,6 +1,7 @@
 import { captureException } from "./lib/sentry.js";
 import { StrictMode, Component } from "react";
 import { createRoot } from "react-dom/client";
+import "./styles/fonts.css";
 import "./index.css";
 import "./styles/home-marketing.css";
 // Leaflet's CSS comes with the components that draw a map, not with every page.
@@ -63,10 +64,17 @@ class RootErrorBoundary extends Component {
   }
 }
 
-createRoot(document.getElementById("root")).render(
-  <StrictMode>
-    <RootErrorBoundary>
-      <App />
-    </RootErrorBoundary>
-  </StrictMode>,
-);
+function start() {
+  createRoot(document.getElementById("root")).render(
+    <StrictMode>
+      <RootErrorBoundary>
+        <App />
+      </RootErrorBoundary>
+    </StrictMode>,
+  );
+}
+
+// A pre-built landing page (scripts/prerender.mjs) paints first: the app
+// starts on the frame after, rather than holding that paint while it renders.
+if (document.documentElement.classList.contains("mz-pre")) requestAnimationFrame(() => setTimeout(start, 0));
+else start();

@@ -32,6 +32,7 @@ import { matchesForLead } from "../../lib/partnerMatch";
 import { customerMessage, displayLink } from "../../lib/partners";
 import { brokerEarnings, inr } from "../../lib/landingCalc";
 import { useLandingSettings } from "../../lib/landingSettings";
+import { usePrerenderHandoff } from "../../lib/prerender";
 
 const AREAS = ["HSR Layout", "Koramangala", "Bellandur", "Whitefield", "Indiranagar", "Marathahalli"];
 const BHKS = ["1 BHK", "2 BHK", "3 BHK"];
@@ -333,6 +334,8 @@ function Calculator({ s }) {
 }
 
 export default function PartnerLanding() {
+  // Drawn: the pre-built copy of this page (scripts/prerender.mjs) steps aside.
+  usePrerenderHandoff();
   const s = useLandingSettings();
   const inventory = useInventory();
   const photos = useListingsWithPhotos(inventory, 4);

@@ -12,16 +12,32 @@ export function isConstrainedNetwork(conn = typeof navigator !== "undefined" ? n
   return Boolean(conn.saveData) || /(^|-)(2g|3g)$/.test(String(conn.effectiveType || ""));
 }
 
-export function prefetchWhenIdle(loaders, { delay = 2500 } = {}) {
+export function prefetchWhenIdle(loaders, { delay = 2500, fallback = 12000 } = {}) {
   if (typeof window === "undefined" || isConstrainedNetwork()) return () => {};
   let cancelled = false;
+  let fallbackTimer = 0;
   const run = () => {
     if (cancelled) return;
     for (const load of loaders) load().catch(() => { /* fetched on demand instead */ });
   };
-  const idle = window.requestIdleCallback
-    ? () => window.requestIdleCallback(run, { timeout: 5000 })
-    : run;
-  const t = setTimeout(idle, delay);
-  return () => { cancelled = true; clearTimeout(t); };
+  const idle = () => {
+    stopWaiting();
+    if (window.requestIdleCallback) window.requestIdleCallback(run, { timeout: 5000 });
+    else run();
+  };
+  // Importing a screen runs its code, so it waits for the person to do
+  // something (scroll, tap, type) — never in the middle of the first paint
+  // and the page settling — or for `fallback` ms if they only read.
+  const INTENT = ["pointerdown", "touchstart", "scroll", "keydown"];
+  function stopWaiting() {
+    clearTimeout(fallbackTimer);
+    for (const e of INTENT) window.removeEventListener(e, idle, true);
+  }
+  const wait = () => {
+    if (cancelled) return;
+    for (const e of INTENT) window.addEventListener(e, idle, { capture: true, once: true, passive: true });
+    fallbackTimer = setTimeout(idle, fallback);
+  };
+  const t = setTimeout(wait, delay);
+  return () => { cancelled = true; clearTimeout(t); stopWaiting(); };
 }

@@ -1,6 +1,36 @@
 {
   "rewrites": [
     {
+      "source": "/",
+      "has": [
+        {
+          "type": "host",
+          "value": "www.moveazy.co.in"
+        }
+      ],
+      "destination": "/home.html"
+    },
+    {
+      "source": "/",
+      "has": [
+        {
+          "type": "host",
+          "value": "moveazy.co.in"
+        }
+      ],
+      "destination": "/home.html"
+    },
+    {
+      "source": "/",
+      "has": [
+        {
+          "type": "host",
+          "value": "partners.moveazy.co.in"
+        }
+      ],
+      "destination": "/partners-home.html"
+    },
+    {
       "source": "/p/:listingId",
       "destination": "/api/p?listingId=:listingId"
     },
@@ -18,7 +48,7 @@
     },
     {
       "source": "/((?!api/).*)",
-      "destination": "/index.html"
+      "destination": "/app.html"
     }
   ],
   "headers": [

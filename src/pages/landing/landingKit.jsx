@@ -6,7 +6,7 @@
  * two pages share structure but not colour. Responsive from 360px phones to
  * wide desktops; the page is a marketing page, not the phone-width app shell.
  */
-import { createContext, useContext, useEffect, useState } from "react";
+import { createContext, startTransition, useContext, useEffect, useState } from "react";
 import { ArrowRight, Minus, Play, Plus, X } from "lucide-react";
 // The official wordmark, as the main site's nav uses it: the mint pair has a
 // transparent ground (the red "dark" file carries a black plate).
@@ -467,11 +467,12 @@ export function useInventory(limit = 500) {
   useEffect(() => {
     let alive = true;
     let got = false;
-    readCache(PUBLIC, `inventory:${limit}`, 30 * DAY_MS).then((r) => { if (alive && !got && r) setRows(r); });
+    // The page redraws with these as transitions: in slices, between frames.
+    readCache(PUBLIC, `inventory:${limit}`, 30 * DAY_MS).then((r) => { if (alive && !got && r) startTransition(() => setRows(r)); });
     fetchPublishedInventory({ limit }).then((r) => {
       got = true;
       if (!alive) return;
-      setRows(r);
+      startTransition(() => setRows(r));
       writeCache(PUBLIC, `inventory:${limit}`, r);
     }, () => { got = true; if (alive) setRows((cur) => cur ?? []); });
     return () => { alive = false; };
@@ -503,7 +504,7 @@ export function useListingsWithPhotos(rows, count = 1) {
         if (!alive) return;
         batch.forEach((l, j) => { if (ok[j] && out.length < count) out.push({ ...l, images: [photoOf(l)], cover_image_url: photoOf(l) }); });
       }
-      setPicks(out);
+      startTransition(() => setPicks(out));
     })();
     return () => { alive = false; };
   }, [rows, count]);

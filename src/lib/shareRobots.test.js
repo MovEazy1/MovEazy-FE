@@ -51,7 +51,7 @@ describe("/b, /c, /building", () => {
     try {
       const res = await share(new Request("https://www.moveazy.co.in/api/share?kind=building&id=ABC234", { headers: { "user-agent": IPHONE } }));
       expect(res.status).toBe(200);
-      expect(calls.every((u) => u.endsWith("/index.html"))).toBe(true);
+      expect(calls.every((u) => u.endsWith("/app.html"))).toBe(true); // the shell; "/" may be a pre-built page
       expect(res.headers.get("cache-control")).toMatch(/no-store/);
     } finally {
       globalThis.fetch = real;

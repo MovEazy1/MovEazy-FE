@@ -28,7 +28,8 @@ import { hasLeadPhone } from "../lib/leadIntake";
 import { useLandingSettings } from "../lib/landingSettings";
 import { LandingStyles } from "./landing/landingKit";
 import { prefetchWhenIdle } from "../lib/prefetch";
-import { HighlightScene, Phone, SITE_CSS, SiteFooter, clamp, ease, reduced, useScrollScene } from "./home/homeKit";
+import { usePrerenderHandoff } from "../lib/prerender";
+import { HighlightScene, Phone, SITE_CSS, SiteFooter, clamp, ease, reduced, usePauseOffscreen, useScrollScene } from "./home/homeKit";
 import { PerfectHomeScreen, SwipeScreen, useSteps } from "./home/homeScreens";
 import logoOnDark from "../assets/logo/moveazy-logo-mint-dark.png";
 import { hasOwnerListing } from "../lib/inventory";
@@ -96,6 +97,7 @@ function HowScene({ steps }) {
   const ref = useRef(null);
   const [active, setActive] = useState(0);
   useScrollScene(ref, (p) => setActive((a) => { const n = Math.min(steps.length - 1, Math.floor(p * steps.length * 0.999)); return n === a ? a : n; }));
+  usePauseOffscreen(ref);
   return (
     <section ref={ref} className="th-how" id="how" style={{ height: `${steps.length * 90 + 60}vh` }}>
       <div className="th-sticky th-how-in">
@@ -131,6 +133,8 @@ function HowScene({ steps }) {
  * tenant home when signed in (owners too), the tenant sign-in when not.
  */
 export default function ForkHome({ tenantEntry = false }) {
+  // Drawn: the pre-built copy of this page (scripts/prerender.mjs) steps aside.
+  usePrerenderHandoff();
   const { user, loading: authLoading } = useAuth();
   const { openLogin } = useLoginModal();
   const navigate = useNavigate();

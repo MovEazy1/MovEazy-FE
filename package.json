@@ -5,7 +5,7 @@
   "type": "module",
   "scripts": {
     "dev": "vite",
-    "build": "vite build",
+    "build": "vite build && node scripts/prerender.mjs",
     "build:moveazy-34225": "vite build --mode moveazy-34225",
     "deploy:hosting": "npm run build && npx --yes firebase-tools@13 deploy --only hosting,firestore --project moveasy-30eed",
     "deploy:hosting:moveazy-34225": "npm run build:moveazy-34225 && npx --yes firebase-tools@13 deploy --only hosting,firestore --project moveazy-34225",
@@ -20,7 +20,15 @@
     "e2e:demo-google": "node e2e/examples/google-search-demo.mjs"
   },
   "dependencies": {
+    "@fontsource/caveat": "^5.3.0",
+    "@fontsource/dm-sans": "^5.3.0",
+    "@fontsource/fredoka": "^5.3.0",
+    "@fontsource/instrument-serif": "^5.3.0",
     "@fontsource/inter": "^5.2.8",
+    "@fontsource/manrope": "^5.3.0",
+    "@fontsource/playfair-display": "^5.3.0",
+    "@fontsource/plus-jakarta-sans": "^5.3.0",
+    "@fontsource/sora": "^5.3.0",
     "@gsap/react": "^2.1.2",
     "@sentry/react": "^9.47.1",
     "@supabase/supabase-js": "^2.110.0",
@@ -51,6 +59,7 @@
     "eslint-plugin-react-refresh": "^0.5.2",
     "firebase-admin": "^13.10.0",
     "globals": "^17.4.0",
+    "jsdom": "^25.0.1",
     "postcss": "^8.5.9",
     "tailwindcss": "^3.4.17",
     "vite": "^8.0.4",

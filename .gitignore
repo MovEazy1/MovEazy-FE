@@ -25,3 +25,6 @@ npm-debug.log*
 
 # Claude Code local tooling
 .claude/
+
+# build-time page rendering (scripts/prerender.mjs)
+.prerender
