@@ -145,6 +145,16 @@ if (typeof window !== "undefined" && window.location.pathname === "/"
   import("./lib/landingSettings").then((m) => m.fetchLandingSettings()).catch(() => {});
 }
 
+/**
+ * A flat's page opened from a link (WhatsApp, a door QR): the flat and its
+ * first photo are asked for now, alongside the page's own code rather than
+ * after it (lib/inventory prefetchListing; the page takes the same request).
+ */
+if (typeof window !== "undefined" && !/^(partners|owners?|society)\./i.test(window.location.hostname)) {
+  const m = /^\/property\/([^/?#]+)/.exec(window.location.pathname);
+  if (m) import("./lib/inventory").then((inv) => inv.prefetchListing(decodeURIComponent(m[1]))).catch(() => {});
+}
+
 const IS_OWNER_HOST = typeof window !== "undefined" && /^owners?\./i.test(window.location.hostname);
 const IS_PARTNER_HOST = typeof window !== "undefined" && /^partners\./i.test(window.location.hostname);
 // society.moveazy.co.in: MovEazy Society, for society managers and guards (pages/society/).

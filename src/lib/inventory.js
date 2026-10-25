@@ -1,8 +1,8 @@
 import { supabase, supabasePublic, isSupabaseConfigured } from "./supabase";
-import { coverMedia, coverPhoto, isVideoFile, orderListingMedia } from "./listingMedia";
+import { coverMedia, coverPhoto, isVideoFile, isVideoUrl, orderListingMedia } from "./listingMedia";
 import { withParentArea } from "../data/preferenceOptions";
 import { STORAGE_LIMIT_BYTES, VIDEO_TARGET_BYTES, shrinkVideo } from "./videoShrink";
-import { MAIN_MAX, THUMB_MAX, jpegName, shrinkImage, thumbPath } from "./imageShrink";
+import { MAIN_MAX, THUMB_MAX, jpegName, shrinkImage, thumbPath, thumbUrl } from "./imageShrink";
 
 /**
  * Inventory = the supply side. One row per listed home in the Supabase
@@ -396,6 +396,51 @@ export async function fetchInventoryByIds(propertyIds = []) {
   );
   if (error) return [];
   return data || [];
+}
+
+/*
+ * A flat's page opened straight from a link (WhatsApp, a QR): App.jsx asks for
+ * the flat as the app starts, before the page's own code has arrived, and
+ * starts its first photo at once; the page then takes that same request.
+ */
+const earlyListing = new Map();
+
+/** The photo the flat page's gallery shows first, at the size its backdrop draws it (PropertyModal). */
+export function galleryLeadPhoto(row) {
+  const listing = mapInventoryToListing(row);
+  if (!listing) return "";
+  const raw = Array.isArray(listing.images) && listing.images.length ? listing.images : [listing.image];
+  const media = orderListingMedia([...new Set(raw.map((u) => String(u ?? "").trim()).filter((u) => u && u !== "undefined" && u !== "null"))]);
+  const first = media.length && !isVideoUrl(media[0]) ? media[0] : coverPhoto(media);
+  return first ? thumbUrl(first) : "";
+}
+
+/** Start loading flat `id` (and its first photo) now. */
+export function prefetchListing(id) {
+  const key = String(id || "").trim();
+  if (!key || earlyListing.has(key)) return;
+  const p = fetchInventoryByIds([key]);
+  earlyListing.set(key, p);
+  p.then((rows) => {
+    const photo = rows?.[0] && galleryLeadPhoto(rows[0]);
+    if (!photo || typeof document === "undefined") return;
+    const link = document.createElement("link");
+    link.rel = "preload";
+    link.as = "image";
+    link.href = photo;
+    link.fetchPriority = "high";
+    document.head.appendChild(link);
+  }, () => {});
+}
+
+/** The rows for flat `id`: the request started by prefetchListing if there was one (once), else a fresh one. */
+export function fetchListingById(id) {
+  const key = String(id || "").trim();
+  const early = earlyListing.get(key);
+  if (!early) return fetchInventoryByIds([key]);
+  earlyListing.delete(key);
+  // Asked before the session was back: a flat only its owner sees may be missing. Ask again then.
+  return early.then((rows) => (rows?.length ? rows : fetchInventoryByIds([key])), () => fetchInventoryByIds([key]));
 }
 
 /** Cheap count for deciding whether to surface "My Properties" in the nav. */

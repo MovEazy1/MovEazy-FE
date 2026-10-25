@@ -16,7 +16,7 @@ import PropertyModal from "../components/PropertyModal";
 import AIBroker from "../components/AIBroker";
 import Toast from "../components/Toast";
 import { useLoginModal } from "../context/LoginModalContext";
-import { fetchInventoryByIds, mapInventoryToListing } from "../lib/inventory";
+import { fetchListingById, mapInventoryToListing } from "../lib/inventory";
 import { recordFlatView } from "../lib/flatInsights";
 
 const T = { ink: "#04211D", text: "#171412", textDim: "#5c554e" };
@@ -130,7 +130,8 @@ export default function PropertyPage() {
     if (!id) { setLoading(false); return undefined; }
     let alive = true;
     setLoading(true);
-    fetchInventoryByIds([id])
+    // Already on its way if the app opened on this page (lib/inventory prefetchListing).
+    fetchListingById(id)
       .then((rows) => {
         if (!alive) return;
         setListing(mapInventoryToListing((rows || [])[0]) || null);
