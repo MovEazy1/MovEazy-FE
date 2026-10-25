@@ -268,7 +268,7 @@ function Gallery({ photos, name }) {
     <div className="bp-gwrap">
       <div className="bp-gallery" {...trackProps}>
         {photos.map((src, k) => (
-          <div key={src + k} style={{ cursor: "zoom-in" }} onClick={() => full.open(k)}><MediaItem src={src} alt={k === 0 ? name : ""} /></div>
+          <div key={src + k} style={{ cursor: "zoom-in" }} onClick={() => full.open(k)}><MediaItem src={src} alt={k === 0 ? name : ""} priority={k === 0} /></div>
         ))}
       </div>
       {full.viewer}

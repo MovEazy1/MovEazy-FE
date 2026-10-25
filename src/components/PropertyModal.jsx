@@ -22,6 +22,7 @@ import { logSavedListingChange } from "../lib/crmSync";
 import { buildBrokerWhatsAppUrl, logBrokerWhatsAppContact } from "../lib/brokerWhatsApp";
 import { fetchPartnerFlatIds, reportContactTap } from "../lib/websiteLeads";
 import { autoDeposit } from "../lib/deposit";
+import { thumbUrl } from "../lib/imageShrink";
 
 // Full screen, loaded on the first tap of a photo.
 const PhotoViewer = lazy(() => import("./PhotoViewer"));
@@ -166,14 +167,26 @@ function SuggestDateTime({ value, onChange, tokens }) {
   );
 }
 
-function MediaElement({ src, alt, style, firstImage }) {
+/**
+ * The blurred backdrop behind a photo. Blurred this much, the 480 px
+ * thumbnail (~30 KB) looks the same as the full photo (~270 KB) — and it is
+ * the largest thing on the page, so it decides how fast the page looks
+ * loaded. A photo without a thumbnail yet falls back to itself.
+ */
+function BlurredBackdrop({ src, blur, brightness, priority }) {
+  const [url, setUrl] = useState(() => thumbUrl(src));
+  return (
+    <img src={url} alt="" fetchPriority={priority ? "high" : undefined} onError={() => { if (url !== src) setUrl(src); }}
+      style={{ position: "absolute", width: "115%", height: "115%", objectFit: "cover", filter: `blur(${blur}px) brightness(${brightness})`, opacity: 0.9 }} />
+  );
+}
+
+function MediaElement({ src, alt, style, firstImage, priority = false }) {
   if (!src) return null;
   if (isVideoUrl(src)) {
     return (
       <div style={{ position: "relative", width: "100%", height: "100%", overflow: "hidden", display: "flex", justifyContent: "center", alignItems: "center" }}>
-        {firstImage && (
-          <img src={firstImage} alt="" style={{ position: "absolute", width: "115%", height: "115%", objectFit: "cover", filter: "blur(30px) brightness(0.8)", opacity: 0.9 }} />
-        )}
+        {firstImage && <BlurredBackdrop src={firstImage} blur={30} brightness={0.8} priority={priority} />}
         <video src={src} style={{ ...style, objectFit: "contain", maxWidth: "100%", maxHeight: "100%", position: "relative", zIndex: 1 }} controls playsInline preload="metadata" />
       </div>
     );
@@ -181,9 +194,9 @@ function MediaElement({ src, alt, style, firstImage }) {
   return (
     <div style={{ position: "relative", width: "100%", height: "100%", overflow: "hidden", display: "flex", justifyContent: "center", alignItems: "center" }}>
       {/* Blurred background layer */}
-      <img src={src} alt="" style={{ position: "absolute", width: "115%", height: "115%", objectFit: "cover", filter: "blur(25px) brightness(0.85)", opacity: 0.9 }} />
-      {/* Main image layer */}
-      <img src={src} alt={alt} loading="lazy" style={{ ...style, objectFit: "contain", position: "relative", zIndex: 1, maxWidth: "100%", maxHeight: "100%" }} />
+      <BlurredBackdrop src={src} blur={25} brightness={0.85} priority={priority} />
+      {/* Main image layer: the first photo straight away, the others as they come near. */}
+      <img src={src} alt={alt} loading={priority ? "eager" : "lazy"} fetchPriority={priority ? "high" : undefined} style={{ ...style, objectFit: "contain", position: "relative", zIndex: 1, maxWidth: "100%", maxHeight: "100%" }} />
     </div>
   );
 }
@@ -934,7 +947,7 @@ export default function PropertyModal({
                       >
                         {/* The one showing and its neighbours; the rest load as they come near. */}
                         {Math.abs(idx - activeMediaIndex) <= 1 && (
-                          <MediaElement src={src} alt={idx === 0 ? property.title : ""} firstImage={firstImageUrl} style={{ width: "100%", height: "100%", objectFit: "contain" }} />
+                          <MediaElement src={src} alt={idx === 0 ? property.title : ""} firstImage={firstImageUrl} priority={idx === activeMediaIndex} style={{ width: "100%", height: "100%", objectFit: "contain" }} />
                         )}
                       </div>
                     );
