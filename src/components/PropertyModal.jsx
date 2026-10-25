@@ -23,6 +23,7 @@ import { buildBrokerWhatsAppUrl, logBrokerWhatsAppContact } from "../lib/brokerW
 import { fetchPartnerFlatIds, reportContactTap } from "../lib/websiteLeads";
 import { autoDeposit } from "../lib/deposit";
 import { thumbUrl } from "../lib/imageShrink";
+import ThumbImg from "./ThumbImg";
 
 // Full screen, loaded on the first tap of a photo.
 const PhotoViewer = lazy(() => import("./PhotoViewer"));
@@ -196,7 +197,7 @@ function MediaElement({ src, alt, style, firstImage, priority = false }) {
       {/* Blurred background layer */}
       <BlurredBackdrop src={src} blur={25} brightness={0.85} priority={priority} />
       {/* Main image layer: the first photo straight away, the others as they come near. */}
-      <img src={src} alt={alt} loading={priority ? "eager" : "lazy"} fetchPriority={priority ? "high" : undefined} style={{ ...style, objectFit: "contain", position: "relative", zIndex: 1, maxWidth: "100%", maxHeight: "100%" }} />
+      <img src={src} alt={alt} loading={priority ? "eager" : "lazy"} style={{ ...style, objectFit: "contain", position: "relative", zIndex: 1, maxWidth: "100%", maxHeight: "100%" }} />
     </div>
   );
 }
@@ -1062,16 +1063,16 @@ export default function PropertyModal({
                             src={src}
                             style={{ width: "100%", height: "100%", objectFit: "cover" }}
                             muted
+                            preload="metadata"
                             onError={(e) => {
                               const btn = e.currentTarget.closest("button");
                               if (btn) btn.style.display = "none";
                             }}
                           />
                         ) : (
-                          <img
+                          <ThumbImg
                             src={src}
                             alt=""
-                            loading="lazy"
                             style={{ width: "100%", height: "100%", objectFit: "cover" }}
                             onError={(e) => {
                               const btn = e.currentTarget.closest("button");
@@ -1237,7 +1238,7 @@ export default function PropertyModal({
                             }}
                           >
                             {img ? (
-                              <img src={img} alt="" style={{ width: "100%", height: "100px", objectFit: "cover", display: "block" }} />
+                              <ThumbImg src={img} alt="" style={{ width: "100%", height: "100px", objectFit: "cover", display: "block" }} />
                             ) : (
                               <div style={{ height: "100px", background: T.lineSoft }} />
                             )}

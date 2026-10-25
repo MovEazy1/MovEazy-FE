@@ -77,6 +77,8 @@
     <!-- Every page talks to the database within its first second: open that
          connection now, alongside the page's own files. -->
     <link rel="preconnect" href="%VITE_SUPABASE_URL%" crossorigin />
+    <!-- …and the one listing photos come down (images connect without CORS). -->
+    <link rel="preconnect" href="%VITE_SUPABASE_URL%" />
     <!-- Fonts come with the app's CSS from our own domain (src/styles/fonts.css):
          no request to Google before the page can draw, and each page
          downloads only the faces its text uses. -->

@@ -47,7 +47,7 @@
       "destination": "/api/share?kind=building&id=:code"
     },
     {
-      "source": "/((?!api/).*)",
+      "source": "/((?!api/|assets/).*)",
       "destination": "/app.html"
     }
   ],

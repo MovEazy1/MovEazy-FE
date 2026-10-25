@@ -7,6 +7,22 @@ import "./styles/home-marketing.css";
 // Leaflet's CSS comes with the components that draw a map, not with every page.
 import App from "./App.jsx";
 
+/*
+ * After a deploy, a page opened earlier asks for screens whose files the new
+ * version no longer has. Load the new version — once, so a file that is
+ * really missing shows the error page instead of reloading forever.
+ */
+window.addEventListener("vite:preloadError", (e) => {
+  try {
+    if (sessionStorage.getItem("mz-reloaded-for") === location.pathname) return;
+    sessionStorage.setItem("mz-reloaded-for", location.pathname);
+  } catch {
+    return;
+  }
+  e.preventDefault();
+  location.reload();
+});
+
 /** Old links used HashRouter (#/checkout). Convert once so BrowserRouter sees the path. */
 (function migrateLegacyHashRoutes() {
   try {
