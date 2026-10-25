@@ -766,6 +766,15 @@
   padding: 0;
 }
 
+/* The button carries Tailwind's lg:hidden, but this sheet loads after
+   Tailwind and its display above won: the button showed on desktop, where
+   the menu it opens is hidden (lg:hidden too), so a click did nothing. */
+@media (min-width: 1024px) {
+  .mkt-nav-menu-btn {
+    display: none;
+  }
+}
+
 @media (max-width: 767px) {
   .mkt-nav-shell {
     gap: 8px;

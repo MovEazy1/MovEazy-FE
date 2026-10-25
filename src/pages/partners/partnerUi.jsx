@@ -107,13 +107,27 @@ const CSS = `
 .pz-prop-badge .pz-pill { font-size: 10.5px; padding: 2px 7px; }
 .pz-prop-heart { position: absolute; bottom: 6px; left: 6px; width: 30px; height: 30px; border-radius: 999px; border: 0;
   background: rgba(255,255,255,.94); display: grid; place-items: center; cursor: pointer; color: var(--ink); }
-.pz-prop-body { padding: 10px 12px; min-width: 0; display: flex; flex-direction: column; }
+.pz-prop-body { padding: 10px 12px; min-width: 0; display: flex; flex-direction: column; container-type: inline-size; }
 .pz-prop-title { font-size: 14.5px; font-weight: 700; margin: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .pz-prop-body .pz-rent { font-size: 17px; }
 .pz-prop-body .pz-meta { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; font-size: 12px; }
 .pz-prop-actions { display: flex; gap: 6px; margin-top: auto; padding-top: 6px; }
 .pz-prop-body .pz-pill { font-size: 10.5px; padding: 2px 7px; }
-.pz-prop-actions .pz-btn { min-height: 32px; padding: 5px 10px; font-size: 12.5px; border-radius: 9px; }
+.pz-prop-actions .pz-btn { min-height: 32px; padding: 5px 10px; font-size: 12.5px; border-radius: 9px; flex: 0 1 auto; min-width: 0; }
+/* A narrow card (a 360 px phone, a mock-up): the rent stays on one line, the
+   brokerage shortens with an ellipsis, WhatsApp keeps only its icon — nothing
+   is cut off at the card's edge. */
+.pz-prop-body .pz-rent { white-space: nowrap; flex: none; }
+.pz-prop-body .pz-between > .pz-pill { display: block; min-width: 0; flex: 0 1 auto; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.pz-prop-body .pz-between > .pz-pill svg { vertical-align: -2px; }
+@container (max-width: 200px) {
+  .pz-prop-actions .pz-wa-label { display: none; }
+  .pz-prop-actions .pz-wa { padding: 5px 9px; }
+  .pz-prop-body .pz-pill-long { display: none; }
+}
+@container (max-width: 170px) {
+  .pz-prop-body .pz-rent small { display: none; }
+}
 .pz-prop-extra { padding: 8px 12px 10px; border-top: 1px solid var(--line); }
 .pz-rent { font-size: 20px; font-weight: 800; letter-spacing: -0.01em; }
 .pz-rent small { font-size: 13px; font-weight: 500; color: var(--dim); }
@@ -272,7 +286,8 @@ export function BrokeragePill({ listing }) {
     return <span className="pz-pill pz-pill--warn"><Lock size={12} /> {Number.isFinite(pct) ? `${pct}% ` : ""}with Premium</span>;
   }
   if (!Number.isFinite(pct) || listing?.brokerage_pct == null) return null;
-  return <span className="pz-pill">{pct}% Brokerage</span>;
+  // "50% Brokerage"; on a narrow card just "50%" (the word goes, partnerUi CSS).
+  return <span className="pz-pill" title={`${pct}% Brokerage`}>{pct}%<span className="pz-pill-long"> Brokerage</span></span>;
 }
 
 /** Another partner's (or MovEazy's) flat from the pool, not unlocked yet. */
@@ -326,7 +341,7 @@ export function PropertyCard({ listing: l, saved, onToggleSave, onWhatsApp, extr
           </div>
           <div className="pz-meta">{who}{l.furnishing ? ` · ${l.furnishing}` : ""}</div>
           <div className="pz-prop-actions">
-            <button type="button" className="pz-btn pz-wa" onClick={onWhatsApp}><WhatsAppIcon size={15} /> WhatsApp</button>
+            <button type="button" className="pz-btn pz-wa" onClick={onWhatsApp} aria-label="WhatsApp"><WhatsAppIcon size={15} /> <span className="pz-wa-label">WhatsApp</span></button>
             <Link to={to} onClick={onOpen ? open : undefined} className="pz-btn">Details</Link>
           </div>
         </div>

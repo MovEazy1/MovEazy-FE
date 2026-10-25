@@ -24,6 +24,7 @@ import { fetchPartnerFlatIds, reportContactTap } from "../lib/websiteLeads";
 import { autoDeposit } from "../lib/deposit";
 import { thumbUrl } from "../lib/imageShrink";
 import ThumbImg from "./ThumbImg";
+import { floorLabel as floorName } from "../lib/buildings";
 
 // Full screen, loaded on the first tap of a photo.
 const PhotoViewer = lazy(() => import("./PhotoViewer"));
@@ -603,14 +604,21 @@ export default function PropertyModal({
   const listedByLabel =
     listedByRaw === "broker" ? "Broker" : listedByRaw === "tenant" ? "Tenant" : listedByRaw === "owner" ? "Owner" : "";
   /** A real date if the listing gave one, otherwise its availability wording. */
-  const moveInLabel = String(property.availableFrom || property.availability || "").trim();
+  // A date as the rest of the page writes one ("1 Nov 2026"), not 2026-11-01.
+  const moveInRaw = String(property.availableFrom || property.availability || "").trim();
+  const moveInLabel = /^\d{4}-\d{2}-\d{2}/.test(moveInRaw) && !Number.isNaN(new Date(moveInRaw).getTime())
+    ? new Date(moveInRaw).toLocaleDateString("en-IN", { day: "numeric", month: "short", year: "numeric" })
+    : moveInRaw;
   const builtUpLabel = property.builtUpArea
     ? `${property.builtUpArea}${property.areaUnit ? ` ${property.areaUnit}` : ""}`
     : "—";
-  const floorLabel =
-    property.floorNumber || property.totalFloors
-      ? `${dash(property.floorNumber)} of ${dash(property.totalFloors)} floors`
-      : "—";
+  // "3rd floor of 10", "3rd floor", "Ground floor" — never "3 of — floors"
+  // (and the ground floor, 0, is a floor rather than a missing one).
+  const hasFloor = property.floorNumber !== null && property.floorNumber !== undefined && String(property.floorNumber).trim() !== "";
+  const totalFloors = Number(property.totalFloors) || 0;
+  const floorLabel = hasFloor
+    ? `${floorName(property.floorNumber)}${totalFloors ? ` of ${totalFloors}` : ""}`
+    : totalFloors ? `${totalFloors} floors in the building` : "";
   /**
    * Only what the listing actually says. Every field was printed regardless,
    * so a listing that had answered six of sixteen showed ten headers over an
@@ -625,7 +633,7 @@ export default function PropertyModal({
     ["Furnishing (type)", dash(property.furnishing)],
     ["Bathrooms", dash(property.bathrooms)],
     ["Balcony", dash(property.balcony)],
-    ["Floor / total floors", property.floorNumber || property.totalFloors ? floorLabel : ""],
+    ["Floor", floorLabel],
     ["Lease type", dash(property.leaseType)],
     ["Age of property", dash(property.ageOfProperty)],
     ["Parking", dash(property.parkingInfo) !== "—" ? property.parkingInfo : (property.parking?.join(", ") || "")],
