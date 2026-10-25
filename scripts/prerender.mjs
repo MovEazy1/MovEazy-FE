@@ -22,6 +22,7 @@ import { execSync } from "node:child_process";
 import { readdirSync, readFileSync, renameSync, rmSync, writeFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
+import Beasties from "beasties";
 import { JSDOM } from "jsdom";
 
 const root = join(dirname(fileURLToPath(import.meta.url)), "..");
@@ -100,12 +101,28 @@ try {
   console.warn("prerender: skipped —", e?.message || e);
 }
 
+// The CSS the pre-built page uses goes inline; the full stylesheet still
+// loads, without holding up the first paint (it is all there before the app
+// draws). So are the @font-face rules of the fonts it uses — the preloaded
+// files are usable at once. Font preloads stay ours (PAGES above).
+const beasties = new Beasties({
+  path: dist, publicPath: "/", preload: "swap-high", pruneSource: false, mergeStylesheets: true,
+  inlineFonts: true, preloadFonts: false, reduceInlineStyles: false, logLevel: "warn",
+});
+
 for (const p of PAGES) {
   const html = rendered[p.page];
-  const page = html
+  let page = html
     ? lowPriorityScripts(shell).replace("</head>", `${HEAD}${fontPreloads(p.fonts)}
 </head>`).replace('<div id="root"></div>', `<div id="prerender">${html}</div><div id="root"></div>`)
     : shell;
+  if (html) {
+    try {
+      page = await beasties.process(page);
+    } catch (e) {
+      console.warn(`prerender: ${p.file} keeps its blocking stylesheet —`, e?.message || e);
+    }
+  }
   writeFileSync(join(dist, p.file), page);
 }
 renameSync(join(dist, "index.html"), join(dist, "app.html"));
