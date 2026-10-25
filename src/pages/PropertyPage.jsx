@@ -10,10 +10,15 @@
  * `?visit=1` opens straight on the booking panel — that is what "Schedule a
  * visit" sends when it has to leave the page it was on.
  */
-import { useEffect, useMemo, useRef, useState } from "react";
+import { Suspense, lazy, useEffect, useMemo, useRef, useState } from "react";
 import { useLocation, useNavigate, useParams } from "react-router-dom";
 import PropertyModal from "../components/PropertyModal";
-import AIBroker from "../components/AIBroker";
+import { prefetchWhenIdle } from "../lib/prefetch";
+
+// The questionnaire (and the map inside it) loads when it's opened — not with
+// the flat, which is what someone arriving from a link came to see.
+const loadAIBroker = () => import("../components/AIBroker");
+const AIBroker = lazy(loadAIBroker);
 import Toast from "../components/Toast";
 import { useLoginModal } from "../context/LoginModalContext";
 import { fetchListingById, mapInventoryToListing } from "../lib/inventory";
@@ -31,6 +36,10 @@ export default function PropertyPage() {
   // useBackClose makes that a real history entry, so back closes the wizard
   // and returns here instead of leaving the site the link came from.
   const [showBroker, setShowBroker] = useState(false);
+  // Mounted from its first opening on, so it can animate closed.
+  const [brokerUsed, setBrokerUsed] = useState(false);
+  if (showBroker && !brokerUsed) setBrokerUsed(true);
+  useEffect(() => prefetchWhenIdle([loadAIBroker]), []);
   const { closeLogin } = useLoginModal();
 
   /**
@@ -222,7 +231,9 @@ export default function PropertyPage() {
       />
       {/* startFresh: an invitation to start, not a half-finished form to
           resume — they came here for a flat, not to pick a questionnaire up. */}
-      <AIBroker open={showBroker} onClose={() => setShowBroker(false)} startFresh />
+      {brokerUsed && (
+        <Suspense fallback={null}><AIBroker open={showBroker} onClose={() => setShowBroker(false)} startFresh /></Suspense>
+      )}
       <Toast message={toast} />
     </div>
   );
