@@ -22,7 +22,7 @@ import { useCrm } from "./CrmShell";
 import { Btn, C, Chip, Empty, Loading, Toast, relTime, shortDate } from "./crmUi";
 import { isSuperAdminEmail, SCOPES } from "../../lib/adminScopes";
 import {
-  CONTACT_KINDS, ROADS, STATUSES, fetchProspect, fetchProspects, importProspects, importRows, prospectError,
+  CONTACT_KINDS, ROADS, STATUSES, fetchOsm, fetchProspect, fetchProspects, importProspects, importRows, osmRows, prospectError,
   removeProspectContact, rentRange, roadLabel, saveProspect, saveProspectContact, statusOf, sweepGoogle, sweepCells,
 } from "../../lib/societyProspects";
 import { brochureAssets, brochureFileName, brochurePdf, drawBrochurePage } from "../../lib/societyBrochure";
@@ -71,7 +71,8 @@ function download(blob, name) {
 /** A society's brochure pictures: its own photo, else Google's first (with its credit). */
 async function assetsFor(s) {
   let googlePhoto = null;
-  if (!(s.photos || []).length && s.place_id) {
+  // OpenStreetMap places (osm-…) have no Google photo.
+  if (!(s.photos || []).length && s.place_id && !s.place_id.startsWith("osm-")) {
     // Photos only: Google's cheaper lookup (a rating would make it the dear one).
     const g = await fetch(`/api/places?id=${encodeURIComponent(s.place_id)}&photos=1`).then((r) => (r.ok ? r.json() : null), () => null);
     const first = g?.photos?.[0];
@@ -121,6 +122,19 @@ function List() {
       const found = importRows(results);
       const known = new Set((rows ?? []).map((r) => r.place_id));
       setPreview({ rows: found, fresh: found.filter((r) => !known.has(r.place_id)).length, failed });
+    } catch (e) {
+      say(prospectError(e), "error");
+    } finally {
+      setJob(null);
+    }
+  };
+  // The free import: OpenStreetMap, no key and no bill. Nothing is saved until checked.
+  const runOsmImport = async () => {
+    setJob({ label: "Asking OpenStreetMap (can take a minute)", done: 0, total: 1 });
+    try {
+      const found = osmRows(await fetchOsm());
+      const known = new Set((rows ?? []).map((r) => r.place_id));
+      setPreview({ rows: found, fresh: found.filter((r) => !known.has(r.place_id)).length, failed: 0 });
     } catch (e) {
       say(prospectError(e), "error");
     } finally {
@@ -178,7 +192,8 @@ function List() {
   return (
     <>
       <div style={{ display: "flex", gap: 10, flexWrap: "wrap", alignItems: "center" }}>
-        {superAdmin && <Btn variant="primary" disabled={!!job} onClick={runImport}>{rows.length ? "Re-run Google import" : "Import from Google"}</Btn>}
+        {superAdmin && <Btn variant="primary" disabled={!!job} onClick={runOsmImport}>{rows.length ? "Refresh from OpenStreetMap (free)" : "Import from OpenStreetMap (free)"}</Btn>}
+        {superAdmin && <Btn disabled={!!job} onClick={runImport} title="Needs GOOGLE_MAPS_API_KEY on Vercel">Google import</Btn>}
         <Btn disabled={!!job || !shown.length} onClick={zipAll}><Download size={14} style={{ verticalAlign: -2 }} /> Brochures (ZIP) · {shown.filter((r) => !r.hidden).length}</Btn>
         <input className="crm-input" style={{ flex: "1 1 200px", minWidth: 0, maxWidth: 320 }} placeholder="Search a society or area" value={q} onChange={(e) => setQ(e.target.value)} aria-label="Search societies" />
       </div>
@@ -194,7 +209,7 @@ function List() {
 
       {preview && (
         <div style={{ ...card, borderColor: C.accent, display: "grid", gap: 8 }}>
-          <div style={{ fontWeight: 800 }}>Google found {preview.rows.length} societies — {preview.fresh} new.</div>
+          <div style={{ fontWeight: 800 }}>Found {preview.rows.length} societies — {preview.fresh} new.</div>
           <div className="crm-mute" style={{ fontSize: 12.5 }}>
             {ROADS.map((r) => `${r.label} ${preview.rows.filter((x) => x.road === r.key).length}`).join(" · ")}
             {preview.failed ? ` · ${preview.failed} areas didn't answer (run again later to fill them)` : ""}
@@ -471,7 +486,7 @@ function Detail({ id }) {
             <input className="crm-input" style={{ fontSize: 18, fontWeight: 800, width: "100%" }} value={draft.name} maxLength={120} onChange={(e) => set({ name: e.target.value })} aria-label="Society name" />
             <div className="crm-mute" style={{ fontSize: 12, marginTop: 6, display: "flex", gap: 10, flexWrap: "wrap", alignItems: "center" }}>
               <span><MapPin size={12} style={{ verticalAlign: -1 }} /> {s.address || "—"}</span>
-              {s.maps_url && <a href={s.maps_url} target="_blank" rel="noreferrer" style={{ color: C.accent }}>Google Maps <ExternalLink size={11} style={{ verticalAlign: -1 }} /></a>}
+              {s.maps_url && <a href={s.maps_url} target="_blank" rel="noreferrer" style={{ color: C.accent }}>{s.maps_url.includes("openstreetmap") ? "OpenStreetMap" : "Google Maps"} <ExternalLink size={11} style={{ verticalAlign: -1 }} /></a>}
               <span>Updated {relTime(s.updated_at)}{s.updated_by ? ` by ${s.updated_by}` : ""}</span>
             </div>
           </div>

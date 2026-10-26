@@ -111,7 +111,12 @@ export function mergeSocieties(places) {
   const out = [];
   for (const p of [...seen.values()].sort((a, b) => a.name.length - b.name.length)) {
     const base = baseName(p.name);
-    const twin = base && out.find((o) => baseName(o.name) === base && haversineKm(o.lat, o.lng, p.lat, p.lng) < 0.6);
+    // "Adarsh Palm Retreat Daffodils" beside "Adarsh Palm Retreat" is one of its phases.
+    const same = (o) => {
+      const b = baseName(o.name);
+      return b === base || (b.length >= 6 && base.startsWith(`${b} `));
+    };
+    const twin = base && out.find((o) => same(o) && haversineKm(o.lat, o.lng, p.lat, p.lng) < 0.6);
     if (twin) {
       if (!twin.phone && p.phone) twin.phone = p.phone;
       continue;
@@ -153,6 +158,75 @@ export function importRows(cellsResults) {
       place_id: s.place_id, name: s.name, road: s.road, area: areaFromAddress(s.address), address: s.address,
       lat: s.lat, lng: s.lng, maps_url: s.maps_url, phone: s.phone, agents: nearestAgents(s, agents),
     }));
+}
+
+/* ── OpenStreetMap: the free import ───────────────────────────────────────── */
+
+// The corridors' box (the cells reach no further); places in it are kept only
+// when they are near one of the six roads (roadFor).
+const OSM_BOX = "12.855,77.62,12.94,77.765";
+export const OSM_QUERY = `[out:json][timeout:120];
+(
+  nwr["name"]["landuse"="residential"](${OSM_BOX});
+  nwr["name"]["building"~"^(apartments|residential)$"](${OSM_BOX});
+  nwr["office"="estate_agent"](${OSM_BOX});
+  nwr["shop"="estate_agent"](${OSM_BOX});
+);
+out bb tags;`;
+const OVERPASS = ["https://overpass-api.de/api/interpreter", "https://overpass.kumi.systems/api/interpreter"];
+
+// A named area that is a neighbourhood, a government campus or an empty plot, not a society.
+const NOT_A_SOCIETY_AREA = /\b(layout|colony|quarters|nagar|village|extension|sector|stage|empty|site|police|slum|homestay|campus|battalion|cpwd|ksrp|kssidc|hostel|colive|plots?|arcade|tea|spice|cafe|restaurant|work)\b|\(u\/c\)|under construction/i;
+// A building named like one tower of something bigger, or a house.
+const ONE_TOWER = /\b(tower|block|wing|phase|club ?house|building|complex|house|nivas|nilaya|mansion|bhavan|bhavana)\b|^[\w\s./&,()-]{0,6}$|^\d/i;
+
+const osmPhone = (t) => String(t.phone || t["contact:phone"] || t["contact:mobile"] || "").split(";")[0].trim();
+
+/** OpenStreetMap's answer → import rows: societies near the six roads, with any agencies nearby. */
+export function osmRows(elements) {
+  // Ways and relations come with their bounding box ("out bb"); a node with its spot.
+  const els = (elements || []).filter((e) => e?.tags && (e.bounds || e.center || e.lat != null));
+  const at = (e) => (e.bounds
+    ? { lat: (e.bounds.minlat + e.bounds.maxlat) / 2, lng: (e.bounds.minlon + e.bounds.maxlon) / 2 }
+    : { lat: e.center?.lat ?? e.lat, lng: e.center?.lon ?? e.lon });
+  const toPlace = (e) => {
+    const t = e.tags;
+    const addr = [t["addr:housename"], t["addr:street"], t["addr:suburb"] || t["addr:place"], t["addr:city"]].filter(Boolean).join(", ");
+    return {
+      place_id: `osm-${e.type}-${e.id}`, name: String(t.name || "").trim(), ...at(e), address: addr,
+      area: t["addr:suburb"] || t["addr:place"] || "", maps_url: `https://www.openstreetmap.org/${e.type}/${e.id}`, phone: osmPhone(t),
+    };
+  };
+
+  const areas = els.filter((e) => e.tags.landuse === "residential" && e.tags.name && !NOT_A_SOCIETY_AREA.test(e.tags.name) && !NOT_A_SOCIETY.test(e.tags.name));
+  // A named block inside a society's outline is a tower of it, not another society.
+  const inside = (p) => areas.some((a) => a.bounds && p.lat >= a.bounds.minlat && p.lat <= a.bounds.maxlat && p.lng >= a.bounds.minlon && p.lng <= a.bounds.maxlon);
+  const buildings = els
+    .filter((e) => /^(apartments|residential)$/.test(e.tags.building || "") && e.tags.landuse !== "residential" && e.tags.name
+      && !ONE_TOWER.test(e.tags.name) && !NOT_A_SOCIETY.test(e.tags.name) && /[a-z]{3}/i.test(e.tags.name))
+    .map(toPlace)
+    .filter((p) => !inside(p));
+  const agents = els.filter((e) => e.tags.office === "estate_agent" || e.tags.shop === "estate_agent")
+    .map(toPlace).filter((a) => a.name && a.phone);
+
+  return mergeSocieties([...areas.map(toPlace), ...buildings])
+    .map((s) => ({ ...s, road: roadFor(s.lat, s.lng) }))
+    .filter((s) => s.road)
+    .map((s) => ({
+      place_id: s.place_id, name: s.name, road: s.road, area: s.area, address: s.address,
+      lat: s.lat, lng: s.lng, maps_url: s.maps_url, phone: s.phone, agents: nearestAgents(s, agents),
+    }));
+}
+
+/** Ask OpenStreetMap (free, no key), trying a second server if the first is busy. */
+export async function fetchOsm() {
+  for (const url of OVERPASS) {
+    try {
+      const r = await fetch(url, { method: "POST", body: new URLSearchParams({ data: OSM_QUERY }) });
+      if (r.ok) return (await r.json()).elements || [];
+    } catch { /* the next server */ }
+  }
+  throw new Error("OpenStreetMap didn't answer. Try again in a minute.");
 }
 
 function mergeAgents(list) {

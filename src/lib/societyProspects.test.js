@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { areaFromAddress, baseName, importRows, isSociety, mergeSocieties, nearestAgents, rentRange, roadFor, sweepCells } from "./societyProspects";
+import { areaFromAddress, baseName, importRows, isSociety, mergeSocieties, nearestAgents, osmRows, rentRange, roadFor, sweepCells } from "./societyProspects";
 
 describe("sweepCells", () => {
   it("covers the six corridors in about 130 cells of ~650 m", () => {
@@ -90,5 +90,29 @@ describe("words", () => {
   it("reads the locality out of an address", () => {
     expect(areaFromAddress("Kasavanahalli, Bengaluru, Karnataka 560035")).toBe("Kasavanahalli");
     expect(areaFromAddress("")).toBe("");
+  });
+});
+
+describe("osmRows", () => {
+  const way = (id, name, b, tags = {}) => ({ type: "way", id, bounds: b, tags: { landuse: "residential", name, ...tags } });
+  const box = (lat, lng, d = 0.002) => ({ minlat: lat - d, maxlat: lat + d, minlon: lng - d, maxlon: lng + d });
+  it("keeps societies near the roads, drops layouts, towers inside them and far places", () => {
+    const rows = osmRows([
+      way(1, "Sobha Silicon Oasis", box(12.8796, 77.6551)),
+      way(2, "Kudlu Main Layout", box(12.89, 77.648)),
+      way(3, "LOCL Colive & Work", box(12.9, 77.65)),
+      { type: "way", id: 4, bounds: box(12.8797, 77.6552, 0.0002), tags: { building: "apartments", name: "Sobha Hibiscus Block A" } },
+      { type: "way", id: 5, bounds: box(12.8798, 77.6553, 0.0002), tags: { building: "apartments", name: "Tower 3" } },
+      { type: "way", id: 6, bounds: box(12.9116, 77.6474, 0.0002), tags: { building: "apartments", name: "Aishwarya Amaze Apartments", "addr:suburb": "HSR Layout" } },
+      way(7, "Faraway Greens", box(12.97, 77.6)),
+      way(8, "Adarsh Palm Retreat", box(12.9188, 77.6849)),
+      way(9, "Adarsh Palm Retreat Mayberry", box(12.9192, 77.6853)),
+      { type: "node", id: 10, lat: 12.8801, lon: 77.6555, tags: { office: "estate_agent", name: "Haralur Homes", phone: "+91 98450 11111" } },
+    ]);
+    expect(rows.map((r) => r.name).sort()).toEqual(["Adarsh Palm Retreat", "Aishwarya Amaze Apartments", "Sobha Silicon Oasis"]);
+    const sobha = rows.find((r) => r.name === "Sobha Silicon Oasis");
+    expect(sobha).toMatchObject({ place_id: "osm-way-1", road: "haralur", maps_url: "https://www.openstreetmap.org/way/1" });
+    expect(sobha.agents[0].name).toBe("Haralur Homes");
+    expect(rows.find((r) => r.name.startsWith("Aishwarya")).area).toBe("HSR Layout");
   });
 });
