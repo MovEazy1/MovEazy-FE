@@ -27,7 +27,7 @@ import {
 } from "../../lib/societyProspects";
 import { brochureAssets, brochureFileName, brochurePdf, drawBrochurePage } from "../../lib/societyBrochure";
 import { zipStore } from "../../lib/zipStore";
-import { fetchGooglePlace, googlePhotoUri } from "../../lib/society";
+import { googlePhotoUri } from "../../lib/society";
 import { uploadInventoryPhotos } from "../../lib/inventory";
 import { saveCrmBuilding } from "../../lib/crmPropertyInternal";
 import logoOnLight from "../../assets/logo/moveazy-logo-mint-light.png";
@@ -72,7 +72,8 @@ function download(blob, name) {
 async function assetsFor(s) {
   let googlePhoto = null;
   if (!(s.photos || []).length && s.place_id) {
-    const g = await fetchGooglePlace(s.place_id);
+    // Photos only: Google's cheaper lookup (a rating would make it the dear one).
+    const g = await fetch(`/api/places?id=${encodeURIComponent(s.place_id)}&photos=1`).then((r) => (r.ok ? r.json() : null), () => null);
     const first = g?.photos?.[0];
     if (first) googlePhoto = { uri: await googlePhotoUri(first.name, 1600), attribution: first.attribution };
   }
@@ -112,7 +113,8 @@ function List() {
 
   const runImport = async () => {
     const cells = sweepCells().length;
-    if (!window.confirm(`Search Google Maps for societies along all six roads?\n\nThat is ${cells} small areas — about ${Math.round(cells * 1.6)} Google searches, normally inside Google's free monthly allowance. Nothing is saved until you check the result.`)) return;
+    const again = rows?.length ? "\n\nSocieties are already imported: running it again spends the same searches again." : "";
+    if (!window.confirm(`Search Google Maps for societies along all six roads?\n\n${cells} small areas: at most ${cells * 3} society searches (Google gives 5,000 free a month) and ${cells} agency searches (1,000 free a month). Nothing is saved until you check the result.${again}`)) return;
     setJob({ label: "Searching Google Maps", done: 0, total: cells });
     try {
       const { results, failed } = await sweepGoogle((done, total) => setJob({ label: "Searching Google Maps", done, total }));

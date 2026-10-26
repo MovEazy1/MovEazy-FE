@@ -6,14 +6,15 @@
  *       place (Text Search, IDs only — free) and its details (name, address,
  *       locality, rating, photos). Signed-in callers only (Supabase token).
  *   GET /api/places?id=<place id>          a society's rating and photos for
- *       its public page — only places one of our societies uses.
+ *       its public page — only places one of our societies uses. With
+ *       &photos=1, just its photos (the CRM's brochures).
  *   GET /api/places?photo=<photo name>&w=  one Google photo: a redirect to
  *       Google's image (same rule: signed in, or one of our places); with
  *       &json=1, its address as { uri } (signed-in setup screens).
  *   GET /api/places?sweep=<s,w,n,e>          the CRM's society import (super
  *       admin only): the apartment complexes and gated societies in one small
- *       rectangle (up to 60), and the real-estate agencies in it (up to 20),
- *       each with its pin, address and business phone. The CRM walks the
+ *       rectangle (up to 60) with their pins and addresses, and the
+ *       real-estate agencies in it (up to 20) with their business phones. The CRM walks the
  *       corridors cell by cell (lib/societyProspects.js).
  *
  * Google's terms let us keep the place id, not its photos or rating, so those
@@ -62,10 +63,15 @@ async function superAdmin(req) {
   }
 }
 
-const SWEEP_FIELDS = "places.id,places.displayName,places.formattedAddress,places.location,places.types,places.googleMapsUri,places.nationalPhoneNumber,places.businessStatus,nextPageToken";
+// Google bills a search by the dearest field asked for. The societies are
+// asked for Pro fields only (5,000 free a month); only the agencies' search
+// asks for the phone, an Enterprise field (1,000 free a month) — one page per
+// cell, so the whole sweep is about 400 Pro and 133 Enterprise searches.
+const SOCIETY_FIELDS = "places.id,places.displayName,places.formattedAddress,places.location,places.types,places.googleMapsUri,places.businessStatus,nextPageToken";
+const AGENCY_FIELDS = "places.id,places.displayName,places.location,places.nationalPhoneNumber,places.businessStatus";
 
 /** Every place a Text Search finds inside one rectangle, up to `pages` pages of 20. */
-async function searchRect(rect, textQuery, includedType, pages) {
+async function searchRect(rect, textQuery, includedType, pages, fields) {
   const out = [];
   let pageToken = "";
   for (let i = 0; i < pages; i++) {
@@ -73,7 +79,7 @@ async function searchRect(rect, textQuery, includedType, pages) {
     if (pageToken) body.pageToken = pageToken;
     const r = await fetch("https://places.googleapis.com/v1/places:searchText", {
       method: "POST",
-      headers: { "content-type": "application/json", "X-Goog-Api-Key": KEY, "X-Goog-FieldMask": SWEEP_FIELDS },
+      headers: { "content-type": "application/json", "X-Goog-Api-Key": KEY, "X-Goog-FieldMask": fields },
       body: JSON.stringify(body),
     });
     if (!r.ok) break;
@@ -150,9 +156,9 @@ function locality(components = []) {
   return pick("sublocality_level_1") || pick("neighborhood") || pick("sublocality") || pick("locality");
 }
 
-async function details(placeId) {
+async function details(placeId, fields = DETAIL_FIELDS) {
   const r = await fetch(`https://places.googleapis.com/v1/places/${encodeURIComponent(placeId)}`, {
-    headers: { "X-Goog-Api-Key": KEY, "X-Goog-FieldMask": DETAIL_FIELDS },
+    headers: { "X-Goog-Api-Key": KEY, "X-Goog-FieldMask": fields },
   });
   if (!r.ok) return null;
   const p = await r.json();
@@ -201,8 +207,8 @@ export default async function handler(req) {
     if (!(await superAdmin(req))) return json({ error: "Only the super admin can import." }, 403);
     const rect = { low: { latitude: s, longitude: w }, high: { latitude: n, longitude: e } };
     const [societies, agents] = await Promise.all([
-      searchRect(rect, "apartments gated society", "apartment_complex", 3),
-      searchRect(rect, "real estate agent", "real_estate_agency", 1),
+      searchRect(rect, "apartments gated society", "apartment_complex", 3, SOCIETY_FIELDS),
+      searchRect(rect, "real estate agent", "real_estate_agency", 1, AGENCY_FIELDS),
     ]);
     return json({ configured: true, societies, agents });
   }
@@ -213,7 +219,8 @@ export default async function handler(req) {
     if (!/^[A-Za-z0-9_-]{10,300}$/.test(id)) return json({ error: "bad id" }, 400);
     if (!KEY) return json({ configured: false }, 200, "public, s-maxage=300");
     if (!(await known(id))) return json({ error: "not ours" }, 403);
-    const d = await details(id);
+    // &photos=1 (the CRM's brochures): photos only — a Pro lookup, not the Enterprise one a rating needs.
+    const d = await details(id, q.get("photos") ? "id,photos" : DETAIL_FIELDS);
     return d ? json({ configured: true, ...d }, 200, "public, s-maxage=86400, max-age=3600") : json({ error: "not found" }, 404);
   }
 
