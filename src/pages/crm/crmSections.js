@@ -4,7 +4,7 @@
  */
 import {
   BarChart3, Bell, Briefcase, Target, Building2, CalendarCheck, Columns3, CreditCard, House, Inbox, Landmark,
-  MapPin, QrCode, ScanLine, Settings, ShieldCheck, Smartphone, UserPlus, Users, Wallet, Wrench,
+  Map as MapIcon, MapPin, QrCode, ScanLine, Settings, ShieldCheck, Smartphone, UserPlus, Users, Wallet, Wrench,
 } from "lucide-react";
 import { SCOPES } from "../../lib/adminScopes";
 
@@ -29,6 +29,8 @@ export const RAIL = [
   // Owners' buildings with a QR: assign the partner, work the visit requests.
   { to: "/crm/owner-qr", code: "QR", label: "Owner QR", icon: QrCode, group: "Flats" },
   { to: "/crm/societies", code: "SO", label: "Societies", icon: Landmark, scope: SCOPES.PROPERTIES_WRITE, group: "Flats" },
+  // Gated societies around HSR the team is bringing on: the map, the people to call, the brochures.
+  { to: "/crm/society-prospects", code: "SP", label: "Society prospects", icon: MapIcon, group: "Flats" },
   // The owner app's queue: repairs, service bookings, designer calls, owners.
   { to: "/crm/ops", code: "IO", label: "Inventory Ops", icon: Wrench, group: "Flats" },
   { to: "/crm/visits", code: "VS", label: "Visits", icon: CalendarCheck, group: "Tenants" },

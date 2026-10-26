@@ -10,6 +10,11 @@
  *   GET /api/places?photo=<photo name>&w=  one Google photo: a redirect to
  *       Google's image (same rule: signed in, or one of our places); with
  *       &json=1, its address as { uri } (signed-in setup screens).
+ *   GET /api/places?sweep=<s,w,n,e>          the CRM's society import (super
+ *       admin only): the apartment complexes and gated societies in one small
+ *       rectangle (up to 60), and the real-estate agencies in it (up to 20),
+ *       each with its pin, address and business phone. The CRM walks the
+ *       corridors cell by cell (lib/societyProspects.js).
  *
  * Google's terms let us keep the place id, not its photos or rating, so those
  * are fetched here when shown and cached at the edge for a day.
@@ -39,6 +44,57 @@ async function signedIn(req) {
   } catch {
     return false;
   }
+}
+
+/** The super admin (the society import spends Google calls). */
+async function superAdmin(req) {
+  const auth = req.headers.get("authorization") || "";
+  if (!/^Bearer\s+\S+/.test(auth) || !SUPABASE_URL) return false;
+  try {
+    const r = await fetch(`${SUPABASE_URL}/rest/v1/rpc/is_super_admin`, {
+      method: "POST",
+      headers: { "content-type": "application/json", apikey: SUPABASE_KEY, authorization: auth },
+      body: "{}",
+    });
+    return r.ok && (await r.json()) === true;
+  } catch {
+    return false;
+  }
+}
+
+const SWEEP_FIELDS = "places.id,places.displayName,places.formattedAddress,places.location,places.types,places.googleMapsUri,places.nationalPhoneNumber,places.businessStatus,nextPageToken";
+
+/** Every place a Text Search finds inside one rectangle, up to `pages` pages of 20. */
+async function searchRect(rect, textQuery, includedType, pages) {
+  const out = [];
+  let pageToken = "";
+  for (let i = 0; i < pages; i++) {
+    const body = { textQuery, includedType, pageSize: 20, locationRestriction: { rectangle: rect } };
+    if (pageToken) body.pageToken = pageToken;
+    const r = await fetch("https://places.googleapis.com/v1/places:searchText", {
+      method: "POST",
+      headers: { "content-type": "application/json", "X-Goog-Api-Key": KEY, "X-Goog-FieldMask": SWEEP_FIELDS },
+      body: JSON.stringify(body),
+    });
+    if (!r.ok) break;
+    const j = await r.json();
+    for (const p of j.places || []) {
+      if (p.businessStatus === "CLOSED_PERMANENTLY") continue;
+      out.push({
+        place_id: p.id,
+        name: p.displayName?.text || "",
+        address: p.formattedAddress || "",
+        lat: p.location?.latitude ?? null,
+        lng: p.location?.longitude ?? null,
+        types: p.types || [],
+        maps_url: p.googleMapsUri || "",
+        phone: p.nationalPhoneNumber || "",
+      });
+    }
+    pageToken = j.nextPageToken || "";
+    if (!pageToken) break;
+  }
+  return out;
 }
 
 /** Is this place one of our societies? */
@@ -134,6 +190,21 @@ export default async function handler(req) {
     // While setting up (the place isn't ours yet) the app asks for the address itself.
     if (q.get("json")) return json({ uri: photoUri });
     return new Response(null, { status: 302, headers: { location: photoUri, "cache-control": "public, s-maxage=86400, max-age=3600" } });
+  }
+
+  // ── The society import: one rectangle ──
+  if (q.get("sweep")) {
+    const [s, w, n, e] = q.get("sweep").split(",").map(Number);
+    const inBengaluru = [s, n].every((v) => v > 12.6 && v < 13.3) && [w, e].every((v) => v > 77.3 && v < 77.95);
+    if (!inBengaluru || !(n > s && e > w) || n - s > 0.02 || e - w > 0.02) return json({ error: "bad rectangle" }, 400);
+    if (!KEY) return json({ configured: false }, 503);
+    if (!(await superAdmin(req))) return json({ error: "Only the super admin can import." }, 403);
+    const rect = { low: { latitude: s, longitude: w }, high: { latitude: n, longitude: e } };
+    const [societies, agents] = await Promise.all([
+      searchRect(rect, "apartments gated society", "apartment_complex", 3),
+      searchRect(rect, "real estate agent", "real_estate_agency", 1),
+    ]);
+    return json({ configured: true, societies, agents });
   }
 
   // ── A society's live details ──

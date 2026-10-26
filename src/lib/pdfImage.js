@@ -9,17 +9,28 @@ export const A1 = { portrait: [1683.78, 2383.94], landscape: [2383.94, 1683.78] 
 
 /** PDF bytes for `jpeg` (a Uint8Array of a baseline JPEG, `w` × `h` pixels) on one page of `paper`. */
 export function jpegToPdf(jpeg, w, h, orientation = "portrait", paper = "A4") {
+  return jpegsToPdf([{ jpeg, w, h }], orientation, paper);
+}
+
+/** PDF bytes for several pages, one JPEG ({ jpeg, w, h }) filling each. */
+export function jpegsToPdf(pages, orientation = "portrait", paper = "A4") {
   const sizes = paper === "A1" ? A1 : A4;
   const [pw, ph] = sizes[orientation] || sizes.portrait;
   const enc = new TextEncoder();
   const content = enc.encode(`q ${pw} 0 0 ${ph} 0 0 cm /Im0 Do Q`);
+  // 1 catalog, 2 page tree, then per page: the page, its image, its content.
   const objects = [
     enc.encode("<< /Type /Catalog /Pages 2 0 R >>"),
-    enc.encode("<< /Type /Pages /Kids [3 0 R] /Count 1 >>"),
-    enc.encode(`<< /Type /Page /Parent 2 0 R /MediaBox [0 0 ${pw} ${ph}] /Resources << /XObject << /Im0 4 0 R >> >> /Contents 5 0 R >>`),
-    [enc.encode(`<< /Type /XObject /Subtype /Image /Width ${w} /Height ${h} /ColorSpace /DeviceRGB /BitsPerComponent 8 /Filter /DCTDecode /Length ${jpeg.length} >>\nstream\n`), jpeg, enc.encode("\nendstream")],
-    [enc.encode(`<< /Length ${content.length} >>\nstream\n`), content, enc.encode("\nendstream")],
+    enc.encode(`<< /Type /Pages /Kids [${pages.map((_, i) => `${3 + i * 3} 0 R`).join(" ")}] /Count ${pages.length} >>`),
   ];
+  pages.forEach(({ jpeg, w, h }, i) => {
+    const page = 3 + i * 3;
+    objects.push(
+      enc.encode(`<< /Type /Page /Parent 2 0 R /MediaBox [0 0 ${pw} ${ph}] /Resources << /XObject << /Im0 ${page + 1} 0 R >> >> /Contents ${page + 2} 0 R >>`),
+      [enc.encode(`<< /Type /XObject /Subtype /Image /Width ${w} /Height ${h} /ColorSpace /DeviceRGB /BitsPerComponent 8 /Filter /DCTDecode /Length ${jpeg.length} >>\nstream\n`), jpeg, enc.encode("\nendstream")],
+      [enc.encode(`<< /Length ${content.length} >>\nstream\n`), content, enc.encode("\nendstream")],
+    );
+  });
 
   const parts = [enc.encode("%PDF-1.4\n%\xE2\xE3\xCF\xD3\n")];
   let offset = parts[0].length;
