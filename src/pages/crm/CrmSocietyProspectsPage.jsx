@@ -240,7 +240,7 @@ function List() {
       </div>
 
       {rows.length === 0 ? (
-        <Empty>No societies yet.{superAdmin ? " Import them from Google above." : " The super admin imports them from Google."}</Empty>
+        <Empty>No societies yet.{superAdmin ? " Import them from OpenStreetMap above." : " The super admin imports them."}</Empty>
       ) : (
         <div style={{ display: "flex", gap: 14, flexWrap: "wrap", alignItems: "stretch" }}>
           <div style={{ flex: "1 1 460px", minWidth: 0, height: "min(70vh, 640px)", minHeight: 320, borderRadius: 12, overflow: "hidden", border: `1px solid ${C.line}`, isolation: "isolate" }}>

@@ -173,7 +173,14 @@ export const OSM_QUERY = `[out:json][timeout:120];
   nwr["shop"="estate_agent"](${OSM_BOX});
 );
 out bb tags;`;
-const OVERPASS = ["https://overpass-api.de/api/interpreter", "https://overpass.kumi.systems/api/interpreter"];
+// OpenStreetMap's public servers, tried in turn (each is often busy for a moment).
+const OVERPASS = [
+  "https://overpass-api.de/api/interpreter",
+  "https://overpass.private.coffee/api/interpreter",
+  "https://maps.mail.ru/osm/tools/overpass/api/interpreter",
+  "https://overpass-api.de/api/interpreter",
+  "https://overpass.kumi.systems/api/interpreter",
+];
 
 // A named area that is a neighbourhood, a government campus or an empty plot, not a society.
 const NOT_A_SOCIETY_AREA = /\b(layout|colony|quarters|nagar|village|extension|sector|stage|empty|site|police|slum|homestay|campus|battalion|cpwd|ksrp|kssidc|hostel|colive|plots?|arcade|tea|spice|cafe|restaurant|work)\b|\(u\/c\)|under construction/i;
@@ -221,10 +228,14 @@ export function osmRows(elements) {
 /** Ask OpenStreetMap (free, no key), trying a second server if the first is busy. */
 export async function fetchOsm() {
   for (const url of OVERPASS) {
+    const stop = new AbortController();
+    const timer = setTimeout(() => stop.abort(), 60000);
     try {
-      const r = await fetch(url, { method: "POST", body: new URLSearchParams({ data: OSM_QUERY }) });
+      const r = await fetch(url, { method: "POST", body: new URLSearchParams({ data: OSM_QUERY }), signal: stop.signal });
       if (r.ok) return (await r.json()).elements || [];
-    } catch { /* the next server */ }
+    } catch { /* the next server */ } finally {
+      clearTimeout(timer);
+    }
   }
   throw new Error("OpenStreetMap didn't answer. Try again in a minute.");
 }
