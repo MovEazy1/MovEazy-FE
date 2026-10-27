@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { buildingUrl, cleanMobile, flatsByFloor, floorLabel, isMobile, nextDays, shortInr, sortFlats, visitTimes } from "./buildings";
+import { buildingUrl, cleanMobile, flatsByFloor, floorLabel, isMobile, nextDays, shortInr, sortFlats, trackSummary, visitTimes } from "./buildings";
 
 describe("buildings", () => {
   it("names floors the way people say them", () => {
@@ -35,6 +35,13 @@ describe("buildings", () => {
     expect(ids("price_desc")).toBe("BADCE");
     expect(ids("flat_no")).toBe("BEACD");
     expect(flats.map((f) => f.property_id).join("")).toBe("ABCDE");
+  });
+
+  it("says where a tenant stands", () => {
+    expect(trackSummary({ visit: "pending", liked: "liked" })).toBe("Visit pending");
+    expect(trackSummary({ visit: "done" })).toBe("Visit done");
+    expect(trackSummary({ visit: "done", liked: "liked", liked_status: "will_pay_token" })).toBe("Liked · Will pay token");
+    expect(trackSummary({ visit: "done", liked: "disliked", reasons: ["size_small", "No covered parking"] })).toBe("Did not like · Size is small, No covered parking");
   });
 
   it("offers half-hour visit times from 9 to 8, none in the next hour today", () => {

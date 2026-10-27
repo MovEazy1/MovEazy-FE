@@ -20,9 +20,10 @@ import { useAreas, withCurrent } from "../../lib/areas";
 import { mediaRejectionReason, uploadInventoryPhotos } from "../../lib/inventory";
 import { isVideoFile } from "../../lib/listingMedia";
 import {
-  fetchCrmBuilding, fetchCrmBuildingTotal, fetchCrmCallDesk, saveCrmBuilding, saveCrmCallDesk, setBuildingUnits, setCrmBuildingTotal, setCrmFlatBuilding,
+  fetchCrmBuilding, fetchCrmBuildingTotal, fetchCrmCallDesk, fetchTenantTracks, saveCrmBuilding, saveCrmCallDesk, setBuildingUnits, setCrmBuildingTotal, setCrmFlatBuilding,
 } from "../../lib/crmPropertyInternal";
 import { callFeedbackLabel } from "../../lib/buildings";
+import { TenantTrackBar, TenantTrackList, TenantTrackSheet } from "./CrmTenantTracker";
 import { buildingUrl, floorLabel } from "../../lib/buildings";
 import { SCOPES } from "../../lib/adminScopes";
 import { moveByKey, useDragReorder } from "../../hooks/useDragReorder";
@@ -62,6 +63,13 @@ export default function CrmBuildingEditor() {
   const [stats, setStats] = useState(null);
   const [owner, setOwner] = useState(null);
   const [calls, setCalls] = useState(null); // Call Caretaker: what tenants did on the QR page
+  const [tracker, setTracker] = useState(null); // the team's tenants: { enabled, tracks, reasons }
+  const [tracking, setTracking] = useState(null); // the Add tenant form: {} new, or a card
+  const loadTracker = useCallback(() => {
+    if (isNew) return;
+    fetchTenantTracks(id).then(setTracker, () => setTracker(null));
+  }, [id, isNew]);
+  useEffect(() => { loadTracker(); }, [loadTracker]);
   const [flats, setFlats] = useState([]); // [{ property_id, unit_no, floor_number, ...listing }]
   const [initialIds, setInitialIds] = useState([]);
   const [q, setQ] = useState("");
@@ -260,6 +268,11 @@ export default function CrmBuildingEditor() {
 
   return (
     <div style={{ display: "flex", flexDirection: "column", flex: 1, minHeight: 0 }}>
+      {tracking && (
+        <TenantTrackSheet buildingId={id} flats={flats} track={tracking.id ? tracking : null} reasons={tracker?.reasons ?? []}
+          onClose={() => setTracking(null)} onReasonsChange={loadTracker}
+          onSaved={(t) => { setTracking(null); loadTracker(); say(`Saved · ${t.name || t.phone}`); }} />
+      )}
       <div className="crm-colhead">
         <span className="crm-label">{isNew ? "Group flats into a building" : `${b.kind === "society" ? "Society" : "Building"} · ${b.name}`}</span>
         <div style={{ display: "flex", gap: 6 }}>
@@ -267,6 +280,7 @@ export default function CrmBuildingEditor() {
           <Btn variant="primary" onClick={requestSave} disabled={saving || Boolean(uploading)}>{saving ? "Saving…" : uploading || "Save"}</Btn>
         </div>
       </div>
+      {tracker?.enabled && <TenantTrackBar count={tracker.tracks.length} onAdd={() => setTracking({})} />}
       <div className="crm-scroll" style={{ flex: 1, padding: 16 }}>
         <div className="crm-stack" style={{ display: "grid", gridTemplateColumns: "minmax(300px, 1fr) minmax(360px, 1.3fr)", gap: 16, alignItems: "start", maxWidth: 1240 }}>
           <div style={{ display: "grid", gap: 14 }}>
@@ -438,10 +452,11 @@ export default function CrmBuildingEditor() {
               ))}
             </div>
 
-            {calls && (
+            {(calls || tracker?.enabled) && (
               <div style={card}>
-                <span className="crm-label">Calls &amp; feedback · {new Set(calls.map((e) => e.phone)).size} tenants</span>
-                {calls.length === 0 ? <span className="crm-mute" style={{ fontSize: 12 }}>No one has asked for the numbers yet.</span> : (
+                <span className="crm-label">Calls &amp; feedback · {new Set([...(calls ?? []).map((e) => e.phone), ...(tracker?.tracks ?? []).map((t) => t.phone)]).size} tenants</span>
+                {tracker?.enabled && <TenantTrackList tracks={tracker.tracks} onOpen={setTracking} />}
+                {!calls ? null : calls.length === 0 ? <span className="crm-mute" style={{ fontSize: 12 }}>No one has asked for the numbers on the QR page yet.</span> : (
                   <div style={{ display: "grid", gap: 4, maxHeight: 320, overflow: "auto" }}>
                     {calls.slice(0, 100).map((e, k) => (
                       <div key={k} style={{ fontSize: 12, borderBottom: `1px solid ${C.line}`, padding: "4px 0" }}>

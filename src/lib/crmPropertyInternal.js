@@ -289,6 +289,12 @@ export const setCrmBuildingTotal = (id, total) => crmRpc("crm_building_total_fla
 export const fetchCrmCallDesk = (id) => crmRpc("crm_building_call_desk", { p_building: id, p_patch: null });
 /** Save { caretaker_name, caretaker_phone, manager_name, manager_phone } ("" clears one). */
 export const saveCrmCallDesk = (id, patch) => crmRpc("crm_building_call_desk", { p_building: id, p_patch: patch });
+/** The team's tenants for a building (building_tenant_tracks.sql): { enabled, tracks, reasons }. */
+export const fetchTenantTracks = (id) => crmRpc("crm_tenant_tracks", { p_building: id });
+/** Add a tenant or update their card: { phone, name, property_ids, note, visit, liked, liked_status, reasons }. Resolves to the card. */
+export const saveTenantTrack = (id, card) => crmRpc("crm_tenant_track_save", { p_building: id, p: card });
+/** Take a typed reason off the list everywhere (cards keep it). */
+export const removeTenantReason = (reasonId) => crmRpc("crm_tenant_reason_remove", { p_id: reasonId });
 /** Put flats in a building with house number, floor and order: [{ property_id, unit_no, floor_number, unit_order }]. */
 export const setBuildingUnits = (buildingId, units) => crmRpc("crm_building_set_units", { p_building: buildingId, p_units: units });
 /** A partner's storefront QR (only their flats), made on first ask. */

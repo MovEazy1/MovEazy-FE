@@ -53,6 +53,31 @@ export const CALL_FEEDBACK = [
 ];
 export const callFeedbackLabel = (id) => CALL_FEEDBACK.find((f) => f.id === id)?.label || id;
 
+/* Where a tenant the MovEazy team brought stands (building_tenant_tracks.sql). */
+export const LIKED_STATUSES = [
+  { id: "negotiate", label: "Negotiate on rent" },
+  { id: "exploring", label: "Exploring other options" },
+  { id: "will_pay_token", label: "Will pay token" },
+  { id: "paid_token", label: "Paid token" },
+];
+export const DISLIKE_REASONS = [
+  { id: "size_small", label: "Size is small" },
+  { id: "office_distance", label: "Distance from office" },
+  { id: "location", label: "Location issue" },
+  { id: "ventilation", label: "Ventilation issue" },
+  { id: "amenities", label: "Amenities issue" },
+];
+/** A built-in reason's words; a typed one is its own words. */
+export const reasonLabel = (r) => DISLIKE_REASONS.find((x) => x.id === r)?.label || r;
+
+/** Where a tenant stands, in a few words: "Liked · Will pay token", "Did not like · Size is small". */
+export function trackSummary(t) {
+  if (!t || t.visit !== "done") return "Visit pending";
+  if (t.liked === "liked") return ["Liked", LIKED_STATUSES.find((s) => s.id === t.liked_status)?.label].filter(Boolean).join(" · ");
+  if (t.liked === "disliked") return ["Did not like", (t.reasons ?? []).map(reasonLabel).join(", ")].filter(Boolean).join(" · ");
+  return "Visit done";
+}
+
 /** A renter's visit request. `visitAt`: a Date, or null for "call me to fix a time". */
 export const requestBuildingVisit = (code, { name, phone, propertyIds = [], visitAt = null, note = "" }) =>
   rpc("building_request_visit", {

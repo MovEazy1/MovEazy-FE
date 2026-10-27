@@ -24,7 +24,8 @@ const OVERVIEW = {
       places: [{ kind: "flat", ref: "MZ-1", at: "2026-10-26T10:00:00Z", hits: 3, visit: true }] },
     { key: "tel:9811144455", user_id: null, name: "Asha Caller", phone: "9811144455", email: "", at: "2026-10-25T10:00:00Z", visit: false,
       profile: null, places: [{ kind: "building", ref: "b-1", at: "2026-10-25T10:00:00Z", hits: 0, visit: false, called: ["caretaker"] }],
-      feedback: [{ kind: "pay_token", note: "", at: "2026-10-25T10:05:00Z", ref: "b-1" }, { kind: "other", note: "No lift?", at: "2026-10-25T10:04:00Z", ref: "b-1" }] },
+      feedback: [{ kind: "pay_token", note: "", at: "2026-10-25T10:05:00Z", ref: "b-1" }, { kind: "other", note: "No lift?", at: "2026-10-25T10:04:00Z", ref: "b-1" }],
+      status: { visit: "done", liked: "liked", liked_status: "will_pay_token", reasons: [], at: "2026-10-26T10:00:00Z" } },
     { key: "tel:9811122233", user_id: null, name: "Walk In", phone: "9811122233", email: "", at: "2026-10-20T10:00:00Z", visit: false,
       profile: null, places: [{ kind: "building", ref: "b-1", at: "2026-10-20T10:00:00Z", hits: 2, visit: false }] },
   ],
@@ -95,6 +96,8 @@ describe("QR scans", () => {
     expect(sheet.textContent).toContain("Called the caretaker");
     expect(sheet.textContent).toContain("What they said after calling");
     expect(sheet.textContent).toContain('"No lift?"');
+    expect(sheet.textContent).toContain("Where they stand");
+    expect(sheet.textContent).toContain("Liked · Will pay token");
     expect(sheet.querySelector('a[href="tel:+919811144455"]')).toBeTruthy();
   });
 

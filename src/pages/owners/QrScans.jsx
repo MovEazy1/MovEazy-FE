@@ -12,7 +12,7 @@ import { Briefcase, Building2, CalendarCheck, ChevronRight, GraduationCap, Link 
 import { useOwner } from "./OwnerApp";
 import { Avatar, Chip, Empty, Loading, Pill, Sheet, TopBar, WhatsAppIcon } from "./ownerUi";
 import { fetchQrOverview } from "../../lib/flatInsights";
-import { callFeedbackLabel } from "../../lib/buildings";
+import { callFeedbackLabel, trackSummary } from "../../lib/buildings";
 import { countMatchingTenants } from "../../lib/ownerMatches";
 import { cleanLinkedIn, fmtDateTime, occupancyOf, op, propertyName, relTime, telLink, waLink } from "../../lib/owners";
 
@@ -134,8 +134,9 @@ export default function QrScans() {
                       {last ? `${placeName(last.kind, last.ref)}${times(last.hits)} · ` : ""}{relTime(p.at)}
                     </span>
                   </span>
-                  {(p.feedback ?? []).some((f) => f.kind === "pay_token") ? <Pill tone="amber">Pay Token</Pill>
-                    : p.visit ? <Pill tone="green">Visit</Pill> : null}
+                  {p.status?.liked_status === "paid_token" ? <Pill tone="green">Paid token</Pill>
+                    : p.status?.liked_status === "will_pay_token" || (p.feedback ?? []).some((f) => f.kind === "pay_token") ? <Pill tone="amber">Pay Token</Pill>
+                      : p.visit ? <Pill tone="green">Visit</Pill> : null}
                   <ChevronRight size={18} color="#94A09B" />
                 </button>
               );
@@ -178,6 +179,13 @@ function PersonSheet({ p, placeName, onClose }) {
             {pr.in_bangalore_since && <div className="qs-line"><Building2 size={16} /><span>In Bangalore since {pr.in_bangalore_since}</span></div>}
             {linkedin && <div className="qs-line"><LinkIcon size={16} /><a href={linkedin} target="_blank" rel="noreferrer">LinkedIn profile</a></div>}
             {pr.score > 0 && <div className="qs-line"><span className="qs-score">{pr.score}</span><span>MovEazy tenant score</span></div>}
+          </>
+        )}
+
+        {p.status && (
+          <>
+            <h3 className="qs-h3">Where they stand</h3>
+            <div className="qs-line"><CalendarCheck size={16} /><span>{trackSummary(p.status)} · {fmtDateTime(p.status.at)}</span></div>
           </>
         )}
 
