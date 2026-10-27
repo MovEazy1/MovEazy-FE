@@ -467,7 +467,6 @@ function CallSheet({ code, building, user, onClose }) {
                 How did the call go?
               </button>
             )}
-            <p className="bp-fine">Calling from +91 {fmt(phone)}. Your number goes only to MovEazy and the people showing the flats.</p>
           </>
         )}
       </div>
