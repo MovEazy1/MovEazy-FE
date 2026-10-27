@@ -8,15 +8,26 @@
  */
 import { useEffect, useMemo, useState } from "react";
 import { Link } from "react-router-dom";
-import { Briefcase, Building2, CalendarCheck, ChevronRight, GraduationCap, Link as LinkIcon, Mail, Phone, QrCode, ScanLine, Users } from "lucide-react";
+import { Briefcase, Building2, CalendarCheck, ChevronRight, GraduationCap, Link as LinkIcon, Mail, MessageSquareText, Phone, QrCode, ScanLine, Users } from "lucide-react";
 import { useOwner } from "./OwnerApp";
 import { Avatar, Chip, Empty, Loading, Pill, Sheet, TopBar, WhatsAppIcon } from "./ownerUi";
 import { fetchQrOverview } from "../../lib/flatInsights";
+import { callFeedbackLabel } from "../../lib/buildings";
 import { countMatchingTenants } from "../../lib/ownerMatches";
 import { cleanLinkedIn, fmtDateTime, occupancyOf, op, propertyName, relTime, telLink, waLink } from "../../lib/owners";
 
 const fmt = (n) => (Number(n) || 0).toLocaleString("en-IN");
 const times = (n) => (Number(n) > 1 ? ` · ${fmt(n)}×` : "");
+/** What someone did on one page: opened it, called from it (Call Caretaker), asked to visit. */
+function placeDid(x) {
+  const called = (x.called ?? []).map((t) => (t === "manager" ? "the property manager" : "the caretaker"));
+  const bits = [
+    x.hits > 0 ? `Opened ${fmt(x.hits)}×` : "",
+    called.length ? `Called ${called.join(" and ")}` : "",
+    x.visit ? (x.hits > 0 || called.length ? "booked a visit" : "Asked to visit") : "",
+  ].filter(Boolean);
+  return bits.length ? bits.join(" · ") : "Asked for the caretaker's number";
+}
 
 export default function QrScans() {
   const { properties, tenants, byId } = useOwner();
@@ -123,7 +134,8 @@ export default function QrScans() {
                       {last ? `${placeName(last.kind, last.ref)}${times(last.hits)} · ` : ""}{relTime(p.at)}
                     </span>
                   </span>
-                  {p.visit && <Pill tone="green">Visit</Pill>}
+                  {(p.feedback ?? []).some((f) => f.kind === "pay_token") ? <Pill tone="amber">Pay Token</Pill>
+                    : p.visit ? <Pill tone="green">Visit</Pill> : null}
                   <ChevronRight size={18} color="#94A09B" />
                 </button>
               );
@@ -169,6 +181,21 @@ function PersonSheet({ p, placeName, onClose }) {
           </>
         )}
 
+        {(p.feedback ?? []).length > 0 && (
+          <>
+            <h3 className="qs-h3">What they said after calling</h3>
+            {p.feedback.map((f, k) => (
+              <div key={k} className="qs-line" style={{ alignItems: "flex-start" }}>
+                <MessageSquareText size={16} />
+                <span style={{ flex: 1 }}>
+                  <strong style={{ fontWeight: 600 }}>{callFeedbackLabel(f.kind)}</strong>
+                  <span className="oz-sub">{f.note ? `"${f.note}" · ` : ""}{fmtDateTime(f.at)}</span>
+                </span>
+              </div>
+            ))}
+          </>
+        )}
+
         <h3 className="qs-h3">What they opened</h3>
         {(p.places ?? []).map((x) => (
           <div key={`${x.kind}-${x.ref}`} className="qs-line" style={{ alignItems: "flex-start" }}>
@@ -176,7 +203,7 @@ function PersonSheet({ p, placeName, onClose }) {
             <span style={{ flex: 1 }}>
               <strong style={{ fontWeight: 600 }}>{placeName(x.kind, x.ref)}</strong>
               <span className="oz-sub">
-                {x.hits > 0 ? `Opened ${fmt(x.hits)}×` : "Asked to visit"}{x.visit && x.hits > 0 ? " · booked a visit" : ""} · {fmtDateTime(x.at)}
+                {placeDid(x)} · {fmtDateTime(x.at)}
               </span>
             </span>
           </div>

@@ -19,7 +19,10 @@ import QrPosterBlock from "../../components/QrPosterBlock";
 import { useAreas, withCurrent } from "../../lib/areas";
 import { mediaRejectionReason, uploadInventoryPhotos } from "../../lib/inventory";
 import { isVideoFile } from "../../lib/listingMedia";
-import { fetchCrmBuilding, fetchCrmBuildingTotal, saveCrmBuilding, setBuildingUnits, setCrmBuildingTotal, setCrmFlatBuilding } from "../../lib/crmPropertyInternal";
+import {
+  fetchCrmBuilding, fetchCrmBuildingTotal, fetchCrmCallDesk, saveCrmBuilding, saveCrmCallDesk, setBuildingUnits, setCrmBuildingTotal, setCrmFlatBuilding,
+} from "../../lib/crmPropertyInternal";
+import { callFeedbackLabel } from "../../lib/buildings";
 import { buildingUrl, floorLabel } from "../../lib/buildings";
 import { SCOPES } from "../../lib/adminScopes";
 import { moveByKey, useDragReorder } from "../../hooks/useDragReorder";
@@ -31,6 +34,7 @@ const MAX_PHOTOS = 30;
 
 const BLANK = {
   name: "", kind: "building", area: "", landmark: "", full_address: "", total_floors: "", total_flats: "",
+  caretaker_name: "", caretaker_phone: "", manager_name: "", manager_phone: "",
   owner_email: "", owner_phone: "", description: "", amenities: [], photos: [], cover_video: "",
 };
 
@@ -57,6 +61,7 @@ export default function CrmBuildingEditor() {
   const [code, setCode] = useState("");
   const [stats, setStats] = useState(null);
   const [owner, setOwner] = useState(null);
+  const [calls, setCalls] = useState(null); // Call Caretaker: what tenants did on the QR page
   const [flats, setFlats] = useState([]); // [{ property_id, unit_no, floor_number, ...listing }]
   const [initialIds, setInitialIds] = useState([]);
   const [q, setQ] = useState("");
@@ -77,19 +82,22 @@ export default function CrmBuildingEditor() {
     if (isNew) return;
     try {
       // Before building_total_flats.sql the count just isn't there; the editor still loads.
-      const [d, total] = await Promise.all([fetchCrmBuilding(id), fetchCrmBuildingTotal(id).catch(() => null)]);
+      const [d, total, desk] = await Promise.all([fetchCrmBuilding(id), fetchCrmBuildingTotal(id).catch(() => null), fetchCrmCallDesk(id).catch(() => null)]);
       if (!d) { setB(false); return; }
       // A framed cover rides as photos[0]; it is edited on the review screen, not in the grid.
       const split = splitCover(d.photos);
       savedPhotos.current = split;
       setB({
         name: d.name || "", kind: d.kind || "building", area: d.area || "", landmark: d.landmark || "", full_address: d.full_address || "",
+        caretaker_name: desk?.caretaker_name || "", caretaker_phone: desk?.caretaker_phone || "",
+        manager_name: desk?.manager_name || "", manager_phone: desk?.manager_phone || "",
         total_floors: d.total_floors ?? "", total_flats: total ?? "", owner_email: d.owner_email || "", owner_phone: d.owner_phone || "",
         description: d.description || "", amenities: d.amenities ?? [], photos: split.gallery, cover_video: d.cover_video || "",
       });
       setCode(d.code);
       setStats(d.stats);
       setOwner(d.owner);
+      setCalls(desk?.events ?? null);
       const list = (d.flats ?? []).map((f) => ({ ...f, unit_no: f.unit_no || "", floor_number: f.floor_number ?? "" }));
       setFlats(list);
       setInitialIds(list.map((f) => f.property_id));
@@ -224,6 +232,9 @@ export default function CrmBuildingEditor() {
       });
       const bid = r.id;
       await setCrmBuildingTotal(bid, String(b.total_flats ?? "").trim());
+      await saveCrmCallDesk(bid, {
+        caretaker_name: b.caretaker_name, caretaker_phone: b.caretaker_phone, manager_name: b.manager_name, manager_phone: b.manager_phone,
+      });
       await setBuildingUnits(bid, flats.map((f, i) => ({
         property_id: f.property_id, unit_no: String(f.unit_no || "").trim(),
         floor_number: String(f.floor_number ?? "").trim() === "" ? "" : Number(f.floor_number), unit_order: i + 1,
@@ -305,6 +316,16 @@ export default function CrmBuildingEditor() {
                   )}
                 </div>
               )}
+              <div style={{ display: "grid", gap: 6 }}>
+                <span className="crm-label">Call Caretaker on the QR page</span>
+                <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8 }}>
+                  <input className="crm-input" placeholder="Caretaker's name" value={b.caretaker_name} onChange={(e) => set({ caretaker_name: e.target.value })} />
+                  <input className="crm-input" inputMode="tel" placeholder="Caretaker's mobile" value={b.caretaker_phone} onChange={(e) => set({ caretaker_phone: e.target.value })} />
+                  <input className="crm-input" placeholder="Property manager's name" value={b.manager_name} onChange={(e) => set({ manager_name: e.target.value })} />
+                  <input className="crm-input" inputMode="tel" placeholder="Property manager's mobile" value={b.manager_phone} onChange={(e) => set({ manager_phone: e.target.value })} />
+                </div>
+                <span className="crm-mute" style={{ fontSize: 11 }}>Tenants who give their mobile get these two numbers. Left empty, MovEazy's team number (91469 69162) shows instead.</span>
+              </div>
               {b.kind === "society" && (
                 <span className="crm-mute" style={{ fontSize: 11.5 }}>Each flat's owner is set on the flat itself (Edit → Owner &amp; building). They see only their own flat.</span>
               )}
@@ -416,6 +437,29 @@ export default function CrmBuildingEditor() {
                 </button>
               ))}
             </div>
+
+            {calls && (
+              <div style={card}>
+                <span className="crm-label">Calls &amp; feedback · {new Set(calls.map((e) => e.phone)).size} tenants</span>
+                {calls.length === 0 ? <span className="crm-mute" style={{ fontSize: 12 }}>No one has asked for the numbers yet.</span> : (
+                  <div style={{ display: "grid", gap: 4, maxHeight: 320, overflow: "auto" }}>
+                    {calls.slice(0, 100).map((e, k) => (
+                      <div key={k} style={{ fontSize: 12, borderBottom: `1px solid ${C.line}`, padding: "4px 0" }}>
+                        <strong>{e.name || "Tenant"}</strong> · <a href={`tel:+91${e.phone}`} style={{ color: C.accent }}>{e.phone}</a>
+                        <span className="crm-mute"> · {new Date(e.at).toLocaleString("en-IN", { day: "numeric", month: "short", hour: "numeric", minute: "2-digit" })}</span>
+                        <div>
+                          {e.kind === "contacts" ? "Asked for the numbers"
+                            : e.kind === "call" ? `Called the ${e.target === "manager" ? "property manager" : "caretaker"}`
+                              : <span style={{ color: e.feedback === "pay_token" ? C.accent : e.feedback === "call_not_picked" ? C.gold : undefined, fontWeight: 600 }}>
+                                  {callFeedbackLabel(e.feedback)}{e.note ? ` — "${e.note}"` : ""}
+                                </span>}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+            )}
 
             {code ? (
               <div style={card}>

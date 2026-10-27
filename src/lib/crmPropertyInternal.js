@@ -285,6 +285,10 @@ export const fetchCrmBuilding = (id) => crmRpc("crm_building_detail", { p_buildi
 export const fetchCrmBuildingTotal = (id) => crmRpc("crm_building_total_flats", { p_building: id, p_total: null });
 /** Set it ("" clears it). Resolves to the count. */
 export const setCrmBuildingTotal = (id, total) => crmRpc("crm_building_total_flats", { p_building: id, p_total: String(total ?? "") });
+/** Call Caretaker: the building's caretaker and property manager, and what tenants did on its QR page (building_call_desk.sql). */
+export const fetchCrmCallDesk = (id) => crmRpc("crm_building_call_desk", { p_building: id, p_patch: null });
+/** Save { caretaker_name, caretaker_phone, manager_name, manager_phone } ("" clears one). */
+export const saveCrmCallDesk = (id, patch) => crmRpc("crm_building_call_desk", { p_building: id, p_patch: patch });
 /** Put flats in a building with house number, floor and order: [{ property_id, unit_no, floor_number, unit_order }]. */
 export const setBuildingUnits = (buildingId, units) => crmRpc("crm_building_set_units", { p_building: buildingId, p_units: units });
 /** A partner's storefront QR (only their flats), made on first ask. */

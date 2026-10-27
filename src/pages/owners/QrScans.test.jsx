@@ -22,6 +22,9 @@ const OVERVIEW = {
       profile: { company: "Flipkart", past_company: "", first_job: false, college: "IIT Madras", graduation_year: 2019,
         linkedin: "https://www.linkedin.com/in/ravi-k", in_bangalore_since: "2020", score: 82 },
       places: [{ kind: "flat", ref: "MZ-1", at: "2026-10-26T10:00:00Z", hits: 3, visit: true }] },
+    { key: "tel:9811144455", user_id: null, name: "Asha Caller", phone: "9811144455", email: "", at: "2026-10-25T10:00:00Z", visit: false,
+      profile: null, places: [{ kind: "building", ref: "b-1", at: "2026-10-25T10:00:00Z", hits: 0, visit: false, called: ["caretaker"] }],
+      feedback: [{ kind: "pay_token", note: "", at: "2026-10-25T10:05:00Z", ref: "b-1" }, { kind: "other", note: "No lift?", at: "2026-10-25T10:04:00Z", ref: "b-1" }] },
     { key: "tel:9811122233", user_id: null, name: "Walk In", phone: "9811122233", email: "", at: "2026-10-20T10:00:00Z", visit: false,
       profile: null, places: [{ kind: "building", ref: "b-1", at: "2026-10-20T10:00:00Z", hits: 2, visit: false }] },
   ],
@@ -81,6 +84,18 @@ describe("QR scans", () => {
     expect(sheet.textContent).toContain("IIT Madras, 2019");
     expect(sheet.querySelector('a[href="https://www.linkedin.com/in/ravi-k"]')).toBeTruthy();
     expect(sheet.textContent).toContain("Opened 3×");
+  });
+
+  it("a Call Caretaker tenant: who they called and what they said after", async () => {
+    const page = await mount();
+    const row = [...page.querySelectorAll("button")].find((b) => b.textContent.includes("Asha Caller"));
+    expect(row.textContent).toContain("Pay Token");
+    await act(async () => row.click());
+    const sheet = page.querySelector("[role=dialog]");
+    expect(sheet.textContent).toContain("Called the caretaker");
+    expect(sheet.textContent).toContain("What they said after calling");
+    expect(sheet.textContent).toContain('"No lift?"');
+    expect(sheet.querySelector('a[href="tel:+919811144455"]')).toBeTruthy();
   });
 
   it("filters to people who booked a visit", async () => {

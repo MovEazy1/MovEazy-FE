@@ -30,6 +30,29 @@ export function recordBuildingView(code, source) {
   }).catch(() => {});
 }
 
+/**
+ * Call Caretaker (building_call_desk.sql): "contacts" logs the tenant and
+ * resolves to { caretaker: { name, phone }, manager: { name, phone } }; "call"
+ * (target caretaker | manager) and "feedback" (one of CALL_FEEDBACK, with a
+ * note) are logged for MovEazy and the owner.
+ */
+export const buildingCallDesk = (code, { phone, name = "", kind = "contacts", target = "", feedback = "", note = "" }) =>
+  rpc("building_call_desk", {
+    p_code: code, p_visitor: visitorId() || "", p_phone: phone, p_name: name,
+    p_kind: kind, p_target: target, p_feedback: feedback, p_note: note,
+  });
+
+/** What a tenant can say after the call. */
+export const CALL_FEEDBACK = [
+  { id: "pay_token", label: "Pay Token" },
+  { id: "issues", label: "Have some issues" },
+  { id: "flat_small", label: "Flat is small" },
+  { id: "ventilation", label: "Ventilation issue" },
+  { id: "call_not_picked", label: "Call not picked" },
+  { id: "other", label: "Any other issue" },
+];
+export const callFeedbackLabel = (id) => CALL_FEEDBACK.find((f) => f.id === id)?.label || id;
+
 /** A renter's visit request. `visitAt`: a Date, or null for "call me to fix a time". */
 export const requestBuildingVisit = (code, { name, phone, propertyIds = [], visitAt = null, note = "" }) =>
   rpc("building_request_visit", {

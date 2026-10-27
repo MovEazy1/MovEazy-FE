@@ -2,93 +2,55 @@
  * A property's page — moveazy.co.in/building/<code>, what its QR poster opens.
  *
  * The building's photos, then every flat floor by floor as the same small
- * card, and a visit booked in three taps: pick the flats, a day and a time,
- * then a name and mobile. No owner contact anywhere — the request goes to the
- * MovEazy partner assigned to the property and to MovEazy (owner_buildings.sql).
- *
- * Where the owner has turned on instant visit, a second sticky button offers
- * it: name, mobile, Google sign-in, and back come the name and number of the
- * person at the property and the address — the tenant walks in now.
+ * card, and one button: Call Caretaker. The tenant gives their mobile (the
+ * site's usual gate, not verified), and gets the building's caretaker — who
+ * can show the flats right away — and its property manager, MovEazy's team
+ * number where the CRM hasn't set one. Back from the call, they say how it
+ * went; "call not picked" offers the manager at once (building_call_desk.sql).
  */
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { Link, useParams, useSearchParams } from "react-router-dom";
+import { useParams, useSearchParams } from "react-router-dom";
 import { useAuth } from "../context/AuthContext";
-import { ArrowUpDown, BadgeCheck, Building2, CalendarCheck, Check, ChevronLeft, Clock, Film, Images, Layers, MapPin, Navigation, Phone, Sparkles, X, Zap } from "lucide-react";
+import { ArrowUpDown, BadgeCheck, Building2, Check, ChevronLeft, Film, Images, Layers, MapPin, MessageCircle, Phone, X, Zap } from "lucide-react";
 import { MediaItem, listingCover, listingMedia } from "./partners/partnerMedia";
 import { useSnapTrack } from "../hooks/useSnapTrack";
 import { usePhotoViewer } from "../hooks/usePhotoViewer";
 import { inr } from "../lib/partners";
 import {
-  FLAT_SORTS, cleanMobile, fetchBuildingPage, flatsByFloor, floorLabel, isMobile, nextDays, recordBuildingView, requestBuildingVisit,
-  shortInr, sortFlats, startInstantVisit, visitTimes, visitWhen,
+  CALL_FEEDBACK, FLAT_SORTS, buildingCallDesk, fetchBuildingPage, flatsByFloor, floorLabel, recordBuildingView, shortInr, sortFlats,
 } from "../lib/buildings";
+import { leadSnapshot } from "../lib/leadIntake";
+import RequirePhoneFirst from "../components/RequirePhoneFirst";
 import logo from "../assets/logo/moveazy-logo-mint-light.png";
 
-const ME_KEY = "mz_visitor_contact";
-// A visit being booked when the renter went to Google to sign in: picked up when they come back.
-const PENDING_VISIT_KEY = "mz_building_visit_pending";
-function readPendingVisit(code) {
+// A call just made from this page: when the tenant comes back, ask how it went.
+const CALLED_KEY = "mz_building_called";
+function readCalled(code) {
   try {
-    const p = JSON.parse(sessionStorage.getItem(PENDING_VISIT_KEY) || "null");
-    return p && p.code === code && Date.now() - (p.savedAt || 0) < 30 * 60 * 1000 ? p : null;
+    const c = JSON.parse(sessionStorage.getItem(CALLED_KEY) || "null");
+    return c && c.code === code && Date.now() - (c.at || 0) < 2 * 60 * 60 * 1000 ? c : null;
   } catch { return null; }
 }
-function savePendingVisit(p) {
-  try { sessionStorage.setItem(PENDING_VISIT_KEY, JSON.stringify({ ...p, savedAt: Date.now() })); } catch { /* private tab */ }
-}
-function clearPendingVisit() {
-  try { sessionStorage.removeItem(PENDING_VISIT_KEY); } catch { /* ignore */ }
-}
-
-function GoogleG() {
-  return (
-    <svg width="18" height="18" viewBox="0 0 48 48" aria-hidden>
-      <path fill="#FFC107" d="M43.6 20.5H42V20H24v8h11.3C33.7 32.7 29.2 36 24 36c-6.6 0-12-5.4-12-12s5.4-12 12-12c3 0 5.8 1.1 7.9 3l5.7-5.7C34 6.1 29.3 4 24 4 12.9 4 4 12.9 4 24s8.9 20 20 20 20-8.9 20-20c0-1.3-.1-2.4-.4-3.5z" />
-      <path fill="#FF3D00" d="M6.3 14.7l6.6 4.8C14.7 15.1 19 12 24 12c3 0 5.8 1.1 7.9 3l5.7-5.7C34 6.1 29.3 4 24 4 16.3 4 9.7 8.3 6.3 14.7z" />
-      <path fill="#4CAF50" d="M24 44c5.2 0 9.9-2 13.4-5.2l-6.2-5.2C29.2 35.1 26.7 36 24 36c-5.2 0-9.6-3.3-11.3-8l-6.5 5C9.5 39.6 16.2 44 24 44z" />
-      <path fill="#1976D2" d="M43.6 20.5H42V20H24v8h11.3c-.8 2.2-2.2 4.2-4.1 5.6l6.2 5.2C37 39.2 44 34 44 24c0-1.3-.1-2.4-.4-3.5z" />
-    </svg>
-  );
-}
-function readMe() {
-  try { return JSON.parse(localStorage.getItem(ME_KEY) || "null") || {}; } catch { return {}; }
-}
-function saveMe(me) {
-  try { localStorage.setItem(ME_KEY, JSON.stringify(me)); } catch { /* private tab */ }
+function saveCalled(c) {
+  try { if (c) sessionStorage.setItem(CALLED_KEY, JSON.stringify(c)); else sessionStorage.removeItem(CALLED_KEY); } catch { /* private tab */ }
 }
 
 const bhk = (f) => f.flat_type || (f.bedrooms ? `${f.bedrooms} BHK` : "Flat");
 /** "Flat 302 · 2 BHK" when MovEazy set a house number, else "2 BHK". */
 const flatName = (f) => (f.unit_no ? `Flat ${f.unit_no} · ${bhk(f)}` : bhk(f));
-const dayLabel = (d, i) => (i === 0 ? "Today" : i === 1 ? "Tomorrow" : d.toLocaleDateString("en-IN", { weekday: "short" }));
 
 export default function BuildingPage() {
   const { code: raw = "" } = useParams();
   const code = raw.toUpperCase();
   const [params] = useSearchParams();
   const [b, setB] = useState(undefined); // undefined loading · null not found
-  const [picked, setPicked] = useState(() => new Set());
   const [open, setOpen] = useState(null); // a flat, in the detail sheet
-  const [booking, setBooking] = useState(false);
-  const [instant, setInstant] = useState(false);
+  // The Call Caretaker sheet; open again on the feedback when a call was just made.
+  const [calling, setCalling] = useState(() => Boolean(readCalled(code)));
   const [floorOn, setFloorOn] = useState("all");
   const [sortBy, setSortBy] = useState("popular");
   const counted = useRef(false);
-  const { user, loading: authLoading, loginWithGoogle, updateUserProfile } = useAuth();
-  // Back from Google with a visit half-booked: reopen it and finish.
-  const [resume, setResume] = useState(null);
-  useEffect(() => {
-    if (authLoading || !user || !b) return;
-    const p = readPendingVisit(code);
-    if (!p) return;
-    clearPendingVisit();
-    // The number they typed before signing in becomes their account's, so the
-    // site doesn't ask for it a second time.
-    if (p.phone && !String(user.phone || "").trim()) updateUserProfile?.(user.name || p.name, p.phone).catch?.(() => {});
-    setPicked(new Set(p.picked || []));
-    setResume(p);
-    if (p.mode === "instant") setInstant(true); else setBooking(true);
-  }, [authLoading, user, b, code, updateUserProfile]);
+  const { user } = useAuth();
 
   useEffect(() => {
     let live = true;
@@ -120,14 +82,6 @@ export default function BuildingPage() {
     return own.length ? own : flats.flatMap((f) => listingMedia(f)).slice(0, 8);
   }, [b, flats]);
   const rents = available.map((f) => Number(f.rent) || 0).filter(Boolean);
-
-  const toggle = useCallback((id) => {
-    setPicked((cur) => {
-      const next = new Set(cur);
-      if (next.has(id)) next.delete(id); else next.add(id);
-      return next;
-    });
-  }, []);
 
   const jump = (key) => {
     setFloorOn(key);
@@ -181,7 +135,7 @@ export default function BuildingPage() {
               </label>
             )}
           </div>
-          <span>Tap <b>+</b> to add flats to your visit — see as many as you like in one trip</span>
+          <span>Tap a flat for photos and details — call the caretaker to see any of them</span>
         </div>
         {floors.length > 1 && (
           <div className="bp-floortabs" role="tablist">
@@ -196,7 +150,7 @@ export default function BuildingPage() {
         {available.length === 0 && <div className="bp-note">Every flat here is taken right now. Ask for a visit and we'll tell you the moment one frees up.</div>}
         <div className="bp-floor">
           {shown.map((f) => (
-            <FlatCard key={f.property_id} flat={f} picked={picked.has(f.property_id)} onToggle={() => toggle(f.property_id)} onOpen={() => setOpen(f)} />
+            <FlatCard key={f.property_id} flat={f} onOpen={() => setOpen(f)} />
           ))}
         </div>
         {occupied > 0 && <div className="bp-occ">{occupied} more flat{occupied === 1 ? " is" : "s are"} already booked</div>}
@@ -207,34 +161,14 @@ export default function BuildingPage() {
         <p>Verified homes, visits arranged by a MovEazy partner. Your number is only used to set up your visit.</p>
       </footer>
 
-      {b.instant_visit && <div className="bp-cta-room" aria-hidden />}
       <div className="bp-cta">
-        {b.instant_visit && (
-          <button type="button" className="bp-instant" onClick={() => setInstant(true)}>
-            <span className="bp-instant-ic"><Zap size={18} /></span>
-            <span className="bp-instant-txt"><b>Instant visit is available on this property</b><small>Walk in now — someone's there to show you around</small></span>
-            <span className="bp-instant-go">Visit now</span>
-          </button>
-        )}
-        <button type="button" className="bp-btn bp-btn--primary bp-btn--block" onClick={() => setBooking(true)}>
-          <CalendarCheck size={19} />
-          {picked.size ? `Schedule visit · ${picked.size} flat${picked.size === 1 ? "" : "s"}` : "Schedule a visit"}
+        <button type="button" className="bp-btn bp-btn--primary bp-btn--block" onClick={() => setCalling(true)}>
+          <Phone size={19} /> Call Caretaker
         </button>
       </div>
 
-      {open && (
-        <FlatSheet flat={open} picked={picked.has(open.property_id)} onClose={() => setOpen(null)}
-          onToggle={() => toggle(open.property_id)}
-          onVisit={() => { if (!picked.has(open.property_id)) toggle(open.property_id); setOpen(null); setBooking(true); }} />
-      )}
-      {booking && (
-        <VisitSheet code={code} building={b} flats={flats} picked={picked} onToggle={toggle} onClose={() => { setBooking(false); setResume(null); }}
-          user={user} loginWithGoogle={loginWithGoogle} resume={resume} />
-      )}
-      {instant && (
-        <InstantSheet code={code} building={b} flats={flats} picked={picked} onToggle={toggle} onClose={() => { setInstant(false); setResume(null); }}
-          user={user} loginWithGoogle={loginWithGoogle} resume={resume?.mode === "instant" ? resume : null} />
-      )}
+      {open && <FlatSheet flat={open} onClose={() => setOpen(null)} onCall={() => { setOpen(null); setCalling(true); }} />}
+      {calling && <CallSheet code={code} building={b} user={user} onClose={() => setCalling(false)} />}
     </Shell>
   );
 }
@@ -296,10 +230,10 @@ function Gallery({ photos, name }) {
   );
 }
 
-function FlatCard({ flat, picked, onToggle, onOpen }) {
+function FlatCard({ flat, onOpen }) {
   const first = listingCover(flat);
   return (
-    <div className={`bp-card${flat.available ? "" : " bp-card--off"}${picked ? " bp-card--on" : ""}`}>
+    <div className={`bp-card${flat.available ? "" : " bp-card--off"}`}>
       <button type="button" className="bp-card-main" onClick={onOpen}>
         <div className="bp-card-img">
           {first ? <MediaItem src={first} alt="" /> : <Building2 size={26} />}
@@ -315,12 +249,6 @@ function FlatCard({ flat, picked, onToggle, onOpen }) {
           </div>
         </div>
       </button>
-      {flat.available && (
-        <button type="button" className={`bp-add${picked ? " on" : ""}`} onClick={onToggle}
-          aria-pressed={picked} aria-label={picked ? "Remove from visit" : "Add to visit"}>
-          {picked ? <Check size={18} /> : "+"}
-        </button>
-      )}
     </div>
   );
 }
@@ -348,7 +276,7 @@ function Sheet({ title, onClose, children, back }) {
   );
 }
 
-function FlatSheet({ flat, picked, onClose, onToggle, onVisit }) {
+function FlatSheet({ flat, onClose, onCall }) {
   const media = useMemo(() => listingMedia(flat), [flat]);
   const full = usePhotoViewer(media, flatName(flat));
   const rows = [
@@ -373,119 +301,138 @@ function FlatSheet({ flat, picked, onClose, onToggle, onVisit }) {
         {(flat.amenities ?? []).length > 0 && <div className="bp-amen" style={{ marginTop: 12 }}>{flat.amenities.map((a) => <span key={a}><Check size={13} /> {a}</span>)}</div>}
         {flat.description && <p className="bp-desc">{flat.description}</p>}
         {flat.available ? (
-          <div className="bp-two">
-            <button type="button" className="bp-btn" onClick={onToggle}>{picked ? <><Check size={16} /> Added</> : "+ Add to visit"}</button>
-            <button type="button" className="bp-btn bp-btn--primary" onClick={onVisit}><CalendarCheck size={17} /> Visit this flat</button>
-          </div>
-        ) : <div className="bp-note">This flat is occupied. Ask for a visit to see the others.</div>}
+          <button type="button" className="bp-btn bp-btn--primary bp-btn--block" style={{ marginTop: 14 }} onClick={onCall}>
+            <Phone size={17} /> Call Caretaker to see it
+          </button>
+        ) : <div className="bp-note">This flat is booked. Call the caretaker to see the others.</div>}
       </div>
     </Sheet>
   );
 }
 
-function VisitSheet({ code, building, flats, picked, onToggle, onClose, user, loginWithGoogle, resume }) {
-  const days = useMemo(() => nextDays(14), []);
-  const [dayIdx, setDayIdx] = useState(() => (visitTimes(days[0]).length ? 0 : 1));
-  const [at, setAt] = useState(() => (resume ? (resume.at === "call" ? "call" : new Date(resume.at)) : null)); // Date, or "call"
-  const [step, setStep] = useState(resume ? "who" : "when"); // when | who | done
-  const me = useMemo(readMe, []);
-  const [name, setName] = useState(resume?.name || me.name || user?.name || "");
-  const [phone, setPhone] = useState(resume?.phone || me.phone || user?.phone || "");
-  const [note, setNote] = useState(resume?.note || "");
-  const [busy, setBusy] = useState(false);
+/**
+ * Call Caretaker: the tenant's mobile (asked once, on this phone), then the
+ * building's caretaker and property manager to call. Back from a call, how it
+ * went — "call not picked" puts the manager one tap away, "pay token" calls
+ * them to arrange it, and the rest is noted for MovEazy and the owner.
+ */
+function CallSheet({ code, building, user, onClose }) {
+  const name = String(user?.name || leadSnapshot().name || "").trim();
+  const [phone, setPhone] = useState(() => String(user?.phone || leadSnapshot().phone || "").replace(/\D/g, "").slice(-10));
+  const [contacts, setContacts] = useState(null);
   const [err, setErr] = useState("");
-  const [done, setDone] = useState(null);
-  const times = useMemo(() => visitTimes(days[dayIdx]), [days, dayIdx]);
-  const parts = ["Morning", "Afternoon", "Evening"].map((p) => [p, times.filter((t) => t.part === p)]).filter(([, l]) => l.length);
-  const avail = flats.filter((f) => f.available);
-  const timeChosen = at === "call" || at instanceof Date;
+  const [tries, setTries] = useState(0);
+  // "contacts", or the feedback after a call; `called` is who they called.
+  const [called, setCalled] = useState(() => readCalled(code));
+  const [view, setView] = useState(() => (readCalled(code) ? "feedback" : "contacts"));
+  const [picked, setPicked] = useState("");
+  const [note, setNote] = useState("");
+  const [sent, setSent] = useState("");
+  const leftAt = useRef(0);
 
-  const submit = async () => {
-    setErr("");
-    if (name.trim().length < 2) { setErr("Tell us your name."); return; }
-    if (!isMobile(phone)) { setErr("Enter your 10-digit mobile number."); return; }
-    // Visits are booked from a MovEazy account: sign in with Google, then we finish this for you.
-    if (!user) {
-      savePendingVisit({ code, picked: [...picked], at: at instanceof Date ? at.toISOString() : "call", name: name.trim(), phone: cleanMobile(phone), note: note.trim() });
-      setBusy(true);
-      const res = await loginWithGoogle();
-      if (res && res.success === false) {
-        clearPendingVisit();
-        setErr(res.error || "Couldn't open Google sign-in. Please try again.");
-        setBusy(false);
+  const send = useCallback((kind, extra = {}) => buildingCallDesk(code, { phone, name, kind, ...extra }), [code, phone, name]);
+
+  useEffect(() => {
+    if (!phone || contacts) return;
+    let live = true;
+    send("contacts").then((c) => live && setContacts(c), (e) => live && setErr(e?.message || "Couldn't load the numbers. Please try again."));
+    return () => { live = false; };
+  }, [phone, contacts, send, tries]);
+
+  // Back on the page after the phone app: how did it go?
+  useEffect(() => {
+    const back = () => {
+      if (document.visibilityState === "visible" && leftAt.current && Date.now() - leftAt.current > 1500) {
+        leftAt.current = 0;
+        setView("feedback");
       }
-      return;
-    }
-    setBusy(true);
-    try {
-      const r = await requestBuildingVisit(code, {
-        name: name.trim(), phone: cleanMobile(phone), propertyIds: [...picked], visitAt: at instanceof Date ? at : null, note: note.trim(),
-      });
-      saveMe({ name: name.trim(), phone: cleanMobile(phone) });
-      setDone({ ...r, at: at instanceof Date ? at : null });
-      setStep("done");
-    } catch (e) {
-      setErr(e?.message || "Could not send your request. Please try again.");
-    } finally {
-      setBusy(false);
-    }
+    };
+    document.addEventListener("visibilitychange", back);
+    window.addEventListener("focus", back);
+    return () => { document.removeEventListener("visibilitychange", back); window.removeEventListener("focus", back); };
+  }, []);
+
+  const call = (target) => {
+    const c = { code, target, at: Date.now() };
+    saveCalled(c);
+    setCalled(c);
+    leftAt.current = Date.now();
+    send("call", { target }).catch(() => {});
+  };
+  const close = () => { saveCalled(null); onClose(); };
+
+  const say = async (fb) => {
+    setPicked(fb);
+    if (fb === "issues" || fb === "other") return; // they write it first
+    send("feedback", { feedback: fb }).catch(() => {});
+    setSent(fb);
+    saveCalled(null);
+  };
+  const sendNote = () => {
+    send("feedback", { feedback: picked, note }).catch(() => {});
+    setSent(picked);
+    saveCalled(null);
   };
 
-  // Back from Google: send the request straight away.
-  const autoSend = useRef(Boolean(resume));
-  useEffect(() => {
-    if (!autoSend.current || !user) return;
-    autoSend.current = false;
-    submit();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [user]);
-
-  if (step === "done") {
+  if (!phone) {
     return (
-      <Sheet title="Visit requested" onClose={onClose}>
-        <div className="bp-pad bp-done">
-          <div className="bp-done-ic"><Check size={34} /></div>
-          <h4>{done?.updated ? "We've updated your visit" : "You're on the list"}</h4>
-          <p className="bp-done-when"><Clock size={16} /> {done?.at ? visitWhen(done.at) : "We'll call you to fix a time"}</p>
-          <p>A MovEazy partner will call you on <b>{cleanMobile(phone).replace(/(\d{5})(\d{5})/, "$1 $2")}</b> to confirm
-            {done?.at ? " this time" : " a time that suits you"} and share the exact address.</p>
-          <div className="bp-done-what"><Building2 size={15} /> {building.name}{picked.size ? ` · ${picked.size} flat${picked.size === 1 ? "" : "s"}` : ""}</div>
-          <button type="button" className="bp-btn bp-btn--primary bp-btn--block" onClick={onClose}>Done</button>
-          <p className="bp-fine">Saved to your MovEazy account{user?.email ? ` (${user.email})` : ""} — <Link to="/visits">see your visits</Link>.</p>
-        </div>
-      </Sheet>
+      <RequirePhoneFirst open onClose={onClose} onDone={(mobile) => setPhone(String(mobile || "").slice(-10))} />
     );
   }
 
-  if (step === "who") {
+  const manager = contacts?.manager;
+  const caretaker = contacts?.caretaker;
+  const fmt = (p) => String(p || "").replace(/(\d{5})(\d{5})/, "$1 $2");
+  const managerCall = manager && (
+    <a className="bp-call" href={`tel:+91${manager.phone}`} onClick={() => call("manager")}>
+      <span className="bp-call-av"><Phone size={20} /></span>
+      <span className="bp-call-who"><small>Property Manager</small><b>{manager.name || "MovEazy team"}</b><span>{fmt(manager.phone)}</span></span>
+      <span className="bp-call-go"><Phone size={15} /> Call</span>
+    </a>
+  );
+
+  if (view === "feedback") {
+    const toManager = sent === "call_not_picked" || sent === "pay_token";
     return (
-      <Sheet title="Your details" onClose={onClose} back={() => setStep("when")}>
+      <Sheet title="How did it go?" onClose={close} back={contacts ? () => { setView("contacts"); setSent(""); setPicked(""); } : undefined}>
         <div className="bp-pad">
-          <div className="bp-summary"><CalendarCheck size={17} /> {at instanceof Date ? visitWhen(at) : "Any time — call me to fix it"}
-            <button type="button" onClick={() => setStep("when")}>Change</button></div>
-          <label className="bp-label" htmlFor="bp-name">Your name</label>
-          <input id="bp-name" className="bp-input" autoComplete="name" placeholder="Full name" value={name} onChange={(e) => setName(e.target.value)} />
-          <label className="bp-label" htmlFor="bp-phone">Mobile number</label>
-          <div className="bp-phone"><span>+91</span>
-            <input id="bp-phone" className="bp-input" inputMode="numeric" autoComplete="tel-national" placeholder="98765 43210" value={phone}
-              onChange={(e) => setPhone(e.target.value.replace(/[^\d+ ]/g, "").slice(0, 16))} />
-          </div>
-          <label className="bp-label" htmlFor="bp-note">Anything we should know? <span>(optional)</span></label>
-          <input id="bp-note" className="bp-input" placeholder="e.g. Moving in with family by 1 Nov" value={note} onChange={(e) => setNote(e.target.value.slice(0, 300))} />
-          {err && <div className="bp-err">{err}</div>}
-          {user ? (
+          {sent ? (
             <>
-              <button type="button" className="bp-btn bp-btn--primary bp-btn--block" disabled={busy} onClick={submit} style={{ marginTop: 16 }}>
-                {busy ? (resume ? "Confirming your visit…" : "Sending…") : <><Phone size={17} /> Request visit</>}
-              </button>
-              <p className="bp-fine">Booking as {user.email || user.name}. No spam — your number goes only to the MovEazy partner arranging this visit.</p>
+              <p className="bp-fine" style={{ textAlign: "left", marginTop: 0 }}>
+                {sent === "call_not_picked" ? "Sorry about that — the property manager will help you right away."
+                  : sent === "pay_token" ? "Call the property manager to pay the token and hold the flat."
+                    : "Thanks — we've noted it, and the MovEazy team will follow up."}
+              </p>
+              {toManager && managerCall}
+              {toManager && manager && (
+                <a className="bp-btn bp-btn--block" style={{ marginTop: 10 }} target="_blank" rel="noreferrer"
+                  href={`https://wa.me/91${manager.phone}?text=${encodeURIComponent(`Hi, I'd like to ${sent === "pay_token" ? "pay the token for a flat" : "see the flats"} at ${building.name} (via MovEazy).`)}`}>
+                  <MessageCircle size={16} /> WhatsApp the property manager
+                </a>
+              )}
+              <button type="button" className="bp-btn bp-btn--block" style={{ marginTop: 10 }} onClick={close}>Done</button>
             </>
           ) : (
             <>
-              <button type="button" className="bp-btn bp-btn--google bp-btn--block" disabled={busy} onClick={submit} style={{ marginTop: 16 }}>
-                {busy ? "Opening Google…" : <><GoogleG /> Continue with Google to book</>}
-              </button>
-              <p className="bp-fine">Sign in once so your visit is saved to your account — you can see or change it any time. We bring you straight back here.</p>
+              <p className="bp-fine" style={{ textAlign: "left", marginTop: 0 }}>
+                {called?.target === "manager" ? "Your call with the property manager" : "Your call with the caretaker"} — tell us how it went.
+              </p>
+              <div className="bp-fb">
+                {CALL_FEEDBACK.map((f) => (
+                  <button key={f.id} type="button" className={`${f.id === "pay_token" ? "bp-fb-token" : ""}${picked === f.id ? " on" : ""}`}
+                    onClick={() => say(f.id)}>{f.label}</button>
+                ))}
+              </div>
+              {(picked === "issues" || picked === "other") && (
+                <>
+                  <label className="bp-label" htmlFor="cd-note">{picked === "issues" ? "What's the issue?" : "Tell us more"}</label>
+                  <textarea id="cd-note" className="bp-input" rows={3} maxLength={1000} value={note} autoFocus
+                    placeholder="A line or two is enough" onChange={(e) => setNote(e.target.value)} />
+                  <button type="button" className="bp-btn bp-btn--primary bp-btn--block" style={{ marginTop: 10 }} disabled={!note.trim()} onClick={sendNote}>
+                    Send
+                  </button>
+                </>
+              )}
             </>
           )}
         </div>
@@ -494,182 +441,33 @@ function VisitSheet({ code, building, flats, picked, onToggle, onClose, user, lo
   }
 
   return (
-    <Sheet title="Schedule a visit" onClose={onClose}>
+    <Sheet title="Call Caretaker" onClose={close}>
       <div className="bp-pad">
-        {avail.length > 0 && (
-          <>
-            <div className="bp-label">Flats to see <span>{picked.size ? `${picked.size} selected` : "optional — we'll show you what's free"}</span></div>
-            <div className="bp-flatchips">
-              {avail.map((f) => (
-                <button key={f.property_id} type="button" className={picked.has(f.property_id) ? "on" : ""} onClick={() => onToggle(f.property_id)}>
-                  {picked.has(f.property_id) && <Check size={13} />}
-                  {f.unit_no ? `#${f.unit_no} · ` : ""}{bhk(f)} · {f.unit_no || f.floor_number == null ? "" : f.floor_number === 0 ? "G · " : `F${f.floor_number} · `}{f.rent ? inr(f.rent) : ""}
-                </button>
-              ))}
-            </div>
-          </>
-        )}
-
-        <div className="bp-label">Pick a day</div>
-        <div className="bp-days">
-          {days.map((d, i) => {
-            const none = visitTimes(d).length === 0;
-            return (
-              <button key={d.toISOString()} type="button" disabled={none} className={i === dayIdx ? "on" : ""}
-                onClick={() => { setDayIdx(i); if (at instanceof Date) setAt(null); }}>
-                <small>{dayLabel(d, i)}</small><b>{d.getDate()}</b><small>{d.toLocaleDateString("en-IN", { month: "short" })}</small>
-              </button>
-            );
-          })}
-        </div>
-
-        <div className="bp-label">Pick a time <span>the partner confirms it with you</span></div>
-        {parts.map(([p, list]) => (
-          <div key={p} className="bp-part">
-            <small>{p}</small>
-            <div className="bp-times">
-              {list.map((t) => (
-                <button key={t.label} type="button" className={at instanceof Date && at.getTime() === t.at.getTime() ? "on" : ""} onClick={() => setAt(t.at)}>
-                  {t.label}
-                </button>
-              ))}
-            </div>
-          </div>
-        ))}
-        <button type="button" className={`bp-anytime${at === "call" ? " on" : ""}`} onClick={() => setAt("call")}>
-          <Sparkles size={15} /> Not sure yet — call me to fix a time
-        </button>
-
-        <button type="button" className="bp-btn bp-btn--primary bp-btn--block" disabled={!timeChosen} onClick={() => setStep("who")} style={{ marginTop: 16 }}>
-          {timeChosen ? (at === "call" ? "Continue" : `Continue · ${visitWhen(at)}`) : "Pick a time to continue"}
-        </button>
-      </div>
-    </Sheet>
-  );
-}
-
-/**
- * Instant visit: who's coming and which flats (none picked: every free flat),
- * Google sign-in, then the person at the property and the address.
- */
-function InstantSheet({ code, building, flats, picked, onToggle, onClose, user, loginWithGoogle, resume }) {
-  const me = useMemo(readMe, []);
-  const [name, setName] = useState(resume?.name || me.name || user?.name || "");
-  const [phone, setPhone] = useState(resume?.phone || me.phone || user?.phone || "");
-  const [busy, setBusy] = useState(false);
-  const [err, setErr] = useState("");
-  const [done, setDone] = useState(null);
-  const avail = flats.filter((f) => f.available);
-
-  const submit = async () => {
-    setErr("");
-    if (name.trim().length < 2) { setErr("Tell us your name."); return; }
-    if (!isMobile(phone)) { setErr("Enter your 10-digit mobile number."); return; }
-    if (!user) {
-      savePendingVisit({ code, mode: "instant", picked: [...picked], name: name.trim(), phone: cleanMobile(phone) });
-      setBusy(true);
-      const res = await loginWithGoogle();
-      if (res && res.success === false) {
-        clearPendingVisit();
-        setErr(res.error || "Couldn't open Google sign-in. Please try again.");
-        setBusy(false);
-      }
-      return;
-    }
-    setBusy(true);
-    try {
-      const r = await startInstantVisit(code, { name: name.trim(), phone: cleanMobile(phone), propertyIds: [...picked] });
-      saveMe({ name: name.trim(), phone: cleanMobile(phone) });
-      setDone(r);
-    } catch (e) {
-      setErr(e?.message || "Could not start your visit. Please try again.");
-    } finally {
-      setBusy(false);
-    }
-  };
-
-  // Back from Google: start it straight away.
-  const autoSend = useRef(Boolean(resume));
-  useEffect(() => {
-    if (!autoSend.current || !user) return;
-    autoSend.current = false;
-    submit();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [user]);
-
-  if (done) {
-    const poc = String(done.poc_phone || "");
-    const first = name.trim().split(/\s+/)[0];
-    const wa = `https://wa.me/91${poc}?text=${encodeURIComponent(`Hi ${done.poc_name}, I'm ${first}. I'm coming now for an instant visit at ${done.name || building.name} (via MovEazy).`)}`;
-    const place = [done.address, done.landmark, done.area].filter(Boolean).join(", ");
-    const maps = done.latitude != null && done.longitude != null
-      ? `https://www.google.com/maps/dir/?api=1&destination=${done.latitude},${done.longitude}`
-      : `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(`${place || building.name}, Bengaluru`)}`;
-    return (
-      <Sheet title="Instant visit" onClose={onClose}>
-        <div className="bp-pad bp-done">
-          <div className="bp-done-ic bp-done-ic--gold"><Zap size={32} /></div>
-          <h4>You're expected!</h4>
-          <p className="bp-done-when"><Clock size={16} /> Please reach by {new Date(done.arrive_by).toLocaleTimeString("en-IN", { hour: "numeric", minute: "2-digit" })}</p>
-          <div className="bp-poc">
-            <span className="bp-poc-av">{String(done.poc_name || "?").trim().charAt(0).toUpperCase()}</span>
-            <span className="bp-poc-who"><small>Meet at the property</small><b>{done.poc_name}</b><span>{poc.replace(/(\d{5})(\d{5})/, "$1 $2")}</span></span>
-          </div>
-          <div className="bp-two" style={{ marginTop: 10 }}>
-            <a className="bp-btn" href={`tel:+91${poc}`}><Phone size={16} /> Call</a>
-            <a className="bp-btn bp-btn--wa" href={wa} target="_blank" rel="noreferrer">WhatsApp</a>
-          </div>
-          {place && <div className="bp-addr"><MapPin size={16} /><span>{place}</span></div>}
-          <a className="bp-btn bp-btn--primary bp-btn--block" href={maps} target="_blank" rel="noreferrer" style={{ marginTop: 12 }}>
-            <Navigation size={17} /> Get directions
-          </a>
-          <p className="bp-fine">Saved to your MovEazy account{user?.email ? ` (${user.email})` : ""} — <Link to="/visits">see your visits</Link>. {done.flats ? `${done.flats} flat${done.flats === 1 ? "" : "s"} to see.` : ""}</p>
-        </div>
-      </Sheet>
-    );
-  }
-
-  return (
-    <Sheet title="Instant visit" onClose={onClose}>
-      <div className="bp-pad">
-        <div className="bp-instant-hero">
-          <span className="bp-instant-ic"><Zap size={20} /></span>
-          <div><b>See it right now</b><span>No appointment needed. Sign in and you'll get the name and number of the person at {building.name}, and the address.</span></div>
-        </div>
-        {avail.length > 0 && (
-          <>
-            <div className="bp-label">Flats to see <span>{picked.size ? `${picked.size} selected` : "all free flats"}</span></div>
-            <div className="bp-flatchips">
-              {avail.map((f) => (
-                <button key={f.property_id} type="button" className={picked.has(f.property_id) ? "on" : ""} onClick={() => onToggle(f.property_id)}>
-                  {picked.has(f.property_id) && <Check size={13} />}
-                  {f.unit_no ? `#${f.unit_no} · ` : ""}{bhk(f)} · {f.rent ? inr(f.rent) : ""}
-                </button>
-              ))}
-            </div>
-          </>
-        )}
-        <label className="bp-label" htmlFor="iv-name">Your name</label>
-        <input id="iv-name" className="bp-input" autoComplete="name" placeholder="Full name" value={name} onChange={(e) => setName(e.target.value)} />
-        <label className="bp-label" htmlFor="iv-phone">Mobile number</label>
-        <div className="bp-phone"><span>+91</span>
-          <input id="iv-phone" className="bp-input" inputMode="numeric" autoComplete="tel-national" placeholder="98765 43210" value={phone}
-            onChange={(e) => setPhone(e.target.value.replace(/[^\d+ ]/g, "").slice(0, 16))} />
-        </div>
-        {err && <div className="bp-err">{err}</div>}
-        {user ? (
-          <>
-            <button type="button" className="bp-btn bp-btn--gold bp-btn--block" disabled={busy} onClick={submit} style={{ marginTop: 16 }}>
-              {busy ? (resume ? "Starting your visit…" : "Starting…") : <><Zap size={17} /> Start instant visit</>}
-            </button>
-            <p className="bp-fine">Visiting as {user.email || user.name}. Your number goes only to the person showing you around and MovEazy.</p>
-          </>
+        {!contacts ? (
+          err ? (
+            <>
+              <div className="bp-err">{err}</div>
+              <button type="button" className="bp-btn bp-btn--block" style={{ marginTop: 10 }} onClick={() => { setErr(""); setTries((t) => t + 1); }}>Try again</button>
+            </>
+          ) : <div className="bp-note">Getting the numbers…</div>
         ) : (
           <>
-            <button type="button" className="bp-btn bp-btn--google bp-btn--block" disabled={busy} onClick={submit} style={{ marginTop: 16 }}>
-              {busy ? "Opening Google…" : <><GoogleG /> Continue with Google to visit now</>}
-            </button>
-            <p className="bp-fine">Sign in once so your visit is saved to your account. We bring you straight back here with the contact.</p>
+            <p className="bp-fine" style={{ textAlign: "left", marginTop: 0 }}>
+              Call to see the flats at {building.name}. The caretaker can show you around — often right away.
+            </p>
+            <a className="bp-call bp-call--care" href={`tel:+91${caretaker.phone}`} onClick={() => call("caretaker")}>
+              <span className="bp-call-tag"><Zap size={11} /> Instant Visit</span>
+              <span className="bp-call-av"><Phone size={20} /></span>
+              <span className="bp-call-who"><small>Caretaker</small><b>{caretaker.name || "MovEazy team"}</b><span>{fmt(caretaker.phone)}</span></span>
+              <span className="bp-call-go"><Phone size={15} /> Call</span>
+            </a>
+            {managerCall}
+            {called && (
+              <button type="button" className="bp-btn bp-btn--block" style={{ marginTop: 14 }} onClick={() => setView("feedback")}>
+                How did the call go?
+              </button>
+            )}
+            <p className="bp-fine">Calling from +91 {fmt(phone)}. Your number goes only to MovEazy and the people showing the flats.</p>
           </>
         )}
       </div>
@@ -697,6 +495,25 @@ const CSS = `
 .bp-video video { width: 100%; height: 100% !important; object-fit: cover; display: block; }
 .bp-heroswitch { position: absolute; left: 12px; top: 12px; z-index: 2; display: inline-flex; align-items: center; gap: 5px; border: 0; border-radius: 99px;
   background: rgba(0,0,0,.6); color: #fff; font: inherit; font-size: 12px; font-weight: 700; padding: 6px 11px; cursor: pointer; }
+.bp-call { position: relative; display: flex; align-items: center; gap: 12px; width: 100%; text-align: left; text-decoration: none; color: var(--ink);
+  background: #fff; border: 1px solid var(--line); border-radius: 16px; padding: 14px; margin-top: 12px; }
+.bp-call--care { border-color: #E2C68F; background: linear-gradient(180deg, #FFFCF4, #fff); padding-top: 18px; }
+.bp-call-av { width: 44px; height: 44px; border-radius: 99px; flex: none; display: grid; place-items: center; background: var(--emt); color: var(--em); }
+.bp-call--care .bp-call-av { background: var(--champ2); color: var(--champ3); }
+.bp-call-who { flex: 1; min-width: 0; display: flex; flex-direction: column; }
+.bp-call-who small { font-size: 11px; color: var(--dim); font-weight: 700; text-transform: uppercase; letter-spacing: .05em; }
+.bp-call-who b { font-size: 16px; }
+.bp-call-who span { font-size: 13.5px; color: var(--deep); font-weight: 700; letter-spacing: .02em; }
+.bp-call-go { flex: none; display: inline-flex; align-items: center; gap: 6px; background: var(--em); color: #fff; border-radius: 12px; padding: 9px 13px;
+  font-weight: 800; font-size: 13.5px; }
+.bp-call-tag { position: absolute; top: -10px; left: 14px; display: inline-flex; align-items: center; gap: 4px; border-radius: 99px; padding: 3px 9px;
+  font-size: 11px; font-weight: 800; letter-spacing: .02em; color: #2A1D06; background: linear-gradient(180deg, #E9C27A, #C39245);
+  box-shadow: 0 3px 10px rgba(176,125,53,.35); }
+.bp-fb { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-top: 12px; }
+.bp-fb button { border: 1px solid var(--line); background: #fff; border-radius: 12px; padding: 12px 10px; font: inherit; font-size: 14px; font-weight: 700;
+  color: var(--ink); cursor: pointer; text-align: left; }
+.bp-fb button.on { border-color: var(--em); background: var(--emt); color: var(--deep); }
+.bp-fb button.bp-fb-token { grid-column: 1 / -1; background: linear-gradient(180deg, #E2B866, #B9853A); border-color: #B07D35; color: #2A1D06; }
 .bp-occ { text-align: center; color: var(--dim); font-size: 12.5px; margin: 4px 0 0; }
 .bp-gcount { position: absolute; right: 12px; top: 12px; background: rgba(0,0,0,.55); color: #fff; font-size: 12px; font-weight: 600;
   border-radius: 99px; padding: 4px 10px; }
@@ -740,7 +557,6 @@ const CSS = `
 .bp-floor h3 span { text-transform: none; letter-spacing: 0; color: var(--dim); font-weight: 500; }
 .bp-card { position: relative; background: #fff; border: 1.5px solid var(--line2); border-radius: 16px; margin-bottom: 10px;
   transition: border-color .15s, box-shadow .15s, transform .1s; }
-.bp-card--on { border-color: var(--em); box-shadow: 0 0 0 3px var(--emt); }
 .bp-card--off { opacity: .62; }
 .bp-card-main { display: grid; grid-template-columns: 112px 1fr; gap: 12px; height: 112px; width: 100%; padding: 8px 52px 8px 8px; border: 0;
   background: transparent; font: inherit; color: inherit; text-align: left; cursor: pointer; }
@@ -773,7 +589,6 @@ const CSS = `
 .bp-btn--google { background: #fff; border: 1.5px solid #DADCE0; color: #1F1F1F; box-shadow: 0 2px 8px rgba(0,0,0,.06); }
 .bp-btn--gold { background: linear-gradient(180deg, #E2B866, #B9853A); border-color: #B07D35; color: #2A1D06; box-shadow: 0 8px 20px rgba(176,125,53,.32); }
 .bp-btn--wa { background: #25D366; border-color: #1FB457; color: #fff; }
-.bp-cta-room { height: 74px; }
 .bp-instant { width: 100%; display: flex; align-items: center; gap: 10px; text-align: left; margin-bottom: 8px; padding: 9px 10px 9px 9px; cursor: pointer;
   border: 1.5px solid #C9974A; border-radius: 16px; font: inherit; color: #2A1D06;
   background: linear-gradient(135deg, #FFF6E2 0%, #F4DFAF 100%); box-shadow: 0 8px 22px rgba(176,125,53,.25); animation: bpglow 2.4s ease-in-out infinite; }
