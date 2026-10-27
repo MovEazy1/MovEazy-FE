@@ -166,7 +166,7 @@ function AfterExit({ session, idle, onDone }) {
     return (
       <section style={{ ...S.card, ...S.ok }}>
         {idle ? "Switched back to your account after 30 minutes idle. " : "You're back in your own account. "}
-        Nothing was changed in {item?.target_name || item?.target_email || "their"} account.
+        Nothing was changed in {item?.target_name || item?.target_email ? `${item.target_name || item.target_email}'s` : "their"} account.
         <button type="button" style={S.link} onClick={onDone}>OK</button>
       </section>
     );
