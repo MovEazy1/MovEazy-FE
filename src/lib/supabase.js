@@ -1,4 +1,5 @@
 import { createClient } from "@supabase/supabase-js";
+import { viewAsFetch, viewAsState } from "./viewAsState";
 
 const url = String(import.meta.env.VITE_SUPABASE_URL || "").trim();
 /** Legacy anon JWT or new publishable key (sb_publishable_…). */
@@ -16,8 +17,20 @@ export const isSupabaseConfigured = Boolean(url && anonKey);
  * number that was already saved.
  */
 let refreshing = null;
+// While the super admin views the site as someone (lib/viewAsState.js), every
+// request goes through viewAsFetch; a file uploaded with actions allowed is
+// noted so Revert can remove it.
+const send = (input, init) => fetch(input, init);
+function noteUpload(bucket, path) {
+  const st = viewAsState();
+  if (st && supabase) {
+    supabase.rpc("view_as_note_upload", { p_session: st.session, p_key: st.key, p_bucket: bucket, p_path: path }).then(() => {}, () => {});
+  }
+}
+const sendOnce = (input, init) => viewAsFetch(input, init, send, noteUpload);
+
 export async function fetchRefreshingExpired(input, init) {
-  const res = await fetch(input, init);
+  const res = await sendOnce(input, init);
   // Auth's own calls are left alone: they run inside its lock, which a refresh would wait on.
   if (res.status !== 401 || !supabase || String(input?.url ?? input).includes("/auth/v1/")) return res;
   let body = "";
@@ -28,7 +41,7 @@ export async function fetchRefreshingExpired(input, init) {
   if (!token) return res;
   const headers = new Headers(init?.headers);
   headers.set("Authorization", `Bearer ${token}`);
-  return fetch(input, { ...init, headers });
+  return sendOnce(input, { ...init, headers });
 }
 
 export const supabase = isSupabaseConfigured

@@ -1,4 +1,4 @@
-import { lazy, Suspense } from "react";
+import { lazy, Suspense, useEffect, useState } from "react";
 import { BrowserRouter, Routes, Route, Navigate, useLocation } from "react-router-dom";
 import { AuthProvider, useAuth } from "./context/AuthContext";
 import { LoginModalProvider } from "./context/LoginModalContext";
@@ -10,11 +10,15 @@ import RequirePhoneForListing from "./components/RequirePhoneForListing";
 import { useSessionTracking } from "./hooks/useSessionTracking";
 import { isPhoneNow } from "./pages/crm/mobile/phoneQuery";
 import { hasStoredSession } from "./lib/supabase";
+import { VIEW_AS_EVENT, VIEW_AS_PATH, isViewingAs } from "./lib/viewAsState";
 
 // Lazy like every page: the tenant home pulls in the map, the swipe deck and
 // the landing kit, and the CRM, owner and partner apps were downloading all of
 // it before their own code could even start.
 const ForkHome = lazy(() => import("./pages/ForkHome"));
+// The super admin's "view as a user" portal and the bar shown while doing it.
+const SuperAdminViewAs = lazy(() => import("./pages/SuperAdminViewAs"));
+const ViewAsBanner = lazy(() => import("./components/ViewAsBanner"));
 const Profile = lazy(() => import("./pages/Profile"));
 const SupabaseLogin = lazy(() => import("./pages/SupabaseLogin"));
 /**
@@ -226,8 +230,24 @@ function SessionTrackerComponent() {
       <RequirePhoneModal />
       <ClaimEarlierViews />
       <AppRoutes />
+      <ViewAsBannerSlot />
     </>
   );
+}
+
+/** Loads the view-as bar only while the super admin is viewing as someone. */
+function ViewAsBannerSlot() {
+  const [on, setOn] = useState(isViewingAs);
+  useEffect(() => {
+    const sync = () => setOn(isViewingAs());
+    window.addEventListener(VIEW_AS_EVENT, sync);
+    window.addEventListener("storage", sync);
+    return () => {
+      window.removeEventListener(VIEW_AS_EVENT, sync);
+      window.removeEventListener("storage", sync);
+    };
+  }, []);
+  return on ? <Suspense fallback={null}><ViewAsBanner /></Suspense> : null;
 }
 
 function AppRoutes() {
@@ -403,6 +423,7 @@ function AppRoutes() {
         <Route path="/broker" element={<Navigate to="/partners" replace />} />
         {/* Legacy routes → home or profile for now */}
         <Route path="/customer" element={<Navigate to="/profile" replace />} />
+        <Route path={VIEW_AS_PATH} element={<SuperAdminViewAs />} />
         <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>
     </Suspense>
