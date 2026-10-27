@@ -46,10 +46,11 @@ async function authAdmin(path, init = {}) {
 
 export default async function handler(req) {
   if (req.method !== "POST") return notFound();
-  if (!env.serviceKey || !env.supabaseUrl) return json({ error: "The server isn't set up for this." }, 503);
   const token = (req.headers.get("authorization") || "").replace(/^Bearer\s+/i, "");
   const admin = await userFromToken(token);
   if (!admin || String(admin.email || "").toLowerCase() !== SUPER_ADMIN || !admin.email_confirmed_at) return notFound();
+  // Signing in as someone needs the service role: Vercel → Settings → Environment Variables.
+  if (!env.serviceKey) return json({ error: "Add SUPABASE_SERVICE_ROLE_KEY in Vercel (Settings → Environment Variables), then redeploy." }, 503);
 
   let body = {};
   try { body = (await req.json()) || {}; } catch { /* handled below */ }
