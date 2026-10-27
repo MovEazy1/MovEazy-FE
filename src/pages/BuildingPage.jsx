@@ -310,7 +310,7 @@ function FlatCard({ flat, picked, onToggle, onOpen }) {
           <div className="bp-card-rent">{flat.rent ? inr(flat.rent) : "Rent on request"}<small> / mo</small></div>
           <div className="bp-card-meta">
             {[flat.floor_number != null ? floorLabel(flat.floor_number) : "", flat.unit_no && flat.furnishing ? flat.furnishing : "",
-              flat.area_sqft ? `${flat.area_sqft} sq ft` : "",
+              Number(flat.maintenance) > 0 ? `${inr(flat.maintenance)} maintenance` : "",
               flat.deposit ? `${shortInr(flat.deposit)} deposit` : ""].filter(Boolean).join(" · ") || "Details on visit"}
           </div>
         </div>
@@ -356,7 +356,7 @@ function FlatSheet({ flat, picked, onClose, onToggle, onVisit }) {
     ["Rent", flat.rent ? `${inr(flat.rent)} / month` : "On request"],
     ["Deposit", flat.deposit ? inr(flat.deposit) : "—"],
     ["Furnishing", flat.furnishing || "—"],
-    ["Size", flat.area_sqft ? `${flat.area_sqft} sq ft` : "—"],
+    ["Maintenance", Number(flat.maintenance) > 0 ? `${inr(flat.maintenance)} / month` : "—"],
     ["Bathrooms", flat.bathrooms || "—"],
     ["Available from", flat.available_from ? new Date(flat.available_from).toLocaleDateString("en-IN", { day: "numeric", month: "short" }) : "Now"],
   ];
