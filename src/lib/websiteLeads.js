@@ -44,12 +44,18 @@ export function rankBoosted(rows, boosted, idOf) {
 export const reportContactTap = (propertyId, channel = "whatsapp") =>
   rpc("flat_contact_tap", { p_property: String(propertyId || ""), p_channel: channel === "call" ? "call" : "whatsapp" }).catch(() => {});
 
-/** Once per tab after signing in with a number: partner flats opened on this phone before become leads. */
+/**
+ * Once per tab after signing in with a number: partner flats opened on this
+ * phone before become leads, and every flat or building page opened become
+ * theirs on the owner's QR scans (owner_qr_overview.sql).
+ */
 export function claimEarlierViews(uid) {
   const key = `mz_views_claimed:${uid}`;
   try { if (sessionStorage.getItem(key)) return Promise.resolve(0); sessionStorage.setItem(key, "1"); } catch { /* fine */ }
   const v = visitorId();
-  return v ? rpc("flat_claim_views", { p_visitor: v }).catch(() => 0) : Promise.resolve(0);
+  if (!v) return Promise.resolve(0);
+  rpc("owner_scans_claim", { p_visitor: v }).catch(() => {});
+  return rpc("flat_claim_views", { p_visitor: v }).catch(() => 0);
 }
 
 /* ── The partner's side ────────────────────────────────────────────────── */

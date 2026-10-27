@@ -47,7 +47,7 @@ export function viewAsNotice(kind) {
 // so the user's numbers stay theirs.
 const QUIET_RPCS = new Set([
   "app_track", "flat_view", "building_view", "increment_listing_view", "partner_storefront_view",
-  "partner_storefront_visit", "flat_claim_views", "partner_matcher_seen", "partner_congrats_seen",
+  "partner_storefront_visit", "flat_claim_views", "owner_scans_claim", "partner_matcher_seen", "partner_congrats_seen",
   "partner_tenant_seen", "partner_trial_seen",
 ]);
 // Money: never, even with actions allowed — a payment can't be reverted.

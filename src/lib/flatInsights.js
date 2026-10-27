@@ -33,6 +33,12 @@ export function recordFlatView(propertyId, source) {
 /* ── Owner ───────────────────────────────────────────────────────────────── */
 export const fetchRentDashboard = () => rpc("owner_rent_dashboard").then((r) => r ?? []);
 export const fetchOwnerFlatInsights = (propertyId) => rpc("owner_flat_insights", { p_property: propertyId });
+/**
+ * Every open of the owner's flats' and buildings' pages, and the people behind
+ * them, with their contact (owner_qr_overview.sql):
+ * { scans, week, people, visited, by_place: [...], list: [...] }
+ */
+export const fetchQrOverview = () => rpc("owner_qr_overview");
 
 /* ── CRM ─────────────────────────────────────────────────────────────────── */
 export const fetchCrmFlatInsights = (propertyId) => rpc("crm_flat_insights", { p_property: propertyId });

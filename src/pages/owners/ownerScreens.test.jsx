@@ -93,7 +93,7 @@ function render(name, path, route = path.split("?")[0]) {
 }
 
 const CASES = [
-  ["OwnerHome", "/", "/", ["YOUR PORTFOLIO", "3 properties", "Needs your attention", "Approve a quote", "Increase Rent"]],
+  ["OwnerHome", "/", "/", ["YOUR PORTFOLIO", "3 properties", "QR scans", "Gave contact", "Booked a visit", "Matching tenants", "Needs your attention", "Approve a quote", "Increase Rent"]],
   ["PropertiesList", "/properties", "/properties", ["My Properties", "Occupied (1)", "Vacant (2)", "Find a Tenant"]],
   ["PropertyForm", "/properties/new", "/properties/new", ["Add Property", "Is it rented right now?"]],
   ["PropertyForm", "/properties/MZ-OWN001/edit", "/properties/:id/edit", ["Edit Property", "32000"]],

@@ -10,7 +10,8 @@ import { useOwner } from "./OwnerApp";
 import PropertyRow from "./PropertyRow";
 import { Avatar, Empty, Loading } from "./ownerUi";
 import { fetchActivity, inr, occupancyOf, op, propertyName } from "../../lib/owners";
-import { fetchRentDashboard } from "../../lib/flatInsights";
+import { fetchQrOverview } from "../../lib/flatInsights";
+import { countMatchingTenants } from "../../lib/ownerMatches";
 import { daysToLeaseEnd, isCurrentTenant } from "../../lib/ownerOccupancy";
 import logo from "../../assets/logo/moveazy-logo-mint-light.png";
 
@@ -24,11 +25,10 @@ function greeting() {
 export default function OwnerHome() {
   const { me, properties, propError, tenants, requests } = useOwner();
   const [unseen, setUnseen] = useState(0);
-  const [rent, setRent] = useState(null);
+  const [qr, setQr] = useState(null);
+  const [matches, setMatches] = useState(null);
   useEffect(() => {
-    fetchRentDashboard().then((rows) => setRent(rows.reduce((t, r) => ({
-      scans: t.scans + (Number(r.stats?.scans) || 0), likes: t.likes + (Number(r.stats?.likes) || 0), visits: t.visits + (Number(r.stats?.visits) || 0),
-    }), { scans: 0, likes: 0, visits: 0 })), () => {});
+    fetchQrOverview().then((r) => setQr(r || null), () => {});
   }, []);
 
   useEffect(() => {
@@ -41,6 +41,13 @@ export default function OwnerHome() {
   const occ = useMemo(() => list.map((p) => occupancyOf(p, tenants)), [list, tenants]);
   const occupied = occ.filter((o) => o === "occupied").length;
   const current = tenants.filter(isCurrentTenant);
+  const onRent = useMemo(() => list.filter((p) => occupancyOf(p, tenants) !== "occupied"), [list, tenants]);
+  useEffect(() => {
+    if (!properties) return;
+    let live = true;
+    countMatchingTenants(onRent).then((m) => live && setMatches(m.total), () => {});
+    return () => { live = false; };
+  }, [properties, onRent]);
 
   const attention = useMemo(() => {
     const items = [];
@@ -115,16 +122,26 @@ export default function OwnerHome() {
         </section>
       </div>
 
-      {properties && list.some((p) => occupancyOf(p, tenants) !== "occupied") && (
+      {properties && list.length > 0 && (
         <div className="oz-pad" style={{ paddingTop: 4, paddingBottom: 4 }}>
-          <Link to={op("/rent-dashboard")} className="oz-card oz-row" style={{ padding: 12, textDecoration: "none", color: "inherit",
-            background: "linear-gradient(135deg, #fff, var(--champ2))", borderColor: "#EADFC6" }}>
-            <span className="oz-avatar" style={{ background: "var(--deep)", color: "var(--champ)", borderRadius: 12 }}><QrCode size={19} /></span>
-            <span style={{ flex: 1, minWidth: 0 }}>
-              <strong style={{ display: "block" }}>QR & leads</strong>
-              <span className="oz-meta">{rent ? `${rent.scans} leads · ${rent.likes} likes · ${rent.visits} visits` : "A QR for every flat on rent"}</span>
+          <style>{QR_CSS}</style>
+          <Link to={op("/qr-scans")} className="oz-card oh-qr" aria-label="QR scans">
+            <span className="oh-qr-top">
+              <span className="oz-avatar" style={{ background: "var(--deep)", color: "var(--champ)", borderRadius: 12 }}><QrCode size={19} /></span>
+              <span style={{ flex: 1, minWidth: 0 }}>
+                <span className="oh-qr-label">QR scans</span>
+                <span className="oh-qr-num">
+                  <b>{qr ? fmtCount(qr.scans) : "…"}</b>
+                  {qr && qr.week > 0 && <span className="oh-qr-week">+{fmtCount(qr.week)} this week</span>}
+                </span>
+              </span>
+              <ChevronRight size={18} color="#94A09B" />
             </span>
-            <ChevronRight size={18} color="#94A09B" />
+            <span className="oh-qr-split">
+              <span><b>{qr ? fmtCount(qr.people) : "…"}</b>Gave contact</span>
+              <span><b>{qr ? fmtCount(qr.visited) : "…"}</b>Booked a visit</span>
+              <span><b>{matches == null ? "…" : fmtCount(matches)}</b>Matching tenants</span>
+            </span>
           </Link>
         </div>
       )}
@@ -170,3 +187,17 @@ export default function OwnerHome() {
     </>
   );
 }
+
+const fmtCount = (n) => (Number(n) || 0).toLocaleString("en-IN");
+
+const QR_CSS = `
+.oh-qr{display:block;padding:14px;text-decoration:none;color:inherit;background:linear-gradient(135deg,#fff,var(--champ2));border-color:#EADFC6}
+.oh-qr-top{display:flex;align-items:center;gap:12px}
+.oh-qr-label{display:block;font-size:12px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;color:var(--dim)}
+.oh-qr-num{display:flex;align-items:baseline;gap:8px;flex-wrap:wrap}
+.oh-qr-num b{font-size:28px;font-weight:800;letter-spacing:-.02em;line-height:1.1}
+.oh-qr-week{font-size:12.5px;font-weight:700;color:var(--em)}
+.oh-qr-split{display:grid;grid-template-columns:repeat(3,1fr);gap:6px;margin-top:12px}
+.oh-qr-split>span{display:flex;flex-direction:column;gap:2px;background:rgba(255,255,255,.75);border:1px solid #EFE6D2;border-radius:12px;padding:8px 9px;font-size:11.5px;color:var(--dim);line-height:1.25}
+.oh-qr-split b{font-size:17px;font-weight:800;color:var(--ink)}
+`;
