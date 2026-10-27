@@ -281,6 +281,10 @@ export const setCrmFlatBuilding = (propertyId, buildingId, floor = null, unitNo 
   crmRpc("crm_set_flat_building", { p_property: propertyId, p_building: buildingId || null, p_floor: floor, p_unit_no: unitNo });
 /** One building for the editor: its details and every flat in it, in order. */
 export const fetchCrmBuilding = (id) => crmRpc("crm_building_detail", { p_building: id });
+/** How many flats the building has in all, booked ones included (null: count the listed flats). */
+export const fetchCrmBuildingTotal = (id) => crmRpc("crm_building_total_flats", { p_building: id, p_total: null });
+/** Set it ("" clears it). Resolves to the count. */
+export const setCrmBuildingTotal = (id, total) => crmRpc("crm_building_total_flats", { p_building: id, p_total: String(total ?? "") });
 /** Put flats in a building with house number, floor and order: [{ property_id, unit_no, floor_number, unit_order }]. */
 export const setBuildingUnits = (buildingId, units) => crmRpc("crm_building_set_units", { p_building: buildingId, p_units: units });
 /** A partner's storefront QR (only their flats), made on first ask. */

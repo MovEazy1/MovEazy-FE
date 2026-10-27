@@ -112,7 +112,9 @@ export default function BuildingPage() {
   const floors = useMemo(() => flatsByFloor(available), [available]);
   const shown = useMemo(() => sortFlats(floorOn === "all" ? available : available.filter((f) => String(f.floor_number ?? "null") === floorOn), sortBy),
     [available, floorOn, sortBy]);
-  const occupied = flats.length - available.length;
+  // The building's own count, booked flats included, when the CRM has set one.
+  const total = Math.max(Number(b?.total_flats) || 0, flats.length);
+  const occupied = total - available.length;
   const photos = useMemo(() => {
     const own = (b?.photos ?? []).filter(Boolean);
     return own.length ? own : flats.flatMap((f) => listingMedia(f)).slice(0, 8);
@@ -156,7 +158,7 @@ export default function BuildingPage() {
         <h1>{b.name}</h1>
         <div className="bp-where"><MapPin size={15} /> {[b.area, b.landmark].filter(Boolean).join(" · ") || "Bengaluru"}</div>
         <div className="bp-facts">
-          <div><b>{available.length}</b><span>of {flats.length} flat{flats.length === 1 ? "" : "s"} available</span></div>
+          <div><b>{available.length}</b><span>of {total} flat{total === 1 ? "" : "s"} available</span></div>
           {rents.length > 0 && <div><b>{shortInr(Math.min(...rents))}{rents.length > 1 && Math.max(...rents) !== Math.min(...rents) ? "+" : ""}</b><span>{rents.length > 1 ? "rent from" : "rent"} / month</span></div>}
           {b.total_floors != null && <div><b>{b.total_floors === 0 ? "G" : `G+${b.total_floors}`}</b><span>floors</span></div>}
         </div>
@@ -197,7 +199,7 @@ export default function BuildingPage() {
             <FlatCard key={f.property_id} flat={f} picked={picked.has(f.property_id)} onToggle={() => toggle(f.property_id)} onOpen={() => setOpen(f)} />
           ))}
         </div>
-        {occupied > 0 && <div className="bp-occ">{occupied} more flat{occupied === 1 ? " is" : "s are"} occupied</div>}
+        {occupied > 0 && <div className="bp-occ">{occupied} more flat{occupied === 1 ? " is" : "s are"} already booked</div>}
       </section>
 
       <footer className="bp-foot">

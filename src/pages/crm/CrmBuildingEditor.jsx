@@ -19,7 +19,7 @@ import QrPosterBlock from "../../components/QrPosterBlock";
 import { useAreas, withCurrent } from "../../lib/areas";
 import { mediaRejectionReason, uploadInventoryPhotos } from "../../lib/inventory";
 import { isVideoFile } from "../../lib/listingMedia";
-import { fetchCrmBuilding, saveCrmBuilding, setBuildingUnits, setCrmFlatBuilding } from "../../lib/crmPropertyInternal";
+import { fetchCrmBuilding, fetchCrmBuildingTotal, saveCrmBuilding, setBuildingUnits, setCrmBuildingTotal, setCrmFlatBuilding } from "../../lib/crmPropertyInternal";
 import { buildingUrl, floorLabel } from "../../lib/buildings";
 import { SCOPES } from "../../lib/adminScopes";
 import { moveByKey, useDragReorder } from "../../hooks/useDragReorder";
@@ -30,7 +30,7 @@ import { initialCoverFor, keptCover, photosChanged, savedCoverUrl, splitCover, w
 const MAX_PHOTOS = 30;
 
 const BLANK = {
-  name: "", kind: "building", area: "", landmark: "", full_address: "", total_floors: "",
+  name: "", kind: "building", area: "", landmark: "", full_address: "", total_floors: "", total_flats: "",
   owner_email: "", owner_phone: "", description: "", amenities: [], photos: [], cover_video: "",
 };
 
@@ -76,14 +76,15 @@ export default function CrmBuildingEditor() {
   const load = useCallback(async () => {
     if (isNew) return;
     try {
-      const d = await fetchCrmBuilding(id);
+      // Before building_total_flats.sql the count just isn't there; the editor still loads.
+      const [d, total] = await Promise.all([fetchCrmBuilding(id), fetchCrmBuildingTotal(id).catch(() => null)]);
       if (!d) { setB(false); return; }
       // A framed cover rides as photos[0]; it is edited on the review screen, not in the grid.
       const split = splitCover(d.photos);
       savedPhotos.current = split;
       setB({
         name: d.name || "", kind: d.kind || "building", area: d.area || "", landmark: d.landmark || "", full_address: d.full_address || "",
-        total_floors: d.total_floors ?? "", owner_email: d.owner_email || "", owner_phone: d.owner_phone || "",
+        total_floors: d.total_floors ?? "", total_flats: total ?? "", owner_email: d.owner_email || "", owner_phone: d.owner_phone || "",
         description: d.description || "", amenities: d.amenities ?? [], photos: split.gallery, cover_video: d.cover_video || "",
       });
       setCode(d.code);
@@ -222,6 +223,7 @@ export default function CrmBuildingEditor() {
         ...(b.kind === "building" ? { owner_email: b.owner_email.trim().toLowerCase(), owner_phone: b.owner_phone.trim() } : {}),
       });
       const bid = r.id;
+      await setCrmBuildingTotal(bid, String(b.total_flats ?? "").trim());
       await setBuildingUnits(bid, flats.map((f, i) => ({
         property_id: f.property_id, unit_no: String(f.unit_no || "").trim(),
         floor_number: String(f.floor_number ?? "").trim() === "" ? "" : Number(f.floor_number), unit_order: i + 1,
@@ -282,6 +284,11 @@ export default function CrmBuildingEditor() {
                 <Field label="Floors above ground"><input className="crm-input" inputMode="numeric" value={b.total_floors}
                   onChange={(e) => set({ total_floors: e.target.value.replace(/\D/g, "").slice(0, 2) })} /></Field>
               </div>
+              <Field label="Total flats in the building"
+                hint={'Booked ones included — the QR page says "26 of 42 flats available". Leave empty to count only the flats listed here.'}>
+                <input className="crm-input" inputMode="numeric" value={b.total_flats} placeholder={String(flats.length || "")}
+                  onChange={(e) => set({ total_flats: e.target.value.replace(/\D/g, "").slice(0, 4) })} />
+              </Field>
               <Field label="Landmark" hint="Shown to tenants."><input className="crm-input" value={b.landmark} onChange={(e) => set({ landmark: e.target.value })} /></Field>
               <Field label="Full address" hint="Never on the QR page — shared once a visit is confirmed."><input className="crm-input" value={b.full_address} onChange={(e) => set({ full_address: e.target.value })} /></Field>
               {b.kind === "building" && (
