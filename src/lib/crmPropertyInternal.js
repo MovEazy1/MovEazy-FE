@@ -295,6 +295,10 @@ export const fetchTenantTracks = (id) => crmRpc("crm_tenant_tracks", { p_buildin
 export const saveTenantTrack = (id, card) => crmRpc("crm_tenant_track_save", { p_building: id, p: card });
 /** Take a typed reason off the list everywhere (cards keep it). */
 export const removeTenantReason = (reasonId) => crmRpc("crm_tenant_reason_remove", { p_id: reasonId });
+/** A building's tenants page: { building, tenants: [{ phone, name, last_at, track, qr }], reasons, flats }. */
+export const fetchBuildingTenants = (id) => crmRpc("crm_building_tenants", { p_building: id });
+/** The CRM home's bar: buildings that track tenants, with { tenants, due }. */
+export const fetchTrackedBuildings = () => crmRpc("crm_tracked_buildings", {}).then((r) => r ?? []);
 /** Put flats in a building with house number, floor and order: [{ property_id, unit_no, floor_number, unit_order }]. */
 export const setBuildingUnits = (buildingId, units) => crmRpc("crm_building_set_units", { p_building: buildingId, p_units: units });
 /** A partner's storefront QR (only their flats), made on first ask. */

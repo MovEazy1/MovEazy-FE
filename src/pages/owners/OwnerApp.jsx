@@ -61,6 +61,7 @@ const BuildingDetail = lazy(() => import("./BuildingDetail"));
 const RentDashboard = lazy(() => import("./RentDashboard"));
 const FlatLeads = lazy(() => import("./FlatLeads"));
 const QrScans = lazy(() => import("./QrScans"));
+const BuildingTenants = lazy(() => import("./BuildingTenants"));
 
 export const OwnerContext = createContext(null);
 export const useOwner = () => useContext(OwnerContext);
@@ -189,6 +190,7 @@ function OwnerWorkspace({ me, reloadMe }) {
             <Route path="buildings/new" element={<BuildingForm />} />
             <Route path="buildings/:id" element={<BuildingDetail />} />
             <Route path="buildings/:id/edit" element={<BuildingForm />} />
+            <Route path="buildings/:id/tenants" element={<BuildingTenants />} />
             <Route path="tenants" element={<TenantsList />} />
             <Route path="tenants/new" element={<TenantForm />} />
             <Route path="tenants/:id" element={<TenantProfile />} />

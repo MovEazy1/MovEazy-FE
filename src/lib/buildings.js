@@ -70,6 +70,40 @@ export const DISLIKE_REASONS = [
 /** A built-in reason's words; a typed one is its own words. */
 export const reasonLabel = (r) => DISLIKE_REASONS.find((x) => x.id === r)?.label || r;
 
+/**
+ * The numbers on a building's tenants page, from its board
+ * (building_tenants_board.sql: rows of { phone, name, track, qr }).
+ */
+export function tenantBoardStats(tenants = [], today = new Date()) {
+  const day = today.toLocaleDateString("en-CA", { timeZone: "Asia/Kolkata" });
+  const n = (f) => tenants.filter(f).length;
+  const t = (x) => x.track;
+  const reasons = {};
+  for (const x of tenants) if (t(x)?.liked === "disliked") for (const r of t(x).reasons ?? []) reasons[r] = (reasons[r] || 0) + 1;
+  return {
+    total: tenants.length,
+    fromQr: n((x) => x.qr), called: n((x) => (x.qr?.called ?? []).length > 0), noStatus: n((x) => !t(x)),
+    visitDone: n((x) => t(x)?.visit === "done"), visitPending: n((x) => t(x) && t(x).visit !== "done"),
+    liked: n((x) => t(x)?.liked === "liked"), disliked: n((x) => t(x)?.liked === "disliked"),
+    ...Object.fromEntries(LIKED_STATUSES.map((s) => [s.id, n((x) => t(x)?.liked === "liked" && t(x).liked_status === s.id)])),
+    due: n((x) => t(x)?.follow_up_on && t(x).follow_up_on <= day),
+    reasons: Object.entries(reasons).sort((a, b) => b[1] - a[1]),
+  };
+}
+
+/** The filters on a tenants page: id, label, and who's in. */
+export const TENANT_FILTERS = [
+  { id: "all", label: "All", test: () => true },
+  { id: "due", label: "Follow-up due", test: (x, day) => Boolean(x.track?.follow_up_on && x.track.follow_up_on <= day) },
+  { id: "qr", label: "From QR", test: (x) => Boolean(x.qr) },
+  { id: "new", label: "No status yet", test: (x) => !x.track },
+  { id: "pending", label: "Visit pending", test: (x) => x.track && x.track.visit !== "done" },
+  { id: "liked", label: "Liked", test: (x) => x.track?.liked === "liked" },
+  { id: "will_pay_token", label: "Will pay token", test: (x) => x.track?.liked_status === "will_pay_token" },
+  { id: "paid_token", label: "Paid token", test: (x) => x.track?.liked_status === "paid_token" },
+  { id: "disliked", label: "Did not like", test: (x) => x.track?.liked === "disliked" },
+];
+
 /** Where a tenant stands, in a few words: "Liked · Will pay token", "Did not like · Size is small". */
 export function trackSummary(t) {
   if (!t || t.visit !== "done") return "Visit pending";
@@ -99,6 +133,9 @@ export const startInstantVisit = (code, { name, phone, propertyIds = [] }) =>
 export const isInstant = (lead) => lead?.kind === "instant";
 
 /* ── The owner's side ────────────────────────────────────────────────────── */
+
+/** Every tenant of one of my buildings and where each stands (building_tenants_board.sql). */
+export const fetchOwnerBuildingTenants = (id) => rpc("owner_building_tenants", { p_building: id });
 
 export const fetchMyBuildings = () => rpc("owner_buildings_list").then((r) => r ?? []);
 export const fetchBuildingDetail = (id) => rpc("owner_building_detail", { p_building: id });

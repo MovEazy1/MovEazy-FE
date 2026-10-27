@@ -269,7 +269,7 @@ export default function CrmBuildingEditor() {
   return (
     <div style={{ display: "flex", flexDirection: "column", flex: 1, minHeight: 0 }}>
       {tracking && (
-        <TenantTrackSheet buildingId={id} flats={flats} track={tracking.id ? tracking : null} reasons={tracker?.reasons ?? []}
+        <TenantTrackSheet buildingId={id} flats={flats} track={tracking} reasons={tracker?.reasons ?? []}
           onClose={() => setTracking(null)} onReasonsChange={loadTracker}
           onSaved={(t) => { setTracking(null); loadTracker(); say(`Saved · ${t.name || t.phone}`); }} />
       )}

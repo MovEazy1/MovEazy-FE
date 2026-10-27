@@ -12,7 +12,7 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import { Link, useNavigate, useParams } from "react-router-dom";
 import {
   BadgeCheck, CalendarCheck, Check, ChevronRight, Copy, ExternalLink, Eye, KeyRound, Layers, MapPin, Pencil, Phone,
-  Plus, QrCode, ScanLine, ShieldCheck, Smartphone, UserCheck, X, Zap,
+  Plus, QrCode, ScanLine, ShieldCheck, Smartphone, UserCheck, Users, X, Zap,
 } from "lucide-react";
 import { useOwner } from "./OwnerApp";
 import { Avatar, Empty, Loading, Pill, Sheet, TopBar, WhatsAppIcon, toast } from "./ownerUi";
@@ -93,6 +93,14 @@ export default function BuildingDetail() {
           </div>
           {d.status === "paused" && <span className="bd-paused">QR paused</span>}
         </div>
+        <Link to={op(`/buildings/${id}/tenants`)} className="oz-card oz-row" style={{ padding: 12, textDecoration: "none", color: "inherit", margin: "10px 0" }}>
+          <span className="oz-avatar" style={{ background: "var(--emt)", color: "var(--em)", borderRadius: 12 }}><Users size={19} /></span>
+          <span style={{ flex: 1, minWidth: 0 }}>
+            <strong style={{ display: "block" }}>Tenants who saw your flats</strong>
+            <span className="oz-meta">Every tenant, and where each one stands</span>
+          </span>
+          <ChevronRight size={18} color="#94A09B" />
+        </Link>
         <div className={`bd-partner${d.has_partner ? "" : " bd-partner--wait"}`}>
           <ShieldCheck size={17} />
           {d.has_partner

@@ -48,15 +48,16 @@ export function TenantTrackList({ tracks, onOpen }) {
 }
 
 /**
- * Add a tenant (`track` empty) or update one. `flats`: the building's flats
+ * Add a tenant (`track` empty, or just { phone, name } from the QR) or update their card. `flats`: the building's flats
  * ({ property_id, unit_no }); `reasons`: the typed ones on offer ({ id, label }).
  */
 export function TenantTrackSheet({ buildingId, flats, track, reasons, onClose, onSaved, onReasonsChange }) {
   const [f, setF] = useState(() => ({
     phone: track?.phone || "", name: track?.name || "", note: track?.note || "",
     property_ids: track?.property_ids ?? [], visit: track?.visit || "pending", liked: track?.liked || "",
-    liked_status: track?.liked_status || "", reasons: track?.reasons ?? [],
+    liked_status: track?.liked_status || "", reasons: track?.reasons ?? [], follow_up_on: track?.follow_up_on || "",
   }));
+  const isCard = Boolean(track?.id);
   const [other, setOther] = useState("");
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState("");
@@ -94,17 +95,17 @@ export function TenantTrackSheet({ buildingId, flats, track, reasons, onClose, o
   const label = { fontSize: 11, fontWeight: 700, color: C.textDim, textTransform: "uppercase", letterSpacing: ".05em", margin: "4px 0 6px" };
   const row = { display: "flex", gap: 6, flexWrap: "wrap" };
   return (
-    <div role="dialog" aria-label={track ? "Update tenant" : "Add tenant"} onClick={onClose}
+    <div role="dialog" aria-label={isCard ? "Update tenant" : "Add tenant"} onClick={onClose}
       style={{ position: "fixed", inset: 0, zIndex: 80, background: "rgba(16,34,30,.35)", display: "flex", justifyContent: "flex-end" }}>
       <div onClick={(e) => e.stopPropagation()}
         style={{ width: "min(520px, 100%)", height: "100%", background: C.bg, display: "flex", flexDirection: "column", boxShadow: "-12px 0 34px rgba(16,34,30,.18)" }}>
         <div className="crm-colhead">
-          <span className="crm-label">{track ? `Update ${track.name || track.phone}` : "Add tenant"}</span>
+          <span className="crm-label">{isCard ? `Update ${track.name || track.phone}` : track?.phone ? `Add status · ${track.name || track.phone}` : "Add tenant"}</span>
           <button type="button" aria-label="Close" onClick={onClose} style={{ border: 0, background: "none", cursor: "pointer", color: C.textDim }}><X size={20} /></button>
         </div>
         <div className="crm-scroll" style={{ flex: 1, padding: 16, display: "grid", gap: 12, alignContent: "start" }}>
           <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8 }}>
-            <input className="crm-input" inputMode="tel" placeholder="Tenant's mobile *" value={f.phone} disabled={Boolean(track)}
+            <input className="crm-input" inputMode="tel" placeholder="Tenant's mobile *" value={f.phone} disabled={Boolean(track?.phone)}
               onChange={(e) => set({ phone: e.target.value })} />
             <input className="crm-input" placeholder="Name" value={f.name} onChange={(e) => set({ name: e.target.value })} />
           </div>
@@ -178,11 +179,19 @@ export function TenantTrackSheet({ buildingId, flats, track, reasons, onClose, o
             </div>
           )}
 
+          <div>
+            <div style={label}>Follow up on</div>
+            <div style={{ display: "flex", gap: 6, alignItems: "center" }}>
+              <input className="crm-input" type="date" value={f.follow_up_on} onChange={(e) => set({ follow_up_on: e.target.value })} style={{ maxWidth: 200 }} />
+              {f.follow_up_on && <Btn sm onClick={() => set({ follow_up_on: "" })}>Clear</Btn>}
+            </div>
+          </div>
+
           <textarea className="crm-input" rows={2} placeholder="Note" value={f.note} maxLength={1000} onChange={(e) => set({ note: e.target.value })} />
           {err && <div style={{ color: C.coral, fontSize: 12.5, fontWeight: 600 }}>{err}</div>}
         </div>
         <div style={{ padding: 12, borderTop: `1px solid ${C.line}` }}>
-          <Btn variant="primary" onClick={save} disabled={busy} style={{ width: "100%" }}>{busy ? "Saving…" : track ? "Update" : "Add tenant"}</Btn>
+          <Btn variant="primary" onClick={save} disabled={busy} style={{ width: "100%" }}>{busy ? "Saving…" : isCard ? "Update" : "Save"}</Btn>
         </div>
       </div>
     </div>

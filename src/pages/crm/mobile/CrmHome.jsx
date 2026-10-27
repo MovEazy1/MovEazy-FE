@@ -3,13 +3,15 @@
  * partners are doing — each one opens its list — then every CRM section as a
  * button. Read on open and every hour (CrmShell holds crm_mobile_summary()).
  */
+import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
-import { RefreshCw } from "lucide-react";
+import { ChevronRight, Plus, RefreshCw } from "lucide-react";
 import { useCrm } from "../CrmShell";
 import { C, Empty } from "../crmUi";
 import { GROUPS, PHONE_ONLY, RAIL } from "../crmSections";
 import { Metric, PhSection, updatedAt } from "./phoneUi";
 import CrmInstallCard from "./CrmInstallCard";
+import { fetchTrackedBuildings } from "../../../lib/crmPropertyInternal";
 
 function greeting(now = new Date()) {
   const h = Number(now.toLocaleString("en-IN", { hour: "numeric", hour12: false, timeZone: "Asia/Kolkata" }));
@@ -22,10 +24,27 @@ export default function CrmHome() {
   const p = summary?.partners ?? {};
   const w = summary?.waiting ?? {};
   const first = String(user?.name || "").split(" ")[0];
+  // Buildings whose tenants the team tracks (BR Homes): a bar each, to add and follow them up.
+  const [tracked, setTracked] = useState([]);
+  useEffect(() => { fetchTrackedBuildings().then(setTracked, () => setTracked([])); }, []);
   const sections = [...PHONE_ONLY.filter((s) => s.to !== "/crm/home"), ...RAIL].filter((s) => !s.scope || access.has(s.scope));
 
   return (
     <div className="crm-ph-page">
+      {tracked.map((b) => (
+        <Link key={b.id} to={`/crm/buildings/${b.id}/tenants`}
+          style={{ display: "flex", alignItems: "center", gap: 10, background: C.accent, color: "#fff", borderRadius: 12, padding: "12px 14px",
+            textDecoration: "none", fontWeight: 800, fontSize: 14.5 }}>
+          <Plus size={18} />
+          <span style={{ flex: 1, minWidth: 0 }}>
+            {b.name} · Add tenant
+            <span style={{ display: "block", fontSize: 12, fontWeight: 600, opacity: 0.9 }}>
+              {b.tenants} tenant{b.tenants === 1 ? "" : "s"}{b.due ? ` · ${b.due} follow-up${b.due === 1 ? "" : "s"} due` : ""}
+            </span>
+          </span>
+          <ChevronRight size={18} />
+        </Link>
+      ))}
       <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
         <div style={{ flex: 1, minWidth: 0 }}>
           <div style={{ fontSize: 19, fontWeight: 800 }}>{greeting()}{first ? `, ${first}` : ""}</div>

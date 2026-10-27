@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { buildingUrl, cleanMobile, flatsByFloor, floorLabel, isMobile, nextDays, shortInr, sortFlats, trackSummary, visitTimes } from "./buildings";
+import { buildingUrl, cleanMobile, flatsByFloor, floorLabel, isMobile, nextDays, shortInr, sortFlats, TENANT_FILTERS, tenantBoardStats, trackSummary, visitTimes } from "./buildings";
 
 describe("buildings", () => {
   it("names floors the way people say them", () => {
@@ -42,6 +42,27 @@ describe("buildings", () => {
     expect(trackSummary({ visit: "done" })).toBe("Visit done");
     expect(trackSummary({ visit: "done", liked: "liked", liked_status: "will_pay_token" })).toBe("Liked · Will pay token");
     expect(trackSummary({ visit: "done", liked: "disliked", reasons: ["size_small", "No covered parking"] })).toBe("Did not like · Size is small, No covered parking");
+  });
+
+  it("counts a building's tenants and filters them", () => {
+    const tenants = [
+      { phone: "1", qr: { called: ["caretaker"] }, track: null },
+      { phone: "2", qr: { called: [] }, track: { visit: "done", liked: "liked", liked_status: "will_pay_token", follow_up_on: "2000-01-01" } },
+      { phone: "3", track: { visit: "done", liked: "liked", liked_status: "paid_token" } },
+      { phone: "4", track: { visit: "done", liked: "disliked", reasons: ["size_small", "Noisy"] } },
+      { phone: "5", track: { visit: "done", liked: "disliked", reasons: ["size_small"], follow_up_on: "2999-01-01" } },
+      { phone: "6", track: { visit: "pending" } },
+    ];
+    const s = tenantBoardStats(tenants);
+    expect([s.total, s.fromQr, s.called, s.noStatus, s.visitDone, s.visitPending]).toEqual([6, 2, 1, 1, 4, 1]);
+    expect([s.liked, s.will_pay_token, s.paid_token, s.negotiate, s.disliked, s.due]).toEqual([2, 1, 1, 0, 2, 1]);
+    expect(s.reasons).toEqual([["size_small", 2], ["Noisy", 1]]);
+    const ids = (f) => tenants.filter((x) => TENANT_FILTERS.find((t) => t.id === f).test(x, "2026-10-28")).map((x) => x.phone).join("");
+    expect(ids("due")).toBe("2");
+    expect(ids("qr")).toBe("12");
+    expect(ids("new")).toBe("1");
+    expect(ids("disliked")).toBe("45");
+    expect(ids("pending")).toBe("6");
   });
 
   it("offers half-hour visit times from 9 to 8, none in the next hour today", () => {
