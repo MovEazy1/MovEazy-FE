@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { buildingUrl, cleanMobile, flatsByFloor, floorLabel, isMobile, nextDays, shortInr, visitTimes } from "./buildings";
+import { buildingUrl, cleanMobile, flatsByFloor, floorLabel, isMobile, nextDays, shortInr, sortFlats, visitTimes } from "./buildings";
 
 describe("buildings", () => {
   it("names floors the way people say them", () => {
@@ -18,6 +18,23 @@ describe("buildings", () => {
     expect(g[1].flats.map((f) => f.property_id)).toEqual(["d", "a"]);
     const taken = flatsByFloor([{ property_id: "x", floor_number: 1, rent: 1000, available: false }, { property_id: "y", floor_number: 1, rent: 9000, available: true }]);
     expect(taken[0].flats.map((f) => f.property_id)).toEqual(["y", "x"]);
+  });
+
+  it("sorts a building's flats the way a tenant picks; popularity keeps MovEazy's order", () => {
+    const flats = [
+      { property_id: "A", unit_no: "207", floor_number: 2, rent: 32000 },
+      { property_id: "B", unit_no: "101", floor_number: 1, rent: 35000 },
+      { property_id: "C", unit_no: "1003", floor_number: 10, rent: 27000 },
+      { property_id: "D", unit_no: "", floor_number: 3, rent: 30000 },
+      { property_id: "E", unit_no: "103", floor_number: 1, rent: 27000 },
+    ];
+    const ids = (how) => sortFlats(flats, how).map((f) => f.property_id).join("");
+    expect(ids("popular")).toBe("ABCDE");
+    expect(ids(undefined)).toBe("ABCDE");
+    expect(ids("price_asc")).toBe("CEDAB");
+    expect(ids("price_desc")).toBe("BADCE");
+    expect(ids("flat_no")).toBe("BEACD");
+    expect(flats.map((f) => f.property_id).join("")).toBe("ABCDE");
   });
 
   it("offers half-hour visit times from 9 to 8, none in the next hour today", () => {

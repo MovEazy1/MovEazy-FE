@@ -13,14 +13,14 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Link, useParams, useSearchParams } from "react-router-dom";
 import { useAuth } from "../context/AuthContext";
-import { BadgeCheck, Building2, CalendarCheck, Check, ChevronLeft, Clock, Film, Images, Layers, MapPin, Navigation, Phone, Sparkles, X, Zap } from "lucide-react";
+import { ArrowUpDown, BadgeCheck, Building2, CalendarCheck, Check, ChevronLeft, Clock, Film, Images, Layers, MapPin, Navigation, Phone, Sparkles, X, Zap } from "lucide-react";
 import { MediaItem, listingCover, listingMedia } from "./partners/partnerMedia";
 import { useSnapTrack } from "../hooks/useSnapTrack";
 import { usePhotoViewer } from "../hooks/usePhotoViewer";
 import { inr } from "../lib/partners";
 import {
-  cleanMobile, fetchBuildingPage, flatsByFloor, floorLabel, isMobile, nextDays, recordBuildingView, requestBuildingVisit,
-  shortInr, startInstantVisit, visitTimes, visitWhen,
+  FLAT_SORTS, cleanMobile, fetchBuildingPage, flatsByFloor, floorLabel, isMobile, nextDays, recordBuildingView, requestBuildingVisit,
+  shortInr, sortFlats, startInstantVisit, visitTimes, visitWhen,
 } from "../lib/buildings";
 import logo from "../assets/logo/moveazy-logo-mint-light.png";
 
@@ -72,6 +72,7 @@ export default function BuildingPage() {
   const [booking, setBooking] = useState(false);
   const [instant, setInstant] = useState(false);
   const [floorOn, setFloorOn] = useState("all");
+  const [sortBy, setSortBy] = useState("popular");
   const counted = useRef(false);
   const { user, loading: authLoading, loginWithGoogle, updateUserProfile } = useAuth();
   // Back from Google with a visit half-booked: reopen it and finish.
@@ -109,7 +110,8 @@ export default function BuildingPage() {
   const available = useMemo(() => flats.filter((f) => f.available), [flats]);
   // Floors that have a free flat, for the filter chips. The list itself stays in MovEazy's order.
   const floors = useMemo(() => flatsByFloor(available), [available]);
-  const shown = floorOn === "all" ? available : available.filter((f) => String(f.floor_number ?? "null") === floorOn);
+  const shown = useMemo(() => sortFlats(floorOn === "all" ? available : available.filter((f) => String(f.floor_number ?? "null") === floorOn), sortBy),
+    [available, floorOn, sortBy]);
   const occupied = flats.length - available.length;
   const photos = useMemo(() => {
     const own = (b?.photos ?? []).filter(Boolean);
@@ -166,7 +168,17 @@ export default function BuildingPage() {
 
       <section id="bp-flats" className="bp-flats">
         <div className="bp-flats-top">
-          <h2><Layers size={18} /> Available flats · {available.length}</h2>
+          <div className="bp-flats-row">
+            <h2><Layers size={18} /> Available flats · {available.length}</h2>
+            {available.length > 1 && (
+              <label className="bp-sort">
+                <ArrowUpDown size={14} aria-hidden />
+                <select value={sortBy} onChange={(e) => setSortBy(e.target.value)} aria-label="Sort flats">
+                  {FLAT_SORTS.map((o) => <option key={o.id} value={o.id}>{o.label}</option>)}
+                </select>
+              </label>
+            )}
+          </div>
           <span>Tap <b>+</b> to add flats to your visit — see as many as you like in one trip</span>
         </div>
         {floors.length > 1 && (
@@ -705,6 +717,12 @@ const CSS = `
 .bp-amen svg { color: var(--champ3); }
 .bp-desc { color: var(--dim); font-size: 14px; line-height: 1.55; margin: 12px 0 0; white-space: pre-line; }
 .bp-flats { padding: 22px 12px 0; }
+.bp-flats-row { display: flex; align-items: center; justify-content: space-between; gap: 10px; flex-wrap: wrap; }
+.bp-sort { position: relative; display: inline-flex; align-items: center; color: var(--deep); }
+.bp-sort svg { position: absolute; left: 10px; pointer-events: none; }
+.bp-sort select { appearance: none; -webkit-appearance: none; border: 1px solid var(--line); background: #fff; border-radius: 99px;
+  padding: 7px 12px 7px 29px; font: inherit; font-size: 13px; font-weight: 600; color: var(--ink); cursor: pointer; }
+.bp-sort select:focus-visible { outline: 2px solid var(--em); outline-offset: 2px; }
 .bp-flats-top h2 { font-size: 18px; margin: 0; display: flex; align-items: center; gap: 8px; letter-spacing: -0.01em; }
 .bp-flats-top h2 svg { color: var(--em); }
 .bp-flats-top > span { display: block; font-size: 12.5px; color: var(--dim); margin: 3px 0 0 26px; }

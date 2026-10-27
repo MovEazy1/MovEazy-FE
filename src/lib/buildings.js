@@ -111,6 +111,33 @@ export function flatsByFloor(flats = []) {
     }));
 }
 
+/** How a tenant can sort a building's flats. "popular" is MovEazy's own order (set in the CRM). */
+export const FLAT_SORTS = [
+  { id: "popular", label: "Popularity" },
+  { id: "price_asc", label: "Price: low to high" },
+  { id: "price_desc", label: "Price: high to low" },
+  { id: "flat_no", label: "Flat no." },
+];
+
+const byFlatNo = (a, b) => {
+  const x = String(a.unit_no || "").trim(), y = String(b.unit_no || "").trim();
+  if (!x || !y) return Number(!x) - Number(!y) || (Number(a.floor_number) || 0) - (Number(b.floor_number) || 0);
+  return x.localeCompare(y, "en", { numeric: true, sensitivity: "base" });
+};
+
+/**
+ * `flats` in the order a tenant picked. They arrive in MovEazy's order, which
+ * is what "popular" keeps; ties in rent or flat number keep it too.
+ */
+export function sortFlats(flats = [], how = "popular") {
+  const rent = (f) => Number(f.rent) || 0;
+  const list = [...flats];
+  if (how === "price_asc") return list.sort((a, b) => (rent(a) || Infinity) - (rent(b) || Infinity));
+  if (how === "price_desc") return list.sort((a, b) => rent(b) - rent(a));
+  if (how === "flat_no") return list.sort(byFlatNo);
+  return list;
+}
+
 /** The next `n` days from `from`, at midnight local time. */
 export function nextDays(n = 14, from = new Date()) {
   const start = new Date(from.getFullYear(), from.getMonth(), from.getDate());
