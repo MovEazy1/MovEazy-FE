@@ -454,7 +454,7 @@ export default function CrmBuildingEditor() {
 
             {(calls || tracker?.enabled) && (
               <div style={card}>
-                <span className="crm-label">Calls &amp; feedback · {new Set([...(calls ?? []).map((e) => e.phone), ...(tracker?.tracks ?? []).map((t) => t.phone)]).size} tenants</span>
+                <span className="crm-label">Calls &amp; feedback · {((n) => `${n} tenant${n === 1 ? "" : "s"}`)(new Set([...(calls ?? []).map((e) => e.phone), ...(tracker?.tracks ?? []).map((t) => t.phone)]).size)}</span>
                 {tracker?.enabled && <TenantTrackList tracks={tracker.tracks} onOpen={setTracking} />}
                 {!calls ? null : calls.length === 0 ? <span className="crm-mute" style={{ fontSize: 12 }}>No one has asked for the numbers on the QR page yet.</span> : (
                   <div style={{ display: "grid", gap: 4, maxHeight: 320, overflow: "auto" }}>
