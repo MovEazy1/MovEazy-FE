@@ -66,7 +66,7 @@ export function brokerFollowUpMessage({ broker = "", clientName = "", clientPhon
 
 /** The CRM's Tenant views filters: id, label, who's in (`day` is today, YYYY-MM-DD in IST). */
 export const VIEW_FILTERS = [
-  { id: "open", label: "No response yet", test: (v) => v.response_by !== "team" },
+  { id: "open", label: "Not marked by team", test: (v) => v.response_by !== "team" },
   { id: "due", label: "Follow-up due", test: (v, day) => Boolean(v.follow_up_on && v.follow_up_on <= day) },
   { id: "share", label: "Link we sent", test: (v) => (v.sources ?? []).includes("share") },
   { id: "liked", label: "Liked", test: (v) => v.liked === "liked" },
