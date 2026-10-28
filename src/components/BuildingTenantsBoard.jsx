@@ -2,11 +2,12 @@
  * A building's tenants, as the MovEazy team and the building's owner see them
  * (building_tenants_board.sql): the numbers on top — from the QR, visits,
  * liked and how far, not liked and why — then filters and every tenant with
- * Call / WhatsApp. `onUpdate(tenant)`, in the CRM, adds the "Update status"
- * button; the owner's copy is read-only.
+ * Call / WhatsApp, and the flats they viewed through MovEazy (tenant_views.sql).
+ * `onUpdate(tenant)`, in the CRM, adds the "Update status" button; the
+ * owner's copy is read-only, and MovEazy's own tenants come without a number.
  */
 import { useMemo, useState } from "react";
-import { CalendarClock, MessageCircle, Phone } from "lucide-react";
+import { CalendarClock, Eye, MessageCircle, Phone } from "lucide-react";
 import { LIKED_STATUSES, TENANT_FILTERS, callFeedbackLabel, reasonLabel, tenantBoardStats, trackSummary } from "../lib/buildings";
 
 const INK = "#10221E", DIM = "#5E6B66", LINE = "#E2E6E4", ACCENT = "#0E7C68", GOLD = "#B0740F", CORAL = "#CC3F28";
@@ -39,6 +40,7 @@ export default function BuildingTenantsBoard({ tenants = [], onUpdate }) {
       <div style={h}>Tenants · {s.total}</div>
       <div style={grid}>
         <Tile label="From QR" value={s.fromQr} sub={`${s.called} called`} />
+        <Tile label="Via MovEazy Website" value={s.viaMoveazy} />
         <Tile label="Visit done" value={s.visitDone} />
         <Tile label="Visit pending" value={s.visitPending} />
         <Tile label="No status yet" value={s.noStatus} />
@@ -78,17 +80,30 @@ export default function BuildingTenantsBoard({ tenants = [], onUpdate }) {
       {shown.length === 0 ? <div style={{ color: DIM, fontSize: 13, padding: "12px 0" }}>No tenants here.</div> : (
         <div style={{ display: "grid", gap: 8 }}>
           {shown.map((x) => {
-            const t = x.track;
+            const card = x.track;
+            const t = card || x.status;
             const due = t?.follow_up_on && t.follow_up_on <= day;
+            const views = x.views ?? [];
             return (
-              <div key={x.phone} style={{ border: `1px solid ${due ? "#F1C9A8" : LINE}`, borderRadius: 12, padding: 12, background: "#fff" }}>
+              <div key={x.key || x.phone} style={{ border: `1px solid ${due ? "#F1C9A8" : LINE}`, borderRadius: 12, padding: 12, background: "#fff" }}>
                 <div style={{ display: "flex", justifyContent: "space-between", gap: 8, alignItems: "baseline" }}>
                   <strong style={{ fontSize: 14.5 }}>{x.name || "Tenant"}</strong>
-                  <span style={{ fontSize: 13, fontWeight: 700, color: ACCENT, letterSpacing: ".02em" }}>{x.phone.replace(/(\d{5})(\d{5})/, "$1 $2")}</span>
+                  {x.phone
+                    ? <span style={{ fontSize: 13, fontWeight: 700, color: ACCENT, letterSpacing: ".02em" }}>{x.phone.replace(/(\d{5})(\d{5})/, "$1 $2")}</span>
+                    : <span style={{ fontSize: 11.5, fontWeight: 700, color: GOLD }}>MovEazy Website</span>}
                 </div>
                 <div style={{ color: tone(t), fontWeight: 700, marginTop: 3 }}>{t ? trackSummary(t) : "No status yet"}</div>
-                {(t?.flats ?? []).length > 0 && <div style={{ color: DIM, fontSize: 12.5, marginTop: 2 }}>Flat {t.flats.join(", ")}</div>}
-                {t?.note && <div style={{ fontSize: 12.5, marginTop: 2 }}>{t.note}</div>}
+                {(card?.flats ?? []).length > 0 && <div style={{ color: DIM, fontSize: 12.5, marginTop: 2 }}>Flat {card.flats.join(", ")}</div>}
+                {card?.note && <div style={{ fontSize: 12.5, marginTop: 2 }}>{card.note}</div>}
+                {views.length > 0 && (
+                  <div style={{ display: "flex", gap: 5, alignItems: "flex-start", color: DIM, fontSize: 12, marginTop: 4 }}>
+                    <Eye size={13} style={{ flex: "none", marginTop: 2 }} />
+                    <span>
+                      Viewed {views.map((v) => `${v.unit_no || v.property_id}${v.opens > 1 ? ` ×${v.opens}` : ""}`).join(", ")}
+                      {x.via === "moveazy" ? " on the MovEazy website" : ""} · {when(views[0].last_at)}
+                    </span>
+                  </div>
+                )}
                 {x.qr && (
                   <div style={{ color: DIM, fontSize: 12, marginTop: 4 }}>
                     From the QR · {when(x.qr.first_at)}
@@ -101,14 +116,16 @@ export default function BuildingTenantsBoard({ tenants = [], onUpdate }) {
                     <CalendarClock size={13} /> Follow up {dayOnly(t.follow_up_on)}{due ? " — due" : ""}
                   </div>
                 )}
-                {t && <div style={{ color: DIM, fontSize: 11, marginTop: 4 }}>Updated {when(t.updated_at)}{t.updated_by ? ` · ${t.updated_by}` : ""}</div>}
-                <div style={{ display: "flex", gap: 6, marginTop: 10, flexWrap: "wrap" }}>
-                  <a href={`tel:+91${x.phone}`} style={btn()}><Phone size={14} /> Call</a>
-                  <a href={`https://wa.me/91${x.phone}`} target="_blank" rel="noreferrer" style={btn()}><MessageCircle size={14} /> WhatsApp</a>
-                  {onUpdate && (
-                    <button type="button" onClick={() => onUpdate(x)} style={{ ...btn(true), marginLeft: "auto" }}>{t ? "Update status" : "Add status"}</button>
-                  )}
-                </div>
+                {card && <div style={{ color: DIM, fontSize: 11, marginTop: 4 }}>Updated {when(card.updated_at)}{card.updated_by ? ` · ${card.updated_by}` : ""}</div>}
+                {(x.phone || onUpdate) && (
+                  <div style={{ display: "flex", gap: 6, marginTop: 10, flexWrap: "wrap" }}>
+                    {x.phone && <a href={`tel:+91${x.phone}`} style={btn()}><Phone size={14} /> Call</a>}
+                    {x.phone && <a href={`https://wa.me/91${x.phone}`} target="_blank" rel="noreferrer" style={btn()}><MessageCircle size={14} /> WhatsApp</a>}
+                    {onUpdate && (
+                      <button type="button" onClick={() => onUpdate(x)} style={{ ...btn(true), marginLeft: "auto" }}>{card ? "Update status" : "Add status"}</button>
+                    )}
+                  </div>
+                )}
               </div>
             );
           })}

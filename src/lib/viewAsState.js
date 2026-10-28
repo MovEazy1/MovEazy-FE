@@ -48,7 +48,7 @@ export function viewAsNotice(kind) {
 const QUIET_RPCS = new Set([
   "app_track", "flat_view", "building_view", "increment_listing_view", "partner_storefront_view",
   "partner_storefront_visit", "flat_claim_views", "owner_scans_claim", "partner_matcher_seen", "partner_congrats_seen",
-  "partner_tenant_seen", "partner_trial_seen",
+  "partner_tenant_seen", "partner_trial_seen", "flat_view_engage", "tenant_visitor_link",
 ]);
 // Money: never, even with actions allowed — a payment can't be reverted.
 const PAYMENT_RPCS = new Set(["partner_payment_start", "partner_plan_pay_upi", "partner_lead_request"]);

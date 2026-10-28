@@ -6,6 +6,7 @@ import { propertyLink, shareVia } from "../lib/crmSettings";
 import { useAuth } from "../context/AuthContext";
 import { useBackClose } from "../hooks/useBackClose";
 import { useSnapTrack } from "../hooks/useSnapTrack";
+import useViewEngagement from "../hooks/useViewEngagement";
 import { getListingPrivateData, isListingPubliclyVisible } from "../lib/firestoreStore";
 import { canReadListingPrivatePhones } from "../lib/accessControl";
 import { isSupabaseConfigured } from "../lib/supabase";
@@ -355,6 +356,8 @@ export default function PropertyModal({
   // The photos swipe like a post (hooks/useSnapTrack.js); a tap opens them full screen.
   const photoTrack = useSnapTrack();
   const { index: activeMediaIndex, goTo: goToPhoto } = photoTrack;
+  // Time on it and photos seen: the tenant's view of this property (tenant_views.sql).
+  useViewEngagement(propertyId, activeMediaIndex);
   const [viewerAt, setViewerAt] = useState(null);
   /**
    * "3 days ago" — how fresh a listing is, from created_at. Computed in an

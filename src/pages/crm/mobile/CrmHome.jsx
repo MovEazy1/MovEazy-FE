@@ -12,6 +12,7 @@ import { GROUPS, PHONE_ONLY, RAIL } from "../crmSections";
 import { Metric, PhSection, updatedAt } from "./phoneUi";
 import CrmInstallCard from "./CrmInstallCard";
 import { fetchTrackedBuildings } from "../../../lib/crmPropertyInternal";
+import { fetchTenantViewsSummary } from "../../../lib/tenantViews";
 
 function greeting(now = new Date()) {
   const h = Number(now.toLocaleString("en-IN", { hour: "numeric", hour12: false, timeZone: "Asia/Kolkata" }));
@@ -27,6 +28,9 @@ export default function CrmHome() {
   // Buildings whose tenants the team tracks (BR Homes): a bar each, to add and follow them up.
   const [tracked, setTracked] = useState([]);
   useEffect(() => { fetchTrackedBuildings().then(setTracked, () => setTracked([])); }, []);
+  // Tenants who opened a property and nobody's marked how it went (tenant_views.sql).
+  const [views, setViews] = useState(null);
+  useEffect(() => { fetchTenantViewsSummary().then(setViews, () => setViews(null)); }, []);
   const sections = [...PHONE_ONLY.filter((s) => s.to !== "/crm/home"), ...RAIL].filter((s) => !s.scope || access.has(s.scope));
 
   return (
@@ -69,6 +73,10 @@ export default function CrmHome() {
           <Metric label="Leads not called" value={(w.not_called_moveazy ?? 0) + (w.not_called_partner ?? 0)}
             sub={`MovEazy ${w.not_called_moveazy ?? 0} · Partners ${w.not_called_partner ?? 0}`} to="/crm/notifications?show=notcalled"
             tone={w.not_called_moveazy || w.not_called_partner ? C.coral : undefined} />
+          {views && (
+            <Metric label="Tenant views to mark" value={views.open} sub={`Last 30 days${views.due ? ` · ${views.due} follow-up${views.due === 1 ? "" : "s"} due` : ""}`}
+              to="/crm/tenant-views" tone={views.due ? C.coral : undefined} />
+          )}
           <Metric label="Visit slots required" value={w.slots_required} to="/crm/notifications?tab=slots" />
           <Metric label="Payments to check" value={w.payments_to_check} sub="Premium + lead pack UTRs" to="/crm/partner-payments?step=utr"
             tone={w.payments_to_check ? C.gold : undefined} />

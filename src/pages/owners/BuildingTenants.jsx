@@ -25,7 +25,8 @@ export default function BuildingTenants() {
       <TopBar title={`${d.building.name} · tenants`} back={op(`/buildings/${id}`)} />
       <div className="oz-pad">
         <p className="oz-hint" style={{ margin: "0 2px 4px" }}>
-          Everyone who has seen your flats — through MovEazy's team or your QR — and where each one stands. The MovEazy team keeps it up to date.
+          Everyone who has seen your flats — through MovEazy's team, the MovEazy website or your QR — and where each one stands. The
+          MovEazy team keeps it up to date; tenants MovEazy sent stay in touch through MovEazy.
         </p>
         <BuildingTenantsBoard tenants={d.tenants ?? []} />
       </div>

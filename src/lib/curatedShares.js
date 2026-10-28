@@ -15,6 +15,8 @@
  */
 import { supabase, isSupabaseConfigured } from "./supabase";
 import { generateShareToken } from "./crmSettings";
+import { linkVisitor } from "./tenantViews";
+
 
 /** Where a curated link points. Attributed like every other share we send. */
 export function curatedLink(token) {
@@ -153,6 +155,7 @@ function shape(row, fallbackToken = "") {
  */
 export async function openCuratedShare(token) {
   if (!isSupabaseConfigured || !supabase || !token) return { ...EMPTY };
+  linkVisitor(token); // this phone's opens are that client's tenant views
   try {
     const { data, error } = await supabase.rpc("curated_share_open", { token });
     if (error) {

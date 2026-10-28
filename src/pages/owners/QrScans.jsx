@@ -1,22 +1,31 @@
 /**
- * QR scans — every open of the owner's flats' and buildings' pages, from the
- * QR on the door or a shared link (owner_qr_overview.sql): the total and this
- * week, how many of those people gave their contact or booked a visit, how
- * many MovEazy tenants match the flats on rent (a count — lib/ownerMatches.js),
- * scans day by day for the last two weeks, and the people themselves: tap one
- * for their mobile, profile and what they opened.
+ * Tenant views — every open of the owner's flats' and buildings' pages, from
+ * the QR on the door or a shared link (owner_qr_overview.sql, tenant_views.sql):
+ * the total and this week, how many of those people gave their contact, came
+ * via the MovEazy website (a link MovEazy sent, or the website), or booked a
+ * visit, how many MovEazy tenants match the flats on rent (a count —
+ * lib/ownerMatches.js), how they found the flats, scans day by day for the
+ * last two weeks, and the people themselves: tap one for what they opened and
+ * where they stand — with their mobile and profile when they reached the
+ * owner's QR; MovEazy's own tenants come without a number.
  */
 import { useEffect, useMemo, useState } from "react";
 import { Link } from "react-router-dom";
-import { Briefcase, Building2, CalendarCheck, ChevronRight, GraduationCap, Link as LinkIcon, Mail, MessageSquareText, Phone, QrCode, ScanLine, Users } from "lucide-react";
+import { Briefcase, Building2, CalendarCheck, ChevronRight, Globe, GraduationCap, Link as LinkIcon, Mail, MessageSquareText, Phone, QrCode, ScanLine, ThumbsDown, ThumbsUp, Users } from "lucide-react";
 import { useOwner } from "./OwnerApp";
 import { Avatar, Chip, Empty, Loading, Pill, Sheet, TopBar, WhatsAppIcon } from "./ownerUi";
 import { fetchQrOverview } from "../../lib/flatInsights";
-import { callFeedbackLabel, trackSummary } from "../../lib/buildings";
+import { callFeedbackLabel, reasonLabel, trackSummary } from "../../lib/buildings";
 import { countMatchingTenants } from "../../lib/ownerMatches";
 import { cleanLinkedIn, fmtDateTime, occupancyOf, op, propertyName, relTime, telLink, waLink } from "../../lib/owners";
 
 const fmt = (n) => (Number(n) || 0).toLocaleString("en-IN");
+const PEOPLE_FILTERS = [
+  ["all", "All", () => true],
+  ["qr", "Gave contact", (p) => p.via !== "moveazy"],
+  ["moveazy", "Via MovEazy Website", (p) => p.via === "moveazy"],
+  ["visit", "Booked a visit", (p) => p.visit],
+];
 const times = (n) => (Number(n) > 1 ? ` · ${fmt(n)}×` : "");
 /** What someone did on one page: opened it, called from it (Call Caretaker), asked to visit. */
 function placeDid(x) {
@@ -52,14 +61,16 @@ export default function QrScans() {
     ? buildingNames.get(ref) || "Your building"
     : byId.get(ref) ? propertyName(byId.get(ref)) : ref;
 
-  if (d === undefined || !properties) return <><TopBar title="QR scans" back={op("/")} /><Loading /></>;
-  if (!d) return <><TopBar title="QR scans" back={op("/")} /><Empty>Couldn't load your scans. Try again in a moment.</Empty></>;
+  if (d === undefined || !properties) return <><TopBar title="Tenant views" back={op("/")} /><Loading /></>;
+  if (!d) return <><TopBar title="Tenant views" back={op("/")} /><Empty>Couldn't load your scans. Try again in a moment.</Empty></>;
 
-  const people = (d.list ?? []).filter((p) => only === "all" || p.visit);
+  const test = PEOPLE_FILTERS.find(([id]) => id === only)?.[2] ?? (() => true);
+  const people = (d.list ?? []).filter(test);
+  const reasons = d.reasons ?? [];
 
   return (
     <>
-      <TopBar title="QR scans" back={op("/")} />
+      <TopBar title="Tenant views" back={op("/")} />
       <style>{CSS}</style>
       <div className="oz-pad">
         <section className="oz-hero" style={{ marginBottom: 14 }}>
@@ -70,15 +81,34 @@ export default function QrScans() {
             <div className="qs-big"><b>{fmt(d.scans)}</b>{d.week > 0 && <span>+{fmt(d.week)} this week</span>}</div>
             <div className="qs-tiles">
               <div><Users size={15} /><b>{fmt(d.people)}</b><span>Gave contact</span></div>
+              <div><Globe size={15} /><b>{fmt(d.moveazy)}</b><span>Via MovEazy Website</span></div>
               <div><CalendarCheck size={15} /><b>{fmt(d.visited)}</b><span>Booked a visit</span></div>
               <div><Users size={15} /><b>{matches ? fmt(matches.total) : "…"}</b><span>Matching tenants</span></div>
             </div>
           </div>
         </section>
         <p className="oz-hint" style={{ margin: "0 2px 16px" }}>
-          Every scan and link open counts. Matching tenants are people on MovEazy whose search fits a flat you have on rent; their
-          details stay private.
+          Every scan and link open counts. Via MovEazy Website are tenants MovEazy sent your flats to, or who found them on the
+          website — MovEazy stays in touch with them. Matching tenants are people on MovEazy whose search fits a flat you have on
+          rent; their details stay private.
         </p>
+
+        {(d.liked > 0 || d.disliked > 0) && (
+          <>
+            <h2 className="oz-h2">How tenants found your flats</h2>
+            <div className="oz-card qs-said" style={{ marginBottom: 18 }}>
+              <div className="qs-said-row">
+                <span><ThumbsUp size={16} /><b>{fmt(d.liked)}</b> liked</span>
+                <span><ThumbsDown size={16} /><b>{fmt(d.disliked)}</b> did not like</span>
+              </div>
+              {reasons.length > 0 && (
+                <div className="oz-row" style={{ gap: 6, flexWrap: "wrap", marginTop: 10 }}>
+                  {reasons.map((r) => <Pill key={r.reason} tone="grey">{reasonLabel(r.reason)} · {fmt(r.n)}</Pill>)}
+                </div>
+              )}
+            </div>
+          </>
+        )}
 
         <h2 className="oz-h2">Scans by day</h2>
         <DayBars days={d.by_day ?? []} />
@@ -87,16 +117,16 @@ export default function QrScans() {
         </Link>
 
         <div className="oz-between" style={{ marginBottom: 10 }}>
-          <h2 className="oz-h2" style={{ margin: 0 }}>People who gave contact</h2>
-          <span className="oz-meta">{fmt(d.people)}</span>
+          <h2 className="oz-h2" style={{ margin: 0 }}>Tenants</h2>
+          <span className="oz-meta">{fmt((d.list ?? []).length)}</span>
         </div>
-        <div className="oz-row" style={{ gap: 6, marginBottom: 10 }}>
-          <Chip on={only === "all"} onClick={() => setOnly("all")}>All</Chip>
-          <Chip on={only === "visit"} onClick={() => setOnly("visit")}>Booked a visit</Chip>
+        <div className="oz-row" style={{ gap: 6, marginBottom: 10, flexWrap: "wrap" }}>
+          {PEOPLE_FILTERS.map(([id, label]) => <Chip key={id} on={only === id} onClick={() => setOnly(id)}>{label}</Chip>)}
         </div>
         {people.length === 0 ? (
           <Empty icon={<Users size={24} />}>
-            {only === "visit" ? "No visits booked yet." : "No one yet. When someone scans your QR and signs in or books a visit, they show up here."}
+            {only === "visit" ? "No visits booked yet." : only === "moveazy" ? "No one yet. Tenants MovEazy sends your flats to show up here."
+              : "No one yet. When someone scans your QR and signs in or books a visit, they show up here."}
           </Empty>
         ) : (
           <div className="oz-card">
@@ -108,12 +138,14 @@ export default function QrScans() {
                   <span style={{ flex: 1, minWidth: 0 }}>
                     <strong style={{ fontWeight: 600 }}>{p.name || "Renter"}</strong>
                     <span className="oz-sub">
-                      {last ? `${placeName(last.kind, last.ref)}${times(last.hits)} · ` : ""}{relTime(p.at)}
+                      {p.via === "moveazy" ? "MovEazy Website · " : ""}{last ? `${placeName(last.kind, last.ref)}${times(last.hits)} · ` : ""}{relTime(p.at)}
                     </span>
                   </span>
                   {p.status?.liked_status === "paid_token" ? <Pill tone="green">Paid token</Pill>
                     : p.status?.liked_status === "will_pay_token" || (p.feedback ?? []).some((f) => f.kind === "pay_token") ? <Pill tone="amber">Pay Token</Pill>
-                      : p.visit ? <Pill tone="green">Visit</Pill> : null}
+                      : p.status?.liked === "liked" ? <Pill tone="green">Liked</Pill>
+                        : p.status?.liked === "disliked" ? <Pill tone="grey">Not liked</Pill>
+                          : p.visit ? <Pill tone="green">Visit</Pill> : null}
                   <ChevronRight size={18} color="#94A09B" />
                 </button>
               );
@@ -172,6 +204,11 @@ function PersonSheet({ p, placeName, onClose }) {
                 target="_blank" rel="noreferrer"><WhatsAppIcon size={16} color="#25D366" /> WhatsApp</a>
             </div>
           </>
+        ) : p.via === "moveazy" ? (
+          <div className="qs-line" style={{ alignItems: "flex-start" }}>
+            <Globe size={16} />
+            <span>Viewed on the MovEazy website. MovEazy is in touch with them and shares how it goes here.</span>
+          </div>
         ) : <p className="oz-meta" style={{ margin: "0 0 6px" }}>No mobile number on their account yet.</p>}
         {p.email && <div className="qs-line"><Mail size={16} /><a href={`mailto:${p.email}`}>{p.email}</a></div>}
 
@@ -229,7 +266,11 @@ const CSS = `
 .qs-big{display:flex;align-items:baseline;gap:10px;flex-wrap:wrap;margin:6px 0 12px}
 .qs-big b{font-size:40px;font-weight:800;letter-spacing:-.03em;line-height:1}
 .qs-big span{font-size:13px;font-weight:700;color:var(--champ)}
-.qs-tiles{display:grid;grid-template-columns:repeat(3,1fr);gap:8px}
+.qs-tiles{display:grid;grid-template-columns:repeat(2,1fr);gap:8px}
+.qs-said{padding:14px}
+.qs-said-row{display:flex;gap:18px;flex-wrap:wrap;font-size:14px;color:var(--dim)}
+.qs-said-row>span{display:inline-flex;align-items:center;gap:6px}
+.qs-said-row b{font-size:18px;color:var(--ink);font-weight:800}
 .qs-tiles>div{background:rgba(255,255,255,.08);border:1px solid rgba(255,255,255,.14);border-radius:12px;padding:9px 10px;display:flex;flex-direction:column;gap:3px}
 .qs-tiles svg{color:var(--champ)}
 .qs-tiles b{font-size:19px;font-weight:800}

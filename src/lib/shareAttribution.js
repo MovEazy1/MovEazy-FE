@@ -11,6 +11,7 @@
  * security-definer function rather than the table.
  */
 import { supabase, isSupabaseConfigured } from "./supabase";
+import { linkVisitor } from "./tenantViews";
 
 const SEEN_KEY = "moveazy_share_opens";
 const UTM_KEYS = ["utm_source", "utm_medium", "utm_campaign", "utm_content", "utm_term"];
@@ -55,6 +56,8 @@ export async function recordShareOpenFromUrl() {
   if (typeof window === "undefined") return;
   const token = new URLSearchParams(window.location.search).get("mz_s");
   if (!token || token.length < 8) return;
+  // Every time: this phone's opens are that client's tenant views (tenant_views.sql).
+  linkVisitor(token);
   if (alreadyCounted(token)) return;
   if (!isSupabaseConfigured || !supabase) return;
 

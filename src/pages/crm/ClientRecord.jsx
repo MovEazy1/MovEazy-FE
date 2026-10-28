@@ -19,7 +19,7 @@ import { Btn, C, Chip, Empty, TempDot, deadlineLabel, inr, relTime } from "./crm
 import RequirementFields from "./RequirementFields";
 import PriorityControl from "./PriorityControl";
 import PropertyQuickView from "./PropertyQuickView";
-import { ASSIGNED_STATUS, crmClientBrokers } from "../../lib/partnerLeads";
+import { ClientBrokerActivity, ClientTenantViews } from "./CrmTenantViews";
 
 /* ── Small pieces ─────────────────────────────────────────────────────────── */
 
@@ -367,42 +367,6 @@ function PropertiesShown({ client, shortlists, inventory, reactions = [], canEdi
           canEdit={canEdit} onPatch={onPatchListing} onToast={onToast} onClose={() => setPreview(null)}
         />
       )}
-    </Section>
-  );
-}
-
-/**
- * MovEazy leads given to partner brokers (partner_moveazy_leads.sql): which
- * brokers have this client, whether each has reached out, and any closure.
- * Hidden until one has them.
- */
-function PartnerBrokers({ clientId }) {
-  const [rows, setRows] = useState([]);
-  useEffect(() => {
-    let alive = true;
-    crmClientBrokers(clientId).then((r) => alive && setRows(r), () => alive && setRows([]));
-    return () => { alive = false; };
-  }, [clientId]);
-  if (!rows.length) return null;
-  return (
-    <Section label={`Partner brokers · ${rows.length}/3`}>
-      <div className="crm-card" style={{ display: "flex", flexDirection: "column", gap: 0 }}>
-        {rows.map((b) => (
-          <div key={b.assignment_id} className="crm-row" style={{ alignItems: "flex-start" }}>
-            <span style={{ minWidth: 0 }}>
-              <b style={{ fontSize: 12.5 }}>{b.broker_name || "Broker"}</b>
-              <span className="crm-mute crm-num" style={{ fontSize: 11 }}> {b.broker_phone}</span>
-              <span className="crm-mute" style={{ display: "block", fontSize: 11 }}>
-                Given {relTime(b.assigned_at)} · {b.reach_count ? `reached out ${b.reach_count}× · last ${relTime(b.last_reach_at)}` : "hasn't reached out yet"}
-                {b.status === "closed" ? ` · closed at ${inr(b.closed_rent)}${Number(b.due_amount) > 0 ? ` · ${inr(b.due_amount)} due` : ""}` : ""}
-              </span>
-            </span>
-            <span style={{ fontSize: 10.5, fontWeight: 700, color: b.reach_count ? C.accent : C.gold, whiteSpace: "nowrap" }}>
-              {ASSIGNED_STATUS[b.status] || b.status}
-            </span>
-          </div>
-        ))}
-      </div>
     </Section>
   );
 }
@@ -819,7 +783,9 @@ export default function ClientRecord({
         <PropertiesShown client={client} shortlists={shortlists} inventory={inventory} reactions={reactions}
           canEdit={canWrite} onPatchListing={onPatchListing} onToast={onToast} />
 
-        <PartnerBrokers clientId={client.id} />
+        <ClientTenantViews clientId={client.id} clientName={client.name} onSaved={refreshActivities} />
+
+        <ClientBrokerActivity client={client} onLogged={refreshActivities} onToast={onToast} />
 
         {/* engagement */}
         <div className="crm-card">

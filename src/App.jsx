@@ -98,6 +98,7 @@ const OwnerApp = lazy(() => import("./pages/owners/OwnerApp"));
 const CrmInventoryOpsPage = lazy(() => import("./pages/crm/CrmInventoryOpsPage"));
 const CrmHome = lazy(() => import("./pages/crm/mobile/CrmHome"));
 const CrmBuildingTenantsPage = lazy(() => import("./pages/crm/CrmBuildingTenantsPage"));
+const CrmTenantViewsPage = lazy(() => import("./pages/crm/CrmTenantViewsPage"));
 const CrmPriorityPage = lazy(() => import("./pages/crm/CrmPriorityPage"));
 const CrmPartnerPayments = lazy(() => import("./pages/crm/mobile/CrmPartnerPayments"));
 const CrmPartnerUsage = lazy(() => import("./pages/crm/mobile/CrmPartnerUsage"));
@@ -121,6 +122,7 @@ function prefetchCrmPage(path) {
     brokers: () => import("./pages/crm/CrmBrokersPage"),
     "broker-leads": () => import("./pages/crm/CrmBrokerLeadsPage"),
     "qr-scans": () => import("./pages/crm/CrmQrScansPage"),
+    "tenant-views": () => import("./pages/crm/CrmTenantViewsPage"),
     "lead-requests": () => import("./pages/crm/CrmLeadRequestsPage"),
     "owner-qr": () => import("./pages/crm/CrmBuildingsPage"),
     societies: () => import("./pages/crm/CrmSocietiesPage"),
@@ -368,6 +370,7 @@ function AppRoutes() {
           <Route path="brokers" element={<CrmBrokersPage />} />
           <Route path="broker-leads" element={<CrmBrokerLeadsPage />} />
           <Route path="qr-scans" element={<CrmQrScansPage />} />
+          <Route path="tenant-views" element={<CrmTenantViewsPage />} />
           <Route path="lead-requests" element={<CrmLeadRequestsPage />} />
           <Route path="owner-qr" element={<CrmBuildingsPage />} />
           <Route path="societies" element={<CrmSocietiesPage />} />

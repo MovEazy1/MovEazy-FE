@@ -3,7 +3,7 @@
  * and top-bar titles. `scope` hides a section from whoever lacks it.
  */
 import {
-  BarChart3, Bell, Briefcase, Target, Building2, CalendarCheck, Columns3, CreditCard, House, Inbox, Landmark,
+  BarChart3, Bell, Briefcase, Target, Building2, CalendarCheck, Columns3, CreditCard, Eye, House, Inbox, Landmark,
   Map as MapIcon, MapPin, QrCode, ScanLine, Settings, ShieldCheck, Smartphone, UserPlus, Users, Wallet, Wrench,
 } from "lucide-react";
 import { SCOPES } from "../../lib/adminScopes";
@@ -16,6 +16,8 @@ export const RAIL = [
   // nobody walks past is a queue nobody clears.
   { to: "/crm/notifications", code: "NF", label: "Notifications", icon: Bell, group: "Tenants" },
   { to: "/crm/pipeline", code: "PI", label: "Pipeline", icon: Columns3, group: "Tenants" },
+  // Who opened which property, and how it went for them — every property.
+  { to: "/crm/tenant-views", code: "TV", label: "Tenant views", icon: Eye, group: "Tenants" },
   { to: "/crm/properties", code: "PR", label: "Properties", icon: Building2, group: "Flats" },
   // The one list of areas every picker shows (tenants, owners, partners, CRM).
   { to: "/crm/areas", code: "AR", label: "Areas", icon: MapPin, group: "Flats" },

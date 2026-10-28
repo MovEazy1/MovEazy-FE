@@ -1,8 +1,9 @@
 // @vitest-environment jsdom
 /**
- * The QR scans screen with a real overview: the numbers, each property, the
- * people who gave contact — and tapping one shows their mobile, Call and
- * WhatsApp, profile and what they opened. Matching tenants are a count only.
+ * The Tenant views screen with a real overview: the numbers, scans by day,
+ * how tenants found the flats, the people — tapping one who gave contact shows
+ * their mobile, Call and WhatsApp, profile and what they opened; one who came
+ * via the MovEazy website shows no number. Matching tenants are a count only.
  */
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { act } from "react";
@@ -12,7 +13,7 @@ import { MemoryRouter } from "react-router-dom";
 globalThis.IS_REACT_ACT_ENVIRONMENT = true;
 
 const OVERVIEW = {
-  scans: 1234, week: 56, people: 2, visited: 1,
+  scans: 1234, week: 56, people: 2, visited: 1, moveazy: 1, liked: 2, disliked: 1, reasons: [{ reason: "ventilation", n: 1 }],
   by_day: Array.from({ length: 14 }, (_, k) => ({ day: `2026-10-${String(15 + k).padStart(2, "0")}`, scans: k === 13 ? 7 : k === 12 ? 3 : 1 })),
   by_place: [
     { kind: "flat", ref: "MZ-1", name: null, scans: 900, week: 40, people: 1 },
@@ -27,6 +28,9 @@ const OVERVIEW = {
       profile: null, places: [{ kind: "building", ref: "b-1", at: "2026-10-25T10:00:00Z", hits: 0, visit: false, called: ["caretaker"] }],
       feedback: [{ kind: "pay_token", note: "", at: "2026-10-25T10:05:00Z", ref: "b-1" }, { kind: "other", note: "No lift?", at: "2026-10-25T10:04:00Z", ref: "b-1" }],
       status: { visit: "done", liked: "liked", liked_status: "will_pay_token", reasons: [], at: "2026-10-26T10:00:00Z" } },
+    { key: "m-neha", user_id: null, name: "Neha Web", phone: "", email: "", at: "2026-10-24T10:00:00Z", visit: false, via: "moveazy",
+      profile: null, places: [{ kind: "flat", ref: "MZ-1", at: "2026-10-24T10:00:00Z", hits: 4, visit: false }],
+      status: { visit: "", liked: "liked", liked_status: "", reasons: [], at: "2026-10-24T11:00:00Z" } },
     { key: "tel:9811122233", user_id: null, name: "Walk In", phone: "9811122233", email: "", at: "2026-10-20T10:00:00Z", visit: false,
       profile: null, places: [{ kind: "building", ref: "b-1", at: "2026-10-20T10:00:00Z", hits: 2, visit: false }] },
   ],
@@ -64,6 +68,11 @@ describe("QR scans", () => {
     expect(text).toContain("1,234");
     expect(text).toContain("+56 this week");
     expect(text).toMatch(/2\s*Gave contact/);
+    expect(text).toMatch(/1\s*Via MovEazy Website/);
+    expect(text).toContain("Tenant views");
+    expect(text).toContain("How tenants found your flats");
+    expect(text).toMatch(/2\s*liked/);
+    expect(text).toContain("Ventilation issue · 1");
     expect(text).toMatch(/1\s*Booked a visit/);
     expect(text).toMatch(/17\s*Matching tenants/);
     // Day by day, not property by property.
@@ -105,6 +114,26 @@ describe("QR scans", () => {
     expect(sheet.textContent).toContain("Where they stand");
     expect(sheet.textContent).toContain("Liked · Will pay token");
     expect(sheet.querySelector('a[href="tel:+919811144455"]')).toBeTruthy();
+  });
+
+  it("a tenant via the MovEazy website: tagged, where they stand, never a number", async () => {
+    const page = await mount();
+    const row = [...page.querySelectorAll("button")].find((b) => b.textContent.includes("Neha Web"));
+    expect(row.textContent).toContain("MovEazy Website");
+    expect(row.textContent).toContain("Liked");
+    await act(async () => row.click());
+    const sheet = page.querySelector("[role=dialog]");
+    expect(sheet.textContent).toContain("Viewed on the MovEazy website");
+    expect(sheet.querySelector('a[href^="tel:"]')).toBeNull();
+    expect(sheet.textContent).toContain("Where they stand");
+  });
+
+  it("filters to MovEazy website tenants", async () => {
+    const page = await mount();
+    const chip = [...page.querySelectorAll("button")].find((b) => b.textContent === "Via MovEazy Website");
+    await act(async () => chip.click());
+    expect(page.textContent).toContain("Neha Web");
+    expect(page.textContent).not.toContain("Walk In");
   });
 
   it("filters to people who booked a visit", async () => {

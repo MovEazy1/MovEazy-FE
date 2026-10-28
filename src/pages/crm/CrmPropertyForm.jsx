@@ -20,6 +20,7 @@ import { InternalDetails, VisitWindow } from "./CrmPropertyInternalFields";
 import CrmPartnerFields from "./CrmPartnerFields";
 import CrmOwnerFields from "./CrmOwnerFields";
 import CrmFlatQr from "./CrmFlatQr";
+import { PropertyTenantViews } from "./CrmTenantViews";
 import { fetchPartnerListingMap } from "../../lib/partners";
 import {
   DEFAULT_POSTING_AMENITIES, FLAT_TYPES, FURNISHINGS, LIFESTYLE, MUST_HAVES, OCCUPANT_OPTIONS,
@@ -1122,6 +1123,18 @@ export default function CrmPropertyForm() {
               building={links?.building || null}
               onToast={showToast}
             />
+          </div>
+        )}
+
+        {/* Every tenant we know who opened it, and how it went for them (tenant_views.sql). */}
+        {isEdit && (
+          <div style={{ padding: "0 16px 24px", maxWidth: 720 }}>
+            <span className="crm-label">Tenant views</span>
+            <p className="crm-mute" style={{ fontSize: 11.5, margin: "4px 0 10px", lineHeight: 1.5 }}>
+              Everyone we can name who opened this property — from a link we sent, the website or the QR. Mark how it went;
+              the owner sees it (without the number) and it's kept for scoring properties.
+            </p>
+            <PropertyTenantViews propertyId={editId} onToast={showToast} />
           </div>
         )}
       </div>

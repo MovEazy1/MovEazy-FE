@@ -40,7 +40,9 @@ export default function CrmBuildingTenantsPage() {
               <Plus size={17} /> Add tenant
             </Btn>
           ) : <div className="crm-mute" style={{ fontSize: 12.5 }}>This building doesn't track tenants yet.</div>}
-          <BuildingTenantsBoard tenants={d.tenants ?? []} onUpdate={b.enabled ? (x) => setEditing(x.track || { phone: x.phone, name: x.name }) : undefined} />
+          <BuildingTenantsBoard tenants={d.tenants ?? []} onUpdate={b.enabled ? (x) => setEditing(x.track || {
+            phone: x.phone, name: x.name, ...(x.status ?? {}), property_ids: (x.views ?? []).map((v) => v.property_id),
+          }) : undefined} />
         </div>
       </div>
       {editing && (

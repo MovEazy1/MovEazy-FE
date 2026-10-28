@@ -125,11 +125,11 @@ export default function OwnerHome() {
       {properties && list.length > 0 && (
         <div className="oz-pad" style={{ paddingTop: 4, paddingBottom: 4 }}>
           <style>{QR_CSS}</style>
-          <Link to={op("/qr-scans")} className="oz-card oh-qr" aria-label="QR scans">
+          <Link to={op("/qr-scans")} className="oz-card oh-qr" aria-label="Tenant views">
             <span className="oh-qr-top">
               <span className="oz-avatar" style={{ background: "var(--deep)", color: "var(--champ)", borderRadius: 12 }}><QrCode size={19} /></span>
               <span style={{ flex: 1, minWidth: 0 }}>
-                <span className="oh-qr-label">QR scans</span>
+                <span className="oh-qr-label">QR scans · Tenant views</span>
                 <span className="oh-qr-num">
                   <b>{qr ? fmtCount(qr.scans) : "…"}</b>
                   {qr && qr.week > 0 && <span className="oh-qr-week">+{fmtCount(qr.week)} this week</span>}
@@ -139,6 +139,7 @@ export default function OwnerHome() {
             </span>
             <span className="oh-qr-split">
               <span><b>{qr ? fmtCount(qr.people) : "…"}</b>Gave contact</span>
+              <span><b>{qr ? fmtCount(qr.moveazy) : "…"}</b>Via MovEazy Website</span>
               <span><b>{qr ? fmtCount(qr.visited) : "…"}</b>Booked a visit</span>
               <span><b>{matches == null ? "…" : fmtCount(matches)}</b>Matching tenants</span>
             </span>
@@ -197,7 +198,7 @@ const QR_CSS = `
 .oh-qr-num{display:flex;align-items:baseline;gap:8px;flex-wrap:wrap}
 .oh-qr-num b{font-size:28px;font-weight:800;letter-spacing:-.02em;line-height:1.1}
 .oh-qr-week{font-size:12.5px;font-weight:700;color:var(--em)}
-.oh-qr-split{display:grid;grid-template-columns:repeat(3,1fr);gap:6px;margin-top:12px}
+.oh-qr-split{display:grid;grid-template-columns:repeat(2,1fr);gap:6px;margin-top:12px}
 .oh-qr-split>span{display:flex;flex-direction:column;gap:2px;background:rgba(255,255,255,.75);border:1px solid #EFE6D2;border-radius:12px;padding:8px 9px;font-size:11.5px;color:var(--dim);line-height:1.25}
 .oh-qr-split b{font-size:17px;font-weight:800;color:var(--ink)}
 `;

@@ -38,7 +38,10 @@ describe("buildings", () => {
   });
 
   it("says where a tenant stands", () => {
-    expect(trackSummary({ visit: "pending", liked: "liked" })).toBe("Visit pending");
+    expect(trackSummary({ visit: "pending" })).toBe("Visit pending");
+    // Liked before a visit: a tenant's swipe, or the team's answer on a property they've only seen online.
+    expect(trackSummary({ visit: "pending", liked: "liked" })).toBe("Liked");
+    expect(trackSummary({ visit: "", liked: "disliked", reasons: ["ventilation"] })).toBe("Did not like · Ventilation issue");
     expect(trackSummary({ visit: "done" })).toBe("Visit done");
     expect(trackSummary({ visit: "done", liked: "liked", liked_status: "will_pay_token" })).toBe("Liked · Will pay token");
     expect(trackSummary({ visit: "done", liked: "disliked", reasons: ["size_small", "No covered parking"] })).toBe("Did not like · Size is small, No covered parking");

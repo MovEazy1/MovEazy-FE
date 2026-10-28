@@ -18,6 +18,8 @@ import { Building2, CalendarClock, Copy, Crown, Gift, IndianRupee, MapPin, Phone
 import { usePartner } from "./PartnerApp";
 import { Chip, Empty, Loading, Sheet, WhatsAppIcon, toast } from "./partnerUi";
 import UpiPay from "./UpiPay";
+import { LeadFlatsViewed, LeadFollowUp } from "./LeadViews";
+import { fetchPartnerLeadViews } from "../../lib/tenantViews";
 import { freeLeadsTopup } from "../../lib/partnerTenants";
 import { friendlyError, pp, waLink } from "../../lib/partners";
 import {
@@ -49,7 +51,7 @@ function Bar({ label, n, max }) {
 
 /* ── One assigned lead ────────────────────────────────────────────────────── */
 
-function AssignedLead({ lead, me, onChanged, onClose }) {
+function AssignedLead({ lead, me, views, onChanged, onClose }) {
   const [busy, setBusy] = useState(false);
   const reach = async (channel) => {
     // Opened first: a phone may not wait for the network before leaving the page.
@@ -95,8 +97,10 @@ function AssignedLead({ lead, me, onChanged, onClose }) {
               <Chip key={s} on={lead.status === s} disabled={busy} onClick={() => setStatus(s)}>{ASSIGNED_STATUS[s]}</Chip>
             ))}
           </div>
+          <LeadFollowUp lead={lead} info={views} onChanged={onChanged} />
         </>
       )}
+      <LeadFlatsViewed lead={lead} info={views} onChanged={onChanged} />
     </div>
   );
 }
@@ -285,6 +289,8 @@ export default function MoveazyLeads({ me: meProp = null, onAssigned = null }) {
   const [err, setErr] = useState("");
   const [requests, setRequests] = useState([]);
   const [assigned, setAssigned] = useState(null);
+  // Per lead: the follow-up, and the partner's flats they viewed (tenant_views.sql).
+  const [leadViews, setLeadViews] = useState(() => new Map());
   const [asking, setAsking] = useState(null);
   const [closing, setClosing] = useState(null);
   const [allSets, setAllSets] = useState(false);
@@ -302,6 +308,7 @@ export default function MoveazyLeads({ me: meProp = null, onAssigned = null }) {
     fetchLeadStats().then(setStats, (e) => setErr(friendlyError(e, "Couldn't load MovEazy leads.")));
     fetchMyLeadRequests().then(setRequests, () => setRequests([]));
     fetchMyAssignedLeads().then((r) => { setAssigned(r); onAssigned?.(r); }, () => setAssigned([]));
+    fetchPartnerLeadViews().then(setLeadViews);
   }, [onAssigned]);
   useEffect(() => {
     let alive = true;
@@ -348,7 +355,7 @@ export default function MoveazyLeads({ me: meProp = null, onAssigned = null }) {
             <strong style={{ fontSize: 16 }}>My assigned leads · {assigned.length}</strong>
             <span className="pz-hint" style={{ display: "block" }}>From MovEazy. WhatsApp and calls are noted so MovEazy knows who reached out.</span>
           </div>
-          {assigned.map((l) => <AssignedLead key={l.id} lead={l} me={me} onChanged={load} onClose={setClosing} />)}
+          {assigned.map((l) => <AssignedLead key={l.id} lead={l} me={me} views={leadViews.get(l.id)} onChanged={load} onClose={setClosing} />)}
         </div>
       )}
 
