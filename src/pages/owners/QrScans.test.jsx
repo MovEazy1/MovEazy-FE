@@ -13,6 +13,7 @@ globalThis.IS_REACT_ACT_ENVIRONMENT = true;
 
 const OVERVIEW = {
   scans: 1234, week: 56, people: 2, visited: 1,
+  by_day: Array.from({ length: 14 }, (_, k) => ({ day: `2026-10-${String(15 + k).padStart(2, "0")}`, scans: k === 13 ? 7 : k === 12 ? 3 : 1 })),
   by_place: [
     { kind: "flat", ref: "MZ-1", name: null, scans: 900, week: 40, people: 1 },
     { kind: "building", ref: "b-1", name: "Sunrise Residency", scans: 334, week: 16, people: 1 },
@@ -65,8 +66,13 @@ describe("QR scans", () => {
     expect(text).toMatch(/2\s*Gave contact/);
     expect(text).toMatch(/1\s*Booked a visit/);
     expect(text).toMatch(/17\s*Matching tenants/);
-    expect(text).toContain("12 matching");
-    expect(text).toContain("Sunrise Residency");
+    // Day by day, not property by property.
+    expect(text).toContain("Scans by day");
+    expect(text).not.toContain("By property");
+    expect(text).not.toContain("12 matching");
+    expect(text).toMatch(/7\s*scans · Today/);
+    expect(text).toContain("Yesterday 3");
+    expect(page.querySelectorAll(".qs-bars button").length).toBe(14);
     expect(text).toContain("Ravi Kumar");
     expect(text).toContain("Walk In");
     // A match is a count: no matching tenant's name or number anywhere.

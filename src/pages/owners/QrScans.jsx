@@ -3,8 +3,8 @@
  * QR on the door or a shared link (owner_qr_overview.sql): the total and this
  * week, how many of those people gave their contact or booked a visit, how
  * many MovEazy tenants match the flats on rent (a count — lib/ownerMatches.js),
- * each property's numbers, and the people themselves: tap one for their
- * mobile, profile and what they opened.
+ * scans day by day for the last two weeks, and the people themselves: tap one
+ * for their mobile, profile and what they opened.
  */
 import { useEffect, useMemo, useState } from "react";
 import { Link } from "react-router-dom";
@@ -56,7 +56,6 @@ export default function QrScans() {
   if (!d) return <><TopBar title="QR scans" back={op("/")} /><Empty>Couldn't load your scans. Try again in a moment.</Empty></>;
 
   const people = (d.list ?? []).filter((p) => only === "all" || p.visit);
-  const places = d.by_place ?? [];
 
   return (
     <>
@@ -81,30 +80,8 @@ export default function QrScans() {
           details stay private.
         </p>
 
-        <h2 className="oz-h2">By property</h2>
-        {places.length === 0 ? <Empty icon={<QrCode size={24} />}>No flats or buildings yet.</Empty> : (
-          <div className="oz-card" style={{ marginBottom: 8 }}>
-            {places.map((p) => {
-              const m = p.kind === "flat" ? matches?.byProperty.get(p.ref) : null;
-              return (
-                <Link key={`${p.kind}-${p.ref}`} className="oz-menurow"
-                  to={p.kind === "building" ? op(`/buildings/${p.ref}`) : op(`/properties/${p.ref}/leads`)}>
-                  <span className="oz-avatar" style={{ background: "var(--champ2)", color: "var(--champ3)" }}>
-                    {p.kind === "building" ? <Building2 size={18} /> : <QrCode size={18} />}
-                  </span>
-                  <span style={{ flex: 1, minWidth: 0 }}>
-                    <strong style={{ fontWeight: 600 }}>{placeName(p.kind, p.ref)}</strong>
-                    <span className="oz-sub">
-                      {fmt(p.week)} this week · {fmt(p.people)} gave contact{m != null ? ` · ${fmt(m)} matching` : ""}
-                    </span>
-                  </span>
-                  <span className="qs-count">{fmt(p.scans)}<small>scans</small></span>
-                  <ChevronRight size={18} color="#94A09B" />
-                </Link>
-              );
-            })}
-          </div>
-        )}
+        <h2 className="oz-h2">Scans by day</h2>
+        <DayBars days={d.by_day ?? []} />
         <Link to={op("/rent-dashboard")} className="oz-btn oz-btn--ghost" style={{ marginBottom: 18 }}>
           <QrCode size={16} /> QR posters for your flats <ChevronRight size={16} />
         </Link>
@@ -147,6 +124,33 @@ export default function QrScans() {
 
       {open && <PersonSheet p={open} placeName={placeName} onClose={() => setOpen(null)} />}
     </>
+  );
+}
+
+/** The last 14 days as bars, today on the right; tap a bar for its day. */
+function DayBars({ days }) {
+  const [pick, setPick] = useState(null);
+  if (!days.length) return null;
+  const max = Math.max(1, ...days.map((x) => Number(x.scans) || 0));
+  const label = (day, k) => (k === days.length - 1 ? "Today" : k === days.length - 2 ? "Yesterday"
+    : new Date(`${day}T00:00`).toLocaleDateString("en-IN", { weekday: "short", day: "numeric", month: "short" }));
+  const shown = pick ?? days.length - 1;
+  return (
+    <div className="oz-card qs-days" style={{ marginBottom: 8 }}>
+      <div className="qs-days-top">
+        <span><b>{fmt(days[shown].scans)}</b> scan{Number(days[shown].scans) === 1 ? "" : "s"} · {label(days[shown].day, shown)}</span>
+        {pick == null && days.length > 1 && <span className="oz-meta">Yesterday {fmt(days[days.length - 2].scans)}</span>}
+      </div>
+      <div className="qs-bars" role="list">
+        {days.map((x, k) => (
+          <button key={x.day} type="button" role="listitem" className={k === shown ? "on" : ""} onClick={() => setPick(k === pick ? null : k)}
+            aria-label={`${label(x.day, k)}: ${fmt(x.scans)} scans`}>
+            <i style={{ height: `${Math.max(4, Math.round(((Number(x.scans) || 0) / max) * 100))}%` }} />
+          </button>
+        ))}
+      </div>
+      <div className="qs-days-axis"><span>{label(days[0].day, 0)}</span><span>Today</span></div>
+    </div>
   );
 }
 
@@ -230,8 +234,14 @@ const CSS = `
 .qs-tiles svg{color:var(--champ)}
 .qs-tiles b{font-size:19px;font-weight:800}
 .qs-tiles span{font-size:11.5px;opacity:.85;line-height:1.25}
-.qs-count{display:flex;flex-direction:column;align-items:flex-end;font-weight:800;font-size:16px;line-height:1.1;margin-right:2px}
-.qs-count small{font-size:10.5px;font-weight:600;color:var(--mute)}
+.qs-days{padding:14px}
+.qs-days-top{display:flex;justify-content:space-between;align-items:baseline;gap:8px;font-size:13.5px;color:var(--dim)}
+.qs-days-top b{font-size:20px;color:var(--ink);font-weight:800}
+.qs-bars{display:grid;grid-template-columns:repeat(14,1fr);gap:4px;align-items:end;height:110px;margin-top:12px}
+.qs-bars button{height:100%;display:flex;align-items:flex-end;border:0;background:none;padding:0;cursor:pointer}
+.qs-bars i{display:block;width:100%;border-radius:5px 5px 2px 2px;background:var(--champ2);transition:background .15s}
+.qs-bars button.on i{background:var(--em)}
+.qs-days-axis{display:flex;justify-content:space-between;font-size:11px;color:var(--mute);margin-top:6px}
 .qs-person{width:100%;background:none;border:0;font:inherit;text-align:left;cursor:pointer;color:inherit}
 .qs-line{display:flex;align-items:center;gap:10px;padding:7px 0;font-size:14px;color:var(--ink);word-break:break-word}
 .qs-line>svg{flex:none;color:var(--dim)}
