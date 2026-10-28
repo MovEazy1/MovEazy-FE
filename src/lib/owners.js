@@ -11,6 +11,7 @@
  * Out of scope for V1, deliberately: rent collection, payment history, dues,
  * receipts and bank details.
  */
+import { trackPixel } from "./metaPixel";
 import { supabase, isSupabaseConfigured } from "./supabase";
 import { buildInventoryRow, generatePropertyId, isMissingColumn, withoutOptionalColumns } from "./inventory";
 import { propertyLink } from "./crmSettings";
@@ -186,6 +187,7 @@ export async function createOwnerProperty(draft, user) {
     throw error;
   }
   await rpc("owner_claim_property", { p_property: propertyId });
+  trackPixel("OwnerListing", { content_ids: [propertyId], content_category: "owner" }, { custom: true, user: { phone: user?.phone } });
   return propertyId;
 }
 

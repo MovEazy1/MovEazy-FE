@@ -6,6 +6,7 @@
  * The authority is MovEazy-BE/supabase/flat_insights.sql: who sees a number
  * and who writes feedback is decided there. This file only calls it.
  */
+import { trackPixel } from "./metaPixel";
 import { supabase, isSupabaseConfigured } from "./supabase";
 import { PUBLIC_ORIGIN } from "./partners";
 import { visitorId } from "./storefront";
@@ -25,6 +26,7 @@ export const flatDisplay = (propertyId) => `moveazy.co.in/property/${propertyId}
 
 /** Count this visitor's open of a flat's page (the QR adds ?s=qr). Never throws. */
 export function recordFlatView(propertyId, source) {
+  trackPixel("ViewContent", { content_ids: [String(propertyId || "")], content_type: "home_listing", content_name: source || "link" });
   return rpc("flat_view", {
     p_property: String(propertyId || ""), p_visitor: visitorId() || "anonymous-visitor", p_source: source === "qr" ? "qr" : "link",
   }).catch(() => {});

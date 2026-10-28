@@ -9,6 +9,7 @@
  * requirement that merely fits a flat is never a lead. Plus the ranking boost: partners on
  * trial or Premium have their flats float up when they fit.
  */
+import { trackPixel } from "./metaPixel";
 import { supabase, isSupabaseConfigured } from "./supabase";
 import { visitorId } from "./storefront";
 
@@ -41,8 +42,10 @@ export function rankBoosted(rows, boosted, idOf) {
 }
 
 /* ── The tenant's side ─────────────────────────────────────────────────── */
-export const reportContactTap = (propertyId, channel = "whatsapp") =>
-  rpc("flat_contact_tap", { p_property: String(propertyId || ""), p_channel: channel === "call" ? "call" : "whatsapp" }).catch(() => {});
+export const reportContactTap = (propertyId, channel = "whatsapp") => {
+  trackPixel("Contact", { content_ids: [String(propertyId || "")], content_type: "home_listing", content_name: channel });
+  return rpc("flat_contact_tap", { p_property: String(propertyId || ""), p_channel: channel === "call" ? "call" : "whatsapp" }).catch(() => {});
+};
 
 /**
  * Once per tab after signing in with a number: partner flats opened on this

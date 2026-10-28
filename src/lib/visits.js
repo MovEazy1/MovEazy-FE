@@ -1,3 +1,4 @@
+import { trackPixel } from "./metaPixel";
 import { supabase, isSupabaseConfigured } from "./supabase";
 
 /**
@@ -165,6 +166,7 @@ export async function bookIndividual(uid, propertyId, slotAt) {
     { onConflict: "user_id,property_id" }
   );
   if (error) throw error;
+  trackPixel("Schedule", { content_ids: [propertyId], content_type: "home_listing" });
 }
 
 /**
@@ -185,6 +187,7 @@ export async function requestNextAvailableVisit(uid, propertyId, preferredSlotAt
     { onConflict: "user_id,property_id" }
   );
   if (error) throw error;
+  trackPixel("Schedule", { content_ids: [propertyId], content_type: "home_listing" });
 }
 
 /**
@@ -200,6 +203,7 @@ export async function bookCombined(uid, propertyIds, slotAt, { fee = 1000 } = {}
   }));
   const { error } = await supabase.from("visit_bookings").upsert(rows, { onConflict: "user_id,property_id" });
   if (error) throw error;
+  trackPixel("Schedule", { content_ids: propertyIds, content_type: "home_listing", value: fee, currency: "INR" });
   return groupId;
 }
 

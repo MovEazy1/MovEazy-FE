@@ -7,6 +7,7 @@ import { recordMarketingClickFromUrl } from "../lib/marketingClicks";
 import { captureAttribution } from "../lib/attribution";
 import { useAuth } from "../context/AuthContext";
 import { startAppAnalytics, trackScreen } from "../lib/appAnalytics";
+import { trackPageView } from "../lib/metaPixel";
 
 export function useSessionTracking() {
   const location = useLocation();
@@ -17,6 +18,8 @@ export function useSessionTracking() {
     sessionTracker.trackPageChange(location.pathname);
     // In the partner and owner apps, each screen opened is part of the session's timeline.
     trackScreen(location.pathname);
+    // Meta pixel: the public site only (lib/metaPixel.js decides).
+    trackPageView(location.pathname);
   }, [location]);
 
   // Partner and owner apps: every button pressed, for the CRM's App analytics.

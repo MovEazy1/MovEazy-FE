@@ -1,3 +1,4 @@
+import { trackPixel } from "./metaPixel";
 import { supabase, isSupabaseConfigured } from "./supabase";
 import { isEmailAdminAllowed } from "./adminAccess";
 import { signupAttribution } from "./attribution";
@@ -107,6 +108,18 @@ function isFreshAccount(sbUser) {
 export async function recordSignupAttribution(sbUser, { force = false } = {}) {
   if (!sbUser?.id || !isSupabaseConfigured || !supabase) return null;
   if (!force && !isFreshAccount(sbUser)) return null;
+
+  // Meta pixel: once per account, on the browser that created it.
+  try {
+    const k = `mz-px-reg-${sbUser.id}`;
+    if (!localStorage.getItem(k)) {
+      localStorage.setItem(k, "1");
+      trackPixel("CompleteRegistration", { content_category: sbUser.user_metadata?.role || "customer" },
+        { user: { email: sbUser.email, phone: sbUser.phone || sbUser.user_metadata?.phone } });
+    }
+  } catch {
+    /* storage blocked: skip rather than risk counting every sign-in */
+  }
 
   const attribution = signupAttribution();
   if (!attribution) return null;

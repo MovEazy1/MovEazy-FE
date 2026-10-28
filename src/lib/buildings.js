@@ -5,6 +5,7 @@
  * The authority is MovEazy-BE/supabase/owner_buildings.sql: who may see a
  * number, move a visit or book a flat is decided there. This file only calls it.
  */
+import { trackPixel } from "./metaPixel";
 import { supabase, isSupabaseConfigured } from "./supabase";
 import { PUBLIC_ORIGIN } from "./partners";
 import { visitorId } from "./storefront";
@@ -117,6 +118,10 @@ export const requestBuildingVisit = (code, { name, phone, propertyIds = [], visi
   rpc("building_request_visit", {
     p_code: code, p_visitor: visitorId() || "", p_name: name, p_phone: phone, p_properties: propertyIds,
     p_visit_at: visitAt ? visitAt.toISOString() : null, p_note: note,
+  }).then((r) => {
+    trackPixel("Lead", { content_category: "tenant", content_name: "building_visit" }, { user: { phone } });
+    trackPixel("Schedule", { content_ids: propertyIds, content_type: "home_listing" }, { user: { phone } });
+    return r;
   });
 
 /**
