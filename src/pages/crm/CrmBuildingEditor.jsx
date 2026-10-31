@@ -30,6 +30,7 @@ import { moveByKey, useDragReorder } from "../../hooks/useDragReorder";
 import { BUILDING_AMENITIES } from "../owners/BuildingForm";
 import PhotoReview from "../../components/PhotoReview";
 import { initialCoverFor, keptCover, photosChanged, savedCoverUrl, splitCover, withCover } from "../../lib/photoReview";
+import CrmAdLink from "./CrmAdLink";
 
 const MAX_PHOTOS = 30;
 
@@ -492,6 +493,12 @@ export default function CrmBuildingEditor() {
                     btnClass="crm-btn crm-btn--primary" softClass="crm-btn" onToast={say} previewWidth={240} />
                 </div>
                 <a href={buildingUrl(code)} target="_blank" rel="noreferrer" style={{ fontSize: 12, color: C.accent }}>/building/{code}</a>
+              </div>
+            ) : null}
+            {code ? (
+              <div style={card}>
+                <span className="crm-label">Meta ad page</span>
+                <CrmAdLink kind="building" refId={code} onToast={say} />
               </div>
             ) : (
               <div style={{ ...card, color: C.textMute, fontSize: 12 }}>Save to get the building's QR poster.</div>

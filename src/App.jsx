@@ -47,6 +47,7 @@ const Terms = lazy(() => import("./pages/Terms"));
 const Storefront = lazy(() => import("./pages/Storefront"));
 const CuratedSwipe = lazy(() => import("./pages/CuratedSwipe"));
 const BuildingPage = lazy(() => import("./pages/BuildingPage"));
+const VisitAdPage = lazy(() => import("./pages/VisitAdPage"));
 const TenantPreview = lazy(() => import("./pages/tenant/TenantPreview"));
 const TenantProfilePage = lazy(() => import("./pages/tenant/TenantProfilePage"));
 const Privacy = lazy(() => import("./pages/Privacy"));
@@ -301,8 +302,10 @@ function AppRoutes() {
         {/* A broker's storefront: what their printed QR poster opens. */}
         <Route path="/b/:code" element={<Storefront />} />
         <Route path="/building/:code" element={<BuildingPage />} />
-        {/* The ads landing page: same building, Schedule a visit (mobile OTP → slot). */}
-        <Route path="/visit/:code" element={<BuildingPage visit />} />
+        {/* Meta ad landing pages: one button, Schedule a visit (visit_ad_pages.sql). /visit/<building code>,
+            the earlier building-only address, opens the building's page too. */}
+        <Route path="/visit/b/:code" element={<VisitAdPage kind="building" />} />
+        <Route path="/visit/:id" element={<VisitAdPage kind="flat" />} />
         {/* A partner broker's curated list for their tenant (not MovEazy's /curated). */}
         <Route path="/c/:token" element={<CuratedSwipe />} />
         {/* The shortlist our team curated for one person. With a token it is the

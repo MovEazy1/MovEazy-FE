@@ -23,6 +23,7 @@ import {
   fetchVisitBookings, groupBy, markConfirmationSent, markReminderSent, summariseVisits,
 } from "../../lib/crmVisits";
 import { buildTemplateVars, renderTemplate, whatsappUrl } from "../../lib/crmSettings";
+import { adSourceLabel, fetchAdVisits, stampAdVisit } from "../../lib/visitAds";
 import { SCOPES } from "../../lib/adminScopes";
 import { Btn, C, Chip, Empty, Loading, Toast, inr } from "./crmUi";
 
@@ -104,7 +105,9 @@ export default function CrmVisitsPage() {
 
   const load = useCallback(async () => {
     setLoading(true);
-    const rows = await fetchVisitBookings();
+    // Visits booked on a Meta ad page come with their number, no account (visit_ad_pages.sql).
+    const [own, ads] = await Promise.all([fetchVisitBookings(), fetchAdVisits()]);
+    const rows = [...own, ...ads];
     setBookings(rows);
     // Anyone who booked before crm_visit_sync.sql was running has no client
     // row; without their name and number this screen can't do its job.
@@ -123,6 +126,8 @@ export default function CrmVisitsPage() {
     for (const c of clients ?? []) if (c.user_id) m.set(c.user_id, c);
     return m;
   }, [clients]);
+
+  const clientById = useMemo(() => new Map((clients ?? []).map((c) => [c.id, c])), [clients]);
 
   const profileByUser = useMemo(
     () => new Map(strangers.map((p) => [p.id, p])),
@@ -144,15 +149,15 @@ export default function CrmVisitsPage() {
     const needle = q.trim().toLowerCase();
     return bookings
       .map((b) => {
-        const client = clientByUser.get(b.user_id) || null;
+        const client = clientByUser.get(b.user_id) || (b.client_id ? clientById.get(b.client_id) : null) || null;
         const profile = profileByUser.get(b.user_id) || null;
         const listing = listingById.get(b.property_id) || null;
         return {
           booking: b,
           client,
           listing,
-          name: client?.name || profile?.name || profile?.email || "Unknown visitor",
-          phone: client?.phone || profile?.phone || "",
+          name: client?.name || b.name || profile?.name || profile?.email || "Unknown visitor",
+          phone: client?.phone || b.phone || profile?.phone || "",
           state: dueState(b, now),
         };
       })
@@ -169,7 +174,7 @@ export default function CrmVisitsPage() {
         return [r.name, r.phone, r.booking.property_id, r.listing?.area, r.listing?.title]
           .join(" ").toLowerCase().includes(needle);
       });
-  }, [bookings, clientByUser, profileByUser, listingById, filter, q, now]);
+  }, [bookings, clientByUser, clientById, profileByUser, listingById, filter, q, now]);
 
   const summary = useMemo(() => summariseVisits(bookings, now), [bookings, now]);
 
@@ -201,7 +206,7 @@ export default function CrmVisitsPage() {
 
     setBusy(booking.id);
     try {
-      const updated = kind === "reminder"
+      const updated = booking.ad ? await stampAd(booking, kind, false) : kind === "reminder"
         ? await markReminderSent(booking.id, user?.email || "")
         : await markConfirmationSent(booking.id, user?.email || "");
       setBookings((cur) => cur.map((b) => (b.id === updated.id ? updated : b)));
@@ -213,10 +218,19 @@ export default function CrmVisitsPage() {
     }
   };
 
+  /** An ad visit's stamp goes through crm_ad_visit_stamp; the row is updated here. */
+  const stampAd = async (booking, kind, clear) => {
+    await stampAdVisit(booking.adId, kind, clear);
+    const at = clear ? null : new Date().toISOString();
+    const by = clear ? "" : user?.email || "";
+    return kind === "reminder" ? { ...booking, reminder_sent_at: at, reminder_sent_by: by }
+      : { ...booking, confirmation_sent_at: at, confirmation_sent_by: by };
+  };
+
   const unsend = async (row, kind) => {
     setBusy(row.booking.id);
     try {
-      const updated = kind === "reminder"
+      const updated = row.booking.ad ? await stampAd(row.booking, kind, true) : kind === "reminder"
         ? await clearReminderSent(row.booking.id)
         : await clearConfirmationSent(row.booking.id);
       setBookings((cur) => cur.map((b) => (b.id === updated.id ? updated : b)));
@@ -236,7 +250,7 @@ export default function CrmVisitsPage() {
         .map((g) => ({ ...g, title: dayLabel(g.key), sub: `${g.items.length} visit${g.items.length === 1 ? "" : "s"}` }));
     }
     if (view === "client") {
-      return groupBy(rows, (r) => r.booking.user_id || r.name, rowTime)
+      return groupBy(rows, (r) => r.booking.user_id || r.client?.id || r.phone || r.name, rowTime)
         .map((g) => ({
           ...g,
           title: g.items[0].name,
@@ -251,7 +265,7 @@ export default function CrmVisitsPage() {
         const l = g.items[0].listing;
         return {
           ...g,
-          title: l ? `${l.flat_type || "Home"} · ${l.area || ""}`.trim() : g.key || "Unknown property",
+          title: l ? `${l.flat_type || "Home"} · ${l.area || ""}`.trim() : g.items[0].booking.building?.name || g.key || "Unknown property",
           sub: [g.key, l ? inr(l.rent) : "", `${g.items.length} visit${g.items.length === 1 ? "" : "s"}`]
             .filter(Boolean).join(" · "),
         };
@@ -282,14 +296,17 @@ export default function CrmVisitsPage() {
         )}
         {showProperty && (
           <span className="crm-num" style={{ fontSize: 11.5, color: C.accent }}>
-            {b.property_id}
-            {r.listing?.area ? <span className="crm-mute"> · {r.listing.area}</span> : null}
+            {b.building ? b.building.name : b.property_id}
+            {r.listing?.area || b.building?.area ? <span className="crm-mute"> · {r.listing?.area || b.building.area}</span> : null}
           </span>
         )}
         {!showTime && b.slot_at && (
           <span className="crm-mute crm-num" style={{ fontSize: 11.5 }}>
             {dayLabel(dayKey(b.slot_at)).split(" · ")[0]}, {timeOf(b.slot_at)}
           </span>
+        )}
+        {b.ad && (
+          <span title="Booked on the property's ad page" style={{ fontSize: 11, fontWeight: 700, color: C.accent }}>{adSourceLabel(b.utm)}</span>
         )}
         {b.kind === "instant" && (
           <span title="Walked in through the building QR's instant visit" style={{ fontSize: 11, fontWeight: 700, color: C.gold }}>⚡ Instant visit</span>

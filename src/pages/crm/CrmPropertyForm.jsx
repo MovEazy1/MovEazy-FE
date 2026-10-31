@@ -21,6 +21,7 @@ import CrmPartnerFields from "./CrmPartnerFields";
 import CrmOwnerFields from "./CrmOwnerFields";
 import CrmFlatQr from "./CrmFlatQr";
 import { PropertyTenantViews } from "./CrmTenantViews";
+import CrmAdLink from "./CrmAdLink";
 import { fetchPartnerListingMap } from "../../lib/partners";
 import {
   DEFAULT_POSTING_AMENITIES, FLAT_TYPES, FURNISHINGS, LIFESTYLE, MUST_HAVES, OCCUPANT_OPTIONS,
@@ -1123,6 +1124,14 @@ export default function CrmPropertyForm() {
               building={links?.building || null}
               onToast={showToast}
             />
+          </div>
+        )}
+
+        {/* The page for Meta ads: photos, details, one Schedule a visit button (visit_ad_pages.sql). */}
+        {isEdit && (
+          <div style={{ padding: "0 16px 24px", maxWidth: 720 }}>
+            <span className="crm-label">Meta ad page</span>
+            <div style={{ marginTop: 8 }}><CrmAdLink kind="flat" refId={editId} onToast={showToast} /></div>
           </div>
         )}
 

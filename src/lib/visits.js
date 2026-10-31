@@ -30,6 +30,30 @@ export async function setReaction(uid, propertyId, reaction, current) {
   return reaction;
 }
 
+/* ── Visit slots ───────────────────────────────────────────────────────────── */
+export const DEFAULT_SLOT_HOURS = [10, 11, 12, 13, 14, 15, 16, 17]; // 10 am – 6 pm, an hour each (IST)
+
+/**
+ * The visit times every property offers when the team hasn't set its own:
+ * each day for `days` days, on the hour from 10 am to 5 pm India time, and
+ * never within the next hour. Same shape as a team slot, marked default.
+ * visit_ad_pages.sql accepts exactly these.
+ */
+export function defaultVisitSlots({ days = 7, now = Date.now() } = {}) {
+  const out = [];
+  const today = new Date(now).toLocaleDateString("en-CA", { timeZone: "Asia/Kolkata" });
+  const base = new Date(`${today}T00:00:00+05:30`).getTime();
+  for (let d = 0; d < days; d++) {
+    for (const h of DEFAULT_SLOT_HOURS) {
+      const at = base + d * 86400000 + h * 3600000;
+      if (at < now + 3600000) continue;
+      const iso = new Date(at).toISOString();
+      out.push({ id: `default-${iso}`, slot_at: iso, capacity: null, default: true });
+    }
+  }
+  return out;
+}
+
 /* ── Visit slots (admin-entered) ───────────────────────────────────────────── */
 /** { [property_id]: [{id, slot_at, capacity}] } for the given properties, future slots only. */
 export async function fetchSlotsFor(propertyIds = []) {
@@ -51,8 +75,16 @@ export async function fetchSlotsFor(propertyIds = []) {
  * `days` days (default 7), not every slot an owner has ever set up. Same
  * shape as fetchSlotsFor — { [property_id]: [slot, ...] } — just bounded, so
  * a far-future custom date doesn't show up as bookable months in advance.
+ * A property the team hasn't set times for gets the default: every day,
+ * 10 am – 6 pm, for the next 7 days (defaultVisitSlots).
  */
 export async function fetchOpenVisitsFor(propertyIds = [], { days = 7 } = {}) {
+  const team = await fetchTeamVisitsFor(propertyIds, { days });
+  const fallback = defaultVisitSlots({ days: Math.min(days, 7) });
+  return Object.fromEntries(propertyIds.map((pid) => [pid, team[pid]?.length ? team[pid] : fallback]));
+}
+
+async function fetchTeamVisitsFor(propertyIds = [], { days = 7 } = {}) {
   if (!isSupabaseConfigured || !supabase || !propertyIds.length) return {};
   const now = new Date();
   const until = new Date(now.getTime() + days * 86400000);
