@@ -189,7 +189,7 @@ export default function BuildingPage({ visit = false }) {
       <div className="bp-cta">
         {visit ? (
           <>
-            <div className="bp-cta-sub"><ShieldCheck size={13} /> Free visit · no brokerage to book · takes 30 seconds</div>
+            <div className="bp-cta-sub"><ShieldCheck size={13} /> Free visit · verified flats · takes 30 seconds</div>
             <button type="button" className="bp-btn bp-btn--primary bp-btn--block" onClick={() => setBooking({ flat: null })}>
               <CalendarCheck size={19} /> Schedule a visit
             </button>
@@ -690,7 +690,7 @@ function VisitSheet({ code, building, flats, flatId, onClose }) {
               style={{ marginTop: 16 }} disabled={busy || otpOn === null}>
               {busy ? "Please wait…" : otpOn === false && !signedIn ? <><GoogleMark /> Continue with Google</> : otpOn ? "Send OTP" : "Continue"}
             </button>
-            <p className="bp-fine">Your number is only used to set up your visit. No spam, no brokers calling you.</p>
+            <p className="bp-fine">Your number is only used to set up your visit.</p>
           </form>
         )}
 
