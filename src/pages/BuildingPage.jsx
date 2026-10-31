@@ -7,19 +7,27 @@
  * can show the flats right away — and its property manager, MovEazy's team
  * number where the CRM hasn't set one. Back from the call, they say how it
  * went; "call not picked" offers the manager at once (building_call_desk.sql).
+ *
+ * moveazy.co.in/visit/<code> is the same page for ads: the one button is
+ * Schedule a visit — the tenant's mobile, verified by SMS code, then a day and
+ * a time (building_request_visit). See VisitSheet below.
  */
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useParams, useSearchParams } from "react-router-dom";
 import { useAuth } from "../context/AuthContext";
-import { ArrowUpDown, BadgeCheck, Building2, Check, ChevronLeft, Film, Images, Layers, MapPin, MessageCircle, Phone, X, Zap } from "lucide-react";
+import { supabase } from "../lib/supabase";
+import { ArrowUpDown, BadgeCheck, Building2, CalendarCheck, Check, ChevronLeft, Clock, Film, Images, Layers, MapPin, MessageCircle, Phone, ShieldCheck, X, Zap } from "lucide-react";
 import { MediaItem, listingCover, listingMedia } from "./partners/partnerMedia";
 import { useSnapTrack } from "../hooks/useSnapTrack";
 import { usePhotoViewer } from "../hooks/usePhotoViewer";
 import { inr } from "../lib/partners";
 import {
-  CALL_FEEDBACK, FLAT_SORTS, buildingCallDesk, fetchBuildingPage, flatsByFloor, floorLabel, recordBuildingView, shortInr, sortFlats,
+  CALL_FEEDBACK, FLAT_SORTS, buildingCallDesk, cleanMobile, fetchBuildingPage, flatsByFloor, floorLabel, isMobile, nextDays, recordBuildingView,
+  requestBuildingVisit, shortInr, sortFlats, visitTimes, visitWhen,
 } from "../lib/buildings";
-import { leadSnapshot } from "../lib/leadIntake";
+import { leadSnapshot, saveLead } from "../lib/leadIntake";
+import { OTP_LENGTH, RESEND_AFTER_S, accountHasVerifiedMobile, phoneOtpAvailable, sendOtp, verifyOtp } from "../lib/phoneOtp";
+import { trackPixelOnce } from "../lib/metaPixel";
 import RequirePhoneFirst from "../components/RequirePhoneFirst";
 import logo from "../assets/logo/moveazy-logo-mint-light.png";
 
@@ -39,14 +47,30 @@ const bhk = (f) => f.flat_type || (f.bedrooms ? `${f.bedrooms} BHK` : "Flat");
 /** "Flat 302 · 2 BHK" when MovEazy set a house number, else "2 BHK". */
 const flatName = (f) => (f.unit_no ? `Flat ${f.unit_no} · ${bhk(f)}` : bhk(f));
 
-export default function BuildingPage() {
+// A visit booking in progress across the Google sign-in redirect (the fallback
+// while SMS codes are off): which building, who, and which flat.
+const DRAFT_KEY = "mz_visit_draft";
+function readDraft(code) {
+  try {
+    const d = JSON.parse(sessionStorage.getItem(DRAFT_KEY) || "null");
+    return d && d.code === code && Date.now() - (d.at || 0) < 30 * 60 * 1000 ? d : null;
+  } catch { return null; }
+}
+function saveDraft(d) {
+  try { if (d) sessionStorage.setItem(DRAFT_KEY, JSON.stringify({ ...d, at: Date.now() })); else sessionStorage.removeItem(DRAFT_KEY); } catch { /* private tab */ }
+}
+
+/** `visit`: the ads page, /visit/<code> — Schedule a visit instead of Call Caretaker. */
+export default function BuildingPage({ visit = false }) {
   const { code: raw = "" } = useParams();
   const code = raw.toUpperCase();
   const [params] = useSearchParams();
   const [b, setB] = useState(undefined); // undefined loading · null not found
   const [open, setOpen] = useState(null); // a flat, in the detail sheet
   // The Call Caretaker sheet; open again on the feedback when a call was just made.
-  const [calling, setCalling] = useState(() => Boolean(readCalled(code)));
+  const [calling, setCalling] = useState(() => !visit && Boolean(readCalled(code)));
+  // Visit mode: the Schedule a visit sheet, and the flat it was opened from. Back from Google, it reopens.
+  const [booking, setBooking] = useState(() => (visit && readDraft(code) ? { flat: readDraft(code).flat || null } : null));
   const [floorOn, setFloorOn] = useState("all");
   const [sortBy, setSortBy] = useState("popular");
   const counted = useRef(false);
@@ -109,6 +133,7 @@ export default function BuildingPage() {
 
       <section className="bp-head">
         <div className="bp-verified"><BadgeCheck size={15} /> Listed with MovEazy</div>
+        {visit && available.length > 0 && <div className="bp-live"><i /> {available.length} flat{available.length === 1 ? "" : "s"} ready to see · visits today</div>}
         <h1>{b.name}</h1>
         <div className="bp-where"><MapPin size={15} /> {[b.area, b.landmark].filter(Boolean).join(" · ") || "Bengaluru"}</div>
         <div className="bp-facts">
@@ -135,7 +160,7 @@ export default function BuildingPage() {
               </label>
             )}
           </div>
-          <span>Tap a flat for photos and details — call the caretaker to see any of them</span>
+          <span>{visit ? "Tap a flat for photos and details — schedule a visit to see any of them" : "Tap a flat for photos and details — call the caretaker to see any of them"}</span>
         </div>
         {floors.length > 1 && (
           <div className="bp-floortabs" role="tablist">
@@ -162,13 +187,26 @@ export default function BuildingPage() {
       </footer>
 
       <div className="bp-cta">
-        <button type="button" className="bp-btn bp-btn--primary bp-btn--block" onClick={() => setCalling(true)}>
-          <Phone size={19} /> Call Caretaker
-        </button>
+        {visit ? (
+          <>
+            <div className="bp-cta-sub"><ShieldCheck size={13} /> Free visit · no brokerage to book · takes 30 seconds</div>
+            <button type="button" className="bp-btn bp-btn--primary bp-btn--block" onClick={() => setBooking({ flat: null })}>
+              <CalendarCheck size={19} /> Schedule a visit
+            </button>
+          </>
+        ) : (
+          <button type="button" className="bp-btn bp-btn--primary bp-btn--block" onClick={() => setCalling(true)}>
+            <Phone size={19} /> Call Caretaker
+          </button>
+        )}
       </div>
 
-      {open && <FlatSheet flat={open} onClose={() => setOpen(null)} onCall={() => { setOpen(null); setCalling(true); }} />}
+      {open && (
+        <FlatSheet flat={open} visit={visit} onClose={() => setOpen(null)}
+          onCall={() => { const f = open; setOpen(null); if (visit) setBooking({ flat: f.property_id }); else setCalling(true); }} />
+      )}
       {calling && <CallSheet code={code} building={b} user={user} onClose={() => setCalling(false)} />}
+      {booking && <VisitSheet code={code} building={b} flats={available} flatId={booking.flat} onClose={() => { saveDraft(null); setBooking(null); }} />}
     </Shell>
   );
 }
@@ -276,7 +314,7 @@ function Sheet({ title, onClose, children, back }) {
   );
 }
 
-function FlatSheet({ flat, onClose, onCall }) {
+function FlatSheet({ flat, visit = false, onClose, onCall }) {
   const media = useMemo(() => listingMedia(flat), [flat]);
   const full = usePhotoViewer(media, flatName(flat));
   const rows = [
@@ -302,9 +340,9 @@ function FlatSheet({ flat, onClose, onCall }) {
         {flat.description && <p className="bp-desc">{flat.description}</p>}
         {flat.available ? (
           <button type="button" className="bp-btn bp-btn--primary bp-btn--block" style={{ marginTop: 14 }} onClick={onCall}>
-            <Phone size={17} /> Call Caretaker to see it
+            {visit ? <><CalendarCheck size={17} /> Schedule a visit to see it</> : <><Phone size={17} /> Call Caretaker to see it</>}
           </button>
-        ) : <div className="bp-note">This flat is booked. Call the caretaker to see the others.</div>}
+        ) : <div className="bp-note">{visit ? "This flat is booked. Schedule a visit to see the others." : "This flat is booked. Call the caretaker to see the others."}</div>}
       </div>
     </Sheet>
   );
@@ -471,6 +509,304 @@ function CallSheet({ code, building, user, onClose }) {
         )}
       </div>
     </Sheet>
+  );
+}
+
+/**
+ * Schedule a visit (the ads page): name and mobile → the SMS code → a day and
+ * a time → booked (building_request_visit). The code signs a new visitor in
+ * with their number, or attaches it to a Google account they're already in.
+ * While SMS codes are off on the project, Google sign-in stands in for the
+ * code, and the half-made booking survives the redirect (DRAFT_KEY).
+ */
+function VisitSheet({ code, building, flats, flatId, onClose }) {
+  const { user, loginWithGoogle } = useAuth();
+  const draft = useMemo(() => readDraft(code), [code]);
+  const [step, setStep] = useState("who"); // who · code · when · done
+  const [name, setName] = useState(() => String(draft?.name || user?.name || leadSnapshot().name || "").trim());
+  const [mobile, setMobile] = useState(() => cleanMobile(draft?.mobile || user?.phone || leadSnapshot().phone || ""));
+  const [otpOn, setOtpOn] = useState(null);
+  const [signedIn, setSignedIn] = useState(false);
+  const [otp, setOtp] = useState("");
+  const [resendIn, setResendIn] = useState(0);
+  const [picked, setPicked] = useState(() => (flatId || draft?.flat ? [flatId || draft.flat] : []));
+  const days = useMemo(() => nextDays(7), []);
+  const [dayIdx, setDayIdx] = useState(() => Math.max(0, days.findIndex((d) => visitTimes(d).length > 0)));
+  const [at, setAt] = useState(null); // a Date, or "any"
+  const [busy, setBusy] = useState(false);
+  const [err, setErr] = useState("");
+  const [booked, setBooked] = useState(null);
+  const otpRef = useRef(null);
+
+  // Who's here, and can we text them a code?
+  useEffect(() => {
+    let live = true;
+    Promise.all([
+      phoneOtpAvailable().catch(() => false),
+      supabase ? supabase.auth.getSession().then(({ data }) => data?.session?.user ?? null).catch(() => null) : null,
+    ]).then(([on, sbUser]) => {
+      if (!live) return;
+      setOtpOn(Boolean(on));
+      setSignedIn(Boolean(sbUser));
+      // Back from Google with the details already given: straight to the time.
+      if (draft && sbUser && isMobile(draft.mobile) && (!on || accountHasVerifiedMobile(sbUser, draft.mobile))) setStep("when");
+    });
+    return () => { live = false; };
+  }, [draft]);
+
+  useEffect(() => {
+    if (resendIn <= 0) return undefined;
+    const t = setTimeout(() => setResendIn((n) => n - 1), 1000);
+    return () => clearTimeout(t);
+  }, [resendIn]);
+
+  useEffect(() => { if (step === "code") otpRef.current?.focus(); }, [step]);
+
+  const fail = (e) => { setErr(e?.message || "Something went wrong. Please try again."); setBusy(false); };
+
+  /** The number is theirs: count the lead and keep it, then pick a time. */
+  const verified = () => {
+    trackPixelOnce(`lead-${mobile}`, "Lead", { content_category: "tenant", content_name: "building_visit_verified", content_ids: [code] },
+      { user: { phone: mobile } });
+    void saveLead({ name, phone: mobile }).catch(() => {});
+    setBusy(false);
+    setErr("");
+    setStep("when");
+  };
+
+  const submitWho = async (e) => {
+    e?.preventDefault();
+    setErr("");
+    if (name.trim().length < 2) return setErr("Tell us your name.");
+    if (!isMobile(mobile)) return setErr("Enter a 10-digit mobile number.");
+    setBusy(true);
+    try {
+      const sbUser = supabase ? (await supabase.auth.getSession()).data?.session?.user ?? null : null;
+      setSignedIn(Boolean(sbUser));
+      if (sbUser && accountHasVerifiedMobile(sbUser, mobile)) return verified();
+      if (otpOn) {
+        await sendOtp(mobile, { signedIn: Boolean(sbUser), name: name.trim() });
+        setOtp("");
+        setResendIn(RESEND_AFTER_S);
+        setBusy(false);
+        return setStep("code");
+      }
+      // SMS codes off: an account is still needed to book, so Google it is.
+      if (sbUser) return verified();
+      saveDraft({ code, name: name.trim(), mobile, flat: picked[0] || null });
+      const r = await loginWithGoogle();
+      if (!r?.success) fail(new Error(r?.error || "Couldn't open Google sign-in."));
+    } catch (er) { fail(er); }
+  };
+
+  const submitCode = async (e) => {
+    e?.preventDefault();
+    if (otp.length !== OTP_LENGTH) return setErr(`Enter the ${OTP_LENGTH}-digit code.`);
+    setBusy(true);
+    setErr("");
+    try {
+      await verifyOtp(mobile, otp, { signedIn });
+      if (!signedIn) await supabase.auth.updateUser({ data: { full_name: name.trim() } }).catch(() => {});
+      verified();
+    } catch (er) { fail(er); }
+  };
+
+  const resend = async () => {
+    setErr("");
+    setBusy(true);
+    try {
+      await sendOtp(mobile, { signedIn, name: name.trim() });
+      setResendIn(RESEND_AFTER_S);
+      setBusy(false);
+    } catch (er) { fail(er); }
+  };
+
+  const book = async () => {
+    if (!at) return setErr("Pick a time, or let us call you to fix one.");
+    setBusy(true);
+    setErr("");
+    try {
+      const visitAt = at === "any" ? null : at;
+      await requestBuildingVisit(code, { name: name.trim(), phone: mobile, propertyIds: picked, visitAt, note: "Booked from the visit page (ads)" });
+      saveDraft(null);
+      setBooked({ at: visitAt });
+      setBusy(false);
+      setStep("done");
+    } catch (er) { fail(er); }
+  };
+
+  const day = days[dayIdx];
+  const times = useMemo(() => (day ? visitTimes(day) : []), [day]);
+  const parts = useMemo(() => ["Morning", "Afternoon", "Evening"].map((p) => [p, times.filter((t) => t.part === p)]).filter(([, l]) => l.length), [times]);
+  const flatLabel = (id) => {
+    const f = flats.find((x) => x.property_id === id);
+    return f ? (f.unit_no ? `Flat ${f.unit_no}` : bhk(f)) : "";
+  };
+  const fmtMobile = `+91 ${mobile.replace(/(\d{5})(\d{5})/, "$1 $2")}`;
+  const stepLabels = otpOn === false ? ["Your details", "Time"] : ["Your details", "Verify", "Time"];
+  const stepNo = step === "who" ? 0 : step === "code" ? 1 : stepLabels.length - 1;
+
+  const calLink = () => {
+    if (!booked?.at) return "";
+    const s = new Date(booked.at);
+    const e = new Date(s.getTime() + 45 * 60 * 1000);
+    const z = (d) => d.toISOString().replace(/[-:]/g, "").replace(/\.\d{3}/, "");
+    return `https://calendar.google.com/calendar/render?action=TEMPLATE&text=${encodeURIComponent(`Flat visit · ${building.name}`)}`
+      + `&dates=${z(s)}/${z(e)}&location=${encodeURIComponent([building.name, building.landmark, building.area, "Bengaluru"].filter(Boolean).join(", "))}`
+      + `&details=${encodeURIComponent(`Booked on MovEazy · ${location.origin}/visit/${code}`)}`;
+  };
+
+  const title = step === "done" ? "Visit booked" : step === "code" ? "Verify your mobile" : step === "when" ? "Pick a time" : "Schedule a visit";
+  const back = step === "code" ? () => { setStep("who"); setErr(""); } : undefined;
+
+  return (
+    <Sheet title={title} onClose={onClose} back={back}>
+      <div className="bp-pad">
+        {step !== "done" && (
+          <div className="bp-steps" aria-hidden>
+            {stepLabels.map((l, i) => (
+              <span key={l} className={i < stepNo ? "done" : i === stepNo ? "on" : ""}><i>{i < stepNo ? <Check size={11} /> : i + 1}</i>{l}</span>
+            ))}
+          </div>
+        )}
+
+        {step === "who" && (
+          <form onSubmit={submitWho}>
+            <div className="bp-visitfor">
+              <Building2 size={16} />
+              <span><b>{building.name}</b>{picked.length ? ` · ${picked.map(flatLabel).join(", ")}` : ` · ${flats.length} flat${flats.length === 1 ? "" : "s"} to see`}</span>
+            </div>
+            <label className="bp-label" htmlFor="vs-name">Your name</label>
+            <input id="vs-name" className="bp-input" value={name} autoComplete="name" maxLength={80} placeholder="Full name"
+              onChange={(e) => setName(e.target.value)} />
+            <label className="bp-label" htmlFor="vs-mobile">Mobile number <span>{otpOn ? "We'll text you a code" : ""}</span></label>
+            <div className="bp-phone">
+              <span>+91</span>
+              <input id="vs-mobile" className="bp-input" type="tel" inputMode="numeric" autoComplete="tel-national" maxLength={10}
+                placeholder="10-digit mobile" value={mobile} onChange={(e) => setMobile(cleanMobile(e.target.value))} />
+            </div>
+            {err && <div className="bp-err">{err}</div>}
+            <button type="submit" className={`bp-btn bp-btn--block ${otpOn === false && !signedIn ? "bp-btn--google" : "bp-btn--primary"}`}
+              style={{ marginTop: 16 }} disabled={busy || otpOn === null}>
+              {busy ? "Please wait…" : otpOn === false && !signedIn ? <><GoogleMark /> Continue with Google</> : otpOn ? "Send OTP" : "Continue"}
+            </button>
+            <p className="bp-fine">Your number is only used to set up your visit. No spam, no brokers calling you.</p>
+          </form>
+        )}
+
+        {step === "code" && (
+          <form onSubmit={submitCode}>
+            <p className="bp-fine" style={{ textAlign: "left", marginTop: 0, fontSize: 14, color: "var(--dim)" }}>
+              Enter the {OTP_LENGTH}-digit code sent to <b style={{ color: "var(--ink)" }}>{fmtMobile}</b>.{" "}
+              <button type="button" className="bp-link" onClick={back}>Change</button>
+            </p>
+            <div className="bp-otp" onClick={() => otpRef.current?.focus()}>
+              <input ref={otpRef} className="bp-otp-input" type="text" inputMode="numeric" autoComplete="one-time-code" maxLength={OTP_LENGTH}
+                aria-label="One-time code" value={otp}
+                onChange={(e) => { const v = e.target.value.replace(/\D/g, "").slice(0, OTP_LENGTH); setOtp(v); setErr(""); }} />
+              {Array.from({ length: OTP_LENGTH }, (_, i) => (
+                <span key={i} className={`${otp[i] ? "full" : ""}${i === Math.min(otp.length, OTP_LENGTH - 1) ? " cur" : ""}`}>{otp[i] || ""}</span>
+              ))}
+            </div>
+            {err && <div className="bp-err">{err}</div>}
+            <button type="submit" className="bp-btn bp-btn--primary bp-btn--block" style={{ marginTop: 16 }} disabled={busy || otp.length !== OTP_LENGTH}>
+              {busy ? "Verifying…" : "Verify & continue"}
+            </button>
+            <p className="bp-fine">
+              {resendIn > 0 ? `Didn't get it? Resend in ${resendIn}s` : <button type="button" className="bp-link" disabled={busy} onClick={resend}>Resend code</button>}
+            </p>
+          </form>
+        )}
+
+        {step === "when" && (
+          <>
+            <div className="bp-summary"><ShieldCheck size={16} /> {name.trim().split(" ")[0]} · {fmtMobile}</div>
+            {flats.length > 1 && (
+              <>
+                <div className="bp-label">Which flats? <span>{picked.length ? `${picked.length} picked` : "All available"}</span></div>
+                <div className="bp-flatchips">
+                  <button type="button" className={picked.length === 0 ? "on" : ""} onClick={() => setPicked([])}>All flats</button>
+                  {flats.map((f) => {
+                    const on = picked.includes(f.property_id);
+                    return (
+                      <button key={f.property_id} type="button" className={on ? "on" : ""}
+                        onClick={() => setPicked((p) => (on ? p.filter((x) => x !== f.property_id) : [...p, f.property_id]))}>
+                        {on && <Check size={13} />}{flatLabel(f.property_id)}{f.rent ? ` · ${shortInr(f.rent)}` : ""}
+                      </button>
+                    );
+                  })}
+                </div>
+              </>
+            )}
+            <div className="bp-label">Day</div>
+            <div className="bp-days">
+              {days.map((d, i) => {
+                const none = visitTimes(d).length === 0;
+                return (
+                  <button key={d.toISOString()} type="button" disabled={none} className={i === dayIdx ? "on" : ""}
+                    onClick={() => { setDayIdx(i); if (at !== "any") setAt(null); }}>
+                    <small>{i === 0 ? "Today" : i === 1 ? "Tmrw" : d.toLocaleDateString("en-IN", { weekday: "short" })}</small>
+                    <b>{d.getDate()}</b>
+                    <small>{d.toLocaleDateString("en-IN", { month: "short" })}</small>
+                  </button>
+                );
+              })}
+            </div>
+            <div className="bp-label">Time <span>Visits take about 30–45 minutes</span></div>
+            {parts.map(([p, list]) => (
+              <div key={p} className="bp-part">
+                <small>{p}</small>
+                <div className="bp-times">
+                  {list.map((t) => (
+                    <button key={t.label} type="button" className={at instanceof Date && at.getTime() === t.at.getTime() ? "on" : ""} onClick={() => { setAt(t.at); setErr(""); }}>
+                      {t.label.replace(" AM", "a").replace(" PM", "p")}
+                    </button>
+                  ))}
+                </div>
+              </div>
+            ))}
+            <button type="button" className={`bp-anytime${at === "any" ? " on" : ""}`} onClick={() => { setAt("any"); setErr(""); }}>
+              <Phone size={15} /> Not sure yet — call me to fix a time
+            </button>
+            {err && <div className="bp-err">{err}</div>}
+            <button type="button" className="bp-btn bp-btn--primary bp-btn--block" style={{ marginTop: 16 }} disabled={busy || !at} onClick={book}>
+              <CalendarCheck size={18} />
+              {busy ? "Booking…" : at instanceof Date ? `Book ${visitWhen(at)}` : at === "any" ? "Request a call-back" : "Pick a time"}
+            </button>
+          </>
+        )}
+
+        {step === "done" && (
+          <div className="bp-done">
+            <div className="bp-done-ic"><Check size={38} strokeWidth={3} /></div>
+            <h4>{booked?.at ? "You're booked in!" : "Request received"}</h4>
+            {booked?.at
+              ? <p><span className="bp-done-when"><Clock size={14} /> {visitWhen(booked.at)}</span></p>
+              : <p>We'll call you shortly to fix a time that suits you.</p>}
+            <div className="bp-done-what"><Building2 size={14} /> {building.name}{picked.length ? ` · ${picked.map(flatLabel).join(", ")}` : ""}</div>
+            <div className="bp-addr"><MapPin size={16} /><span>{[building.landmark, building.area, "Bengaluru"].filter(Boolean).join(", ")}<br />
+              <small style={{ color: "var(--dim)" }}>The exact address and the caretaker's number come with your confirmation call on {fmtMobile}.</small></span></div>
+            {booked?.at && (
+              <a className="bp-btn bp-btn--block" style={{ marginTop: 12 }} href={calLink()} target="_blank" rel="noreferrer">
+                <CalendarCheck size={17} /> Add to Google Calendar
+              </a>
+            )}
+            <button type="button" className="bp-btn bp-btn--primary bp-btn--block" style={{ marginTop: 10 }} onClick={onClose}>Done</button>
+          </div>
+        )}
+      </div>
+    </Sheet>
+  );
+}
+
+function GoogleMark() {
+  return (
+    <svg width="18" height="18" viewBox="0 0 48 48" aria-hidden>
+      <path fill="#FFC107" d="M43.6 20.5H42V20H24v8h11.3C33.7 32.7 29.3 36 24 36c-6.6 0-12-5.4-12-12s5.4-12 12-12c3.1 0 5.8 1.2 7.9 3.1l5.7-5.7C34 6.1 29.3 4 24 4 12.9 4 4 12.9 4 24s8.9 20 20 20 20-8.9 20-20c0-1.3-.1-2.4-.4-3.5z" />
+      <path fill="#FF3D00" d="M6.3 14.7l6.6 4.8C14.7 15.1 19 12 24 12c3.1 0 5.8 1.2 7.9 3.1l5.7-5.7C34 6.1 29.3 4 24 4 16.3 4 9.7 8.3 6.3 14.7z" />
+      <path fill="#4CAF50" d="M24 44c5.2 0 9.9-2 13.4-5.2l-6.2-5.2C29.2 35.1 26.7 36 24 36c-5.3 0-9.7-3.3-11.3-8l-6.5 5C9.5 39.6 16.2 44 24 44z" />
+      <path fill="#1976D2" d="M43.6 20.5H42V20H24v8h11.3c-.8 2.2-2.2 4.2-4.1 5.6l6.2 5.2C37 39.2 44 34 44 24c0-1.3-.1-2.4-.4-3.5z" />
+    </svg>
   );
 }
 
@@ -689,5 +1025,29 @@ const CSS = `
 .bp-skel b { display: block; height: 96px; margin: 12px; border-radius: 16px; background: linear-gradient(90deg, #ECE7DA, #F4F0E6, #ECE7DA);
   background-size: 200% 100%; animation: bpsh 1.2s infinite; }
 @keyframes bpsh { to { background-position: -200% 0; } }
-@media (prefers-reduced-motion: reduce) { .bp-sheet, .bp-sheet-bg, .bp-done-ic, .bp-instant { animation: none; } }
+.bp-cta-sub { display: flex; align-items: center; justify-content: center; gap: 5px; font-size: 12px; font-weight: 600; color: var(--deep); margin: 0 0 7px; }
+.bp-cta-sub svg { color: var(--em); }
+.bp-live { display: inline-flex; align-items: center; gap: 7px; margin-left: 6px; font-size: 12px; font-weight: 700; color: var(--champ3);
+  background: var(--champ2); border-radius: 99px; padding: 4px 10px; }
+.bp-live i { width: 7px; height: 7px; border-radius: 99px; background: #12936B; box-shadow: 0 0 0 3px rgba(18,147,107,.2); animation: bplive 1.6s ease-in-out infinite; }
+@keyframes bplive { 50% { box-shadow: 0 0 0 6px rgba(18,147,107,0); } }
+.bp-steps { display: flex; gap: 6px; margin: 2px 0 10px; }
+.bp-steps span { flex: 1; display: flex; align-items: center; gap: 6px; font-size: 12px; font-weight: 700; color: var(--mute);
+  padding-top: 8px; border-top: 3px solid var(--line2); }
+.bp-steps span.on { color: var(--deep); border-top-color: var(--em); }
+.bp-steps span.done { color: var(--em); border-top-color: var(--em); }
+.bp-steps i { width: 18px; height: 18px; border-radius: 99px; display: grid; place-items: center; font-style: normal; font-size: 11px;
+  background: var(--line2); color: var(--dim); }
+.bp-steps span.on i, .bp-steps span.done i { background: var(--em); color: #fff; }
+.bp-visitfor { display: flex; align-items: center; gap: 8px; background: var(--cream); border-radius: 14px; padding: 11px 12px; font-size: 13.5px; color: var(--dim); }
+.bp-visitfor svg { flex: none; color: var(--em); }
+.bp-visitfor b { color: var(--ink); }
+.bp-link { border: 0; background: none; padding: 0; font: inherit; font-weight: 700; color: var(--em); cursor: pointer; text-decoration: underline; text-underline-offset: 2px; }
+.bp-otp { position: relative; display: grid; grid-template-columns: repeat(6, 1fr); gap: 8px; margin-top: 6px; cursor: text; }
+.bp-otp span { height: 54px; border: 1.5px solid var(--line); border-radius: 14px; background: #fff; display: grid; place-items: center;
+  font-size: 22px; font-weight: 800; color: var(--deep); transition: border-color .12s, box-shadow .12s; }
+.bp-otp span.full { border-color: #9FC8B7; }
+.bp-otp-input { position: absolute; inset: 0; opacity: 0; width: 100%; height: 100%; font-size: 16px; caret-color: transparent; }
+.bp-otp-input:focus ~ span.cur { border-color: var(--em); box-shadow: 0 0 0 3px var(--emt); }
+@media (prefers-reduced-motion: reduce) { .bp-sheet, .bp-sheet-bg, .bp-done-ic, .bp-instant, .bp-live i { animation: none; } }
 `;

@@ -301,6 +301,8 @@ function AppRoutes() {
         {/* A broker's storefront: what their printed QR poster opens. */}
         <Route path="/b/:code" element={<Storefront />} />
         <Route path="/building/:code" element={<BuildingPage />} />
+        {/* The ads landing page: same building, Schedule a visit (mobile OTP → slot). */}
+        <Route path="/visit/:code" element={<BuildingPage visit />} />
         {/* A partner broker's curated list for their tenant (not MovEazy's /curated). */}
         <Route path="/c/:token" element={<CuratedSwipe />} />
         {/* The shortlist our team curated for one person. With a token it is the

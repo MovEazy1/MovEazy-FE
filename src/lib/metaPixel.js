@@ -103,6 +103,22 @@ export function trackPixel(event, params = {}, { custom = false, user } = {}) {
   }
 }
 
+/**
+ * Report an event at most once per `key` in this browser — a Lead per number,
+ * say, however many times the same person goes through a form.
+ */
+export function trackPixelOnce(key, event, params = {}, opts = {}) {
+  const k = `mz-px-${key}`;
+  try {
+    if (localStorage.getItem(k)) return null;
+    const id = trackPixel(event, params, opts);
+    if (id) localStorage.setItem(k, "1");
+    return id;
+  } catch {
+    return trackPixel(event, params, opts);
+  }
+}
+
 /** One PageView per route. Call from the router on every location change. */
 export function trackPageView(pathname) {
   if (pathname === lastPath) return;

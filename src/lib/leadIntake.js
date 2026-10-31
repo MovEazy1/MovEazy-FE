@@ -18,7 +18,7 @@
  * security-definer RPC, because the visitor has no session and cannot write to
  * a table directly. localStorage is the cache; the database is the record.
  */
-import { trackPixel } from "./metaPixel";
+import { trackPixel, trackPixelOnce } from "./metaPixel";
 import { supabase, isSupabaseConfigured } from "./supabase";
 import { anonId } from "./sessionSync";
 import { firstTouch } from "./attribution";
@@ -121,7 +121,8 @@ export async function saveLead(patch = {}) {
   // Meta pixel, once each per browser: the first number given is the lead;
   // finishing the questionnaire is the application.
   if (patch.phone && !before.phone) {
-    trackPixel("Lead", { content_category: "tenant", content_name: next.leadType || "questionnaire" }, { user: { phone: patch.phone } });
+    trackPixelOnce(`lead-${String(patch.phone).replace(/\D/g, "").slice(-10)}`, "Lead",
+      { content_category: "tenant", content_name: next.leadType || "questionnaire" }, { user: { phone: patch.phone } });
   }
   if (patch.completed && !before.completed) {
     trackPixel("SubmitApplication", { content_category: "tenant" }, { user: { phone: next.phone } });

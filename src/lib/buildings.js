@@ -5,7 +5,7 @@
  * The authority is MovEazy-BE/supabase/owner_buildings.sql: who may see a
  * number, move a visit or book a flat is decided there. This file only calls it.
  */
-import { trackPixel } from "./metaPixel";
+import { trackPixel, trackPixelOnce } from "./metaPixel";
 import { supabase, isSupabaseConfigured } from "./supabase";
 import { PUBLIC_ORIGIN } from "./partners";
 import { visitorId } from "./storefront";
@@ -26,6 +26,7 @@ export const buildingDisplay = (code) => `moveazy.co.in/building/${code}`;
 export const fetchBuildingPage = (code) => rpc("building_page", { p_code: String(code || "") });
 
 export function recordBuildingView(code, source) {
+  trackPixel("ViewContent", { content_ids: [String(code || "")], content_type: "home_listing", content_name: source === "qr" ? "building_qr" : "building" });
   return rpc("building_view", {
     p_code: code, p_visitor: visitorId() || "anonymous-visitor", p_source: source === "qr" ? "qr" : "link",
   }).catch(() => {});
@@ -126,8 +127,9 @@ export const requestBuildingVisit = (code, { name, phone, propertyIds = [], visi
     p_code: code, p_visitor: visitorId() || "", p_name: name, p_phone: phone, p_properties: propertyIds,
     p_visit_at: visitAt ? visitAt.toISOString() : null, p_note: note,
   }).then((r) => {
-    trackPixel("Lead", { content_category: "tenant", content_name: "building_visit" }, { user: { phone } });
-    trackPixel("Schedule", { content_ids: propertyIds, content_type: "home_listing" }, { user: { phone } });
+    // The visit page may already have counted this number as a Lead when it was verified.
+    trackPixelOnce(`lead-${cleanMobile(phone)}`, "Lead", { content_category: "tenant", content_name: "building_visit" }, { user: { phone } });
+    trackPixel("Schedule", { content_ids: propertyIds.length ? propertyIds : [code], content_type: "home_listing", content_name: code }, { user: { phone } });
     return r;
   });
 
