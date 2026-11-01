@@ -350,6 +350,10 @@ export default function CrmShell() {
     <Gate>
       <div className="crm" style={{ display: "flex", height: "100vh", overflow: "hidden" }}>
         <CrmStyles />
+        {/* The phone's own screens (Home, Partner payments, Partner usage) open on a laptop too: their styles,
+            at a readable width. Every rule is crm-ph-* or .crm--phone, so nothing else changes. */}
+        <style>{`${PHONE_CSS}
+.crm:not(.crm--phone) .crm-ph-page { width: 100%; max-width: 820px; margin: 0 auto; }`}</style>
         <TopProgress active={refreshing} color={C.accent} />
         <Rail access={access} />
         {/* The frame is the screen's height and clips; a page that doesn't scroll its own
