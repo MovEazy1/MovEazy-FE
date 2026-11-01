@@ -8,10 +8,20 @@
  * 10 am – 6 pm — adds their name if they like, and gets a confirmation with
  * a Google Calendar link. Booking again with the same number moves the visit.
  * The page never says a flat is rented: every visit is a lead.
+ *
+ * Top right, Explore more: the same mobile gate, then the find-a-home flow
+ * (/tenant) for anyone this flat or building isn't right for.
+ *
+ * Meta pixel, so ads can optimise on any step (lib/metaPixel.js):
+ *   ScheduleVisitClick  (custom) the Schedule a visit button
+ *   ExploreMoreClick    (custom) the Explore more button
+ *   PhoneSubmitted      (custom) a mobile given here, with which button asked
+ *   Lead                the first mobile from this browser (RequirePhoneFirst → saveLead)
+ *   Schedule            a visit booked (bookAdVisit)
  */
 import { useEffect, useMemo, useState } from "react";
-import { useLocation, useParams } from "react-router-dom";
-import { BadgeCheck, Bath, BedDouble, Building2, CalendarCheck, CalendarPlus, Check, ChevronLeft, MapPin, Phone, Ruler, Sofa, X } from "lucide-react";
+import { useLocation, useNavigate, useParams } from "react-router-dom";
+import { BadgeCheck, Bath, BedDouble, Building2, CalendarCheck, CalendarPlus, Check, ChevronLeft, Compass, MapPin, Phone, Ruler, Sofa, X } from "lucide-react";
 import { MediaItem, listingMedia } from "./partners/partnerMedia";
 import { useSnapTrack } from "../hooks/useSnapTrack";
 import { usePhotoViewer } from "../hooks/usePhotoViewer";
@@ -20,6 +30,7 @@ import RequirePhoneFirst from "../components/RequirePhoneFirst";
 import { leadSnapshot } from "../lib/leadIntake";
 import { recordFlatView } from "../lib/flatInsights";
 import { recordBuildingView } from "../lib/buildings";
+import { trackPixel } from "../lib/metaPixel";
 import { adSlots, bookAdVisit, calendarLink, dayLabel, fetchAdPage, readAdUtm, slotLabel, slotsByDay } from "../lib/visitAds";
 import logo from "../assets/logo/moveazy-logo-mint-light.png";
 
@@ -41,6 +52,8 @@ export default function VisitAdPage({ kind: asked = "flat" }) {
   const ref = raw;
   const [page, setPage] = useState(undefined);
   const [step, setStep] = useState(null); // null | phone | slot | done
+  const [gateFor, setGateFor] = useState("schedule"); // which button asked for the mobile
+  const navigate = useNavigate();
   const [done, setDone] = useState(null);
   const { search } = useLocation();
   const utm = useMemo(() => readAdUtm(search), [search]);
@@ -57,12 +70,29 @@ export default function VisitAdPage({ kind: asked = "flat" }) {
     : [page.flat_type, page.furnishing].filter(Boolean).join(" · ") || page.title || "Flat for rent";
   useEffect(() => { if (title) document.title = `${title} in ${page?.area || "Bengaluru"} · Schedule a visit · MovEazy`; }, [title, page]);
 
-  const schedule = () => setStep(leadSnapshot().phone ? "slot" : "phone");
+  const px = { content_ids: [ref], content_type: kind === "building" ? "product_group" : "home_listing", content_category: kind };
+  const exploreUrl = `/tenant${search || ""}`;
 
-  if (page === undefined) return <Shell><div className="va-load" aria-busy="true"><span /><span /><span /></div></Shell>;
+  const schedule = () => {
+    trackPixel("ScheduleVisitClick", px, { custom: true });
+    setGateFor("schedule");
+    setStep(leadSnapshot().phone ? "slot" : "phone");
+  };
+  const explore = () => {
+    trackPixel("ExploreMoreClick", px, { custom: true });
+    if (leadSnapshot().phone) { navigate(exploreUrl); return; }
+    setGateFor("explore");
+    setStep("phone");
+  };
+  const phoneGiven = (mobile) => {
+    trackPixel("PhoneSubmitted", { ...px, content_name: gateFor }, { custom: true, user: { phone: mobile } });
+    if (gateFor === "explore") { setStep(null); navigate(exploreUrl); } else setStep("slot");
+  };
+
+  if (page === undefined) return <Shell onExplore={explore}><div className="va-load" aria-busy="true"><span /><span /><span /></div></Shell>;
   if (!page) {
     return (
-      <Shell>
+      <Shell onExplore={explore}>
         <div className="va-empty"><Building2 size={36} /><p>This page isn&apos;t available right now.</p></div>
       </Shell>
     );
@@ -83,7 +113,7 @@ export default function VisitAdPage({ kind: asked = "flat" }) {
     ];
 
   return (
-    <Shell>
+    <Shell onExplore={explore}>
       <Gallery photos={photos} name={title} />
       <section className="va-head">
         <h1>{title}</h1>
@@ -126,7 +156,7 @@ export default function VisitAdPage({ kind: asked = "flat" }) {
 
       <RequirePhoneFirst open={step === "phone"} onClose={() => setStep(null)}
         extra={{ leadType: "direct", propertyId: kind === "flat" ? ref : undefined }}
-        onDone={() => setStep("slot")} />
+        onDone={phoneGiven} />
       {step === "slot" && (
         <SlotSheet kind={kind} refId={ref} page={page} title={title} utm={utm}
           onClose={() => setStep(null)} onChangePhone={() => setStep("phone")}
@@ -139,11 +169,15 @@ export default function VisitAdPage({ kind: asked = "flat" }) {
   );
 }
 
-function Shell({ children }) {
+function Shell({ children, onExplore }) {
   return (
     <div className="va">
       <style>{CSS}</style>
-      <header className="va-top"><img src={logo} alt="MovEazy" /></header>
+      <header className="va-top">
+        <span />
+        <img src={logo} alt="MovEazy" />
+        {onExplore ? <button type="button" className="va-explore" onClick={onExplore}><Compass size={14} /> Explore more</button> : <span />}
+      </header>
       <main className="va-col">{children}</main>
     </div>
   );
@@ -273,9 +307,12 @@ const CSS = `
   font-family: Inter, system-ui, -apple-system, "Segoe UI", sans-serif; color: var(--ink); background: var(--cream); min-height: 100dvh;
   -webkit-tap-highlight-color: transparent; }
 .va *, .va *::before, .va *::after { box-sizing: border-box; }
-.va-top { position: sticky; top: 0; z-index: 20; height: 56px; display: flex; align-items: center; justify-content: center;
+.va-top { position: sticky; top: 0; z-index: 20; height: 56px; display: grid; grid-template-columns: 1fr auto 1fr; align-items: center; gap: 8px; padding: 0 12px;
   background: rgba(247,244,236,.92); backdrop-filter: blur(10px); -webkit-backdrop-filter: blur(10px); border-bottom: 1px solid var(--line2); }
 .va-top img { height: 26px !important; width: auto; display: block; }
+.va-explore { justify-self: end; display: inline-flex; align-items: center; gap: 5px; border: 1px solid var(--em); background: #fff; color: var(--em);
+  border-radius: 99px; padding: 6px 11px; font: inherit; font-size: 12.5px; font-weight: 700; cursor: pointer; white-space: nowrap; }
+.va-explore:active { background: var(--emt); }
 .va-col { max-width: 560px; margin: 0 auto; padding: 0 0 calc(110px + env(safe-area-inset-bottom)); }
 .va-gwrap { position: relative; }
 .va-gallery { display: flex; overflow-x: auto; scroll-snap-type: x mandatory; scrollbar-width: none; aspect-ratio: 4 / 3; background: #E9E4D6; }

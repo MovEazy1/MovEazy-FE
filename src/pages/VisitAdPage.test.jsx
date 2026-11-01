@@ -22,20 +22,25 @@ vi.mock("../lib/leadIntake", () => ({ leadSnapshot: () => ({ ...lead }) }));
 vi.mock("../lib/flatInsights", () => ({ recordFlatView: vi.fn() }));
 vi.mock("../lib/buildings", () => ({ recordBuildingView: vi.fn() }));
 vi.mock("../lib/tenantViews", () => ({ reportEngagement: vi.fn() }));
+const pixel = vi.fn();
+vi.mock("../lib/metaPixel", () => ({ trackPixel: (...a) => pixel(...a) }));
 vi.mock("../components/RequirePhoneFirst", () => ({
   default: ({ open, onDone }) => (open ? <button type="button" onClick={() => { lead.phone = "9845012345"; onDone("9845012345"); }}>Give number</button> : null),
 }));
 const VisitAdPage = (await import("./VisitAdPage")).default;
 
 let root, host;
-afterEach(() => { act(() => root?.unmount()); host?.remove(); lead.phone = ""; booked.mockClear(); });
+afterEach(() => { act(() => root?.unmount()); host?.remove(); lead.phone = ""; booked.mockClear(); pixel.mockClear(); });
 async function mount(path = "/visit/MZ-1?utm_source=facebook&utm_campaign=MZ-1") {
   host = document.createElement("div");
   document.body.appendChild(host);
   root = createRoot(host);
   await act(async () => {
     root.render(<MemoryRouter initialEntries={[path]}>
-      <Routes><Route path="/visit/:id" element={<VisitAdPage kind="flat" />} /></Routes></MemoryRouter>);
+      <Routes>
+        <Route path="/visit/:id" element={<VisitAdPage kind="flat" />} />
+        <Route path="/tenant" element={<div>Find my home</div>} />
+      </Routes></MemoryRouter>);
   });
   await act(async () => {});
   return document.body;
@@ -90,5 +95,31 @@ describe("Visit ad page", () => {
     await act(async () => button(el, /Schedule a visit/).click());
     expect(button(el, /Give number/)).toBeFalsy();
     expect(el.querySelector("[role=dialog]").textContent).toContain("Pick a time");
+  });
+
+  it("Explore more: the mobile first, then the find-a-home flow, with the ad's UTM", async () => {
+    const el = await mount();
+    await act(async () => button(el, /Explore more/).click());
+    expect(pixel).toHaveBeenCalledWith("ExploreMoreClick", expect.objectContaining({ content_ids: ["MZ-1"] }), { custom: true });
+    await act(async () => button(el, /Give number/).click());
+    expect(pixel).toHaveBeenCalledWith("PhoneSubmitted", expect.objectContaining({ content_name: "explore" }),
+      expect.objectContaining({ custom: true, user: { phone: "9845012345" } }));
+    expect(el.textContent).toContain("Find my home");
+  });
+
+  it("Explore more with a number already given goes straight there", async () => {
+    lead.phone = "9845012345";
+    const el = await mount();
+    await act(async () => button(el, /Explore more/).click());
+    expect(button(el, /Give number/)).toBeFalsy();
+    expect(el.textContent).toContain("Find my home");
+  });
+
+  it("Schedule a visit is counted on the click, and the number by which button asked", async () => {
+    const el = await mount();
+    await act(async () => button(el, /Schedule a visit/).click());
+    expect(pixel).toHaveBeenCalledWith("ScheduleVisitClick", expect.objectContaining({ content_ids: ["MZ-1"] }), { custom: true });
+    await act(async () => button(el, /Give number/).click());
+    expect(pixel).toHaveBeenCalledWith("PhoneSubmitted", expect.objectContaining({ content_name: "schedule" }), expect.anything());
   });
 });
