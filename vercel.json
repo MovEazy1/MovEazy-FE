@@ -47,6 +47,14 @@
       "destination": "/api/share?kind=building&id=:code"
     },
     {
+      "source": "/visit/b/:code",
+      "destination": "/api/share?kind=visit-b&id=:code"
+    },
+    {
+      "source": "/visit/:id",
+      "destination": "/api/share?kind=visit&id=:id"
+    },
+    {
       "source": "/((?!api/|assets/).*)",
       "destination": "/app.html"
     }

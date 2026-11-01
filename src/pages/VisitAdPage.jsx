@@ -9,6 +9,12 @@
  * a Google Calendar link. Booking again with the same number moves the visit.
  * The page never says a flat is rented: every visit is a lead.
  *
+ * The same page is a building's WhatsApp share (?utm_source=whatsapp). A
+ * building's page lists its available flats as cards (VisitAdExtras.jsx).
+ * Once booked, this phone sees its visit at the top and, from the visit's
+ * start until that day ends, the caretaker and property manager to call —
+ * every open, flat, call and answer kept with where they came from.
+ *
  * Top right, Explore more: the same mobile gate, then the find-a-home flow
  * (/tenant) for anyone this flat or building isn't right for.
  *
@@ -31,7 +37,8 @@ import { leadSnapshot } from "../lib/leadIntake";
 import { recordFlatView } from "../lib/flatInsights";
 import { recordBuildingView } from "../lib/buildings";
 import { trackPixel } from "../lib/metaPixel";
-import { adSlots, bookAdVisit, calendarLink, dayLabel, fetchAdPage, readAdUtm, slotLabel, slotsByDay } from "../lib/visitAds";
+import { adSlots, bookAdVisit, calendarLink, dayLabel, fetchAdPage, readAdBooking, readAdUtm, recordAdEvent, slotLabel, slotsByDay } from "../lib/visitAds";
+import { AvailableFlats, EXTRA_CSS, VisitCallCard } from "./VisitAdExtras";
 import logo from "../assets/logo/moveazy-logo-mint-light.png";
 
 const inr = (n) => `₹${Number(n || 0).toLocaleString("en-IN")}`;
@@ -55,6 +62,7 @@ export default function VisitAdPage({ kind: asked = "flat" }) {
   const [gateFor, setGateFor] = useState("schedule"); // which button asked for the mobile
   const navigate = useNavigate();
   const [done, setDone] = useState(null);
+  const [booking, setBooking] = useState(() => readAdBooking(kind, ref));
   const { search } = useLocation();
   const utm = useMemo(() => readAdUtm(search), [search]);
 
@@ -64,6 +72,8 @@ export default function VisitAdPage({ kind: asked = "flat" }) {
     if (kind === "building") recordBuildingView(ref, "link"); else recordFlatView(ref, "link");
     return () => { live = false; };
   }, [kind, ref]);
+  // Opening the page, with where they came from (WhatsApp, a Meta ad…).
+  useEffect(() => { recordAdEvent(kind, ref, "open", { utm }); }, [kind, ref, utm]);
   useViewEngagement(kind === "flat" && page ? ref : null, 0);
 
   const title = !page ? "" : kind === "building" ? page.name
@@ -137,6 +147,9 @@ export default function VisitAdPage({ kind: asked = "flat" }) {
         <div className="va-trust"><BadgeCheck size={16} /> Verified by MovEazy · free visit, no brokerage to book</div>
       </section>
 
+      {booking && <VisitCallCard key={booking.id + booking.slot_at} booking={booking} />}
+      {kind === "building" && <AvailableFlats flats={page.available ?? []} code={ref} utm={utm} onSchedule={schedule} Sheet={Sheet} />}
+
       {(page.amenities ?? []).length > 0 && (
         <section className="va-card">
           <h2>Amenities</h2>
@@ -151,7 +164,7 @@ export default function VisitAdPage({ kind: asked = "flat" }) {
       )}
 
       <div className="va-cta">
-        <button type="button" className="va-btn" onClick={schedule}><CalendarCheck size={19} /> Schedule a visit</button>
+        <button type="button" className="va-btn" onClick={schedule}><CalendarCheck size={19} /> {booking ? "Change your visit" : "Schedule a visit"}</button>
       </div>
 
       <RequirePhoneFirst open={step === "phone"} onClose={() => setStep(null)}
@@ -160,7 +173,7 @@ export default function VisitAdPage({ kind: asked = "flat" }) {
       {step === "slot" && (
         <SlotSheet kind={kind} refId={ref} page={page} title={title} utm={utm}
           onClose={() => setStep(null)} onChangePhone={() => setStep("phone")}
-          onBooked={(r) => { setDone(r); setStep("done"); }} />
+          onBooked={(r) => { setDone(r); setBooking(readAdBooking(kind, ref)); setStep("done"); }} />
       )}
       {step === "done" && done && (
         <DoneSheet done={done} title={title} where={where} onClose={() => setStep(null)} onChange={() => setStep("slot")} />
@@ -172,7 +185,7 @@ export default function VisitAdPage({ kind: asked = "flat" }) {
 function Shell({ children, onExplore }) {
   return (
     <div className="va">
-      <style>{CSS}</style>
+      <style>{CSS + EXTRA_CSS}</style>
       <header className="va-top">
         <img src={logo} alt="MovEazy" />
         {onExplore && <button type="button" className="va-explore" onClick={onExplore}><Compass size={14} /> Explore more</button>}
@@ -290,7 +303,8 @@ function DoneSheet({ done, title, where, onClose, onChange }) {
         <h4>{done.moved ? "Your visit is moved" : "Your visit is booked"}</h4>
         <div className="va-done-when">{dayLabel(day)}, {slotLabel(done.slot_at)}</div>
         <div className="va-done-what">{title}{where ? ` · ${where}` : ""}</div>
-        <p>MovEazy will call you to confirm and share the exact location on WhatsApp.</p>
+        <p>MovEazy will call you to confirm and share the exact location on WhatsApp. From the time of your visit, you can call the
+          caretaker right on this page.</p>
         <a className="va-btn va-btn--ghost" href={calendarLink({ title, slotAt: done.slot_at, where })} target="_blank" rel="noreferrer">
           <CalendarPlus size={18} /> Add to Google Calendar
         </a>

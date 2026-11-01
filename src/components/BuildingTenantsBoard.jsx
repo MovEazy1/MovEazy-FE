@@ -106,7 +106,7 @@ export default function BuildingTenantsBoard({ tenants = [], onUpdate }) {
                 )}
                 {x.qr && (
                   <div style={{ color: DIM, fontSize: 12, marginTop: 4 }}>
-                    From the QR · {when(x.qr.first_at)}
+                    {x.qr.source === "ad" ? "From the ad / WhatsApp page" : "From the QR"} · {when(x.qr.first_at)}
                     {(x.qr.called ?? []).length ? ` · called the ${x.qr.called.map((c) => (c === "manager" ? "property manager" : "caretaker")).join(" and ")}` : ""}
                     {(x.qr.feedback ?? []).length ? ` · said: ${x.qr.feedback.map((f) => callFeedbackLabel(f.kind) + (f.note ? ` ("${f.note}")` : "")).join(", ")}` : ""}
                   </div>

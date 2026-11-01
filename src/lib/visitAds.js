@@ -6,8 +6,11 @@
  *   moveazy.co.in/visit/MZ-XXXX     a property
  *   moveazy.co.in/visit/b/H33PSH    a building
  *
- * The CRM copies the link with Meta UTMs on it; whatever UTM a visitor
- * arrives with is kept on their visit.
+ * The CRM copies the link with Meta UTMs on it, or WhatsApp's for sharing a
+ * building (?utm_source=whatsapp); whatever UTM a visitor arrives with is
+ * kept on their visit. What they do is kept too: opening the page and each
+ * flat, booking, and — from the visit's start until that day ends — calling
+ * the caretaker or property manager and what they said after.
  */
 import { supabase, isSupabaseConfigured } from "./supabase";
 import { visitorId } from "./storefront";
@@ -35,13 +38,51 @@ export function readAdUtm(search = typeof window !== "undefined" ? window.locati
   return out;
 }
 
-/** The ad page's address; `meta` adds the UTMs the CRM's "Meta ad link" copies. */
-export function adPageUrl(kind, ref, { meta = false } = {}) {
+/** The ad page's address; `meta` / `whatsapp` add the UTMs the CRM's copy buttons give. */
+export function adPageUrl(kind, ref, { meta = false, whatsapp = false } = {}) {
   const path = kind === "building" ? `/visit/b/${encodeURIComponent(ref)}` : `/visit/${encodeURIComponent(ref)}`;
-  if (!meta) return `${PUBLIC_ORIGIN}${path}`;
-  const q = new URLSearchParams({ utm_source: "facebook", utm_medium: "paid_social", utm_campaign: String(ref) });
+  if (!meta && !whatsapp) return `${PUBLIC_ORIGIN}${path}`;
+  const q = new URLSearchParams(whatsapp
+    ? { utm_source: "whatsapp", utm_medium: "share", utm_campaign: String(ref) }
+    : { utm_source: "facebook", utm_medium: "paid_social", utm_campaign: String(ref) });
   return `${PUBLIC_ORIGIN}${path}?${q}`;
 }
+
+/** Something they did before booking: 'open' (the page) or 'flat_open' (a building's flat, with seconds). Never throws. */
+export function recordAdEvent(kind, ref, event, { property = null, seconds = 0, utm = {} } = {}) {
+  if (!isSupabaseConfigured || !supabase) return Promise.resolve();
+  return supabase.rpc("visit_ad_event", {
+    p_kind: kind, p_ref: ref, p_visitor: visitorId() || "", p_event: event,
+    p_property: property, p_seconds: Math.round(seconds || 0), p_utm: utm,
+  }).then(() => {}, () => {});
+}
+
+/* ── The visit they booked, remembered on this phone ────────────────────── */
+const bookedKey = (kind, ref) => `mz_ad_visit:${kind}:${String(ref).toUpperCase()}`;
+/** { id, slot_at, calls_until, phone } while its call options can still open; else null. */
+export function readAdBooking(kind, ref, now = Date.now()) {
+  try {
+    const b = JSON.parse(localStorage.getItem(bookedKey(kind, ref)) || "null");
+    if (!b?.id || !b.calls_until || new Date(b.calls_until).getTime() <= now) return null;
+    return b;
+  } catch {
+    return null;
+  }
+}
+export function saveAdBooking(kind, ref, b) {
+  try { localStorage.setItem(bookedKey(kind, ref), JSON.stringify(b)); } catch { /* the visit is booked either way */ }
+}
+
+/**
+ * The call desk for a booked visit (open from its start until that day ends):
+ * kind 'contacts' → { open, opens_at, closes_at, caretaker: { name, phone } | null, manager }; 'call' (target
+ * caretaker | manager) and 'feedback' (one of CALL_FEEDBACK, with a note) are kept.
+ */
+export const adDesk = (booking, { kind = "contacts", target = "", feedback = "", note = "" } = {}) =>
+  rpc("visit_ad_desk", {
+    p_booking: booking.id, p_phone: booking.phone, p_visitor: visitorId() || "",
+    p_kind: kind, p_target: target, p_feedback: feedback, p_note: note,
+  });
 
 /** What the page shows (null: no such page). */
 export const fetchAdPage = (kind, ref) => rpc("visit_ad_page", { p_kind: kind, p_ref: ref });
@@ -85,6 +126,7 @@ export async function bookAdVisit({ kind, ref, phone, name = "", slotAt, utm = {
   const r = await rpc("visit_ad_book", {
     p_kind: kind, p_ref: ref, p_visitor: visitorId() || "", p_phone: phone, p_name: name, p_slot: slotAt, p_utm: utm,
   });
+  if (r?.id) saveAdBooking(kind, ref, { id: r.id, slot_at: r.slot_at, calls_until: r.calls_until, phone });
   trackPixel("Schedule", { content_ids: [String(ref)], content_type: kind === "building" ? "product_group" : "home_listing" }, { user: { phone } });
   return r;
 }
@@ -110,10 +152,21 @@ export async function fetchAdVisits(days = 30) {
 /** Mark the reminder / confirmation sent (or not) on an ad visit. */
 export const stampAdVisit = (adId, what, clear = false) => rpc("crm_ad_visit_stamp", { p_id: adId, p_what: what, p_clear: clear });
 
-/** "Meta ad · P1 · banner-a" — where an ad visit came from. */
+/** "Meta ad · P1 · banner-a", "WhatsApp · H33PSH" — where an ad visit came from. */
 export function adSourceLabel(utm = {}) {
-  const src = /^(fb|facebook|ig|instagram|meta)$/i.test(utm.utm_source || "") ? "Meta ad" : utm.utm_source || "Ad page";
+  const s = utm.utm_source || "";
+  const src = /^(wa|whatsapp)/i.test(s) ? "WhatsApp" : /^(fb|facebook|ig|instagram|meta)$/i.test(s) ? "Meta ad" : s || "Ad page";
   return [src, utm.utm_campaign, utm.utm_content].filter(Boolean).join(" · ");
+}
+
+/** "saw 101, 204 · called caretaker, manager · said: Call not picked" — what an ad visitor did. */
+export function adDid(v) {
+  const said = { pay_token: "Pay token", issues: "has issues", flat_small: "flat is small", ventilation: "ventilation", call_not_picked: "call not picked", other: "other" };
+  return [
+    (v.flats ?? []).length ? `saw ${v.flats.join(", ")}` : "",
+    (v.called ?? []).length ? `called ${v.called.map((t) => (t === "manager" ? "manager" : "caretaker")).join(", ")}` : "",
+    (v.feedback ?? []).length ? `said: ${v.feedback.map((f) => said[f.kind] || f.kind).join(", ")}${v.feedback.find((f) => f.note)?.note ? ` ("${v.feedback.find((f) => f.note).note}")` : ""}` : "",
+  ].filter(Boolean).join(" · ");
 }
 
 /** A Google Calendar link for the visit (an hour). */

@@ -20,7 +20,7 @@ const booked = vi.fn(async ({ slotAt }) => ({ id: "v1", slot_at: slotAt, moved: 
 vi.mock("../lib/visitAds", async (orig) => ({ ...(await orig()), fetchAdPage: vi.fn(async () => PAGE), bookAdVisit: (...a) => booked(...a) }));
 vi.mock("../lib/leadIntake", () => ({ leadSnapshot: () => ({ ...lead }) }));
 vi.mock("../lib/flatInsights", () => ({ recordFlatView: vi.fn() }));
-vi.mock("../lib/buildings", () => ({ recordBuildingView: vi.fn() }));
+vi.mock("../lib/buildings", async (orig) => ({ ...(await orig()), recordBuildingView: vi.fn() }));
 vi.mock("../lib/tenantViews", () => ({ reportEngagement: vi.fn() }));
 const pixel = vi.fn();
 vi.mock("../lib/metaPixel", () => ({ trackPixel: (...a) => pixel(...a) }));

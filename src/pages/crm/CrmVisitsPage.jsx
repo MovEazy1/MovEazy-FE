@@ -23,7 +23,7 @@ import {
   fetchVisitBookings, groupBy, markConfirmationSent, markReminderSent, summariseVisits,
 } from "../../lib/crmVisits";
 import { buildTemplateVars, renderTemplate, whatsappUrl } from "../../lib/crmSettings";
-import { adSourceLabel, fetchAdVisits, stampAdVisit } from "../../lib/visitAds";
+import { adDid, adSourceLabel, fetchAdVisits, stampAdVisit } from "../../lib/visitAds";
 import { SCOPES } from "../../lib/adminScopes";
 import { Btn, C, Chip, Empty, Loading, Toast, inr } from "./crmUi";
 
@@ -308,6 +308,7 @@ export default function CrmVisitsPage() {
         {b.ad && (
           <span title="Booked on the property's ad page" style={{ fontSize: 11, fontWeight: 700, color: C.accent }}>{adSourceLabel(b.utm)}</span>
         )}
+        {b.ad && adDid(b) && <span className="crm-mute" style={{ fontSize: 11 }}>{adDid(b)}</span>}
         {b.kind === "instant" && (
           <span title="Walked in through the building QR's instant visit" style={{ fontSize: 11, fontWeight: 700, color: C.gold }}>⚡ Instant visit</span>
         )}

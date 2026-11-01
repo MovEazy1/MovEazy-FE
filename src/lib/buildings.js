@@ -86,7 +86,7 @@ export function tenantBoardStats(tenants = [], today = new Date()) {
   for (const x of tenants) if (t(x)?.liked === "disliked") for (const r of t(x).reasons ?? []) reasons[r] = (reasons[r] || 0) + 1;
   return {
     total: tenants.length,
-    fromQr: n((x) => x.qr), called: n((x) => (x.qr?.called ?? []).length > 0), noStatus: n((x) => !t(x)),
+    fromQr: n((x) => x.qr && x.qr.source !== "ad"), called: n((x) => (x.qr?.called ?? []).length > 0), noStatus: n((x) => !t(x)),
     viaMoveazy: n((x) => x.via === "moveazy"),
     visitDone: n((x) => t(x)?.visit === "done"), visitPending: n((x) => t(x) && t(x).visit !== "done"),
     liked: n((x) => t(x)?.liked === "liked"), disliked: n((x) => t(x)?.liked === "disliked"),
@@ -103,7 +103,7 @@ const st = (x) => x.track || x.status;
 export const TENANT_FILTERS = [
   { id: "all", label: "All", test: () => true },
   { id: "due", label: "Follow-up due", test: (x, day) => Boolean(st(x)?.follow_up_on && st(x).follow_up_on <= day) },
-  { id: "qr", label: "From QR", test: (x) => Boolean(x.qr) },
+  { id: "qr", label: "From QR", test: (x) => Boolean(x.qr && x.qr.source !== "ad") },
   { id: "moveazy", label: "Via MovEazy Website", test: (x) => x.via === "moveazy" },
   { id: "new", label: "No status yet", test: (x) => !st(x) },
   { id: "pending", label: "Visit pending", test: (x) => st(x) && st(x).visit !== "done" },

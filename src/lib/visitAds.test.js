@@ -1,7 +1,7 @@
 import { describe, expect, it, vi } from "vitest";
 
 vi.mock("./supabase", () => ({ supabase: null, isSupabaseConfigured: false }));
-const { adPageUrl, adSlots, adSourceLabel, calendarLink, dayLabel, readAdUtm, slotLabel, slotsByDay } = await import("./visitAds");
+const { adDid, adPageUrl, adSlots, adSourceLabel, calendarLink, dayLabel, readAdBooking, readAdUtm, saveAdBooking, slotLabel, slotsByDay } = await import("./visitAds");
 const { defaultVisitSlots } = await import("./visits");
 
 // Sun 1 Nov 2026, 8:30 am in India.
@@ -64,5 +64,26 @@ describe("links and UTM", () => {
     const u = new URL(calendarLink({ title: "2 BHK", slotAt: "2026-11-02T05:30:00.000Z", where: "HSR Layout" }));
     expect(u.searchParams.get("dates")).toBe("20261102T053000Z/20261102T063000Z");
     expect(u.searchParams.get("text")).toBe("Flat visit · 2 BHK");
+  });
+});
+
+describe("WhatsApp and what they did", () => {
+  it("the WhatsApp link and its source", () => {
+    expect(adPageUrl("building", "H33PSH", { whatsapp: true }))
+      .toBe("https://www.moveazy.co.in/visit/b/H33PSH?utm_source=whatsapp&utm_medium=share&utm_campaign=H33PSH");
+    expect(adSourceLabel({ utm_source: "whatsapp", utm_campaign: "H33PSH" })).toBe("WhatsApp · H33PSH");
+  });
+  it("remembers the visit on this phone until its day is over", () => {
+    const store = {};
+    vi.stubGlobal("localStorage", { getItem: (k) => store[k] ?? null, setItem: (k, v) => { store[k] = v; } });
+    saveAdBooking("building", "h33psh", { id: "v1", slot_at: "2026-11-02T05:30:00Z", calls_until: "2026-11-02T18:30:00Z", phone: "9845012345" });
+    expect(readAdBooking("building", "H33PSH", new Date("2026-11-02T10:00:00Z").getTime())?.id).toBe("v1");
+    expect(readAdBooking("building", "H33PSH", new Date("2026-11-02T19:00:00Z").getTime())).toBeNull();
+    vi.unstubAllGlobals();
+  });
+  it("words what an ad visitor did", () => {
+    expect(adDid({ flats: ["101"], called: ["caretaker", "manager"], feedback: [{ kind: "issues", note: "No lift" }] }))
+      .toBe('saw 101 · called caretaker, manager · said: has issues ("No lift")');
+    expect(adDid({})).toBe("");
   });
 });

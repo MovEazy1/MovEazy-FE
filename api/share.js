@@ -1,7 +1,8 @@
 /**
  * Link previews for the QR pages: /b/<code> (a broker's storefront),
  * /c/<token> (a broker's curated list) and /building/<code> (an owner's
- * building, owner_buildings.sql). Facebook groups and WhatsApp read the page's
+ * building, owner_buildings.sql) — and the ad / WhatsApp pages, /visit/b/<code>
+ * and /visit/<property id> (visit_ad_pages.sql). Facebook groups and WhatsApp read the page's
  * tags without running JavaScript, and the SPA's index.html has one set of
  * tags for every route — so this serves that same index.html with the tags
  * for this page. People get the app exactly as before; nothing redirects.
@@ -64,6 +65,29 @@ async function tagsFor(kind, id) {
       image: (d.photos || [])[0] || first?.cover_image_url || first?.images?.[0] || FALLBACK_IMAGE,
     };
   }
+  // The ad / WhatsApp pages: /visit/<building code> is a building too.
+  if ((kind === "visit-b" || kind === "visit") && /^[A-HJ-NP-Z2-9]{6}$/i.test(id)) {
+    const d = await rpc("visit_ad_page", { p_kind: "building", p_ref: id });
+    if (!d) return null;
+    const free = d.available || [];
+    const rents = free.map((f) => Number(f.rent) || 0).filter(Boolean);
+    const first = free.find((f) => f.cover_image_url || (f.images || [])[0]);
+    return {
+      title: `${d.name}${d.area ? `, ${d.area}` : ""}${free.length ? ` — ${free.length} flat${free.length === 1 ? "" : "s"} available` : ""}`,
+      description: `${rents.length ? `From ₹${Math.min(...rents).toLocaleString("en-IN")} a month. ` : ""}Verified by MovEazy. See the flats and schedule a free visit.`,
+      image: (d.photos || [])[0] || first?.cover_image_url || first?.images?.[0] || FALLBACK_IMAGE,
+    };
+  }
+  if (kind === "visit" && /^MZ-[A-Z0-9]{4,12}$/i.test(id)) {
+    const d = await rpc("visit_ad_page", { p_kind: "flat", p_ref: id });
+    if (!d) return null;
+    const what = [d.flat_type, d.furnishing].filter(Boolean).join(", ") || "Flat for rent";
+    return {
+      title: `${what}${d.area ? ` in ${d.area}` : ""}${d.rent ? ` — ₹${Number(d.rent).toLocaleString("en-IN")}/month` : ""}`,
+      description: "Verified by MovEazy. See the photos and schedule a free visit.",
+      image: d.cover_image_url || (d.images || [])[0] || FALLBACK_IMAGE,
+    };
+  }
   return null;
 }
 
@@ -97,7 +121,8 @@ export default async function handler(req) {
   }
   try {
     const t = await tagsFor(kind, id);
-    if (t) html = inject(html, t, `https://www.moveazy.co.in/${kind}/${id}`);
+    const path = kind === "visit-b" ? `visit/b/${id}` : `${kind}/${id}`;
+    if (t) html = inject(html, t, `https://www.moveazy.co.in/${path}`);
   } catch { /* the page, untouched */ }
   return new Response(html, {
     status: 200,
