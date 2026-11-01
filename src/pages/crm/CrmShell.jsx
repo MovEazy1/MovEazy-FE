@@ -352,7 +352,9 @@ export default function CrmShell() {
         <CrmStyles />
         <TopProgress active={refreshing} color={C.accent} />
         <Rail access={access} />
-        <main style={{ flex: 1, minWidth: 0, display: "flex", flexDirection: "column" }}>
+        {/* The frame is the screen's height and clips; a page that doesn't scroll its own
+            panels (Home, Partner payments, QR scans…) scrolls here instead of being cut off. */}
+        <main style={{ flex: 1, minWidth: 0, minHeight: 0, overflowY: "auto", display: "flex", flexDirection: "column" }}>
           {!ready && !error && <Loading label="Loading the workspace…" />}
           {!ready && error && <Empty>{error}</Empty>}
           {ready && (
