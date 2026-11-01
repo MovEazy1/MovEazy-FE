@@ -174,9 +174,8 @@ function Shell({ children, onExplore }) {
     <div className="va">
       <style>{CSS}</style>
       <header className="va-top">
-        <span />
         <img src={logo} alt="MovEazy" />
-        {onExplore ? <button type="button" className="va-explore" onClick={onExplore}><Compass size={14} /> Explore more</button> : <span />}
+        {onExplore && <button type="button" className="va-explore" onClick={onExplore}><Compass size={14} /> Explore more</button>}
       </header>
       <main className="va-col">{children}</main>
     </div>
@@ -307,10 +306,10 @@ const CSS = `
   font-family: Inter, system-ui, -apple-system, "Segoe UI", sans-serif; color: var(--ink); background: var(--cream); min-height: 100dvh;
   -webkit-tap-highlight-color: transparent; }
 .va *, .va *::before, .va *::after { box-sizing: border-box; }
-.va-top { position: sticky; top: 0; z-index: 20; height: 56px; display: grid; grid-template-columns: 1fr auto 1fr; align-items: center; gap: 8px; padding: 0 12px;
+.va-top { position: sticky; top: 0; z-index: 20; height: 56px; display: flex; align-items: center; justify-content: space-between; gap: 8px; padding: 0 16px;
   background: rgba(247,244,236,.92); backdrop-filter: blur(10px); -webkit-backdrop-filter: blur(10px); border-bottom: 1px solid var(--line2); }
 .va-top img { height: 26px !important; width: auto; display: block; }
-.va-explore { justify-self: end; display: inline-flex; align-items: center; gap: 5px; border: 1px solid var(--em); background: #fff; color: var(--em);
+.va-explore { display: inline-flex; align-items: center; gap: 5px; border: 1px solid var(--em); background: #fff; color: var(--em);
   border-radius: 99px; padding: 6px 11px; font: inherit; font-size: 12.5px; font-weight: 700; cursor: pointer; white-space: nowrap; }
 .va-explore:active { background: var(--emt); }
 .va-col { max-width: 560px; margin: 0 auto; padding: 0 0 calc(110px + env(safe-area-inset-bottom)); }
