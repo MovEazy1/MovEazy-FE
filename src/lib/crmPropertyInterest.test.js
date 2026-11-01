@@ -9,8 +9,11 @@
 import { describe, expect, it } from "vitest";
 import {
   basisLabel, effectiveFacts, groupInterestByClient, hasStatedRequirement, inferRequirement,
-  rentSeenLabel, requirementForMatching,
+  rentSeenLabel, requirementForMatching, withOwnAnswers,
 } from "./crmPropertyInterest";
+import { matchRequirementToListings } from "./inventoryMatch";
+import { filterMatches } from "./curation";
+import { setAreaGroups } from "../data/preferenceOptions";
 
 const inv = new Map([
   ["MZ-RPN52S", { property_id: "MZ-RPN52S", area: "JP Nagar", rent: 27000, flat_type: "2 BHK" }],
@@ -147,6 +150,53 @@ describe("requirementForMatching", () => {
   it("returns the requirement untouched when there is no guess", () => {
     const empty = { localities: [] };
     expect(requirementForMatching(empty, null)).toBe(empty);
+  });
+});
+
+describe("withOwnAnswers", () => {
+  // Raunak: finished Find My Flat, never edited in the CRM — no row at all.
+  const own = {
+    localities: ["HSR", "JP Nagar"], budget_min: 20000, budget_max: 80000,
+    flat_types: ["2 BHK", "3 BHK", "Villa", "Room in Preoccupied flat", "1 BHK"],
+    must_haves: [], deal_breakers: [], occupants: ["Bachelor"],
+  };
+  const empty = { localities: [], flat_types: [], budget_min: null, budget_max: null, min_score: 60, office_radius_km: 8 };
+
+  it("lays their wizard answers into an empty requirement, keeping its settings", () => {
+    const r = withOwnAnswers({ ...empty, min_score: 55 }, own);
+    expect(r.localities).toEqual(["HSR", "JP Nagar"]);
+    expect(r.budget_max).toBe(80000);
+    expect(r.flat_types).toHaveLength(5);
+    expect(r.min_score).toBe(55);
+  });
+
+  it("so the flats in their areas and budget match", () => {
+    // The CRM's list (areas.sql): HSR Layout / HSR Extension are inside HSR.
+    setAreaGroups({ HSR: ["HSR Extension", "HSR Layout", "Harlur Road", "ITI Layout", "Kudlu Gate", "Kudlu Road", "Silver County Road"] });
+    const flats = [
+      { property_id: "A", area: "HSR Layout", flat_type: "2 BHK", rent: 35000, status: "published" },
+      { property_id: "B", area: "HSR", flat_type: "1 BHK", rent: 26000, status: "published" },
+      { property_id: "C", area: "JP Nagar", flat_type: "3 BHK", rent: 60000, status: "published" },
+      { property_id: "D", area: "Whitefield", flat_type: "2 BHK", rent: 30000, status: "published" },
+    ];
+    const req = withOwnAnswers(empty, own);
+    const ids = filterMatches(matchRequirementToListings(req, flats, { min: 60 }), req, { disliked: new Set() })
+      .map((m) => m.listing.property_id);
+    expect(ids).toEqual(expect.arrayContaining(["A", "B", "C"]));
+    expect(ids).not.toContain("D");
+    // Before: the empty requirement matched nothing.
+    expect(matchRequirementToListings(empty, flats, { min: 60 })).toEqual([]);
+    setAreaGroups(null);
+  });
+
+  it("an agent's own requirement always wins", () => {
+    const stated = { ...empty, localities: ["Koramangala"] };
+    expect(withOwnAnswers(stated, own)).toBe(stated);
+  });
+
+  it("nothing to lay in: untouched", () => {
+    expect(withOwnAnswers(empty, null)).toBe(empty);
+    expect(withOwnAnswers(empty, { localities: [], must_haves: [] })).toBe(empty);
   });
 });
 

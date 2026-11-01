@@ -193,6 +193,27 @@ export function effectiveFacts(req, ownAnswers, inferred) {
 }
 
 /**
+ * The CRM requirement, or — while nothing is stated on it — the client's own
+ * wizard answers (public.user_requirements) laid in. A CRM row only exists once
+ * an agent saves one, so without this anyone who finished Find My Flat but was
+ * never edited here matched nothing at all. Settings on the row (minimum score,
+ * office radius) are kept; the first edit saves the whole thing as the row.
+ */
+export function withOwnAnswers(req, ownAnswers) {
+  if (hasStatedRequirement(req) || !ownAnswers) return req;
+  const own = {
+    localities: hasList(ownAnswers.localities) ? ownAnswers.localities : [],
+    flat_types: hasList(ownAnswers.flat_types) ? ownAnswers.flat_types : [],
+    budget_min: ownAnswers.budget_min ?? null,
+    budget_max: ownAnswers.budget_max ?? null,
+    must_haves: hasList(ownAnswers.must_haves) ? ownAnswers.must_haves : [],
+    deal_breakers: hasList(ownAnswers.deal_breakers) ? ownAnswers.deal_breakers : [],
+    occupants: hasList(ownAnswers.occupants) ? ownAnswers.occupants : [],
+  };
+  return hasStatedRequirement(own) ? { ...req, ...own } : req;
+}
+
+/**
  * The requirement matching should run on.
  *
  * The client's own if there is one. Otherwise their existing (empty) record

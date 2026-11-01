@@ -25,7 +25,7 @@ import {
   shortlistDueTs, sortClients, summariseClients,
 } from "../../lib/crmLeadBuckets";
 import {
-  basisLabel, effectiveFacts, groupInterestByClient, inferRequirement, requirementForMatching,
+  basisLabel, effectiveFacts, groupInterestByClient, inferRequirement, requirementForMatching, withOwnAnswers,
 } from "../../lib/crmPropertyInterest";
 import { SCOPES } from "../../lib/adminScopes";
 import { buildTemplateCsv, downloadCsv, parseCsv, planImport, runImport } from "../../lib/crmImport";
@@ -412,10 +412,12 @@ export default function CrmClientsPage() {
   /* ── Requirement: DB row, or a blank one held locally until first save ──── */
 
   const storedReq = selected ? reqByClient.get(selected.id) : null;
+  const selectedOwn = selected ? ownAnswersByUser.get(selected.user_id) : null;
   const requirement = useMemo(() => {
     if (reqDraft && reqDraft.__clientId === selected?.id) return reqDraft;
-    return { ...EMPTY_REQ, ...(storedReq ?? {}) };
-  }, [reqDraft, storedReq, selected?.id]);
+    // Nothing saved here yet: their own wizard answers, so matches show at once.
+    return withOwnAnswers({ ...EMPTY_REQ, ...(storedReq ?? {}) }, selectedOwn);
+  }, [reqDraft, storedReq, selectedOwn, selected?.id]);
 
   useEffect(() => setReqDraft(null), [selected?.id]);
 
