@@ -98,7 +98,7 @@ export function followUpState(client, { lastContactAt = 0, lastSiteAt = 0, now =
 
 /** Somebody to ring first: on the site in the last day, or moving in within 15 days. */
 export function isHotLead({ lastSiteAt = 0, moveInAt = 0, now = Date.now() }) {
-  return (lastSiteAt && now - lastSiteAt < DAY) || (moveInAt && moveInAt - now < 15 * DAY && moveInAt > now - 7 * DAY);
+  return Boolean((lastSiteAt && now - lastSiteAt < DAY) || (moveInAt && moveInAt - now < 15 * DAY && moveInAt > now - 7 * DAY));
 }
 
 /* ── Partners ──────────────────────────────────────────────────────────────── */

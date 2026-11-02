@@ -59,7 +59,8 @@ describe("the daily list", () => {
   it("hot: on the site today, or moving in within 15 days", () => {
     expect(isHotLead({ lastSiteAt: NOW - 3600e3, now: NOW })).toBe(true);
     expect(isHotLead({ moveInAt: NOW + 10 * DAY, now: NOW })).toBe(true);
-    expect(isHotLead({ moveInAt: NOW + 40 * DAY, lastSiteAt: NOW - 3 * DAY, now: NOW })).toBeFalsy();
+    expect(isHotLead({ moveInAt: NOW + 40 * DAY, lastSiteAt: NOW - 3 * DAY, now: NOW })).toBe(false);
+    expect(isHotLead({ now: NOW })).toBe(false);
   });
   it("last contact counts staff contact only", () => {
     const m = lastContactByClient([

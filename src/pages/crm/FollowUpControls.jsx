@@ -18,6 +18,7 @@ import { useCrm } from "./CrmShell";
 import { Btn, C, Chip } from "./crmUi";
 import { whatsappUrl } from "../../lib/crmSettings";
 import { fetchBrokerActivity } from "../../lib/tenantViews";
+import { expandAreas } from "../../data/preferenceOptions";
 import {
   OUTCOMES, assignPartners, endsSearch, fetchFollowUpSettings, fetchPartnerPicker, partnerAssignMessage, quickPicks,
   saveFollowUp, suggestedNext, whenLabel,
@@ -186,7 +187,8 @@ export function AssignPartnerSheet({ client, areas = [], defaultReplace = false,
   }, [client.id]);
 
   const has = useMemo(() => new Set(current.map((b) => b.broker_id)), [current]);
-  const wanted = useMemo(() => new Set(areas.map(norm)), [areas]);
+  // "HSR" takes in HSR Layout, Kudlu Gate… (the CRM's area list).
+  const wanted = useMemo(() => new Set(expandAreas(areas).map(norm)), [areas]);
   const list = useMemo(() => {
     const needle = norm(q);
     return (partners ?? [])

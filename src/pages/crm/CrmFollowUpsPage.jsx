@@ -173,7 +173,7 @@ export default function CrmFollowUpsPage() {
   const crm = useCrm();
   const navigate = useNavigate();
   const { clients, touches, engagement, ownAnswers, requirements, access } = crm;
-  const [tab, setTab] = useState("today");
+  const [picked, setTab] = useState("");
   const [who, setWho] = useState("all");
   const [q, setQ] = useState("");
   const [toast, setToast] = useState(null);
@@ -202,6 +202,8 @@ export default function CrmFollowUpsPage() {
   const found = (r) => !needle || `${r.c.name} ${r.c.phone} ${r.c.follow_up_note}`.toLowerCase().includes(needle);
   const scoped = rows.filter((r) => mine(r) && found(r));
   const counts = Object.fromEntries(TABS.map((t) => [t.id, scoped.filter((r) => r.state.bucket === t.id).length]));
+  // Opens on the most urgent list with anyone on it.
+  const tab = picked || (["overdue", "today", "upcoming", "quiet"].find((id) => counts[id] > 0) ?? "today");
   const shown = scoped.filter((r) => r.state.bucket === tab)
     .sort((a, b) => (tab === "upcoming" ? a.state.at - b.state.at : (b.hot - a.hot) || (a.state.at - b.state.at)));
   const calledToday = rows.filter((r) => isToday(r.lastContactAt, now)).length;
