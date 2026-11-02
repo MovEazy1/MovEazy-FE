@@ -102,6 +102,7 @@ const CrmBuildingTenantsPage = lazy(() => import("./pages/crm/CrmBuildingTenants
 const CrmTenantViewsPage = lazy(() => import("./pages/crm/CrmTenantViewsPage"));
 const CrmPriorityPage = lazy(() => import("./pages/crm/CrmPriorityPage"));
 const CrmFollowUpsPage = lazy(() => import("./pages/crm/CrmFollowUpsPage"));
+const CrmWhatsAppPage = lazy(() => import("./pages/crm/CrmWhatsAppPage"));
 const CrmPartnerPayments = lazy(() => import("./pages/crm/mobile/CrmPartnerPayments"));
 const CrmPartnerUsage = lazy(() => import("./pages/crm/mobile/CrmPartnerUsage"));
 /**
@@ -117,6 +118,7 @@ function prefetchCrmPage(path) {
     home: () => import("./pages/crm/mobile/CrmHome"),
     priority: () => import("./pages/crm/CrmPriorityPage"),
     "follow-ups": () => import("./pages/crm/CrmFollowUpsPage"),
+    whatsapp: () => import("./pages/crm/CrmWhatsAppPage"),
     "partner-payments": () => import("./pages/crm/mobile/CrmPartnerPayments"),
     "partner-usage": () => import("./pages/crm/mobile/CrmPartnerUsage"),
     clients: () => import("./pages/crm/CrmClientsPage"),
@@ -367,6 +369,7 @@ function AppRoutes() {
           <Route path="home" element={<CrmHome />} />
           <Route path="priority" element={<CrmPriorityPage />} />
           <Route path="follow-ups" element={<CrmFollowUpsPage />} />
+          <Route path="whatsapp" element={<CrmWhatsAppPage />} />
           <Route path="partner-payments" element={<CrmPartnerPayments />} />
           <Route path="partner-usage" element={<CrmPartnerUsage />} />
           <Route path="partner-usage/:brokerId" element={<CrmPartnerUsage />} />

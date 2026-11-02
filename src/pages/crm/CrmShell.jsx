@@ -35,6 +35,7 @@ import { PHONE_CSS, PhoneNav, PhoneTopBar, usePhone } from "./mobile/phoneUi";
 import { REFRESH_MS, fetchMobileSummary, waitingTotal } from "../../lib/crmMobile";
 import { loadAreas } from "../../lib/areas";
 import { pokeDigest } from "../../lib/followUps";
+import { fetchWaPendingCount } from "../../lib/whatsappIntake";
 
 const CrmContext = createContext(null);
 export const useCrm = () => useContext(CrmContext);
@@ -134,6 +135,15 @@ function Gate({ children }) {
 
 function Rail({ access }) {
   const { pathname } = useLocation();
+  // WhatsApp flats waiting for a person: read on opening and on each section change.
+  const section = pathname.split("/")[2] || "";
+  const [badges, setBadges] = useState({});
+  useEffect(() => {
+    if (!access.isStaff) return undefined;
+    let live = true;
+    fetchWaPendingCount().then((n) => { if (live) setBadges({ whatsapp: n }); });
+    return () => { live = false; };
+  }, [access.isStaff, section]);
   return (
     <nav
       aria-label="CRM sections"
@@ -149,9 +159,15 @@ function Rail({ access }) {
           title={r.label}
           aria-label={r.label}
           className={pathname.startsWith(r.to) ? "crm-rail-item crm-rail-item--on" : "crm-rail-item"}
-          style={{ textDecoration: "none" }}
+          style={{ textDecoration: "none", position: "relative" }}
         >
           {r.code}
+          {r.badge && badges[r.badge] > 0 && (
+            <span aria-label={`${badges[r.badge]} waiting`} style={{
+              position: "absolute", top: -3, right: -3, minWidth: 16, height: 16, padding: "0 4px", borderRadius: 999,
+              background: C.coral, color: "#fff", fontSize: 9.5, fontWeight: 700, display: "grid", placeItems: "center",
+            }}>{badges[r.badge] > 99 ? "99+" : badges[r.badge]}</span>
+          )}
         </NavLink>
       ))}
       <div style={{ flex: 1 }} />

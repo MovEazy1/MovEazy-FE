@@ -94,5 +94,10 @@
         }
       ]
     }
-  ]
+  ],
+  "functions": {
+    "api/whatsapp-process.js": {
+      "maxDuration": 60
+    }
+  }
 }

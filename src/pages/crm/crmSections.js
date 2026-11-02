@@ -4,7 +4,7 @@
  */
 import {
   BarChart3, Bell, Briefcase, CalendarClock, Target, Building2, CalendarCheck, Columns3, CreditCard, Eye, House, Inbox, Landmark,
-  Map as MapIcon, MapPin, QrCode, ScanLine, Settings, ShieldCheck, Smartphone, UserPlus, Users, Wallet, Wrench,
+  Map as MapIcon, MapPin, MessageCircle, QrCode, ScanLine, Settings, ShieldCheck, Smartphone, UserPlus, Users, Wallet, Wrench,
 } from "lucide-react";
 import { SCOPES } from "../../lib/adminScopes";
 
@@ -21,6 +21,8 @@ export const RAIL = [
   // Who opened which property, and how it went for them — every property.
   { to: "/crm/tenant-views", code: "TV", label: "Tenant views", icon: Eye, group: "Tenants" },
   { to: "/crm/properties", code: "PR", label: "Properties", icon: Building2, group: "Flats" },
+  // Flats marked numbers sent on WhatsApp, read by AI, waiting for a person to publish.
+  { to: "/crm/whatsapp", code: "WA", label: "WhatsApp inbox", icon: MessageCircle, group: "Flats", badge: "whatsapp" },
   // The one list of areas every picker shows (tenants, owners, partners, CRM).
   { to: "/crm/areas", code: "AR", label: "Areas", icon: MapPin, group: "Flats" },
   { to: "/crm/brokers", code: "BR", label: "Brokers", icon: Briefcase, group: "Partners" },

@@ -12,7 +12,7 @@
  * be removed or added to, and the listing's status becomes editable.
  */
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { useNavigate, useParams } from "react-router-dom";
+import { useNavigate, useParams, useSearchParams } from "react-router-dom";
 import { useCrm } from "./CrmShell";
 import { useAreas, withCurrent } from "../../lib/areas";
 import PropertyVisitSlots from "../../components/PropertyVisitSlots";
@@ -23,6 +23,7 @@ import CrmFlatQr from "./CrmFlatQr";
 import { PropertyTenantViews } from "./CrmTenantViews";
 import CrmAdLink from "./CrmAdLink";
 import { fetchPartnerListingMap } from "../../lib/partners";
+import { draftToForm, fetchWaDraft, markWaDraftPublished, senderLine } from "../../lib/whatsappIntake";
 import {
   DEFAULT_POSTING_AMENITIES, FLAT_TYPES, FURNISHINGS, LIFESTYLE, MUST_HAVES, OCCUPANT_OPTIONS,
   parentAreaOf, withParentArea,
@@ -146,12 +147,15 @@ export default function CrmPropertyForm() {
   const navigate = useNavigate();
   const { propertyId: editId } = useParams();
   const isEdit = Boolean(editId);
+  // ?wa=<draft>: a flat from the WhatsApp inbox, filled in from the message.
+  const [params] = useSearchParams();
+  const waId = isEdit ? "" : params.get("wa") || "";
 
   const [f, setF] = useState(() => {
     // A saved draft belongs to the *new listing* form. Restoring it over a
     // listing being edited would quietly overwrite real data with someone
-    // else's half-typed flat.
-    if (editId) return BLANK;
+    // else's half-typed flat. A WhatsApp draft brings its own.
+    if (editId || waId) return BLANK;
     try {
       const saved = localStorage.getItem(DRAFT_KEY);
       return saved ? { ...BLANK, ...JSON.parse(saved) } : BLANK;
@@ -242,13 +246,31 @@ export default function CrmPropertyForm() {
     });
 
   // Autosave from the first keystroke — a half-typed listing survives a reload.
-  // Only for a new listing: an edit is already saved, in the database.
+  // Only for a new listing: an edit is already saved, in the database (and a
+  // WhatsApp draft is saved in the inbox).
   useEffect(() => {
-    if (isEdit) return;
+    if (isEdit || waId) return;
     try {
       localStorage.setItem(DRAFT_KEY, JSON.stringify(f));
     } catch { /* private mode */ }
-  }, [f, isEdit]);
+  }, [f, isEdit, waId]);
+
+  /** The WhatsApp draft being reviewed: the form, photos and person to call filled from it. */
+  const [waDraft, setWaDraft] = useState(null);
+  useEffect(() => {
+    if (!waId) return undefined;
+    let cancelled = false;
+    fetchWaDraft(waId).then((d) => {
+      if (cancelled) return;
+      const p = draftToForm(d);
+      setF({ ...BLANK, ...p.form });
+      replaceMedia(savedItems(p.images));
+      setInternal({ ...BLANK_INTERNAL, ...p.internal });
+      setPasteText(p.text);
+      setWaDraft(d);
+    }, (e) => { if (!cancelled) showToast(e?.message || "Couldn't open the WhatsApp draft", "error"); });
+    return () => { cancelled = true; };
+  }, [waId]);
 
   /**
    * The internal row, when editing.
@@ -582,6 +604,12 @@ export default function CrmPropertyForm() {
 
       const { data, error } = await supabase.from("inventory").insert(row).select(PUBLIC_INVENTORY_COLS).single();
       if (error) throw error;
+      // Out of the WhatsApp inbox (and a partner's flat becomes their listing).
+      if (waId) {
+        try { await markWaDraftPublished(waId, propertyId); } catch (e) {
+          showToast(`Published, but the WhatsApp draft is still open: ${e?.message || "unknown error"}`, "error");
+        }
+      }
 
       // Both of these key on a property_id that did not exist a moment ago,
       // which is why they run here and not with the rest of the form.
@@ -613,7 +641,7 @@ export default function CrmPropertyForm() {
       setSaving(false);
     }
   }, [canWrite, missingRequired, f, media, user, requirements, reload, isEdit, editId,
-      writeInternal, visitRule, internal, building, buildingOptions, links, reloadBuildingOptions]);
+      writeInternal, visitRule, internal, building, buildingOptions, links, reloadBuildingOptions, waId]);
 
   const reviewItems = useMemo(
     () => media.map((m) => ({ key: m.key, src: m.url, isVideo: isVideoItem(m), file: m.file })),
@@ -717,8 +745,10 @@ export default function CrmPropertyForm() {
           </div>
         )}
         <div style={{ display: "flex", gap: 7 }}>
-          <Btn variant="primary" onClick={() => {
-            setPublished(null); setF(BLANK); setImportInfo(null); setPasteText("");
+          {waId && <Btn variant="primary" onClick={() => navigate("/crm/whatsapp")}>Back to WhatsApp inbox</Btn>}
+          <Btn variant={waId ? undefined : "primary"} onClick={() => {
+            if (waId) navigate("/crm/properties/new", { replace: true });
+            setWaDraft(null); setPublished(null); setF(BLANK); setImportInfo(null); setPasteText("");
             // Otherwise the last flat's POC is saved against the next one.
             setInternal({ ...BLANK_INTERNAL });
             setBuilding({ id: "" }); setLinks(null);
@@ -761,6 +791,16 @@ export default function CrmPropertyForm() {
               </Field>
             ) : (
               <>
+            {waDraft && (
+              <div className="crm-card" style={{ display: "grid", gap: 3, background: C.accentSoft, borderColor: C.accentSoft }}>
+                <span className="crm-label">From WhatsApp</span>
+                <span style={{ fontSize: 12.5 }}>{senderLine(waDraft)}{waDraft.sender_kind === "partner" ? " — listed as their flat when published" : ""}</span>
+                {waDraft.fields?.building_name && <span style={{ fontSize: 12 }}>Building: {waDraft.fields.building_name}</span>}
+                <span className="crm-mute" style={{ fontSize: 11, lineHeight: 1.45 }}>
+                  AI filled this from the message below. Check every field and the photos before publishing.
+                </span>
+              </div>
+            )}
             <Field
               label="Paste the post"
               hint="Facebook post text or the owner's WhatsApp message. Facebook links can't be read — paste the words."
@@ -1079,7 +1119,8 @@ export default function CrmPropertyForm() {
                 <Btn onClick={() => navigate("/crm/properties")}>Cancel</Btn>
               ) : (
                 <Btn onClick={() => {
-                  setF(BLANK); replaceMedia([]); setPasteText(""); setImportInfo(null);
+                  if (waId) navigate("/crm/properties/new", { replace: true });
+                  setWaDraft(null); setF(BLANK); replaceMedia([]); setPasteText(""); setImportInfo(null);
                   setInternal({ ...BLANK_INTERNAL }); setVisitRule({ ...DEFAULT_VISIT_RULE }); setBuilding({ id: "" });
                 }}>
                   Clear

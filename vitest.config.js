@@ -5,6 +5,6 @@ export default defineConfig({
   esbuild: { jsx: "automatic" },
   test: {
     environment: "node",
-    include: ["src/**/*.test.js", "src/**/*.test.jsx"],
+    include: ["src/**/*.test.js", "src/**/*.test.jsx", "api/**/*.test.js"],
   },
 });
