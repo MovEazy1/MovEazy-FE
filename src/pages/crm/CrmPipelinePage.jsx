@@ -9,6 +9,7 @@
 import { useCallback, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { useCrm } from "./CrmShell";
+import { FollowUpActions } from "./FollowUpControls";
 import {
   CLOSED_STATUSES, STATUSES, setClientStatus, tempColor,
 } from "../../lib/crmClients";
@@ -49,12 +50,12 @@ function Card({ client, requirement, engagement, lastTouch, canWrite, onOpen, on
         {client.status === "dnp" && client.dnp_count > 0 ? `DNP ×${client.dnp_count} · ` : ""}
         touched {relTime(lastTouch ?? client.created_at)}
       </span>
-      {CLOSED_STATUSES.includes(client.status) && (
+      {CLOSED_STATUSES.includes(client.status) ? (
         <span className="crm-mute crm-num" style={{ fontSize: 10.5 }}>
           {client.closed_reason || client.closed_property_id || ""}
           {client.closed_rent ? ` · ${inr(client.closed_rent)}` : ""}
         </span>
-      )}
+      ) : canWrite && <FollowUpActions client={client} style={{ marginTop: 2 }} />}
     </div>
   );
 }

@@ -7,6 +7,7 @@
 import { useCallback, useEffect, useState } from "react";
 import { Link, useSearchParams } from "react-router-dom";
 import { useCrm } from "../CrmShell";
+import { FollowUpActions } from "../FollowUpControls";
 import { C, Empty, Loading, inr, relTime } from "../crmUi";
 import { friendlyError } from "../../../lib/partners";
 import {
@@ -140,6 +141,7 @@ function LikedList({ rows }) {
             {r.crm_client_id && (
               <Link to={`/crm/clients?client=${r.crm_client_id}`} className="crm-btn" style={{ justifyContent: "center", textDecoration: "none" }}>Open the client</Link>
             )}
+            {r.crm_client_id && <FollowUpActions clientId={r.crm_client_id} name={r.name} phone={r.phone} sm={false} />}
           </div>
         ))}
       </div>
@@ -168,6 +170,7 @@ function NotCalledList({ quiet }) {
             </div>
             <ContactButtons phone={c.phone} label={c.name} text={notCalledMessage(c)} />
             <Link to={`/crm/clients?client=${c.client_id}`} className="crm-btn" style={{ justifyContent: "center", textDecoration: "none" }}>Open the client</Link>
+            <FollowUpActions clientId={c.client_id} name={c.name} phone={c.phone} sm={false} />
           </div>
         ))
       ) : (

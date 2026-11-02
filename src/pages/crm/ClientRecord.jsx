@@ -18,6 +18,7 @@ import { SIGNAL_LABEL, basisLabel, effectiveFacts, rentSeenLabel } from "../../l
 import { Btn, C, Chip, Empty, TempDot, deadlineLabel, inr, relTime } from "./crmUi";
 import RequirementFields from "./RequirementFields";
 import PriorityControl from "./PriorityControl";
+import { FollowUpActions } from "./FollowUpControls";
 import PropertyQuickView from "./PropertyQuickView";
 import { ClientBrokerActivity, ClientTenantViews } from "./CrmTenantViews";
 
@@ -698,6 +699,8 @@ export default function ClientRecord({
               Mark contacted
             </Btn>
           )}
+          <FollowUpActions client={client} sm={false} onToast={onToast}
+            onSaved={(row) => { onPatch(row); refreshActivities(); }} />
           <Btn variant="wa" onClick={handleWhatsApp} disabled={!client.phone}>WhatsApp</Btn>
           <Btn variant="call" onClick={handleCall} disabled={!client.phone}>
             {copied ? "Copied" : "Call"}

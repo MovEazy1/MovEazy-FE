@@ -28,10 +28,15 @@ import CrmPropertyFollowUp from "./CrmPropertyFollowUp";
 import CrmContactMessages from "./CrmContactMessages";
 import { crmContactMessages } from "../../lib/contactMessages";
 import PhoneAlerts from "./mobile/PhoneAlerts";
+import { FollowUpActions } from "./FollowUpControls";
 
 /** A tenant with no number can't be messaged, only called back by email. */
 function WaitingRow({ person, group, nameFor, onMessaged }) {
   const name = nameFor(person);
+  const { clients } = useCrm();
+  const digits = String(person.phone || "").replace(/\D/g, "").slice(-10);
+  const client = (digits && clients.find((c) => String(c.phone || "").replace(/\D/g, "").slice(-10) === digits))
+    || (person.email && clients.find((c) => String(c.email || "").toLowerCase() === person.email.toLowerCase())) || null;
   const hasSlots = group.slots.length > 0;
 
   const message = hasSlots
@@ -67,6 +72,7 @@ function WaitingRow({ person, group, nameFor, onMessaged }) {
         )}
       </span>
 
+      {client && <FollowUpActions client={client} />}
       {href ? (
         <a
           className={`crm-btn crm-btn--sm ${hasSlots ? "crm-btn--wa" : ""}`}

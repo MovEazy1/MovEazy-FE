@@ -38,6 +38,7 @@ import { prefetchWhenIdle } from "../../lib/prefetch";
 import { DAY_MS, readCache, writeCache } from "../../lib/localCache";
 import TopProgress from "../../components/TopProgress";
 import { loadAreas } from "../../lib/areas";
+import { pokeDigest } from "../../lib/followUps";
 
 // What the broker saw last time stays on the device for 30 days, so the app
 // opens on it at once and refreshes underneath (lib/localCache.js).
@@ -277,6 +278,9 @@ function PartnerWorkspace({ me, reloadMe }) {
 
   // The areas list, so lead matching counts a wider area's flats (lib/areas.js).
   useEffect(() => { loadAreas(); }, []);
+  // Today's 9:30 follow-up summary, if cron hasn't sent it yet (crm_follow_ups.sql).
+  const partnerId = me?.partner?.user_id;
+  useEffect(() => { if (partnerId && !demo) pokeDigest(); }, [partnerId, demo]);
 
   return (
     <PartnerContext.Provider value={value}>

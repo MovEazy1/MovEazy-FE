@@ -13,6 +13,7 @@ import { DISLIKE_REASONS, LIKED_STATUSES } from "../../lib/buildings";
 import { removeTenantReason } from "../../lib/crmPropertyInternal";
 import { whatsappUrl } from "../../lib/crmSettings";
 import { ASSIGNED_STATUS } from "../../lib/partnerLeads";
+import { unassignPartner } from "../../lib/followUps";
 import {
   RESPONDERS, brokerFollowUpMessage, fetchBrokerActivity, fetchClientTenantViews, fetchPropertyTenantViews,
   fetchTenantViewHistory, logBrokerFollowUp, saveTenantView, sourcesLabel, viewSignals, viewSummary,
@@ -246,7 +247,8 @@ export function ClientTenantViews({ clientId, clientName, onSaved }) {
   );
 }
 
-const EVENT_LABEL = { call: "Call", whatsapp: "WhatsApp", status: "Status", follow_up: "Follow-up", response: "Response", team_follow_up: "MovEazy" };
+const EVENT_LABEL = { call: "Call", whatsapp: "WhatsApp", status: "Status", follow_up: "Follow-up", response: "Response", team_follow_up: "MovEazy",
+  outcome: "Call", assigned: "Assigned", removed: "Taken off" };
 
 /**
  * CRM client record: the partner brokers who have this client, everything
@@ -269,20 +271,47 @@ export function ClientBrokerActivity({ client, onLogged, onToast }) {
     try { await logBrokerFollowUp(b.assignment_id); load(); onLogged?.(); } catch { /* the message still went */ }
   };
 
+  const takeOff = async (b) => {
+    if (!window.confirm(`Take ${client.name || "this client"} off ${b.broker_name}? Their calls and notes stay on the record.`)) return;
+    try { await unassignPartner(b.assignment_id); load(); onLogged?.(); onToast?.(`Taken off ${b.broker_name}`); }
+    catch (e) { onToast?.(e?.message || "Couldn't take it off", "error"); }
+  };
+
   return (
     <div>
-      <div className="crm-label" style={{ marginBottom: 7 }}>Partner brokers · {rows.length}</div>
+      <div className="crm-label" style={{ marginBottom: 7 }}>Partner brokers · {rows.filter((b) => !b.removed_at).length}</div>
       <div className="crm-card" style={{ display: "flex", flexDirection: "column", gap: 10 }}>
         {rows.map((b) => {
           const last = b.events[0];
           const open = shown === b.assignment_id;
+          if (b.removed_at) {
+            return (
+              <div key={b.assignment_id} style={{ borderBottom: `1px solid ${C.line}`, paddingBottom: 8, opacity: 0.7 }}>
+                <span style={{ fontSize: 12.5 }}><b>{b.broker_name}</b> <span className="crm-mute" style={{ fontSize: 11 }}>
+                  · taken off {relTime(b.removed_at)}{b.removed_by ? ` by ${b.removed_by.split("@")[0]}` : ""} · was {ASSIGNED_STATUS[b.status] || b.status}</span></span>
+                {b.events.length > 0 && (
+                  <div><Btn sm onClick={() => setShown(open ? null : b.assignment_id)}>{open ? "Hide" : `What they did · ${b.events.length}`}</Btn></div>
+                )}
+                {open && (
+                  <div style={{ display: "grid", gap: 4, marginTop: 8 }}>
+                    {b.events.map((e, i) => (
+                      <div key={i} style={{ fontSize: 12, display: "flex", gap: 8 }}>
+                        <span className="crm-chip" style={{ flex: "none", pointerEvents: "none" }}>{EVENT_LABEL[e.kind] || e.kind}</span>
+                        <span style={{ color: C.textDim }}>{e.detail} <span className="crm-mute">· {e.actor ? `${e.actor}, ` : ""}{relTime(e.at)}</span></span>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+            );
+          }
           return (
             <div key={b.assignment_id} style={{ borderBottom: `1px solid ${C.line}`, paddingBottom: 8 }}>
               <div style={{ display: "flex", justifyContent: "space-between", gap: 8, alignItems: "flex-start" }}>
                 <span style={{ minWidth: 0, fontSize: 12.5 }}>
                   <b>{b.broker_name}</b> <span className="crm-mute crm-num" style={{ fontSize: 11 }}>{b.broker_phone}</span>
                   <span className="crm-mute" style={{ display: "block", fontSize: 11 }}>
-                    {[`Given ${relTime(b.assigned_at)}`, b.pack === "website" ? "MovEazy Website" : "",
+                    {[`Given ${relTime(b.assigned_at)}`, b.pack === "website" ? "MovEazy Website" : b.pack === "crm" ? "assigned from the CRM" : "",
                       b.flats_seen ? `saw ${b.flats_seen} of their flat${b.flats_seen === 1 ? "" : "s"}` : "",
                       b.follow_up_on ? `follows up ${day(b.follow_up_on)}${b.follow_up_note ? ` — ${b.follow_up_note}` : ""}` : "",
                       last ? `last: ${last.detail} ${relTime(last.at)}` : "nothing done yet"].filter(Boolean).join(" · ")}
@@ -294,6 +323,7 @@ export function ClientBrokerActivity({ client, onLogged, onToast }) {
               </div>
               <div style={{ display: "flex", gap: 6, marginTop: 6, flexWrap: "wrap" }}>
                 <Btn sm variant="primary" onClick={() => followUp(b)}><MessageCircle size={13} /> Follow up with broker</Btn>
+                {b.status !== "closed" && <Btn sm onClick={() => takeOff(b)}>Take off</Btn>}
                 {b.events.length > 0 && <Btn sm onClick={() => setShown(open ? null : b.assignment_id)}>{open ? "Hide" : `What they did · ${b.events.length}`}</Btn>}
               </div>
               {open && (

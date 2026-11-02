@@ -19,10 +19,12 @@ import { KIT_CSS, TenantRow, useReach } from "./TenantKit";
 import { useTenants } from "./tenantData";
 import { pp } from "../../lib/partners";
 import { fetchMyAssignedLeads, moveazyTabBadge } from "../../lib/partnerLeads";
+import { fetchPartnerFollowUps, partnerBucket } from "../../lib/followUps";
 import { OPEN_STAGES, STAGES, stageCounts } from "../../lib/partnerTenants";
 
 // Its own file, loaded when the tab is opened.
 const MoveazyLeads = lazy(() => import("./MoveazyLeads"));
+const PartnerToday = lazy(() => import("./PartnerToday"));
 
 const CHIPS = [["open", "In play"], ...STAGES.map((s) => [s.id, s.label]), ["all", "All"]];
 
@@ -30,7 +32,7 @@ const seenKey = (id) => `pz-mzleads-seen:${id}`;
 const readSeen = (id) => { try { return localStorage.getItem(seenKey(id)) === "1"; } catch { return true; } };
 
 /** My leads | MovEazy — big pills under the top bar; MovEazy says NEW until first opened, then how many await a call. */
-function BookPills({ book, setBook, me, mineCount, assigned }) {
+function BookPills({ book, setBook, me, mineCount, assigned, todayCount }) {
   const id = me?.partner?.user_id ?? "";
   const [seen, setSeen] = useState(() => readSeen(id));
   const [fetched, setFetched] = useState([]);
@@ -55,6 +57,11 @@ function BookPills({ book, setBook, me, mineCount, assigned }) {
         MovEazy leads
         {badge && <span style={{ padding: "1px 6px", borderRadius: 99, background: "#E3141B", color: "#fff", fontSize: 10.5, fontWeight: 800 }}>{badge}</span>}
       </button>
+      {/* MovEazy clients to call today — the team holds partners to a call within 24 hours. */}
+      <button type="button" role="tab" aria-selected={book === "today"} className={`pc-pill${book === "today" ? " on" : ""}`} onClick={() => setBook("today")}>
+        Today
+        {todayCount > 0 && <span style={{ padding: "1px 6px", borderRadius: 99, background: "#E3141B", color: "#fff", fontSize: 10.5, fontWeight: 800 }}>{todayCount}</span>}
+      </button>
     </div>
   );
 }
@@ -76,8 +83,14 @@ export default function LeadsList() {
   const [q, setQ] = useState("");
   const [assigned, setAssigned] = useState(null); // as the MovEazy tab last loaded them
   const [params, setParams] = useSearchParams();
-  const book = params.get("tab") === "moveazy" ? "moveazy" : "mine";
-  const setBook = (b) => setParams(b === "moveazy" ? { tab: "moveazy" } : {}, { replace: true });
+  const book = ["moveazy", "today"].includes(params.get("tab")) ? params.get("tab") : "mine";
+  const setBook = (b) => setParams(b === "mine" ? {} : { tab: b }, { replace: true });
+  const [todayCount, setTodayCount] = useState(0);
+  useEffect(() => {
+    let alive = true;
+    fetchPartnerFollowUps().then((r) => alive && setTodayCount(r.filter((x) => partnerBucket(x) !== "later").length), () => {});
+    return () => { alive = false; };
+  }, []);
 
   const counts = useMemo(() => stageCounts(board), [board]);
   const rows = useMemo(() => {
@@ -100,9 +113,11 @@ export default function LeadsList() {
   return (
     <>
       <PartnerHeader>
-        <BookPills book={book} setBook={setBook} me={me} mineCount={counts.open ?? 0} assigned={assigned} />
+        <BookPills book={book} setBook={setBook} me={me} mineCount={counts.open ?? 0} assigned={assigned} todayCount={todayCount} />
       </PartnerHeader>
-      {book === "moveazy" ? (
+      {book === "today" ? (
+        <Suspense fallback={<Loading />}><PartnerToday me={me?.partner} onCount={setTodayCount} /></Suspense>
+      ) : book === "moveazy" ? (
         <Suspense fallback={<Loading />}><MoveazyLeads onAssigned={setAssigned} /></Suspense>
       ) : (
       <>

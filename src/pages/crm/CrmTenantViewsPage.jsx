@@ -10,6 +10,7 @@ import { Link } from "react-router-dom";
 import { Phone } from "lucide-react";
 import { C, Chip, Empty, Toast } from "./crmUi";
 import { TenantViewRow, TenantViewSheet, propertyLine } from "./CrmTenantViews";
+import { FollowUpActions } from "./FollowUpControls";
 import { VIEW_FILTERS, fetchTenantViews, istDay } from "../../lib/tenantViews";
 import { waLink } from "../../lib/partners";
 
@@ -56,7 +57,7 @@ export default function CrmTenantViewsPage() {
           {shown.map((v) => (
             <div key={v.id} style={{ display: "grid", gap: 4 }}>
               <TenantViewRow v={v} title={`${v.client?.name || "Tenant"} · ${v.property_id}`} sub={propertyLine(v.property)} onOpen={setOpen} />
-              <div style={{ display: "flex", gap: 10, fontSize: 12, paddingLeft: 4 }}>
+              <div style={{ display: "flex", gap: 10, fontSize: 12, paddingLeft: 4, alignItems: "center", flexWrap: "wrap" }}>
                 {v.client?.phone && (
                   <>
                     <a href={`tel:+91${v.client.phone}`} style={{ color: C.accent, fontWeight: 600, display: "inline-flex", gap: 4, alignItems: "center" }}>
@@ -68,6 +69,7 @@ export default function CrmTenantViewsPage() {
                 )}
                 <Link to={`/crm/clients?client=${v.client_id}`} style={{ color: C.textDim }}>Client</Link>
                 <Link to={`/crm/properties/${encodeURIComponent(v.property_id)}/edit`} style={{ color: C.textDim }}>Property</Link>
+                {v.client_id && <FollowUpActions clientId={v.client_id} name={v.client?.name} phone={v.client?.phone} />}
               </div>
             </div>
           ))}

@@ -13,6 +13,7 @@ import {
 } from "../../lib/crmSettings";
 import { SCOPES } from "../../lib/adminScopes";
 import { Btn, C, Chip, Empty, Toast } from "./crmUi";
+import CrmFollowUpSettings from "./CrmFollowUpSettings";
 
 // The one-off photo shrink: super admins only, so its code loads only for them.
 const CrmPhotoOptimizer = lazy(() => import("./CrmPhotoOptimizer"));
@@ -180,6 +181,8 @@ export default function CrmSettingsPage() {
             </span>
           </div>
         </div>
+
+        <CrmFollowUpSettings isSuperAdmin={access.role === "super_admin"} onToast={showToast} />
 
         <div className="crm-card" style={{ maxWidth: 620 }}>
           <span className="crm-label">“Closed outside” reasons</span>

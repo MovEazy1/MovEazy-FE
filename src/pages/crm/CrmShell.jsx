@@ -34,6 +34,7 @@ import { fetchPriority } from "../../lib/crmPriority";
 import { PHONE_CSS, PhoneNav, PhoneTopBar, usePhone } from "./mobile/phoneUi";
 import { REFRESH_MS, fetchMobileSummary, waitingTotal } from "../../lib/crmMobile";
 import { loadAreas } from "../../lib/areas";
+import { pokeDigest } from "../../lib/followUps";
 
 const CrmContext = createContext(null);
 export const useCrm = () => useContext(CrmContext);
@@ -192,6 +193,7 @@ const NEEDS = {
   properties: ["inventory", "requirements", "clients", "marketingChannels"],
   brokers: ["inventory", "clients", "requirements"],
   priority: ["clients", "requirements", "inventory", "shortlists", "touches", "ownAnswers", "interest", "settings", "priority"],
+  "follow-ups": ["clients", "touches", "engagement", "ownAnswers", "requirements"],
   // The phone's own screens read their own RPCs (crm_mobile.sql).
   home: [],
   "partner-payments": [],
@@ -264,6 +266,8 @@ export default function CrmShell() {
 
   // The areas list, so matching counts a wider area's flats (lib/areas.js).
   useEffect(() => { loadAreas(); }, []);
+  // Today's 9:30 follow-up summary, if cron hasn't sent it yet (crm_follow_ups.sql).
+  useEffect(() => { if (!access.loading && access.isStaff) pokeDigest(); }, [access.loading, access.isStaff]);
 
   // Open: the saved copy if there is one, then the fresh data either way.
   const opened = useRef(false);

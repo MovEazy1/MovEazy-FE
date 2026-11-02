@@ -101,6 +101,7 @@ const CrmHome = lazy(() => import("./pages/crm/mobile/CrmHome"));
 const CrmBuildingTenantsPage = lazy(() => import("./pages/crm/CrmBuildingTenantsPage"));
 const CrmTenantViewsPage = lazy(() => import("./pages/crm/CrmTenantViewsPage"));
 const CrmPriorityPage = lazy(() => import("./pages/crm/CrmPriorityPage"));
+const CrmFollowUpsPage = lazy(() => import("./pages/crm/CrmFollowUpsPage"));
 const CrmPartnerPayments = lazy(() => import("./pages/crm/mobile/CrmPartnerPayments"));
 const CrmPartnerUsage = lazy(() => import("./pages/crm/mobile/CrmPartnerUsage"));
 /**
@@ -115,6 +116,7 @@ function prefetchCrmPage(path) {
     "": () => (isPhoneNow() ? import("./pages/crm/mobile/CrmHome") : import("./pages/crm/CrmClientsPage")),
     home: () => import("./pages/crm/mobile/CrmHome"),
     priority: () => import("./pages/crm/CrmPriorityPage"),
+    "follow-ups": () => import("./pages/crm/CrmFollowUpsPage"),
     "partner-payments": () => import("./pages/crm/mobile/CrmPartnerPayments"),
     "partner-usage": () => import("./pages/crm/mobile/CrmPartnerUsage"),
     clients: () => import("./pages/crm/CrmClientsPage"),
@@ -364,6 +366,7 @@ function AppRoutes() {
           <Route index element={<Navigate to={isPhoneNow() ? "/crm/home" : "/crm/clients"} replace />} />
           <Route path="home" element={<CrmHome />} />
           <Route path="priority" element={<CrmPriorityPage />} />
+          <Route path="follow-ups" element={<CrmFollowUpsPage />} />
           <Route path="partner-payments" element={<CrmPartnerPayments />} />
           <Route path="partner-usage" element={<CrmPartnerUsage />} />
           <Route path="partner-usage/:brokerId" element={<CrmPartnerUsage />} />

@@ -84,7 +84,9 @@ export const fetchClients = () =>
     "id,user_id,name,phone,email,source,status,temperature,note,note_by,note_at,dnp_count," +
       "assigned_to,next_follow_up_at,tags,closed_property_id,closed_rent,closed_reason,closed_at," +
       "brokerage_amount,expected_credit_date,payment_status,payment_marked_by,payment_marked_at," +
-      "payment_approved_by,payment_approved_at,created_at,updated_at,via,via_broker",
+      "payment_approved_by,payment_approved_at,created_at,updated_at,via,via_broker," +
+      // The next step (crm_follow_ups.sql).
+      "follow_up_note,follow_up_by,follow_up_set_at,last_outcome,last_outcome_at,no_answer_streak",
     // MovEazy's own leads, plus tenants from a partner's QR poster (via = 'qr',
     // partner_qr_leads.sql), which both MovEazy and the broker follow up. Any
     // other number that first came through a partner broker is theirs

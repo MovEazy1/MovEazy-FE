@@ -13,8 +13,15 @@ import { Btn, C, Chip, Empty, Loading, inr, relTime } from "./crmUi";
 import { decideSoldOut, fetchBrokerLeads, fetchSoldOutRequests } from "../../lib/partnerCurated";
 import { KIND_LABEL, fetchWebsiteLeads } from "../../lib/websiteLeads";
 import { waLink } from "../../lib/partners";
+import { useCrm } from "./CrmShell";
+import { FollowUpActions } from "./FollowUpControls";
+
+const last10 = (p) => String(p || "").replace(/\D/g, "").slice(-10);
 
 export default function CrmBrokerLeadsPage() {
+  const crm = useCrm();
+  // A broker's tenant who is also a CRM client (a QR-poster lead, say) gets the team's follow-up.
+  const clientByPhone = useMemo(() => new Map((crm?.clients ?? []).filter((c) => c.phone).map((c) => [last10(c.phone), c])), [crm?.clients]);
   const [tab, setTab] = useState("leads");
   const [leads, setLeads] = useState(null);
   const [sold, setSold] = useState(null);
@@ -84,7 +91,7 @@ export default function CrmBrokerLeadsPage() {
           {rows.length === 0 ? <Empty>No tenants from brokers yet.</Empty> : (
             <div style={{ overflowX: "auto", border: `1px solid ${C.line}`, borderRadius: 10 }}>
               <table style={{ width: "100%", borderCollapse: "collapse" }}>
-                <thead><tr><th style={th}>Tenant</th><th style={th}>Broker</th><th style={th}>Came via</th><th style={th}>Likes</th><th style={th}>Status</th><th style={th}>Last seen</th></tr></thead>
+                <thead><tr><th style={th}>Tenant</th><th style={th}>Broker</th><th style={th}>Came via</th><th style={th}>Likes</th><th style={th}>Status</th><th style={th}>Last seen</th><th style={th}>Follow up</th></tr></thead>
                 <tbody>
                   {rows.map((t) => (
                     <tr key={t.id}>
@@ -94,6 +101,13 @@ export default function CrmBrokerLeadsPage() {
                       <td style={cell}>{t.likes}</td>
                       <td style={cell}><span style={{ color: C.gold, fontWeight: 600 }}>{t.status}</span></td>
                       <td style={cell}>{relTime(t.last_seen_at)}</td>
+                      <td style={cell}>
+                        {clientByPhone.get(last10(t.phone)) ? <FollowUpActions client={clientByPhone.get(last10(t.phone))} partner={false} />
+                          : t.broker_phone && (
+                            <a className="crm-btn crm-btn--sm" target="_blank" rel="noreferrer"
+                              href={waLink(t.broker_phone, `Hi ${t.broker || ""}, what's the status of ${t.name || "your tenant"} (${last10(t.phone)})? — MovEazy`)}>Ask broker</a>
+                          )}
+                      </td>
                     </tr>
                   ))}
                 </tbody>

@@ -13,6 +13,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { useCrm } from "./CrmShell";
+import { FollowUpActions } from "./FollowUpControls";
 import { Btn, C, Empty } from "./crmUi";
 import { whatsappUrl } from "../../lib/crmSettings";
 import { logActivity } from "../../lib/crmClients";
@@ -119,6 +120,7 @@ function TaskRow({ task, onSnooze, onUnsnooze, onOpen, onMessaged, busy }) {
         ) : (
           <span className="crm-mute" style={{ fontSize: 11 }}>no number</span>
         )}
+        <FollowUpActions clientId={task.clientId} />
         <SnoozeControl busy={busy} onSnooze={(h) => onSnooze(task.clientId, h)} />
         {task.returned && <Btn sm onClick={() => onUnsnooze(task.clientId)} disabled={busy}>Clear</Btn>}
       </span>

@@ -18,6 +18,7 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { useCrm } from "./CrmShell";
+import { FollowUpActions } from "./FollowUpControls";
 import {
   clearConfirmationSent, clearReminderSent, dayKey, dueState, fetchProfilesFor,
   fetchVisitBookings, groupBy, markConfirmationSent, markReminderSent, summariseVisits,
@@ -294,6 +295,7 @@ export default function CrmVisitsPage() {
             {r.name}
           </button>
         )}
+        {showClient && r.client && <FollowUpActions client={r.client} />}
         {showProperty && (
           <span className="crm-num" style={{ fontSize: 11.5, color: C.accent }}>
             {b.building ? b.building.name : b.property_id}
@@ -407,7 +409,8 @@ export default function CrmVisitsPage() {
                 </div>
                 {view === "client" && g.client && (
                   <div style={{ marginTop: 4 }}>
-                    <Btn sm onClick={() => navigate(`/crm/clients?client=${g.client.id}`)}>Open record</Btn>
+                    <Btn sm onClick={() => navigate(`/crm/clients?client=${g.client.id}`)}>Open record</Btn>{" "}
+                    <FollowUpActions client={g.client} />
                   </div>
                 )}
                 <div style={{ marginTop: 6 }}>

@@ -29,6 +29,7 @@ import { SCOPES } from "../../lib/adminScopes";
 import { coverPhoto } from "../../lib/listingMedia";
 import { fetchShortlists, logActivity, saveClientRequirement, tempColor } from "../../lib/crmClients";
 import { buildTemplateVars, renderTemplate, whatsappUrl } from "../../lib/crmSettings";
+import { FollowUpActions } from "./FollowUpControls";
 import { effectiveFacts, groupInterestByClient, inferRequirement, requirementForMatching } from "../../lib/crmPropertyInterest";
 import { summariseClients } from "../../lib/crmLeadBuckets";
 import { scoreMatch } from "../../lib/inventoryMatch";
@@ -429,7 +430,8 @@ function ClientCard({ p, on, now, canWrite, onPick, onContact, onCurate, onFresh
         {canWrite && <Btn sm variant="primary" onClick={onCurate}><Send size={12} /> Curate & send</Btn>}
         {canWrite && fresh.length > 0 && <Btn sm onClick={onFresh}><Sparkles size={12} /> {fresh.length} new flat{fresh.length === 1 ? "" : "s"}</Btn>}
         <Link to={`/crm/clients?client=${c.id}`} className="crm-btn crm-btn--sm" style={{ textDecoration: "none" }}>Record</Link>
-        {canWrite && <Btn sm onClick={() => setMore((v) => !v)}>{more ? "Less" : "Follow-up / remove"}</Btn>}
+        <FollowUpActions client={c} />
+        {canWrite && <Btn sm onClick={() => setMore((v) => !v)}>{more ? "Less" : "More / remove"}</Btn>}
       </div>
       {more && canWrite && (
         <div style={{ display: "flex", flexDirection: "column", gap: 6, paddingTop: 6, borderTop: `1px solid ${C.lineSoft}` }}>
