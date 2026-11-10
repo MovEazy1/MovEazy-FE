@@ -11,6 +11,7 @@
  * open). Any failure serves the page untouched.
  */
 import { isPreviewRobot } from "./_bots.js";
+import { withAdPrepaint } from "./_adPrepaint.js";
 
 export const config = { runtime: "edge" };
 
@@ -174,7 +175,16 @@ export default async function handler(req) {
   let html = await page.text();
   if (!robot) {
     if (data && page.ok) {
-      try { html = withPageData(html, read.key(id), data, read.lead(data)); } catch { /* the plain shell */ }
+      try {
+        html = withPageData(html, read.key(id), data, read.lead(data));
+        // The ad page is drawn before its code arrives (api/_adPrepaint.js).
+        if (read.fn === "visit_ad_page") {
+          const building = read === PAGE_READS["visit-b"];
+          const media = building ? (data.photos ?? []).filter(Boolean) : flatMedia(data);
+          const lead = read.lead(data);
+          html = withAdPrepaint(html, building ? "building" : "flat", data, media, lead ? thumbUrl(lead) : "");
+        }
+      } catch { /* the plain shell */ }
     }
     return new Response(html, { status: 200, headers: { "content-type": "text/html; charset=utf-8", "cache-control": "private, no-store" } });
   }

@@ -145,6 +145,17 @@ ${row.rent_flag === "potentially_rented" ? '<div class="mzp-flag">Potentially re
 </div></div>`;
 }
 
+/**
+ * The app's stylesheet, no longer holding up a phone's first paint: the drawn
+ * copy has its own styles above. Still fetched at once and at high priority
+ * (the preload), applied as it lands — well before the app's ~200 KB of code
+ * has drawn the page it styles. A wider screen (no drawn copy) waits for it
+ * as before.
+ */
+const phoneStylesheet = (_, href) =>
+  `<link rel="preload" as="style" crossorigin href="${href}">`
+  + `<link rel="stylesheet" crossorigin href="${href}" media="(min-width: 768px)" onload="this.media='all'">`;
+
 /** The shell with the flat added: photo preload, its data, the drawn copy, and its own title. */
 export function withListing(shell, row, now = Date.now()) {
   const photos = photosOf(row);
@@ -162,6 +173,7 @@ export function withListing(shell, row, now = Date.now()) {
     .replace(/<title>[^<]*<\/title>/, `<title>${esc(`${title} · MovEazy`)}</title>`)
     // The photo and styles first; the app's code still comes at once, just behind them.
     .replace(/<link rel="modulepreload"/g, '<link rel="modulepreload" fetchpriority="low"')
+    .replace(/<link rel="stylesheet" crossorigin href="([^"]+)">/, phoneStylesheet)
     .replace("</head>", `${head}</head>`)
     .replace('<div id="root"></div>', `<div id="prerender">${prepaint(row, now)}</div><div id="root"></div>`);
 }

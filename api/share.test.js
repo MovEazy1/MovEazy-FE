@@ -30,6 +30,28 @@ describe("ad and building pages: the first photo and the data inside the page", 
   });
 });
 
+describe("the ad page drawn before the app", () => {
+  it("photo, title, rent, deposit, facts and the button, as VisitAdPage writes them", async () => {
+    const { adPrepaint } = await import("./_adPrepaint.js");
+    const html = adPrepaint("flat", { flat_type: "1 BHK", furnishing: "Semi Furnished", area: "HSR", rent: 26000, deposit: 100000, bedrooms: 1, bathrooms: 1 },
+      [`${B}1.jpg`, `${B}2.jpg`], thumbUrl(`${B}1.jpg`));
+    expect(html).toContain("<h1>1 BHK · Semi Furnished</h1>");
+    expect(html).toContain("<b>₹26,000</b><small> / month</small>");
+    expect(html).toContain("<small>Deposit</small><b>₹1L</b>");
+    expect(html).toContain("1 bed</span>");
+    expect(html).toContain('<div class="va-gcount">1 / 2</div>');
+    expect(html).toContain(`<img src="${thumbUrl(`${B}1.jpg`)}"`);
+    expect(html).toContain("Schedule a visit");
+  });
+  it("a building's ad page: its name and rent from", async () => {
+    const { adPrepaint } = await import("./_adPrepaint.js");
+    const html = adPrepaint("building", { name: "BR <Homes>", area: "HSR", rent_from: 18000, flat_types: ["1 BHK", "2 BHK"] }, [], "");
+    expect(html).toContain("<h1>BR &lt;Homes&gt;</h1>");
+    expect(html).toContain("From <b>₹18,000</b>");
+    expect(html).toContain("va-gallery--none");
+  });
+});
+
 describe("the page takes it once", () => {
   afterEach(() => { delete globalThis.window; });
   it("for its own read only", () => {

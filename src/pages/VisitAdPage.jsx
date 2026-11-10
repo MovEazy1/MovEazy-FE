@@ -25,7 +25,7 @@
  *   Lead                the first mobile from this browser (RequirePhoneFirst → saveLead)
  *   Schedule            a visit booked (bookAdVisit)
  */
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useLayoutEffect, useMemo, useState } from "react";
 import { useLocation, useNavigate, useParams } from "react-router-dom";
 import { BadgeCheck, Bath, BedDouble, Building2, CalendarCheck, CalendarPlus, Check, ChevronLeft, Compass, MapPin, Phone, Ruler, Sofa, X } from "lucide-react";
 import { MediaItem, listingMedia } from "./partners/partnerMedia";
@@ -37,9 +37,11 @@ import { leadSnapshot } from "../lib/leadIntake";
 import { recordFlatView } from "../lib/flatInsights";
 import { recordBuildingView } from "../lib/buildings";
 import { trackPixel } from "../lib/metaPixel";
+import { dropPrerender } from "../lib/prerender";
 import { adSlots, bookAdVisit, calendarLink, dayLabel, fetchAdPage, readAdBooking, readAdUtm, recordAdEvent, slotLabel, slotsByDay } from "../lib/visitAds";
 import { AvailableFlats, EXTRA_CSS, VisitCallCard } from "./VisitAdExtras";
-import logo from "../assets/logo/moveazy-logo-mint-light.png";
+// From public/, at a fixed address: the page drawn before the app (api/_adPrepaint.js) shows the same file.
+const logo = "/moveazy-logo-mint-light.png";
 
 const inr = (n) => `₹${Number(n || 0).toLocaleString("en-IN")}`;
 const short = (n) => {
@@ -72,6 +74,8 @@ export default function VisitAdPage({ kind: asked = "flat" }) {
     if (kind === "building") recordBuildingView(ref, "link"); else recordFlatView(ref, "link");
     return () => { live = false; };
   }, [kind, ref]);
+  // The page drawn before the app (api/_adPrepaint.js) gives way once this one is drawn.
+  useLayoutEffect(() => { if (page !== undefined) dropPrerender(); }, [page]);
   // Opening the page, with where they came from (WhatsApp, a Meta ad…).
   useEffect(() => { recordAdEvent(kind, ref, "open", { utm }); }, [kind, ref, utm]);
   useViewEngagement(kind === "flat" && page ? ref : null, 0);

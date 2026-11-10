@@ -55,6 +55,12 @@ describe("the page", () => {
     const data = JSON.parse(html.match(/window\.__MZ_LISTING__=(.*?);<\/script>/)[1]);
     expect(data).toEqual({ id: "MZ-LTQJ2A", rows: [row] });
   });
+  it("on a phone the app's stylesheet no longer holds up the first paint; wider screens unchanged", () => {
+    const shell = SHELL.replace('<link rel="stylesheet" href="/assets/index.css">', '<link rel="stylesheet" crossorigin href="/assets/index.css">');
+    const html = withListing(shell, row, NOW);
+    expect(html).toContain('<link rel="preload" as="style" crossorigin href="/assets/index.css">');
+    expect(html).toContain(`<link rel="stylesheet" crossorigin href="/assets/index.css" media="(min-width: 768px)" onload="this.media='all'">`);
+  });
   it("a row can't close the script it rides in", () => {
     const html = withListing(SHELL, { ...row, description: "</script><script>alert(1)</script>" }, NOW);
     expect(html).not.toContain("</script><script>alert(1)");

@@ -10,6 +10,15 @@ import { useLayoutEffect } from "react";
 
 export function dropPrerender() {
   if (typeof document === "undefined") return;
+  // A stylesheet that didn't hold up the first paint (api/property-page.js)
+  // may still be on its way: swap once it has landed, never to an unstyled app.
+  const pending = [...document.querySelectorAll('link[rel="stylesheet"]')].find((l) => !l.sheet);
+  if (pending && document.documentElement.classList.contains("mz-pre")) {
+    const go = () => dropPrerender();
+    pending.addEventListener("load", go, { once: true });
+    pending.addEventListener("error", go, { once: true });
+    return;
+  }
   document.documentElement.classList.remove("mz-pre");
   document.getElementById("prerender")?.remove();
 }
