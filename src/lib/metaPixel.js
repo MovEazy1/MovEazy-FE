@@ -60,15 +60,41 @@ function userData({ phone, email } = {}) {
   return out;
 }
 
+/**
+ * Meta's 213 KB script, fetched once the page has had its chance: the first
+ * tap, scroll or key — or 4 s, whichever is sooner. Until then fbq() queues
+ * every event (Meta's own stub), and the script sends the queue when it lands.
+ * Loading it at once took bandwidth from the flat's photo on a phone.
+ */
+const PIXEL_DELAY_MS = 4000;
+function insertScriptSoon(src) {
+  let done = false;
+  const go = () => {
+    if (done) return;
+    done = true;
+    for (const ev of ["pointerdown", "scroll", "keydown"]) window.removeEventListener(ev, go, true);
+    try {
+      const t = document.createElement("script");
+      t.async = true;
+      t.src = src;
+      document.head.appendChild(t);
+    } catch { /* blocked or unavailable */ }
+  };
+  for (const ev of ["pointerdown", "scroll", "keydown"]) window.addEventListener(ev, go, { capture: true, passive: true, once: true });
+  setTimeout(go, PIXEL_DELAY_MS);
+}
+
 /** Meta's standard loader, without the <noscript> image (a React app has script). */
 function load() {
   if (loaded) return true;
   try {
-    !(function (f, b, e, v, n, t, s) {
-      if (f.fbq) return; n = f.fbq = function () { n.callMethod ? n.callMethod.apply(n, arguments) : n.queue.push(arguments); };
-      if (!f._fbq) f._fbq = n; n.push = n; n.loaded = !0; n.version = "2.0"; n.queue = [];
-      t = b.createElement(e); t.async = !0; t.src = v; s = b.getElementsByTagName(e)[0]; s.parentNode.insertBefore(t, s);
-    })(window, document, "script", "https://connect.facebook.net/en_US/fbevents.js");
+    if (!window.fbq) {
+      const n = function () { n.callMethod ? n.callMethod.apply(n, arguments) : n.queue.push(arguments); };
+      window.fbq = n;
+      if (!window._fbq) window._fbq = n;
+      n.push = n; n.loaded = true; n.version = "2.0"; n.queue = [];
+      insertScriptSoon("https://connect.facebook.net/en_US/fbevents.js");
+    }
     window.fbq("init", PIXEL_ID);
     loaded = true;
   } catch {

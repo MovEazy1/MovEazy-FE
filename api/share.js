@@ -107,16 +107,75 @@ function inject(html, t, pageUrl) {
   return html;
 }
 
+/* ── For people: the page's data and first photo, inside the page ─────────── */
+
+const VIDEO_EXT = /\.(mp4|m4v|webm|ogv|ogg|mov|qt|3gp)(?:[?#]|$)/i;
+const IMAGE_EXT = /\.(jpe?g|png|webp|gif|avif|heic|heif|bmp|svg)(?:[?#]|$)/i;
+const isVideo = (u) => !IMAGE_EXT.test(u) && (VIDEO_EXT.test(u) || /\/videos?\//i.test(u));
+const isMadeCover = (u) => /\/cover-\d+\.jpe?g(\?|$)/i.test(String(u || ""));
+const MARKER = "/storage/v1/object/public/listings/";
+
+/** The 480 px copy of a listing photo (src/lib/imageShrink.js thumbUrl). */
+export function thumbUrl(src) {
+  const s = String(src || "");
+  const i = s.indexOf(MARKER);
+  if (i < 0) return s;
+  const rest = s.slice(i + MARKER.length);
+  if (rest.startsWith("thumbs/") || !/\.(jpe?g|png|webp|heic|heif)(\?|$)/i.test(rest)) return s;
+  return `${s.slice(0, i + MARKER.length)}thumbs/${rest}`;
+}
+
+/** A flat's gallery, first photo first (partnerMedia listingMedia: a typed cover leads, a made one is skipped). */
+function flatMedia(f) {
+  const list = (f?.images ?? []).filter(Boolean);
+  const cover = f?.cover_image_url;
+  return [...new Set(!cover || isMadeCover(cover) ? list : [cover, ...list])];
+}
+const firstPhoto = (urls) => (urls || []).find((u) => u && !isVideo(u)) || "";
+
+/** Which database read draws this page (the same one the app makes), and the photo at its top. */
+export const PAGE_READS = {
+  building: { fn: "building_page", args: (id) => ({ p_code: id }), ok: (id) => /^[A-Za-z0-9]{6}$/.test(id),
+    key: (id) => `building_page:${id}`,
+    // BuildingPage: its own photos, else its flats' — none when a video leads.
+    lead: (d) => (d.cover_video ? "" : firstPhoto((d.photos ?? []).filter(Boolean).length ? d.photos : (d.flats ?? []).flatMap(flatMedia))) },
+  "visit-b": { fn: "visit_ad_page", args: (id) => ({ p_kind: "building", p_ref: id }), ok: (id) => /^[A-HJ-NP-Z2-9]{6}$/i.test(id),
+    key: (id) => `visit_ad_page:building:${id}`, lead: (d) => firstPhoto(d.photos) },
+  visit: { fn: "visit_ad_page", args: (id) => ({ p_kind: "flat", p_ref: id }), ok: (id) => /^MZ-[A-Z0-9]{4,12}$/i.test(id),
+    key: (id) => `visit_ad_page:flat:${id}`, lead: (d) => firstPhoto(flatMedia(d)) },
+};
+
+/** The shell with the page's data (window.__MZ_PAGE__) and its first photo asked for at once. */
+export function withPageData(html, key, data, lead) {
+  const json = JSON.stringify({ key, data }).replace(/</g, "\\u003c");
+  const head = `${lead ? `<link rel="preload" as="image" href="${esc(thumbUrl(lead))}" fetchpriority="high">` : ""}<script>window.__MZ_PAGE__=${json};</script>`;
+  return html
+    .replace(/<link rel="modulepreload"/g, '<link rel="modulepreload" fetchpriority="low"')
+    .replace("</head>", `${head}</head>`);
+}
+
+/** Never longer than `ms`: a slow read must not hold the page up — the app asks for itself. */
+const within = (p, ms) => Promise.race([p, new Promise((r) => setTimeout(() => r(null), ms))]);
+
 export default async function handler(req) {
   const url = new URL(req.url);
   const kind = url.searchParams.get("kind") || "";
   const id = url.searchParams.get("id") || "";
-  // The app's shell (dist/app.html; "/" itself may be a pre-built landing page).
-  const page = await fetch(`${url.origin}/app.html`);
+  // A person (a QR scan, a tap on a shared link) gets the app at once, with
+  // what the page will ask for first already in it.
+  const robot = isPreviewRobot(req.headers.get("user-agent"));
+  // /visit/<code> is a building too (6 letters), as the app reads it.
+  const read = kind === "visit" && !/^MZ-/i.test(id) ? PAGE_READS["visit-b"] : PAGE_READS[kind];
+  const [page, data] = await Promise.all([
+    // The app's shell (dist/app.html; "/" itself may be a pre-built landing page).
+    fetch(`${url.origin}/app.html`),
+    !robot && read?.ok(id) ? within(rpc(read.fn, read.args(id)).catch(() => null), 700) : null,
+  ]);
   let html = await page.text();
-  // A person (a QR scan, a tap on a shared link) gets the app at once; the
-  // lookup below only writes the preview card robots read.
-  if (!isPreviewRobot(req.headers.get("user-agent"))) {
+  if (!robot) {
+    if (data && page.ok) {
+      try { html = withPageData(html, read.key(id), data, read.lead(data)); } catch { /* the plain shell */ }
+    }
     return new Response(html, { status: 200, headers: { "content-type": "text/html; charset=utf-8", "cache-control": "private, no-store" } });
   }
   try {

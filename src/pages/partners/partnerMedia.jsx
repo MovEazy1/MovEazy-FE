@@ -8,6 +8,7 @@ import { Home } from "lucide-react";
 import SmartImage from "../../components/SmartImage";
 import { isVideoUrl, orderListingMedia } from "../../lib/listingMedia";
 import ThumbImg from "../../components/ThumbImg";
+import SharpenedImg from "../../components/SharpenedImg";
 import { galleryOf, isMadeCover } from "../../lib/coverCrop";
 
 /** The gallery: every photo and video. A framed cover (lib/coverCrop.js) is a copy of one of them, so it isn't repeated here. */
@@ -36,7 +37,9 @@ function PhotoOrPlaceholder({ src, alt, thumb, priority }) {
     return <div style={{ width: "100%", height: "100%", display: "grid", placeItems: "center", color: "#9CA3AF" }}><Home size={36} /></div>;
   }
   if (thumb) return <ThumbImg src={src} alt={alt} onBroken={() => setBroken(true)} />;
-  return <img src={src} alt={alt} loading={priority ? "eager" : "lazy"} fetchPriority={priority ? "high" : undefined} onError={() => setBroken(true)} />;
+  // The top of the page: its thumbnail at once (the page's HTML asked for it), then sharp.
+  if (priority) return <SharpenedImg src={src} alt={alt} loading="eager" fetchPriority="high" onError={() => setBroken(true)} />;
+  return <img src={src} alt={alt} loading="lazy" onError={() => setBroken(true)} />;
 }
 
 /** The listing's first photo. `thumb` for small places — cards, rows, tiles — which get the 480 px copy. */

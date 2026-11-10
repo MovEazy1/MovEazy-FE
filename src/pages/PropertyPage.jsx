@@ -10,7 +10,7 @@
  * `?visit=1` opens straight on the booking panel — that is what "Schedule a
  * visit" sends when it has to leave the page it was on.
  */
-import { Suspense, lazy, useEffect, useMemo, useRef, useState } from "react";
+import { Suspense, lazy, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { useLocation, useNavigate, useParams } from "react-router-dom";
 import PropertyModal from "../components/PropertyModal";
 import { prefetchWhenIdle } from "../lib/prefetch";
@@ -21,7 +21,8 @@ const loadAIBroker = () => import("../components/AIBroker");
 const AIBroker = lazy(loadAIBroker);
 import Toast from "../components/Toast";
 import { useLoginModal } from "../context/LoginModalContext";
-import { fetchListingById, mapInventoryToListing } from "../lib/inventory";
+import { fetchInventoryByIds, fetchListingById, mapInventoryToListing, takeInlineListing } from "../lib/inventory";
+import { dropPrerender } from "../lib/prerender";
 import { recordFlatView } from "../lib/flatInsights";
 
 const T = { ink: "#04211D", text: "#171412", textDim: "#5c554e" };
@@ -144,6 +145,16 @@ export default function PropertyPage() {
       .then((rows) => {
         if (!alive) return;
         setListing(mapInventoryToListing((rows || [])[0]) || null);
+        // Drawn from the copy that came inside the page (api/property-page.js),
+        // which the edge may have kept a few minutes: check it is still current.
+        if (takeInlineListing(id)) {
+          // The view count moves with every open; only a real change redraws.
+          const sig = (r) => (r ? JSON.stringify({ ...r, view_count: 0 }) : "null");
+          const seen = sig((rows || [])[0]);
+          fetchInventoryByIds([id]).then((fresh) => {
+            if (alive && sig(fresh?.[0]) !== seen) setListing(mapInventoryToListing(fresh?.[0]) || null);
+          }, () => {});
+        }
       })
       .catch(() => { if (alive) setListing(null); })
       .finally(() => { if (alive) setLoading(false); });
@@ -162,6 +173,9 @@ export default function PropertyPage() {
     if (location.key && location.key !== "default") navigate(-1);
     else navigate("/");
   };
+
+  // The phone's drawn copy of this page (api/property-page.js) gives way once the real one is drawn.
+  useLayoutEffect(() => { if (!loading) dropPrerender(); }, [loading]);
 
   if (loading) {
     return (

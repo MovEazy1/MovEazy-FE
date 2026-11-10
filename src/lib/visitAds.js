@@ -17,6 +17,7 @@ import { visitorId } from "./storefront";
 import { defaultVisitSlots } from "./visits";
 import { trackPixel } from "./metaPixel";
 import { PUBLIC_ORIGIN } from "./partners";
+import { takePageData } from "./pageData";
 
 async function rpc(fn, args) {
   if (!isSupabaseConfigured || !supabase) throw new Error("Not connected.");
@@ -85,7 +86,11 @@ export const adDesk = (booking, { kind = "contacts", target = "", feedback = "",
   });
 
 /** What the page shows (null: no such page). */
-export const fetchAdPage = (kind, ref) => rpc("visit_ad_page", { p_kind: kind, p_ref: ref });
+export const fetchAdPage = (kind, ref) => {
+  // Opened from the ad, the page already holds this read (lib/pageData, api/share.js).
+  const early = takePageData(`visit_ad_page:${kind}:${ref}`);
+  return early !== undefined ? Promise.resolve(early) : rpc("visit_ad_page", { p_kind: kind, p_ref: ref });
+};
 
 /** The times the page offers: the team's for the property, else every day 10 am – 6 pm for 7 days. */
 export function adSlots(page, now = Date.now()) {

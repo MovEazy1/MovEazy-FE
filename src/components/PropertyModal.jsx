@@ -14,7 +14,9 @@ import {
   ArrowLeft, Share2, Heart, BedDouble, Users, Home as HomeIcon, CalendarDays,
   MapPin, ChevronRight, CalendarCheck, Images, Maximize2,
 } from "lucide-react";
-import logoMint from "../assets/logo/moveazy-logo-mint-dark.png";
+// From public/, at a fixed address: a flat page opened from a link drew it
+// already (api/property-page.js), so this is the same file, not a second one.
+const logoMint = "/moveazy-logo-mint-dark.png";
 import { useLoginModal } from "../context/LoginModalContext";
 import { bookIndividual, fetchBookingForProperty, fetchOpenVisitsForProperty, requestNextAvailableVisit } from "../lib/visits";
 import { findNearbyListings } from "../lib/geo";
@@ -25,6 +27,7 @@ import { fetchPartnerFlatIds, reportContactTap } from "../lib/websiteLeads";
 import { autoDeposit } from "../lib/deposit";
 import { thumbUrl } from "../lib/imageShrink";
 import ThumbImg from "./ThumbImg";
+import SharpenedImg from "./SharpenedImg";
 import { floorLabel as floorName } from "../lib/buildings";
 
 // Full screen, loaded on the first tap of a photo.
@@ -199,7 +202,7 @@ function MediaElement({ src, alt, style, firstImage, priority = false }) {
       {/* Blurred background layer */}
       <BlurredBackdrop src={src} blur={25} brightness={0.85} priority={priority} />
       {/* Main image layer: the first photo straight away, the others as they come near. */}
-      <img src={src} alt={alt} loading={priority ? "eager" : "lazy"} style={{ ...style, objectFit: "contain", position: "relative", zIndex: 1, maxWidth: "100%", maxHeight: "100%" }} />
+      <SharpenedImg src={src} alt={alt} loading={priority ? "eager" : "lazy"} style={{ ...style, objectFit: "contain", position: "relative", zIndex: 1, maxWidth: "100%", maxHeight: "100%" }} />
     </div>
   );
 }

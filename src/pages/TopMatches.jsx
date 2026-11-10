@@ -417,7 +417,9 @@ export default function TopMatches() {
   }, []);
   useEffect(() => () => clearTimeout(visitToastTimer.current), []);
 
-  const loading = authLoading || listingsLoading || !prefsChecked;
+  // Somebody with no preferences sees the "tell us" screen at once: the 500
+  // listings are only for ranking, and there is nothing to rank yet.
+  const loading = authLoading || !prefsChecked || (Boolean(prefs) && listingsLoading);
   const total = topMatches.length;
 
   // The team has picked, so that is the answer to "find my flat" — whether or

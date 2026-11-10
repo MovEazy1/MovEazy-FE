@@ -404,6 +404,16 @@ export async function fetchInventoryByIds(propertyIds = []) {
  * starts its first photo at once; the page then takes that same request.
  */
 const earlyListing = new Map();
+// Flats whose row came inside the page: the edge's copy is up to a few minutes old.
+const inlineListing = new Set();
+
+/** Did flat `id` come inside the page (so worth checking again once it has drawn)? Asked once. */
+export function takeInlineListing(id) {
+  const key = String(id || "").trim();
+  const had = inlineListing.has(key);
+  inlineListing.delete(key);
+  return had;
+}
 
 /** The photo the flat page's gallery shows first, at the size its backdrop draws it (PropertyModal). */
 export function galleryLeadPhoto(row) {
@@ -419,6 +429,14 @@ export function galleryLeadPhoto(row) {
 export function prefetchListing(id) {
   const key = String(id || "").trim();
   if (!key || earlyListing.has(key)) return;
+  // The page came with the flat in it (api/property-page.js), its photo already on its way.
+  const inline = typeof window !== "undefined" ? window.__MZ_LISTING__ : null;
+  if (inline?.id && inline.id.toUpperCase() === key.toUpperCase() && inline.rows?.length) {
+    earlyListing.set(key, Promise.resolve(inline.rows));
+    inlineListing.add(key);
+    window.__MZ_LISTING__ = null;
+    return;
+  }
   const p = fetchInventoryByIds([key]);
   earlyListing.set(key, p);
   p.then((rows) => {

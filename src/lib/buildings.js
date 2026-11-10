@@ -9,6 +9,7 @@ import { trackPixel, trackPixelOnce } from "./metaPixel";
 import { supabase, isSupabaseConfigured } from "./supabase";
 import { PUBLIC_ORIGIN } from "./partners";
 import { visitorId } from "./storefront";
+import { takePageData } from "./pageData";
 
 async function rpc(fn, args) {
   if (!isSupabaseConfigured || !supabase) throw new Error("Not connected.");
@@ -23,7 +24,11 @@ export const buildingDisplay = (code) => `moveazy.co.in/building/${code}`;
 
 /* ── The public page ─────────────────────────────────────────────────────── */
 
-export const fetchBuildingPage = (code) => rpc("building_page", { p_code: String(code || "") });
+// Opened from a link, the page already holds this read (lib/pageData, api/share.js).
+export const fetchBuildingPage = (code) => {
+  const early = takePageData(`building_page:${code}`);
+  return early !== undefined ? Promise.resolve(early) : rpc("building_page", { p_code: String(code || "") });
+};
 
 export function recordBuildingView(code, source) {
   trackPixel("ViewContent", { content_ids: [String(code || "")], content_type: "home_listing", content_name: source === "qr" ? "building_qr" : "building" });

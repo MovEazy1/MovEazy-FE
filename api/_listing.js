@@ -80,6 +80,36 @@ export function listingDescription(listing) {
   return bits.length ? bits.join(" · ") : String(listing.description || "").slice(0, 160);
 }
 
+/**
+ * The columns the flat page itself reads (src/lib/inventory.js
+ * PUBLIC_INVENTORY_COLS — a test keeps the two the same), so the row this
+ * fetches can go into the page and spare the app its own request.
+ */
+export const APP_LISTING_COLS =
+  "property_id, posted_by, city, area, nearby_areas, full_address, landmark, " +
+  "latitude, longitude, rent, deposit, available_from, flat_type, bedrooms, " +
+  "bathrooms, furnishing, max_flatmates, gender_pref, occupants_allowed, maintenance, " +
+  "floor_number, total_floors, " +
+  "amenities, lifestyle, house_rules, title, description, images, " +
+  "cover_image_url, status, is_verified, view_count, created_at, updated_at, rent_flag";
+
+/** The flat page's row for a published flat, exactly as the app would get it, or null. Never throws. */
+export async function fetchAppListingRow(propertyId) {
+  const id = String(propertyId || "").trim().toUpperCase();
+  if (!/^[A-Z0-9-]{3,40}$/.test(id) || !SUPABASE_URL || !SUPABASE_KEY) return null;
+  try {
+    const res = await fetch(
+      `${SUPABASE_URL}/rest/v1/inventory?select=${encodeURIComponent(APP_LISTING_COLS)}&property_id=in.(${encodeURIComponent(id)})`,
+      { headers: { apikey: SUPABASE_KEY, Authorization: `Bearer ${SUPABASE_KEY}` } },
+    );
+    if (!res.ok) return null;
+    const rows = await res.json();
+    return Array.isArray(rows) && rows[0]?.status === "published" ? rows[0] : null;
+  } catch {
+    return null;
+  }
+}
+
 /** Escape for interpolation into an HTML attribute. */
 export function esc(s) {
   return String(s ?? "")

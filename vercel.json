@@ -55,6 +55,10 @@
       "destination": "/api/share?kind=visit&id=:id"
     },
     {
+      "source": "/property/:id",
+      "destination": "/api/property-page?id=:id"
+    },
+    {
       "source": "/((?!api/|assets/).*)",
       "destination": "/app.html"
     }
@@ -91,6 +95,15 @@
         {
           "key": "Cache-Control",
           "value": "public, max-age=31536000, immutable"
+        }
+      ]
+    },
+    {
+      "source": "/moveazy-logo-mint-dark.png",
+      "headers": [
+        {
+          "key": "Cache-Control",
+          "value": "public, max-age=604800, stale-while-revalidate=86400"
         }
       ]
     }

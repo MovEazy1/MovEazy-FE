@@ -44,14 +44,16 @@ describe("/p/:id", () => {
 });
 
 describe("/b, /c, /building", () => {
-  it("serves a person the app without looking anything up", async () => {
+  it("serves a person the app with only the page's own first read inside it", async () => {
     const calls = [];
     const real = globalThis.fetch;
     globalThis.fetch = async (u) => { calls.push(String(u)); return new Response("<html><head><title>x</title></head></html>"); };
     try {
       const res = await share(new Request("https://www.moveazy.co.in/api/share?kind=building&id=ABC234", { headers: { "user-agent": IPHONE } }));
       expect(res.status).toBe(200);
-      expect(calls.every((u) => u.endsWith("/app.html"))).toBe(true); // the shell; "/" may be a pre-built page
+      // The shell ("/" may be a pre-built page) and, when the database is configured, the
+      // read the page itself makes first (api/share.js PAGE_READS) — never a counted view.
+      expect(calls.every((u) => u.endsWith("/app.html") || u.endsWith("/rpc/building_page"))).toBe(true);
       expect(res.headers.get("cache-control")).toMatch(/no-store/);
     } finally {
       globalThis.fetch = real;
