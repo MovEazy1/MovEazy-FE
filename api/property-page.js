@@ -14,7 +14,8 @@
  *     and swaps in when drawn (lib/prerender.js; PropertyPage hands over).
  *
  * Anything missing (not published, not found, the database slow) and the plain
- * shell goes out instead, exactly as before. Cached at the edge for a minute.
+ * shell goes out instead, exactly as before. Cached at the edge; the app
+ * re-checks the flat once drawn.
  */
 import { esc, fetchAppListingRow } from "./_listing.js";
 
@@ -195,10 +196,11 @@ export default async function handler(req) {
     status: shellRes.ok ? 200 : shellRes.status,
     headers: {
       "content-type": "text/html; charset=utf-8",
-      // Browsers always ask again; the edge keeps a copy for a minute, so a
-      // changed rent shows within about a minute.
+      // Browsers always ask again; the edge keeps a copy (10 minutes fresh, then
+      // served while it refreshes). The page re-checks the flat as soon as it is
+      // drawn (PropertyPage), so a changed rent or a rented flat shows at once anyway.
       "cache-control": "public, max-age=0, must-revalidate",
-      "cdn-cache-control": "public, s-maxage=60, stale-while-revalidate=300",
+      "cdn-cache-control": "public, s-maxage=600, stale-while-revalidate=86400",
     },
   });
 }

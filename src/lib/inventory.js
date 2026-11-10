@@ -79,6 +79,8 @@ export async function uploadInventoryPhotos(files = [], propertyId, onProgress, 
         .upload(path, file, {
           upsert: false,
           contentType: file.type || (isVideoFile(original) ? "video/mp4" : "image/jpeg"),
+          // The name carries the upload time, so the file never changes: phones may keep it.
+          cacheControl: "31536000",
         });
       if (!error && data) {
         const { data: pub } = supabase.storage.from(PHOTO_BUCKET).getPublicUrl(data.path);
@@ -86,7 +88,7 @@ export async function uploadInventoryPhotos(files = [], propertyId, onProgress, 
         if (thumb) {
           // Best effort: without it, cards just show the full photo.
           await supabase.storage.from(PHOTO_BUCKET)
-            .upload(thumbPath(data.path), thumb, { upsert: true, contentType: "image/jpeg" })
+            .upload(thumbPath(data.path), thumb, { upsert: true, contentType: "image/jpeg", cacheControl: "31536000" })
             .catch(() => {});
         }
       } else if (error) {

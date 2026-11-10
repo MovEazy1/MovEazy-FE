@@ -40,7 +40,7 @@ export async function pasteWaMessage(text, files = [], from = "") {
   for (const file of files.slice(0, 30)) {
     const ext = EXT[file.type] || (file.type.startsWith("video/") ? "mp4" : "jpg");
     const path = `whatsapp/paste/${crypto.randomUUID()}.${ext}`;
-    const { data, error } = await supabase.storage.from("listings").upload(path, file, { contentType: file.type || undefined });
+    const { data, error } = await supabase.storage.from("listings").upload(path, file, { contentType: file.type || undefined, cacheControl: "31536000" });
     if (error) throw error;
     urls.push(supabase.storage.from("listings").getPublicUrl(data.path).data.publicUrl);
   }

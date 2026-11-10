@@ -9,9 +9,12 @@
  *
  * A request with no user agent at all is treated as a robot: serving it the
  * preview page is always correct, merely slower.
+ *
+ * Lighthouse (PageSpeed Insights) is not on the list: it loads the page as a
+ * person's phone would, and has to be served what a person gets to measure it.
  */
 const ROBOT =
-  /bot\b|bot\/|crawl|spider|slurp|facebookexternalhit|facebookcatalog|meta-externalagent|whatsapp|telegram|slack|discord|linkedin|embedly|skypeuripreview|pinterest|vkshare|w3c_validator|redditbot|applebot|bingpreview|google-inspectiontool|googleother|quora link preview|outbrain|nuzzel|bitlybot|tumblr|iframely|preview|headless|lighthouse|curl|wget|python|node-fetch|axios|go-http/i;
+  /bot\b|bot\/|crawl|spider|slurp|facebookexternalhit|facebookcatalog|meta-externalagent|whatsapp|telegram|slack|discord|linkedin|embedly|skypeuripreview|pinterest|vkshare|w3c_validator|redditbot|applebot|bingpreview|google-inspectiontool|googleother|quora link preview|outbrain|nuzzel|bitlybot|tumblr|iframely|preview|headless|curl|wget|python|node-fetch|axios|go-http/i;
 
 export function isPreviewRobot(userAgent) {
   const ua = String(userAgent || "").trim();

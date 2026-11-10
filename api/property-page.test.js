@@ -79,10 +79,10 @@ describe("the edge handler", () => {
     const res = await handler(new Request(`https://${host}/api/property-page?id=MZ-LTQJ2A`));
     return { res, html: await res.text() };
   };
-  it("a published flat: the full page, cached a minute at the edge", async () => {
+  it("a published flat: the full page, cached at the edge", async () => {
     const { res } = await run([row]);
     expect(res.status).toBe(200);
-    expect(res.headers.get("cdn-cache-control")).toContain("s-maxage=60");
+    expect(res.headers.get("cdn-cache-control")).toContain("s-maxage=600");
   });
   it("not found, or not published: the plain shell", async () => {
     expect((await run([])).html).toBe(SHELL);
