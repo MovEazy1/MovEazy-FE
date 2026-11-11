@@ -19,7 +19,7 @@
  * the two files are simply copies of index.html, which works as before.
  */
 import { execSync } from "node:child_process";
-import { readdirSync, readFileSync, renameSync, rmSync, writeFileSync } from "node:fs";
+import { readdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
 import Beasties from "beasties";
@@ -86,7 +86,22 @@ const lowPriorityScripts = (html) => html
   .replace(/<link rel="modulepreload"/g, '<link rel="modulepreload" fetchpriority="low"')
   .replace(/<script type="module" crossorigin/g, '<script type="module" fetchpriority="low" crossorigin');
 
-const shell = readFileSync(join(dist, "index.html"), "utf8");
+/**
+ * The app's code is fetched at once (a modulepreload) but run only after the
+ * page's first frame has painted. On a phone's CPU, running ~800 KB of code
+ * the moment it lands held up the first paint of a page that was already
+ * there in the HTML by over a second (measured: home's first paint 1.9 s with
+ * every file in by 0.8 s). A tab opened in the background never paints, so it
+ * starts after 300 ms anyway.
+ */
+function paintFirst(html) {
+  return html.replace(/<script type="module" crossorigin src="([^"]+)"><\/script>/, (_, src) =>
+    `<link rel="modulepreload" crossorigin href="${src}">`
+    + `<script>(function(){var d=0;function go(){if(d)return;d=1;var s=document.createElement("script");s.type="module";s.crossOrigin="";s.src=${JSON.stringify(src)};document.head.appendChild(s);}`
+    + `requestAnimationFrame(function(){setTimeout(go,0)});setTimeout(go,300);})();</script>`);
+}
+
+const shell = paintFirst(readFileSync(join(dist, "index.html"), "utf8"));
 let rendered = {};
 try {
   execSync(`npx vite build --ssr src/entry-prerender.jsx --outDir .prerender --emptyOutDir --logLevel warn`, { cwd: root, stdio: "inherit" });
@@ -128,7 +143,9 @@ for (const p of PAGES) {
   }
   writeFileSync(join(dist, p.file), page);
 }
-renameSync(join(dist, "index.html"), join(dist, "app.html"));
+// Every other page and host: the shell, its code started after the first paint too.
+writeFileSync(join(dist, "app.html"), shell);
+rmSync(join(dist, "index.html"));
 rmSync(out, { recursive: true, force: true });
 // Timers and listeners the app's modules set up would keep Node running.
 process.exit(0);
