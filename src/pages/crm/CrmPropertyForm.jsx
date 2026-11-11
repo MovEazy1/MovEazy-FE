@@ -23,7 +23,7 @@ import CrmFlatQr from "./CrmFlatQr";
 import { PropertyTenantViews } from "./CrmTenantViews";
 import CrmAdLink from "./CrmAdLink";
 import { fetchPartnerListingMap } from "../../lib/partners";
-import { draftToForm, fetchWaDraft, markWaDraftPublished, senderLine } from "../../lib/whatsappIntake";
+import { draftToForm, fetchWaDraft, markWaDraftPublished, saveWaDraftFields, senderLine } from "../../lib/whatsappIntake";
 import {
   DEFAULT_POSTING_AMENITIES, FLAT_TYPES, FURNISHINGS, LIFESTYLE, MUST_HAVES, OCCUPANT_OPTIONS,
   parentAreaOf, withParentArea,
@@ -344,7 +344,7 @@ export default function CrmPropertyForm() {
   /* ── Import ────────────────────────────────────────────────────────────── */
 
   const runImport = () => {
-    const { fields, found, missing } = parseListingText(pasteText);
+    const { fields, found, missing, internal: readInternal } = parseListingText(pasteText);
     if (!found.length) {
       setImportInfo({ found: [], missing });
       return showToast("Nothing recognisable in that text — fill it in by hand", "error");
@@ -355,8 +355,54 @@ export default function CrmPropertyForm() {
       deposit: fields.deposit ?? f.deposit,
       bedrooms: fields.bedrooms ?? f.bedrooms,
     });
+    // The sender's number and brokerage are internal: the POC, not the public listing.
+    if (readInternal && (readInternal.poc_phone || readInternal.poc_note)) {
+      setInternal((cur) => ({
+        ...cur,
+        ...(cur.source === "owner" ? { source: "broker" } : {}),
+        poc_phone: cur.poc_phone || readInternal.poc_phone || "",
+        poc_note: [cur.poc_note, readInternal.poc_note].filter(Boolean).join(". ").slice(0, 500),
+      }));
+      if (readInternal.poc_phone && f.posted_by === "owner") set({ posted_by: "broker" });
+    }
     setImportInfo({ found, missing });
     showToast(`Read ${found.length} field${found.length === 1 ? "" : "s"}`);
+  };
+
+  /** The form's state back onto the WhatsApp draft it came from — saved, still unpublished. */
+  const [savingWaDraft, setSavingWaDraft] = useState(false);
+  const saveWaDraft = async () => {
+    if (!waId || !waDraft) return;
+    setSavingWaDraft(true);
+    try {
+      const base = waDraft.fields ?? {};
+      const num = (v) => (String(v ?? "").trim() === "" ? "" : Number(v));
+      const fields = {
+        ...base,
+        area: f.area || "", area_text: base.area_text || "",
+        full_address: f.full_address || "", landmark: f.landmark || "",
+        rent: num(f.rent), deposit: num(f.deposit), maintenance: num(f.maintenance),
+        available_from: f.available_from || "",
+        flat_type: f.flat_type || "", bedrooms: num(f.bedrooms), bathrooms: num(f.bathrooms),
+        floor_number: num(f.floor_number), total_floors: num(f.total_floors),
+        furnishing: f.furnishing || "", gender_pref: f.gender_pref || "any",
+        occupants_allowed: f.occupants_allowed ?? [], amenities: f.amenities ?? [],
+        house_rules: f.house_rules ?? [],
+        title: f.title || "", description: f.description || "",
+      };
+      const missing = [];
+      if (!fields.area) missing.push("Locality");
+      if (!fields.rent) missing.push("Rent");
+      if (!fields.flat_type) missing.push("Flat type");
+      if (!fields.furnishing) missing.push("Furnishing");
+      const saved = await saveWaDraftFields(waId, fields, missing);
+      if (saved) setWaDraft(saved);
+      showToast("Draft saved — still not published. Reopen it from the WhatsApp inbox anytime.");
+    } catch (e) {
+      showToast(e?.message || "Couldn't save the draft", "error");
+    } finally {
+      setSavingWaDraft(false);
+    }
   };
 
   /* ── Photos: drag, pick, or paste straight from the owner's chat ────────── */
@@ -771,6 +817,11 @@ export default function CrmPropertyForm() {
             <span className="crm-mute" style={{ fontSize: 11 }}>Needs: {missingRequired.join(", ")}</span>
           )}
           {isEdit && <Btn onClick={() => navigate("/crm/properties")}>Back to properties</Btn>}
+          {waId && waDraft && !isEdit && (
+            <Btn onClick={saveWaDraft} disabled={saving || savingWaDraft}>
+              {savingWaDraft ? "Saving…" : "Save draft"}
+            </Btn>
+          )}
           <Btn variant="primary" onClick={requestPublish} disabled={saving}>
             {saving ? (isEdit ? "Saving…" : "Publishing…") : (isEdit ? "Save changes" : "Publish")}
           </Btn>

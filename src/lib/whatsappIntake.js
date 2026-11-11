@@ -21,6 +21,8 @@ export const fetchWaInbox = () => rpc("crm_wa_inbox").then((r) => r ?? { drafts:
 export const fetchWaPendingCount = () => rpc("crm_wa_pending_count").then((n) => Number(n) || 0, () => 0);
 export const fetchWaDraft = (id) => rpc("crm_wa_draft", { p_id: id });
 export const markWaDraftPublished = (id, propertyId) => rpc("crm_wa_draft_published", { p_id: id, p_property: propertyId });
+/** The form's checked fields back onto a pending draft — saved for later, still not published. */
+export const saveWaDraftFields = (id, fields, missing) => rpc("crm_wa_draft_save_fields", { p_id: id, p_fields: fields, p_missing: missing });
 export const dismissWaDraft = (id) => rpc("crm_wa_draft_dismiss", { p_id: id });
 export const markWaRented = (id, propertyId) => rpc("crm_wa_mark_rented", { p_id: id, p_property: propertyId });
 export const retryWaBatch = (id) => rpc("crm_wa_retry", { p_batch: id });

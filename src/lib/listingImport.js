@@ -88,6 +88,95 @@ function parseOccupants(text) {
   return found;
 }
 
+
+function parseBathrooms(text) {
+  const t = lower(text);
+  const m = t.match(/\bbath(?:room)?s?\s*[:\-]?\s*(\d+)/) || t.match(/\b(\d+)\s*bath(?:room)?s?\b/);
+  return m ? parseInt(m[1], 10) : null;
+}
+
+/** "Floor : 4th" / "4th floor" / "4/12" / "4th of 12" -> { floor, total }. */
+function parseFloors(text) {
+  const t = lower(text);
+  let floor = null, total = null;
+  const labeled = t.match(/\bfloor\s*[:\-]?\s*(\d{1,2})(?:st|nd|rd|th)?(?:\s*(?:\/|of|out of)\s*(\d{1,2}))?/);
+  const reversed = t.match(/\b(\d{1,2})(?:st|nd|rd|th)?\s*(?:\/|of)\s*(\d{1,2})\s*floors?\b/) || t.match(/\b(\d{1,2})(?:st|nd|rd|th)\s*floors?\b/);
+  if (labeled) { floor = parseInt(labeled[1], 10); if (labeled[2]) total = parseInt(labeled[2], 10); }
+  else if (reversed) { floor = parseInt(reversed[1], 10); if (reversed[2]) total = parseInt(reversed[2], 10); }
+  if (total == null) {
+    const tf = t.match(/\b(?:total|of)\s*(\d{1,2})\s*floors?\b/);
+    if (tf) total = parseInt(tf[1], 10);
+  }
+  return { floor, total };
+}
+
+/** Parking stated in words the amenities list uses. */
+function parseParking(text) {
+  const t = lower(text);
+  if (/parking\s*[:\-]?\s*covered|\bcovered\s*(?:car\s*)?parking/.test(t)) return "Covered Parking";
+  if (/parking\s*[:\-]?\s*(?:open|outside)|\b(?:open|outside)\s*(?:car\s*)?parking/.test(t)) return "Outside Car Parking";
+  return "";
+}
+
+const MONTHS = { jan: 1, january: 1, feb: 2, february: 2, mar: 3, march: 3, apr: 4, april: 4, may: 5, jun: 6, june: 6, jul: 7, july: 7, aug: 8, august: 8, sep: 9, sept: 9, september: 9, oct: 10, october: 10, nov: 11, november: 11, dec: 12, december: 12 };
+const iso = (y, m, d) => `${y}-${String(m).padStart(2, "0")}-${String(d).padStart(2, "0")}`;
+
+/** "Move in : Immediately" / "ready to move" / "1st Dec" / "from December" -> YYYY-MM-DD. */
+function parseAvailableFrom(text, today = new Date()) {
+  const t = lower(text);
+  const seg = t.match(/(?:move[\s-]?in|available(?:\s*from)?|possession|ready)\s*[:\-]?\s*([a-z0-9 ,\/.-]{1,40})/);
+  const zone = seg ? seg[1] : t;
+  if (/immediately|immediate|any ?time|ready\s*(?:to\s*move)?|asap/.test(zone)) return iso(today.getFullYear(), today.getMonth() + 1, today.getDate());
+  const md = zone.match(/\b(\d{1,2})(?:st|nd|rd|th)?\s*(?:of\s*)?([a-z]+)/) || zone.match(/\b([a-z]+)\s*(\d{1,2})(?:st|nd|rd|th)?/);
+  if (md) {
+    const day = parseInt(md[1].match(/\d/) ? md[1] : md[2], 10);
+    const month = MONTHS[(md[1].match(/\d/) ? md[2] : md[1]).slice(0, 9)];
+    if (month && day >= 1 && day <= 31) {
+      let y = today.getFullYear();
+      const candidate = new Date(y, month - 1, day);
+      if (candidate < today) y += 1;
+      return iso(y, month, day);
+    }
+  }
+  const monthOnly = seg && Object.keys(MONTHS).find((k) => new RegExp(`\\b${k}\\b`).test(seg[1]));
+  if (monthOnly) {
+    let y = today.getFullYear(), m = MONTHS[monthOnly];
+    if (new Date(y, m - 1, 1) <= today) { m += 1; if (m > 12) { m = 1; y += 1; } }
+    return iso(y, m, 1);
+  }
+  return "";
+}
+
+/** A Google Maps share link in the message, if one came along. */
+function parseMapLink(text) {
+  const m = String(text || "").match(/https?:\/\/(?:maps\.app\.goo\.gl|goo\.gl\/maps|(?:www\.)?google\.[a-z.]+\/maps)[^\s),\]"']*/i);
+  return m ? m[0] : "";
+}
+
+/** The brokerage figure a broker quotes — internal money, never a public field. */
+function parseBrokerage(text) {
+  const t = lower(text);
+  const m = t.match(/(?:brokerage|commission|brokrage)\s*[:\-]?\s*(?:rs\.?|₹)?\s*([\d.,]+\s*(?:k|lakh|lac|l)?\b)/);
+  return m ? parseAmount(m[1]) : null;
+}
+
+/** A "Location : ..." line, when the text has one. */
+function parseLocationLine(text) {
+  const m = String(text || "").match(/(?:^|[\n\/|])\s*(?:location|loc)\s*[:\-]\s*([^\n\/|]{3,120})/i);
+  return m ? m[1].trim() : "";
+}
+
+/** Brokerage terms and sender phone numbers are internal: out of the public description. */
+function stripInternalLines(text) {
+  return String(text || "")
+    .split(/\n+/)
+    .filter((line) => !/(?:^|[\/|:])\s*(?:brokerage|commission|brokrage)\b/i.test(line))
+    .map((line) => line.replace(/(?:^|[\/|])\s*(?:brokerage|commission|brokrage)\s*[:\-]?\s*[^\n\/|]*/gi, ""))
+    .join("\n")
+    .replace(/[ \t]+\n/g, "\n")
+    .trim();
+}
+
 function parsePhone(text) {
   const m = String(text || "").match(/(?:\+?91[\s-]?)?([6-9]\d{9})\b/);
   return m ? m[1] : "";
@@ -158,6 +247,16 @@ export function parseListingText(text) {
     if (beds) fields.bedrooms = beds;
   }
 
+  const maintenance = findAmountNear(raw, ["maintenance", "maint\\b"], { max: 40 });
+  if (maintenance) fields.maintenance = maintenance;
+
+  const bathrooms = parseBathrooms(raw);
+  if (bathrooms) fields.bathrooms = bathrooms;
+
+  const { floor, total } = parseFloors(raw);
+  if (floor != null) fields.floor_number = floor;
+  if (total != null) fields.total_floors = total;
+
   const localities = parseLocalities(raw);
   if (localities.length) {
     fields.area = localities[0];
@@ -168,17 +267,41 @@ export function parseListingText(text) {
   if (furnishing) fields.furnishing = furnishing;
 
   const amenities = parseAmenities(raw);
+  const parking = parseParking(raw);
+  if (parking && !amenities.includes(parking)) amenities.push(parking);
+  if (/\bgated\b/.test(lower(raw)) && !amenities.includes("Gated Society")) amenities.push("Gated Society");
   if (amenities.length) fields.amenities = amenities;
 
   const occupants = parseOccupants(raw);
   if (occupants.length) fields.occupants_allowed = occupants;
 
+  const availableFrom = parseAvailableFrom(raw);
+  if (availableFrom) fields.available_from = availableFrom;
+
+  // No locality from the list, but a "Location : …" line — park it where a
+  // person sees it and picks the right locality.
+  if (!fields.area) {
+    const hint = parseLocationLine(raw);
+    if (hint) fields.landmark = hint;
+  }
+
+  // The map a broker sends is the flat's own pin: keep it as the traceable
+  // source link rather than dropping it into the public write-up.
+  const mapLink = parseMapLink(raw);
+  if (mapLink) fields.source_url = mapLink;
+
+  // The sender's number and any brokerage they quote are internal: the POC and
+  // the team's note, never the public listing's phone or description.
+  const internal = {};
   const phone = parsePhone(raw);
-  if (phone) fields.phone = phone;
+  if (phone) internal.poc_phone = phone;
+  const brokerage = parseBrokerage(raw);
+  if (brokerage) internal.poc_note = `Brokerage asked: ₹${brokerage.toLocaleString("en-IN")}`;
 
   // Keep the original post as the description — an agent edits it down rather
-  // than retyping it, and nothing the parser missed is lost.
-  const cleaned = raw.trim().slice(0, 2000);
+  // than retyping it, and nothing the parser missed is lost. Brokerage terms
+  // stay out of it: they are internal money, not tenant-facing text.
+  const cleaned = stripInternalLines(raw).slice(0, 2000);
   if (cleaned) fields.description = cleaned;
 
   const REQUIRED = [
@@ -188,10 +311,24 @@ export function parseListingText(text) {
     ["furnishing", "Furnishing"],
     ["deposit", "Deposit"],
   ];
-  const found = REQUIRED.filter(([k]) => fields[k] != null && fields[k] !== "").map(([, l]) => l);
+  const ALSO_READ = [
+    ["maintenance", "Maintenance"],
+    ["bathrooms", "Bathrooms"],
+    ["floor_number", "Floor"],
+    ["total_floors", "Total floors"],
+    ["available_from", "Available from"],
+    ["nearby_areas", "Nearby areas"],
+    ["amenities", "Amenities"],
+    ["occupants_allowed", "Occupants"],
+    ["source_url", "Map link"],
+    ["landmark", "Landmark"],
+  ];
+  const found = [...REQUIRED, ...ALSO_READ]
+    .filter(([k]) => fields[k] != null && fields[k] !== "" && (!Array.isArray(fields[k]) || fields[k].length))
+    .map(([, l]) => l);
   const missing = REQUIRED.filter(([k]) => fields[k] == null || fields[k] === "").map(([, l]) => l);
 
-  return { fields, found, missing };
+  return { fields, found, missing, internal };
 }
 
 export { FURNISHINGS };
