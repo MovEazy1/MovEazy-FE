@@ -12,6 +12,8 @@
  */
 import { isPreviewRobot } from "./_bots.js";
 import { withAdPrepaint } from "./_adPrepaint.js";
+import { withBuildingPrepaint } from "./_buildingPrepaint.js";
+import { withStorefrontPrepaint } from "./_storefrontPrepaint.js";
 
 export const config = { runtime: "edge" };
 
@@ -167,12 +169,27 @@ export default async function handler(req) {
   const robot = isPreviewRobot(req.headers.get("user-agent"));
   // /visit/<code> is a building too (6 letters), as the app reads it.
   const read = kind === "visit" && !/^MZ-/i.test(id) ? PAGE_READS["visit-b"] : PAGE_READS[kind];
+  // A broker's page is drawn from what anyone may see; the app makes its own
+  // read (it knows the viewer's likes), so this one isn't handed over.
+  const storefront = !robot && kind === "b" && /^[A-Za-z0-9]{6}$/.test(id);
   const [page, data] = await Promise.all([
     // The app's shell (dist/app.html; "/" itself may be a pre-built landing page).
     fetch(`${url.origin}/app.html`),
-    !robot && read?.ok(id) ? within(rpc(read.fn, read.args(id)).catch(() => null), 700) : null,
+    !robot && read?.ok(id) ? within(rpc(read.fn, read.args(id)).catch(() => null), 700)
+      : storefront ? within(rpc("partner_storefront", { p_code: id }).catch(() => null), 700) : null,
   ]);
   let html = await page.text();
+  if (storefront) {
+    if (data?.broker && page.ok) {
+      try {
+        const cover = (h) => { const u = firstPhoto(isMadeCover(h.cover_image_url) ? [h.cover_image_url] : flatMedia(h)); return u ? thumbUrl(u) : ""; };
+        const first = data.homes?.[0] ? cover(data.homes[0]) : "";
+        html = withStorefrontPrepaint(html, data, cover);
+        if (first) html = html.replace("</head>", `<link rel="preload" as="image" href="${esc(first)}" fetchpriority="high"></head>`);
+      } catch { /* the plain shell */ }
+    }
+    return new Response(html, { status: 200, headers: { "content-type": "text/html; charset=utf-8", "cache-control": "private, no-store" } });
+  }
   if (!robot) {
     if (data && page.ok) {
       try {
@@ -183,6 +200,12 @@ export default async function handler(req) {
           const media = building ? (data.photos ?? []).filter(Boolean) : flatMedia(data);
           const lead = read.lead(data);
           html = withAdPrepaint(html, building ? "building" : "flat", data, media, lead ? thumbUrl(lead) : "");
+        } else if (read === PAGE_READS.building && !data.cover_video) {
+          // A building's own page, drawn too (api/_buildingPrepaint.js): its photos, else its flats'.
+          const own = (data.photos ?? []).filter(Boolean);
+          const media = own.length ? own : (data.flats ?? []).flatMap(flatMedia).slice(0, 8);
+          const lead = read.lead(data);
+          html = withBuildingPrepaint(html, data, media, lead ? thumbUrl(lead) : "");
         }
       } catch { /* the plain shell */ }
     }

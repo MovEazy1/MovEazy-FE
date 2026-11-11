@@ -52,6 +52,34 @@ describe("the ad page drawn before the app", () => {
   });
 });
 
+describe("the building and broker pages drawn before the app", () => {
+  it("a building: name, where, available of total, rent from, floors, amenities", async () => {
+    const { buildingPrepaint } = await import("./_buildingPrepaint.js");
+    const html = buildingPrepaint({ name: "BR Homes", area: "HSR", landmark: "Sector 2", total_floors: 5, total_flats: 42, amenities: ["Lift"],
+      flats: [{ available: true, rent: 27000 }, { available: true, rent: 35000 }, { available: false, rent: 20000 }] }, [`${B}1.jpg`, `${B}2.jpg`], `${B}t.jpg`);
+    expect(html).toContain("<h1>BR Homes</h1>");
+    expect(html).toContain("HSR · Sector 2");
+    expect(html).toContain("<b>2</b><span>of 42 flats available</span>");
+    expect(html).toContain("<b>₹27k+</b><span>rent from / month</span>");
+    expect(html).toContain("<b>G+5</b><span>floors</span>");
+    expect(html).toContain("Lift</span>");
+    expect(html).toContain('<div class="bp-gcount">1 / 2</div>');
+  });
+  it("a broker: card, rating or new, contact, chips and the first homes", async () => {
+    const { storefrontPrepaint } = await import("./_storefrontPrepaint.js");
+    const html = storefrontPrepaint({ broker: { name: "yatharth singh", phone: "+91 89898 98989", rating: 4.8 },
+      homes: [{ property_id: "MZ-1", rent: 33000, flat_type: "2 BHK", area: "HSR Layout", furnishing: "Semi Furnished", property_type: "Apartment" },
+        { property_id: "MZ-2", rent: 20000, flat_type: "1 BHK", area: "HSR" }] }, () => `${B}t.jpg`);
+    expect(html).toContain("<h1>yatharth singh</h1>");
+    expect(html).toContain(">YS</span>");
+    expect(html).toContain("<b>4.8</b>");
+    expect(html).toContain("89898 98989");
+    expect(html).toContain('<span class="sf-chip on">All 2</span><span class="sf-chip">1 BHK</span><span class="sf-chip">2 BHK</span>');
+    expect(html).toContain("₹33,000 <small>/ month</small>");
+    expect(html.match(/<img src="[^"]*t\.jpg"/g)).toHaveLength(1);
+  });
+});
+
 describe("the page takes it once", () => {
   afterEach(() => { delete globalThis.window; });
   it("for its own read only", () => {

@@ -85,15 +85,24 @@ export function adPrepaint(kind, d, photos, lead) {
   return `<div class="va"><header class="va-top"><img src="/moveazy-logo-mint-light.png" alt="MovEazy" width="112" height="26"><span class="va-explore"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m16.24 7.76-1.804 5.411a2 2 0 0 1-1.265 1.265L7.76 16.24l1.804-5.411a2 2 0 0 1 1.265-1.265z"></path><circle cx="12" cy="12" r="10"></circle></svg> Explore more</span></header>
 <main class="va-col">${gallery}<section class="va-head"><h1>${esc(title)}</h1>${where ? `<div class="va-where">${ICON.PIN} ${esc(where)}</div>` : ""}
 <div class="va-rent">${rent}</div>${money}${facts.length ? `<div class="va-facts">${facts.map(([i, t]) => `<span>${i} ${esc(t)}</span>`).join("")}</div>` : ""}
-<div class="va-trust">${ICON.CHECK} Verified by MovEazy · free visit</div></section>
+<div class="va-trust">${ICON.CHECK} Verified by MovEazy · free visit, no brokerage to book</div></section>
 <div class="va-cta"><div class="va-btn">${ICON.CAL} Schedule a visit</div></div></main></div>`;
 }
 
 /** The shell with the drawn ad page; the app's stylesheet stops holding up the first paint (the copy has its own). */
 export function withAdPrepaint(html, kind, d, photos, lead) {
+  return withPrepaint(html, CSS, adPrepaint(kind, d, photos, lead));
+}
+
+/** Any drawn page: its styles and markup in, the app's stylesheet no longer holding up the first paint. */
+export function withPrepaint(html, css, body, logo = "/moveazy-logo-mint-light.png") {
   return html
     .replace(/<link rel="stylesheet" crossorigin href="([^"]+)">/, (_, href) =>
       `<link rel="preload" as="style" crossorigin href="${href}"><link rel="stylesheet" crossorigin href="${href}" media="print" onload="this.media='all'">`)
-    .replace("</head>", `<link rel="preload" as="image" href="/moveazy-logo-mint-light.png">${HEAD_SCRIPT}<style>${CSS}</style></head>`)
-    .replace('<div id="root"></div>', `<div id="prerender">${adPrepaint(kind, d, photos, lead)}</div><div id="root"></div>`);
+    .replace("</head>", `<link rel="preload" as="image" href="${logo}">${HEAD_SCRIPT}<style>${css}</style></head>`)
+    .replace('<div id="root"></div>', `<div id="prerender">${body}</div><div id="root"></div>`);
 }
+
+/** The hand-over rules every drawn page needs, ahead of its own styles. */
+export const PREPAINT_BASE_CSS = "html:not(.mz-pre) #prerender{display:none}html.mz-pre #root{position:absolute;top:0;left:0;right:0;visibility:hidden;pointer-events:none}html.mz-pre #root *{animation-play-state:paused!important}body{margin:0}";
+export { ICON };

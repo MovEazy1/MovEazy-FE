@@ -14,7 +14,7 @@
  * here, which comes back with ?visit=<id>) asks the broker for a visit and
  * shows "you'll be contacted soon" with WhatsApp / Call / their other flats.
  */
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { Link, useParams, useSearchParams } from "react-router-dom";
 import { BadgeCheck, CalendarCheck, CheckCircle2, Heart, LocateFixed, MapPin, Phone, Star } from "lucide-react";
 import { useAuth } from "../context/AuthContext";
@@ -24,8 +24,10 @@ import { inr, telLink, waLink } from "../lib/partners";
 import { fetchStorefront, likeStorefrontHome, rateStorefront, recordStorefrontView, storefrontDisplay } from "../lib/storefront";
 import { formatMobile } from "../lib/qrPoster";
 import { checkinStorefront, currentPosition, noteBrowse, readBrowse, requestStorefrontVisit, visitMessage } from "../lib/qrLeads";
-import logoOnDark from "../assets/logo/moveazy-logo-mint-dark.png";
-import logoOnLight from "../assets/logo/moveazy-logo-mint-light.png";
+import { dropPrerender } from "../lib/prerender";
+// From public/, at fixed addresses: the page drawn before the app (api/_storefrontPrepaint.js) shows the same files.
+const logoOnDark = "/moveazy-logo-mint-dark.png";
+const logoOnLight = "/moveazy-logo-mint-light.png";
 
 const PENDING_KEY = "mz_storefront_pending";
 const FROM_KEY = (code) => `mz_qr_from:${code}`;
@@ -243,6 +245,9 @@ export default function Storefront() {
     if (!hasPhone) return; // the mobile-number screen is up; the visit goes once it's saved
     pump();
   };
+
+  // The page drawn before the app (api/_storefrontPrepaint.js) gives way once this one is drawn.
+  useLayoutEffect(() => { if (data !== undefined) dropPrerender(); }, [data]);
 
   const homes = useMemo(() => data?.homes ?? [], [data]);
   const types = useMemo(() => [...new Set(homes.map((h) => h.flat_type).filter(Boolean))].sort(), [homes]);

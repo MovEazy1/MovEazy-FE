@@ -12,7 +12,7 @@
  * Schedule a visit — the tenant's mobile, verified by SMS code, then a day and
  * a time (building_request_visit). See VisitSheet below.
  */
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { useParams, useSearchParams } from "react-router-dom";
 import { useAuth } from "../context/AuthContext";
 import { supabase } from "../lib/supabase";
@@ -29,7 +29,9 @@ import { leadSnapshot, saveLead } from "../lib/leadIntake";
 import { OTP_LENGTH, RESEND_AFTER_S, accountHasVerifiedMobile, phoneOtpAvailable, sendOtp, verifyOtp } from "../lib/phoneOtp";
 import { trackPixelOnce } from "../lib/metaPixel";
 import RequirePhoneFirst from "../components/RequirePhoneFirst";
-import logo from "../assets/logo/moveazy-logo-mint-light.png";
+import { dropPrerender } from "../lib/prerender";
+// From public/, at a fixed address: the page drawn before the app (api/_buildingPrepaint.js) shows the same file.
+const logo = "/moveazy-logo-mint-light.png";
 
 // A call just made from this page: when the tenant comes back, ask how it went.
 const CALLED_KEY = "mz_building_called";
@@ -87,6 +89,9 @@ export default function BuildingPage({ visit = false }) {
     counted.current = true;
     recordBuildingView(code, params.get("s") === "qr" ? "qr" : "link");
   }, [b, code, params]);
+
+  // The page drawn before the app (api/_buildingPrepaint.js) gives way once this one is drawn.
+  useLayoutEffect(() => { if (b !== undefined) dropPrerender(); }, [b]);
 
   useEffect(() => {
     if (b?.name) document.title = `${b.name} · ${b.area || "Bengaluru"} | MovEazy`;
