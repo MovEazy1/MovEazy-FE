@@ -39,6 +39,11 @@ const PAGES = [
     fonts: ["sora-latin-800", "manrope-latin-600", "manrope-latin-700", "manrope-latin-800", "inter-latin-700"] },
   { page: "partners", file: "partners-home.html", host: "partners.moveazy.co.in",
     fonts: ["sora-latin-700", "sora-latin-800", "inter-latin-600", "inter-latin-700"] },
+  // Signed-out landings of the owner and society apps, at every path of their hosts (vercel.json);
+  // each page hands over itself (usePrerenderHandoff). A returning society visitor skips the splash,
+  // so isn't shown it (SKIP: a localStorage key that means the page opens elsewhere).
+  { page: "owners", file: "owners-home.html", host: "owners.moveazy.co.in", fonts: [], handoff: "page" },
+  { page: "society", file: "society-home.html", host: "society.moveazy.co.in", fonts: [], handoff: "page", skip: "mz_society_splash" },
 ];
 
 // In <head>, so it runs before the first paint: a signed-in visitor
@@ -58,7 +63,23 @@ const HEAD = `<script>(function(){try{var q=location.search.replace(/[?&](utm_[a
  */
 function lighter(html) {
   let n = 0;
-  return html.replace(/<img (?![^>]*loading=)/g, (m) => (++n > 2 ? '<img loading="lazy" ' : m));
+  const lazy = html.replace(/<img (?![^>]*loading=)/g, (m) => (++n > 2 ? '<img loading="lazy" ' : m));
+  // Only the first two sections at all: a slow phone still styles a skipped
+  // section (measured: home's first layout 328 ms at 4x CPU with ~1,000 nodes).
+  // The app, a moment later, draws the rest.
+  try {
+    const frag = JSDOM.fragment(lazy);
+    const sections = [...frag.querySelectorAll("section")].filter((s) => !s.parentElement?.closest("section"));
+    if (sections.length > 2) {
+      for (const s of sections.slice(2)) s.remove();
+      for (const f of frag.querySelectorAll("footer")) f.remove();
+    }
+    const box = new JSDOM("").window.document.createElement("div");
+    box.append(frag);
+    return box.innerHTML;
+  } catch {
+    return lazy;
+  }
 }
 
 function browser(host) {
@@ -146,9 +167,12 @@ const beasties = new Beasties({
 
 for (const p of PAGES) {
   const html = rendered[p.page];
+  const skip = p.skip
+    ? `<script>try{if(localStorage.getItem(${JSON.stringify(p.skip)}))document.documentElement.classList.remove("mz-pre")}catch(e){}</script>`
+    : "";
   let page = html
     ? lowPriorityScripts(shell).replace("</head>", `${HEAD}${fontPreloads(p.fonts)}
-</head>`).replace('<div id="root"></div>', `<div id="prerender"${p.handoff ? ` data-handoff="${p.handoff}"` : ""}>${lighter(html)}</div><div id="root"></div>`)
+</head>`).replace('<div id="root"></div>', `${skip}<div id="prerender"${p.handoff ? ` data-handoff="${p.handoff}"` : ""}>${lighter(html)}</div><div id="root"></div>`)
     : shell;
   if (html) {
     try {

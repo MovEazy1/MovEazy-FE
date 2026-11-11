@@ -149,6 +149,46 @@
       "destination": "/matches.html"
     },
     {
+      "source": "/((?!api/|assets/|join/).*)",
+      "has": [
+        {
+          "type": "host",
+          "value": "partners.moveazy.co.in"
+        }
+      ],
+      "destination": "/partners-home.html"
+    },
+    {
+      "source": "/((?!api/|assets/).*)",
+      "has": [
+        {
+          "type": "host",
+          "value": "owners.moveazy.co.in"
+        }
+      ],
+      "destination": "/owners-home.html"
+    },
+    {
+      "source": "/((?!api/|assets/).*)",
+      "has": [
+        {
+          "type": "host",
+          "value": "owner.moveazy.co.in"
+        }
+      ],
+      "destination": "/owners-home.html"
+    },
+    {
+      "source": "/((?!api/|assets/).*)",
+      "has": [
+        {
+          "type": "host",
+          "value": "society.moveazy.co.in"
+        }
+      ],
+      "destination": "/society-home.html"
+    },
+    {
       "source": "/((?!api/|assets/).*)",
       "destination": "/app.html"
     }

@@ -8,6 +8,7 @@ import { useAuth } from "../../context/AuthContext";
 import { normalizeIndianMobile, formatForDisplay } from "../../lib/mobile";
 import { BuildingArt, SocietyLogo } from "./societyUi";
 import { markSplashSeen, rememberSocietyPhone, splashSeen } from "./societySignup";
+import { usePrerenderHandoff } from "../../lib/prerender";
 
 const SLIDES = [
   { title: ["Add Flats.", "Earn Together."], body: "Help us maintain accurate society information and earn up to 70% of brokerage." },
@@ -92,6 +93,8 @@ function Login() {
 }
 
 export default function Welcome() {
+  // Built at deploy for society.moveazy.co.in (scripts/prerender.mjs): once drawn, the copy goes.
+  usePrerenderHandoff();
   const [step, setStep] = useState(splashSeen() ? "login" : "splash");
   if (step === "splash") return <Splash onStart={() => { markSplashSeen(); setStep("login"); }} />;
   return <Login />;

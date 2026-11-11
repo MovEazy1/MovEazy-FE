@@ -20,6 +20,8 @@ import { LoginModalProvider } from "./context/LoginModalContext";
 import { VisitCartProvider } from "./context/VisitCartContext";
 import ForkHome from "./pages/ForkHome";
 import PartnerLanding from "./pages/partners/PartnerLanding";
+import OwnerLanding from "./pages/owners/OwnerLanding";
+import SocietyWelcome from "./pages/society/Welcome";
 import HowItWorks from "./pages/HowItWorks";
 import About from "./pages/About";
 import Contact from "./pages/Contact";
@@ -51,6 +53,9 @@ const PAGES = {
       <PartnerLanding />
     </div>
   ),
+  // owners.moveazy.co.in and society.moveazy.co.in, signed out: their landing / first splash.
+  owners: () => <OwnerLanding />,
+  society: () => <SocietyWelcome />,
 };
 
 /** www pages drawn at their own path: path → the page. */

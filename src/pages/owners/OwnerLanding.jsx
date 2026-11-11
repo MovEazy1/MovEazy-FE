@@ -19,6 +19,7 @@ import { Chip, Pill, PropertyThumb, TopBar } from "./ownerUi";
 import { ServiceIcon } from "./serviceIcons";
 import { inr, ownerReturns } from "../../lib/landingCalc";
 import { useLandingSettings } from "../../lib/landingSettings";
+import { usePrerenderHandoff } from "../../lib/prerender";
 
 const StatusBar = () => <div style={{ height: 34 }} />;
 const flatName = (l) => (l ? `${l.flat_type || "2 BHK"} · ${l.area || "Bengaluru"}` : "2 BHK · HSR Layout");
@@ -241,6 +242,8 @@ function Calculator({ s }) {
 }
 
 export default function OwnerLanding() {
+  // Built at deploy for owners.moveazy.co.in (scripts/prerender.mjs): once drawn, the copy goes.
+  usePrerenderHandoff();
   const s = useLandingSettings();
   const inventory = useInventory(80);
   const photos = useListingsWithPhotos(inventory, 3);
