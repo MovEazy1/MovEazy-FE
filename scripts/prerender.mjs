@@ -48,7 +48,18 @@ const PAGES = [
 // Otherwise <html> gets mz-pre: the pre-built copy shows, #root renders
 // hidden beneath it until the app hands over.
 const HEAD = `<script>(function(){try{var q=location.search.replace(/[?&](utm_[a-z]+|fbclid|gclid)=[^&]*/g,"").replace(/^[?&]+/,"");for(var i=0;i<localStorage.length;i++){if(/^sb-.*-auth-token$/.test(localStorage.key(i)))return;}if(q||/access_token|error_description|type=recovery/.test(location.hash))return;document.documentElement.classList.add("mz-pre");setTimeout(function(){document.documentElement.classList.remove("mz-pre");var p=document.getElementById("prerender");if(p)p.remove();},15000);}catch(e){}})();</script>
-<style>html:not(.mz-pre) #prerender{display:none}html.mz-pre #root{position:absolute;top:0;left:0;right:0;visibility:hidden;pointer-events:none}html.mz-pre #prerender *,html.mz-pre #root *{animation-play-state:paused!important}</style>`;
+<style>html:not(.mz-pre) #prerender{display:none}html.mz-pre #root{position:absolute;top:0;left:0;right:0;visibility:hidden;pointer-events:none}html.mz-pre #prerender *,html.mz-pre #root *{animation-play-state:paused!important}html.mz-pre #prerender section:nth-of-type(n+2),html.mz-pre #prerender footer{content-visibility:auto;contain-intrinsic-size:auto 700px}</style>`;
+
+/**
+ * The copy is on screen for a moment, until the app has drawn: below the first
+ * screen it costs layout and downloads nobody sees. Its sections after the
+ * first (and the footer) skip layout until scrolled to (HEAD), and its images
+ * after the first two load only when near the screen.
+ */
+function lighter(html) {
+  let n = 0;
+  return html.replace(/<img (?![^>]*loading=)/g, (m) => (++n > 2 ? '<img loading="lazy" ' : m));
+}
 
 function browser(host) {
   const dom = new JSDOM("<!doctype html><html><head></head><body><div id=\"root\"></div></body></html>", {
@@ -137,7 +148,7 @@ for (const p of PAGES) {
   const html = rendered[p.page];
   let page = html
     ? lowPriorityScripts(shell).replace("</head>", `${HEAD}${fontPreloads(p.fonts)}
-</head>`).replace('<div id="root"></div>', `<div id="prerender"${p.handoff ? ` data-handoff="${p.handoff}"` : ""}>${html}</div><div id="root"></div>`)
+</head>`).replace('<div id="root"></div>', `<div id="prerender"${p.handoff ? ` data-handoff="${p.handoff}"` : ""}>${lighter(html)}</div><div id="root"></div>`)
     : shell;
   if (html) {
     try {
