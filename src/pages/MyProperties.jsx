@@ -14,7 +14,7 @@ import {
 import { useAuth } from "../context/AuthContext";
 import { useLoginModal } from "../context/LoginModalContext";
 import MovEazyNav from "../components/layout/MovEazyNav";
-import { fetchMyInventory, setInventoryStatus } from "../lib/inventory";
+import { fetchMyInventory, setInventoryStatus, shownHouseRules } from "../lib/inventory";
 import { coverMedia, isVideoUrl } from "../lib/listingMedia";
 import { propertyLink, shareVia } from "../lib/crmSettings";
 import { fetchSlotsFor } from "../lib/visits";
@@ -218,7 +218,7 @@ export function PropertyCard({ p, slotCount, onStatus, busy, onSlotCountChange, 
               <Row label="Occupants" value={p.occupants_allowed} />
               <Row label="Amenities" value={p.amenities} />
               <Row label="Lifestyle" value={p.lifestyle} />
-              <Row label="House rules" value={p.house_rules} />
+              <Row label="House rules" value={shownHouseRules(p.house_rules)} />
             </div>
             {p.description && (
               <div className="pt-2">

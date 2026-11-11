@@ -69,7 +69,7 @@ export function listingTitle(listing) {
 }
 
 export function listingDescription(listing) {
-  if (!listing) return "Real listings, verified owners, deposit protection.";
+  if (!listing) return "Real listings, verified owners, same-day visits.";
   const bits = [
     listing.furnishing,
     listing.bedrooms ? `${listing.bedrooms} bed` : "",

@@ -124,7 +124,7 @@ export default function Contact() {
               We&apos;re here to help.
             </motion.h1>
             <motion.p {...fadeUp(0.12)} className="mt-4 text-[15px] sm:text-[16px] text-gray-500 leading-relaxed max-w-lg">
-              Questions about listings, the plan, or deposit protection? Reach out and our team will get back to you quickly.
+              Questions about listings, visits or moving in? Reach out and our team will get back to you quickly.
             </motion.p>
           </div>
         </div>

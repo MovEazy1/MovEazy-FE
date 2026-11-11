@@ -7,6 +7,7 @@ import { Suspense, lazy, useEffect, useRef, useState } from "react";
 import { ChevronLeft, Heart, Landmark, MapPin, X } from "lucide-react";
 import { MediaItem, listingMedia } from "../partners/partnerMedia";
 import { inr } from "../../lib/partners";
+import { shownHouseRules } from "../../lib/inventory";
 import { factsOf, firstName } from "./curatedText";
 
 const ApproxMap = lazy(() => import("./ApproxMap"));
@@ -65,8 +66,8 @@ export default function CuratedDetails({ home: h, brokerName = "", onClose, onDe
           {(h.amenities ?? []).length > 0 && (
             <section><h2>Amenities</h2><div className="cd-chips">{h.amenities.map((a) => <span key={a}>{a}</span>)}</div></section>
           )}
-          {(h.house_rules ?? []).length > 0 && (
-            <section><h2>House rules</h2><div className="cd-chips cd-chips--rules">{h.house_rules.map((a) => <span key={a}>{a}</span>)}</div></section>
+          {shownHouseRules(h.house_rules).length > 0 && (
+            <section><h2>House rules</h2><div className="cd-chips cd-chips--rules">{shownHouseRules(h.house_rules).map((a) => <span key={a}>{a}</span>)}</div></section>
           )}
           {h.description && <section><h2>About this flat</h2><p className="cd-desc">{h.description}</p></section>}
 

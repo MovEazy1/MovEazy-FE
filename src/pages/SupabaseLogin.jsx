@@ -227,7 +227,7 @@ export default function SupabaseLogin() {
 
       {/* Trust badges */}
       <div style={{ marginTop: 24, display: "flex", gap: 20, flexWrap: "wrap", justifyContent: "center" }}>
-        {["Verified listings", "Zero broker spam", "Direct handovers"].map((t) => (
+        {["Verified listings", "Same-day visits", "Direct handovers"].map((t) => (
           <span key={t} style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 12, color: MUTED, fontWeight: 500 }}>
             <svg viewBox="0 0 24 24" fill="none" stroke={FOREST} strokeWidth="3" width="12" height="12">
               <path d="M4 12l5 5L20 7" />

@@ -307,7 +307,7 @@ export default function ForkHome({ tenantEntry = false }) {
               </button>
               <button type="button" className="th-btn th-btn--ghost" onClick={list}>List my flat</button>
             </div>
-            <ul className="th-checks"><li>Verified homes</li><li>Same-day visits</li><li>Deposit protection</li></ul>
+            <ul className="th-checks"><li>Verified homes</li><li>Same-day visits</li><li>Agreement checked</li></ul>
           </div>
           <div className="th-hero-stage">
             <Phone className="th-phone--hero"><SwipeScreen matches={matches} /></Phone>
@@ -318,7 +318,7 @@ export default function ForkHome({ tenantEntry = false }) {
               <span className="ic"><CalendarCheck size={17} /></span><span><b>Today, 4 PM</b>Visit booked</span>
             </div>
             <div className="th-float" style={{ bottom: 70, left: -28 }}>
-              <span className="ic"><ShieldCheck size={17} /></span><span><b>Protected</b>Deposit</span>
+              <span className="ic"><ShieldCheck size={17} /></span><span><b>Verified</b>Owner</span>
             </div>
           </div>
         </div>

@@ -148,7 +148,7 @@ export default function VisitAdPage({ kind: asked = "flat" }) {
             {facts.filter(Boolean).map(([Icon, text]) => <span key={text}><Icon size={15} /> {text}</span>)}
           </div>
         )}
-        <div className="va-trust"><BadgeCheck size={16} /> Verified by MovEazy · free visit, no brokerage to book</div>
+        <div className="va-trust"><BadgeCheck size={16} /> Verified by MovEazy · free visit</div>
       </section>
 
       {booking && <VisitCallCard key={booking.id + booking.slot_at} booking={booking} />}

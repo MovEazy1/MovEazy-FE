@@ -61,7 +61,7 @@ export default function Terms() {
           <section>
             <h2 className="text-xl font-bold text-gray-900 mt-8 mb-3">4. Guarantee Plan</h2>
             <p>
-              The MovEazy Guarantee (₹1,999) provides legal contract verification and deposit protection.
+              The MovEazy Guarantee (₹1,999) provides legal contract verification.
               Flat Search is billed separately (₹1,499). Refunds are issued only when a deal falls through due to verified broker negligence, as determined
               by our legal team. Processing time for refunds is 7–14 business days.
             </p>

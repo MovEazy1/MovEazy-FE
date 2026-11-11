@@ -30,7 +30,7 @@ const COMPARE = [
   ["Time to move in", "~1 month", "≤ 7 days"],
 ];
 
-const INCLUDED = [[BadgeCheck, "Verified homes"], [FileCheck2, "Agreement checked"], [ShieldCheck, "Deposit protected"], [Wallet, "Rent on auto-pay"]];
+const INCLUDED = [[BadgeCheck, "Verified homes"], [FileCheck2, "Agreement checked"], [ShieldCheck, "Owner verified"], [Wallet, "Rent on auto-pay"]];
 
 /** The visit day we're building: one car, every shortlisted flat, the deal, the drop. */
 const RIDE = [
@@ -140,7 +140,7 @@ export default function HowItWorks() {
     { k: "list", time: "Hour 6", title: "Your curated list.", sub: "Only homes that fit — ranked.", screen: <RankedScreen matches={matches} requirement={requirement} /> },
     { k: "swipe", time: "Hour 6", title: "Swipe to shortlist.", sub: "Right to keep, left to skip.", screen: <SwipeScreen matches={matches} /> },
     { k: "visit", time: "Day 1", title: "Visit in one tap.", sub: "Same-day slots. No calls.", screen: <VisitScreen listing={matches[1] || matches[0]} /> },
-    { k: "done", time: "Day 1", title: "Finalised.", sub: "Agreement checked. Deposit protected.", screen: <MoveInScreen listing={matches[0]} /> },
+    { k: "done", time: "Day 1", title: "Finalised.", sub: "Agreement checked. Move-in fixed.", screen: <MoveInScreen listing={matches[0]} /> },
     { k: "keys", time: "Within 7 days", title: "Welcome home.", sub: "Keys in hand." },
   ];
 

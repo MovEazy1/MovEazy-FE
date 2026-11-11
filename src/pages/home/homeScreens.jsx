@@ -203,7 +203,7 @@ export function PerfectHomeScreen({ listing }) {
         </div>
       </div>
       <div style={{ padding: 16, display: "grid", gap: 10 }}>
-        {[[BadgeCheck, "Verified by MovEazy"], [ShieldCheck, "Deposit protected"], [CalendarCheck, "Visit today"]].map(([I, t]) => (
+        {[[BadgeCheck, "Verified by MovEazy"], [ShieldCheck, "Free visit"], [CalendarCheck, "Visit today"]].map(([I, t]) => (
           <div key={t} style={{ display: "flex", alignItems: "center", gap: 10, fontSize: 14, fontWeight: 600, color: T.ink }}>
             <I size={17} color={T.teal} /> {t}
           </div>
@@ -298,7 +298,7 @@ export function VisitScreen({ listing }) {
 
 /* 4 ── Move in: the home is finalised, and one agent carries it through. */
 export function MoveInScreen({ listing }) {
-  const rows = [[ShieldCheck, "Deposit protected"], [BadgeCheck, "Agreement verified"], [Wallet, "Rent on auto-pay"], [Home, "Move-in: Sat, 11 AM"]];
+  const rows = [[ShieldCheck, "Owner verified"], [BadgeCheck, "Agreement verified"], [Wallet, "Rent on auto-pay"], [Home, "Move-in: Sat, 11 AM"]];
   return (
     <div style={{ background: "#fff", minHeight: "100%", fontFamily: "Inter, system-ui, sans-serif" }}>
       <div style={{ padding: "54px 22px 22px", textAlign: "center", background: `linear-gradient(180deg, ${T.wash}, #fff)` }}>

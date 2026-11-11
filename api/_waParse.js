@@ -19,7 +19,7 @@ export const MUST_HAVES = ["Balcony", "Gym", "Swimming Pool", "Lift", "Covered P
   "Gated Society", "Good Sunlight", "Quiet Area", "High Floor", "Low Floor"];
 export const OCCUPANTS = ["Bachelor", "Family", "Couple", "Working Professionals", "Students", "Pet Owner",
   "Bachelor Boys Not Allowed", "Bachelor Girls Not Allowed"];
-export const HOUSE_RULES = ["No Smoking", "No Pets", "No Alcohol", "Vegetarians Only", "Working Professionals Only", "No Brokerage"];
+export const HOUSE_RULES = ["No Smoking", "No Pets", "No Alcohol", "Vegetarians Only", "Working Professionals Only"];
 
 const str = { type: "string" };
 const list = (values) => ({ type: "array", items: { type: "string", enum: values } });

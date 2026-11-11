@@ -140,6 +140,11 @@ function list(v) {
   return v.map((x) => String(x || "").trim()).filter(Boolean);
 }
 
+/** House rules as tenants see them: never a brokerage claim ("No Brokerage" was once a rule owners could tick). */
+export function shownHouseRules(v) {
+  return list(v).filter((r) => !/broker/i.test(r));
+}
+
 /**
  * Build the DB row from the List my Flat form draft. `poster` is the signed-in
  * auth user; `postedBy` is the role they claimed (tenant|broker|owner). The
@@ -540,7 +545,7 @@ export function mapInventoryToListing(row) {
     floorNumber: row.floor_number == null ? "" : String(row.floor_number),
     totalFloors: row.total_floors == null ? "" : String(row.total_floors),
     description: String(row.description || "").trim(),
-    houseRules: list(row.house_rules),
+    houseRules: shownHouseRules(row.house_rules),
     preferredTenants: list(row.occupants_allowed),
     lifestyle: list(row.lifestyle),
     bedrooms: num(row.bedrooms),

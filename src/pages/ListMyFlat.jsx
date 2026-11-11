@@ -30,7 +30,7 @@ import { useAreas, withCurrent } from "../lib/areas";
 const BRAND_RED = "#ff3131";
 const RULE_OPTIONS = [
   "No Smoking", "No Pets", "No Alcohol", "Vegetarians Only",
-  "Working Professionals Only", "No Brokerage", "Fully Furnished",
+  "Working Professionals Only", "Fully Furnished",
 ];
 const POSTER_ROLES = [
   ["owner", "Owner", "I own this property"],

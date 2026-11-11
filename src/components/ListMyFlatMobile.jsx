@@ -45,7 +45,7 @@ const POSTER_ROLES = [
 ];
 const RULE_OPTIONS = [
   "No Smoking", "No Pets", "No Alcohol", "Vegetarians Only",
-  "Working Professionals Only", "No Brokerage", "Fully Furnished",
+  "Working Professionals Only", "Fully Furnished",
 ];
 /** The account already told us who they are at signup, so the listing form
  *  opens on that role instead of always guessing "owner". seller is folded

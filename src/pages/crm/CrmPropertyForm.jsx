@@ -73,7 +73,7 @@ const GENDER_PREFS = [["any", "Co-ed / Any"], ["female", "Girls only"], ["male",
 // corrected here reads identically to one posted there.
 const HOUSE_RULES = [
   "No Smoking", "No Pets", "No Alcohol", "Vegetarians Only",
-  "Working Professionals Only", "No Brokerage", "Fully Furnished",
+  "Working Professionals Only", "Fully Furnished",
 ];
 
 /** A DB row → the form's shape. Nulls become "", arrays stay arrays, and the
