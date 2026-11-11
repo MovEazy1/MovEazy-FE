@@ -8,6 +8,7 @@
  */
 import { supabase, isSupabaseConfigured } from "./supabase";
 import { PUBLIC_ORIGIN } from "./partners";
+import { takePageData } from "./pageData";
 
 async function rpc(fn, args) {
   if (!isSupabaseConfigured || !supabase) throw new Error("Not connected.");
@@ -35,7 +36,11 @@ export const markSoldOut = (propertyId, note = "") => rpc("partner_mark_sold_out
 export const decideSoldOut = (propertyId, approve) => rpc("partner_decide_sold_out", { p_property: propertyId, p_approve: approve });
 
 /* Tenant (signed out) */
-export const openCuratedList = (token) => rpc("partner_curated_open", { p_token: token });
+// Opened from the link, the page already holds this read — the open, made once (lib/pageData, api/share.js).
+export const openCuratedList = (token) => {
+  const early = takePageData(`partner_curated_open:${token}`);
+  return early !== undefined ? Promise.resolve(early) : rpc("partner_curated_open", { p_token: token });
+};
 export const giveCuratedContact = (token, phone, name = "") => rpc("partner_curated_contact", { p_token: token, p_phone: phone, p_name: name });
 export const actOnCurated = (token, propertyId, action) => rpc("partner_curated_act", { p_token: token, p_property: propertyId, p_action: action });
 /** The partner's other lists to the same tenant (My homes), once they've given their number. */

@@ -13,7 +13,7 @@
  * leads to MovEazy's own pages. Separate from MovEazy's curated shortlists at
  * /curated/<token>.
  */
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { useParams } from "react-router-dom";
 import { ChevronDown, ChevronRight, Heart, Info, MapPin, Phone, RotateCcw, X } from "lucide-react";
 import { SmartListingImage } from "./partners/partnerMedia";
@@ -23,7 +23,9 @@ import { actOnCurated, curatedUrl, fetchCuratedSiblings, giveCuratedContact, ope
 import { formatForDisplay, normalizeIndianMobile } from "../lib/mobile";
 import CuratedDetails from "./curated/CuratedDetails";
 import { allHomes, firstName, flatLine, likedMessage } from "./curated/curatedText";
-import logoOnDark from "../assets/logo/moveazy-logo-mint-dark.png";
+import { dropPrerender } from "../lib/prerender";
+// From public/, at a fixed address: the page drawn before the app (api/_curatedPrepaint.js) shows the same file.
+const logoOnDark = "/moveazy-logo-mint-dark.png";
 
 const seenKey = (t) => `mz_curated_${t}`;
 const initials = (n) => String(n || "").trim().split(/\s+/).slice(0, 2).map((w) => w[0] || "").join("").toUpperCase() || "M";
@@ -71,6 +73,9 @@ export default function CuratedSwipe() {
       setIdx(first < 0 ? homes.length : first);
     }, () => setData(null));
   }, [token]);
+
+  // The page drawn before the app (api/_curatedPrepaint.js) gives way once this one is drawn.
+  useLayoutEffect(() => { if (data !== undefined) dropPrerender(); }, [data]);
 
   // Once we know who they are: the partner's other lists to them.
   useEffect(() => {

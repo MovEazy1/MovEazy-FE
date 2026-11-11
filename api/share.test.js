@@ -80,6 +80,37 @@ describe("the building and broker pages drawn before the app", () => {
   });
 });
 
+describe("a partner's shortlist", () => {
+  afterEach(() => vi.unstubAllGlobals());
+  const list = { lead_name: "Ravi Kumar", known: false, broker: { name: "Kiran Realty" }, homes: [{ property_id: "MZ-1" }, { property_id: "MZ-2" }] };
+  it("the first-visit form, drawn: header, the partner's words, no live fields", async () => {
+    const { curatedPrepaint, withCuratedPrepaint } = await import("./_curatedPrepaint.js");
+    const html = curatedPrepaint(list);
+    expect(html).toContain("<b>Kiran Realty</b><span>picked 2 homes for you, Ravi</span>");
+    expect(html).toContain("Kiran sees the homes you like");
+    expect(html).not.toMatch(/<input|<form|<button/);
+    const page = withCuratedPrepaint(SHELL.replace("<body>", "<body>"), "ab".repeat(16), list);
+    expect(page).toContain('localStorage.getItem("mz_curated_' + "ab".repeat(16) + '")');
+  });
+  it("opened once, on the person's behalf only — and handed to the page", async () => {
+    process.env.VITE_SUPABASE_URL = "https://x.supabase.co";
+    process.env.VITE_SUPABASE_PUBLISHABLE_KEY = "k";
+    vi.resetModules();
+    const calls = [];
+    vi.stubGlobal("fetch", vi.fn(async (u) => { calls.push(String(u)); return String(u).endsWith("/app.html") ? new Response(SHELL) : new Response(JSON.stringify(list)); }));
+    const { default: handler } = await import("./share.js");
+    const tok = "ab".repeat(16);
+    const person = await (await handler(new Request(`https://www.moveazy.co.in/api/share?kind=c&id=${tok}`, { headers: { "user-agent": "Mozilla/5.0 (Linux; Android 13) Chrome/130 Mobile" } }))).text();
+    expect(calls.filter((u) => u.endsWith("/rpc/partner_curated_open"))).toHaveLength(1);
+    expect(person).toContain(`"key":"partner_curated_open:${tok}"`);
+    expect(person).toContain("Your homes are ready");
+    calls.length = 0;
+    await handler(new Request(`https://www.moveazy.co.in/api/share?kind=c&id=${tok}`, { headers: { "user-agent": "WhatsApp/2.23" } }));
+    expect(calls.some((u) => u.endsWith("/rpc/partner_curated_open"))).toBe(false);
+    delete process.env.VITE_SUPABASE_URL; delete process.env.VITE_SUPABASE_PUBLISHABLE_KEY;
+  });
+});
+
 describe("the page takes it once", () => {
   afterEach(() => { delete globalThis.window; });
   it("for its own read only", () => {

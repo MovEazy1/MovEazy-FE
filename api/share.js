@@ -14,6 +14,7 @@ import { isPreviewRobot } from "./_bots.js";
 import { withAdPrepaint } from "./_adPrepaint.js";
 import { withBuildingPrepaint } from "./_buildingPrepaint.js";
 import { withStorefrontPrepaint } from "./_storefrontPrepaint.js";
+import { withCuratedPrepaint } from "./_curatedPrepaint.js";
 
 export const config = { runtime: "edge" };
 
@@ -138,6 +139,10 @@ const firstPhoto = (urls) => (urls || []).find((u) => u && !isVideo(u)) || "";
 
 /** Which database read draws this page (the same one the app makes), and the photo at its top. */
 export const PAGE_READS = {
+  // A partner's shortlist: this read is the open itself (counted, the partner told on the first) —
+  // made here once for the person opening it, and the app takes it instead of making it again.
+  c: { fn: "partner_curated_open", args: (id) => ({ p_token: id }), ok: (id) => /^[0-9a-f]{32}$/.test(id),
+    key: (id) => `partner_curated_open:${id}`, lead: () => "" },
   building: { fn: "building_page", args: (id) => ({ p_code: id }), ok: (id) => /^[A-Za-z0-9]{6}$/.test(id),
     key: (id) => `building_page:${id}`,
     // BuildingPage: its own photos, else its flats' — none when a video leads.
@@ -200,6 +205,9 @@ export default async function handler(req) {
           const media = building ? (data.photos ?? []).filter(Boolean) : flatMedia(data);
           const lead = read.lead(data);
           html = withAdPrepaint(html, building ? "building" : "flat", data, media, lead ? thumbUrl(lead) : "");
+        } else if (read === PAGE_READS.c && !data.known) {
+          // First visit to a shortlist: the number form, drawn (api/_curatedPrepaint.js).
+          html = withCuratedPrepaint(html, id, data);
         } else if (read === PAGE_READS.building && !data.cover_video) {
           // A building's own page, drawn too (api/_buildingPrepaint.js): its photos, else its flats'.
           const own = (data.photos ?? []).filter(Boolean);
