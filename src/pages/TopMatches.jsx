@@ -10,7 +10,7 @@
  * rather than opening a search box — unless a shortlist has already landed, in
  * which case it hands straight over to it.
  */
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 import { motion, useReducedMotion } from "framer-motion";
 import { X, Heart } from "lucide-react";
@@ -28,6 +28,7 @@ import { fetchBookings, fetchReactions, setReaction } from "../lib/visits";
 import { MOVEAZY_TEAM_WHATSAPP } from "../config/contactChannels";
 import { fetchMyCuratedProperties } from "../lib/curatedShares";
 import ExploreSocietiesCard from "./societies/ExploreSocietiesCard";
+import { dropPrerender } from "../lib/prerender";
 
 const TOP_N = 5;
 const T = { ink: "#04211D", teal: "#0E7C68", gold: "#E8A33D", text: "#171412", textDim: "#5c554e" };
@@ -421,6 +422,8 @@ export default function TopMatches() {
   // listings are only for ranking, and there is nothing to rank yet.
   const loading = authLoading || !prefsChecked || (Boolean(prefs) && listingsLoading);
   const total = topMatches.length;
+  // The signed-out copy built at deploy (entry-prerender /matches) gives way once this page knows what to show.
+  useLayoutEffect(() => { if (!loading) dropPrerender(); }, [loading]);
 
   // The team has picked, so that is the answer to "find my flat" — whether or
   // not the five were ever swiped through. Returned before the page shell

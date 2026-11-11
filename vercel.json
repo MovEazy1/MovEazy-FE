@@ -139,6 +139,16 @@
       "destination": "/auth.html"
     },
     {
+      "source": "/matches",
+      "has": [
+        {
+          "type": "host",
+          "value": "www.moveazy.co.in"
+        }
+      ],
+      "destination": "/matches.html"
+    },
+    {
       "source": "/((?!api/|assets/).*)",
       "destination": "/app.html"
     }

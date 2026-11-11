@@ -121,7 +121,7 @@ try {
   // The info pages and sign-in (src/entry-prerender.jsx ROUTES), at
   // www.moveazy.co.in/<path> (vercel.json rewrites each to <path>.html).
   for (const path of Object.keys(mod.ROUTES ?? {})) {
-    PAGES.push({ page: path, file: `${path.slice(1)}.html`, host: "www.moveazy.co.in", fonts: [], handoff: "route" });
+    PAGES.push({ page: path, file: `${path.slice(1)}.html`, host: "www.moveazy.co.in", fonts: [], handoff: mod.SELF_HANDOFF?.has(path) ? "page" : "route" });
   }
   for (const p of PAGES) {
     try {
