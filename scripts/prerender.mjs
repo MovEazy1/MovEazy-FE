@@ -107,6 +107,11 @@ try {
   execSync(`npx vite build --ssr src/entry-prerender.jsx --outDir .prerender --emptyOutDir --logLevel warn`, { cwd: root, stdio: "inherit" });
   browser(PAGES[0].host);
   const mod = await import(pathToFileURL(join(out, "entry-prerender.js")).href);
+  // The info pages and sign-in (src/entry-prerender.jsx ROUTES), at
+  // www.moveazy.co.in/<path> (vercel.json rewrites each to <path>.html).
+  for (const path of Object.keys(mod.ROUTES ?? {})) {
+    PAGES.push({ page: path, file: `${path.slice(1)}.html`, host: "www.moveazy.co.in", fonts: [], handoff: "route" });
+  }
   for (const p of PAGES) {
     try {
       rendered[p.page] = await mod.render(p.page);
@@ -132,7 +137,7 @@ for (const p of PAGES) {
   const html = rendered[p.page];
   let page = html
     ? lowPriorityScripts(shell).replace("</head>", `${HEAD}${fontPreloads(p.fonts)}
-</head>`).replace('<div id="root"></div>', `<div id="prerender">${html}</div><div id="root"></div>`)
+</head>`).replace('<div id="root"></div>', `<div id="prerender"${p.handoff ? ` data-handoff="${p.handoff}"` : ""}>${html}</div><div id="root"></div>`)
     : shell;
   if (html) {
     try {

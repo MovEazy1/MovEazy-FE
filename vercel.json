@@ -59,6 +59,86 @@
       "destination": "/api/property-page?id=:id"
     },
     {
+      "source": "/how-it-works",
+      "has": [
+        {
+          "type": "host",
+          "value": "www.moveazy.co.in"
+        }
+      ],
+      "destination": "/how-it-works.html"
+    },
+    {
+      "source": "/about",
+      "has": [
+        {
+          "type": "host",
+          "value": "www.moveazy.co.in"
+        }
+      ],
+      "destination": "/about.html"
+    },
+    {
+      "source": "/contact",
+      "has": [
+        {
+          "type": "host",
+          "value": "www.moveazy.co.in"
+        }
+      ],
+      "destination": "/contact.html"
+    },
+    {
+      "source": "/terms",
+      "has": [
+        {
+          "type": "host",
+          "value": "www.moveazy.co.in"
+        }
+      ],
+      "destination": "/terms.html"
+    },
+    {
+      "source": "/privacy",
+      "has": [
+        {
+          "type": "host",
+          "value": "www.moveazy.co.in"
+        }
+      ],
+      "destination": "/privacy.html"
+    },
+    {
+      "source": "/refund-policy",
+      "has": [
+        {
+          "type": "host",
+          "value": "www.moveazy.co.in"
+        }
+      ],
+      "destination": "/refund-policy.html"
+    },
+    {
+      "source": "/delivery-policy",
+      "has": [
+        {
+          "type": "host",
+          "value": "www.moveazy.co.in"
+        }
+      ],
+      "destination": "/delivery-policy.html"
+    },
+    {
+      "source": "/auth",
+      "has": [
+        {
+          "type": "host",
+          "value": "www.moveazy.co.in"
+        }
+      ],
+      "destination": "/auth.html"
+    },
+    {
       "source": "/((?!api/|assets/).*)",
       "destination": "/app.html"
     }

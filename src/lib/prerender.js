@@ -23,6 +23,20 @@ export function dropPrerender() {
   document.getElementById("prerender")?.remove();
 }
 
+/**
+ * For the pages built at deploy time (scripts/prerender.mjs, data-handoff
+ * "route"): placed beside the routes inside their Suspense boundary, it mounts
+ * only once the page's own code has arrived and drawn — then the copy goes.
+ * Pages drawn by the edge from live data (a flat, an ad) hand over themselves,
+ * when their data has drawn, so it leaves those alone.
+ */
+export function RouteHandOff() {
+  useLayoutEffect(() => {
+    if (document.getElementById("prerender")?.dataset.handoff === "route") dropPrerender();
+  }, []);
+  return null;
+}
+
 /** Call at the top of a pre-built page: once it has drawn, its pre-built copy goes. */
 export function usePrerenderHandoff() {
   useLayoutEffect(() => { dropPrerender(); }, []);

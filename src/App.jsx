@@ -10,6 +10,7 @@ import RequirePhoneForListing from "./components/RequirePhoneForListing";
 import { useSessionTracking } from "./hooks/useSessionTracking";
 import { isPhoneNow } from "./pages/crm/mobile/phoneQuery";
 import { hasStoredSession } from "./lib/supabase";
+import { RouteHandOff } from "./lib/prerender";
 import { VIEW_AS_EVENT, VIEW_AS_PATH, isViewingAs } from "./lib/viewAsState";
 
 // Lazy like every page: the tenant home pulls in the map, the swipe deck and
@@ -262,6 +263,7 @@ function AppRoutes() {
   if (IS_OWNER_HOST) {
     return (
       <Suspense fallback={<PageLoader />}>
+        <RouteHandOff />
         <Routes>
           <Route path="/*" element={<OwnerApp />} />
         </Routes>
@@ -271,6 +273,7 @@ function AppRoutes() {
   if (IS_SOCIETY_HOST) {
     return (
       <Suspense fallback={<PageLoader />}>
+        <RouteHandOff />
         <Routes>
           <Route path="/*" element={<SocietyApp />} />
         </Routes>
@@ -280,6 +283,7 @@ function AppRoutes() {
   if (IS_PARTNER_HOST) {
     return (
       <Suspense fallback={<PageLoader />}>
+        <RouteHandOff />
         <Routes>
           <Route path="/*" element={<PartnerApp />} />
         </Routes>
@@ -288,6 +292,7 @@ function AppRoutes() {
   }
   return (
     <Suspense fallback={<PageLoader />}>
+      <RouteHandOff />
       <Routes>
         <Route path="/" element={IS_TENANT_HOST ? <ForkHome tenantEntry /> : <ForkHome />} />
         <Route path="/tenant" element={<ForkHome tenantEntry />} />
