@@ -235,21 +235,21 @@ export default function ForkHome({ tenantEntry = false }) {
     }
   };
 
-  // The shared nav's "Start your move" / "Find My Flat" on other pages routes
-  // here as `/?search=1`, so every entry point runs this one flow rather than
-  // each page reimplementing the preferences check.
+  // Old `/?search=1` links go to /find. `/?curate=1` is /find's first card
+  // ("Build my curated flat list"): the preferences check → the agent or the
+  // top matches, as before. Wait out authLoading first — otherwise this would
+  // consume the param while the session is still restoring, startFlatSearch()'s
+  // own guard would no-op, and the deep link would be silently dropped.
   useEffect(() => {
-    // Also wait out authLoading here — otherwise this effect would consume the
-    // ?search=1 param immediately (even while auth is still resolving), then
-    // startFlatSearch()'s own guard would no-op and the param is already gone,
-    // silently dropping the deep link instead of just delaying it.
-    if (searchParams.get("search") !== "1" || authLoading) return;
+    if (searchParams.get("search") === "1") { navigate("/find", { replace: true }); return; }
+    if (searchParams.get("curate") !== "1" || authLoading) return;
     setSearchParams({}, { replace: true });
     startFlatSearch();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [searchParams, user, authLoading]);
 
-  const find = (e) => { e?.preventDefault?.(); startFlatSearch(); };
+  // "Find my home" opens the five ways to find a flat (pages/find/FindHub.jsx).
+  const find = (e) => { e?.preventDefault?.(); navigate("/find"); };
   const list = (e) => { e?.preventDefault?.(); listMyFlat(); };
   const top = matches[0];
 
@@ -274,7 +274,7 @@ export default function ForkHome({ tenantEntry = false }) {
     // The cream runs under the nav's own spacer too, so there is no white band above the card.
     return (
       <div style={{ background: "#F4F2ED", minHeight: "100vh" }}>
-        <MovEazyNav active="home" onFindFlat={startFlatSearch} />
+        <MovEazyNav active="home" onFindFlat={find} />
         <Suspense fallback={<Cream />}><TenantHome
           underNav
           name={user.name}
@@ -292,7 +292,7 @@ export default function ForkHome({ tenantEntry = false }) {
     <div className="lp lp--tenant th">
       <LandingStyles />
       <style>{SITE_CSS + CSS}</style>
-      <MovEazyNav active="home" transparentAtTop onFindFlat={startFlatSearch} />
+      <MovEazyNav active="home" transparentAtTop onFindFlat={find} />
 
       {/* ── HERO ── */}
       <header className="th-hero">

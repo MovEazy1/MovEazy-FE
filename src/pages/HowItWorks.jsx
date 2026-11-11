@@ -3,7 +3,7 @@
  * and a scroll: one phone per moment, the app's own screens over real
  * inventory (home/homeScreens.jsx). Few words; the screens carry it.
  *
- * "Find my home" hands over to the homepage's one search flow (/?search=1):
+ * "Find my home" opens /find, the five ways to find a flat:
  * it decides between the number, the AI broker and saved matches, so this page
  * never guesses.
  */
@@ -128,7 +128,7 @@ function Journey({ stages }) {
 
 export default function HowItWorks() {
   const navigate = useNavigate();
-  const find = () => navigate("/?search=1");
+  const find = () => navigate("/find");
   const { user, loading } = useAuth();
   const { openLogin } = useLoginModal();
   const list = () => { if (loading) return; user ? navigate("/list-my-flat") : openLogin(() => navigate("/list-my-flat")); };

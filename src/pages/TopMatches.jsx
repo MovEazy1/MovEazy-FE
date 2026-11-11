@@ -451,7 +451,7 @@ export default function TopMatches() {
             <p style={{ color: T.textDim, marginBottom: 16 }}>We don't have your preferences yet.</p>
             <button
               type="button"
-              onClick={() => navigate("/?search=1")}
+              onClick={() => navigate("/?curate=1")}
               style={{ padding: "12px 24px", borderRadius: 999, border: "none", background: T.ink, color: "#fff", fontWeight: 700, cursor: "pointer" }}
             >
               Tell us what you're looking for

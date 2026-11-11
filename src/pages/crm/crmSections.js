@@ -3,7 +3,7 @@
  * and top-bar titles. `scope` hides a section from whoever lacks it.
  */
 import {
-  BarChart3, Bell, Briefcase, CalendarClock, Target, Building2, CalendarCheck, Columns3, CreditCard, Eye, House, Inbox, Landmark,
+  BarChart3, Bell, Briefcase, Flame, CalendarClock, Target, Building2, CalendarCheck, Columns3, CreditCard, Eye, House, Inbox, Landmark,
   Map as MapIcon, MapPin, MessageCircle, QrCode, ScanLine, Settings, ShieldCheck, Smartphone, UserPlus, Users, Wallet, Wrench,
 } from "lucide-react";
 import { SCOPES } from "../../lib/adminScopes";
@@ -36,6 +36,8 @@ export const RAIL = [
   { to: "/crm/owner-qr", code: "QR", label: "Owner QR", icon: QrCode, group: "Flats" },
   { to: "/crm/societies", code: "SO", label: "Societies", icon: Landmark, scope: SCOPES.PROPERTIES_WRITE, group: "Flats" },
   // Gated societies around HSR the team is bringing on: the map, the people to call, the brochures.
+  // What /find shows tenants: Steal Deals of the Week and Deal of the Day.
+  { to: "/crm/deals", code: "DL", label: "Deals", icon: Flame, group: "Flats" },
   { to: "/crm/society-prospects", code: "SP", label: "Society prospects", icon: MapIcon, group: "Flats" },
   // The owner app's queue: repairs, service bookings, designer calls, owners.
   { to: "/crm/ops", code: "IO", label: "Inventory Ops", icon: Wrench, group: "Flats" },

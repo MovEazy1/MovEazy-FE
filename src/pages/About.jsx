@@ -5,7 +5,7 @@
  * drawn from the founders' own profiles; the portraits are their own photos,
  * resized for the web (founder-*.jpg, from yatharthdesk.png and aman.png).
  *
- * "Find my home" hands over to the homepage's one search flow (/?search=1).
+ * "Find my home" opens /find, the five ways to find a flat.
  */
 import { useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
@@ -74,7 +74,7 @@ export default function About() {
   const navigate = useNavigate();
   const { user, loading } = useAuth();
   const { openLogin } = useLoginModal();
-  const find = () => navigate("/?search=1");
+  const find = () => navigate("/find");
   const list = () => { if (loading) return; user ? navigate("/list-my-flat") : openLogin(() => navigate("/list-my-flat")); };
 
   return (

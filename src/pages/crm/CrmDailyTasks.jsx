@@ -129,7 +129,7 @@ function TaskRow({ task, onSnooze, onUnsnooze, onOpen, onMessaged, busy }) {
 }
 
 export default function CrmDailyTasks() {
-  const { clients, user, setData } = useCrm();
+  const { activeClients: clients, user, setData } = useCrm();
   const navigate = useNavigate();
   const actorEmail = user?.email || "";
 

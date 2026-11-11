@@ -11,7 +11,7 @@
  *   other page keeps the solid bar so the light-background pages stay readable.
  * @param {() => void} [onFindFlat] — page-supplied "find a flat" handler. Home
  *   passes its own (preferences check → recommendations or the choice modal);
- *   elsewhere we deep-link to home's `?search=1`, which runs that same flow.
+ *   elsewhere it opens /find, the five ways to find a flat.
  * @param {() => void} [onGetAgent] — page-supplied "open the AI preferences
  *   chat" handler; pages holding their own <AIBroker/> pass it so the chat opens
  *   in place. Without one we deep-link to home's `?find=1`, which opens it there.
@@ -297,7 +297,7 @@ export default function MovEazyNav({ active = "", transparentAtTop = false, onFi
   // The owner app lives on its own subdomain; every "Register as an Owner" goes straight there.
   const registerOwner = () => { window.location.href = OWNERS_URL; };
   const listMyFlat = () => { if (authLoading) return; user ? navigate("/list-my-flat") : openLogin(() => navigate("/list-my-flat")); };
-  const findFlat = () => { if (authLoading) return; onFindFlat ? onFindFlat() : navigate("/?search=1"); };
+  const findFlat = () => { if (authLoading) return; onFindFlat ? onFindFlat() : navigate("/find"); };
   const getAgent = () => { if (authLoading) return; onGetAgent ? onGetAgent() : navigate("/?find=1"); };
   const closeThen = (fn) => () => { setMenuOpen(false); fn(); };
 

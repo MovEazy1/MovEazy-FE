@@ -89,11 +89,16 @@ const CrmPaymentsPage = lazy(() => import("./pages/crm/CrmPaymentsPage"));
 const CrmSettingsPage = lazy(() => import("./pages/crm/CrmSettingsPage"));
 const CrmAreasPage = lazy(() => import("./pages/crm/CrmAreasPage"));
 const CrmSocietyProspectsPage = lazy(() => import("./pages/crm/CrmSocietyProspectsPage"));
+const CrmDealsPage = lazy(() => import("./pages/crm/CrmDealsPage"));
 // The broker app. Its own route tree: at /partners here, and at the root of
 // partners.moveazy.co.in (same deployment, same bundle — see lib/partners.js).
 const PartnerApp = lazy(() => import("./pages/partners/PartnerApp"));
 const SocietyApp = lazy(() => import("./pages/society/SocietyApp"));
 const ExploreSocieties = lazy(() => import("./pages/societies/ExploreSocieties"));
+// "Find my home": five ways to find a flat, and the two deal lists (find_deals.sql).
+const FindHub = lazy(() => import("./pages/find/FindHub"));
+const StealDeals = lazy(() => import("./pages/find/StealDeals"));
+const DealOfTheDay = lazy(() => import("./pages/find/DealOfTheDay"));
 const SocietyPage = lazy(() => import("./pages/societies/SocietyPage"));
 // The owner app: /owners here, the root of owners.moveazy.co.in.
 const OwnerApp = lazy(() => import("./pages/owners/OwnerApp"));
@@ -142,6 +147,7 @@ function prefetchCrmPage(path) {
     settings: () => import("./pages/crm/CrmSettingsPage"),
     areas: () => import("./pages/crm/CrmAreasPage"),
     "society-prospects": () => import("./pages/crm/CrmSocietyProspectsPage"),
+    deals: () => import("./pages/crm/CrmDealsPage"),
   }[seg];
   import("./pages/crm/CrmShell").catch(() => {});
   page?.().catch(() => {});
@@ -299,6 +305,9 @@ function AppRoutes() {
         <Route path="/partners/*" element={<PartnerApp />} />
         <Route path="/society/*" element={<SocietyApp />} />
         {/* Explore societies (MovEazy Society's flats), live once the CRM switches it on. */}
+        <Route path="/find" element={<FindHub />} />
+        <Route path="/find/steal-deals" element={<StealDeals />} />
+        <Route path="/find/deal-of-the-day" element={<DealOfTheDay />} />
         <Route path="/societies" element={<ExploreSocieties />} />
         <Route path="/societies/:code" element={<SocietyPage />} />
         <Route path="/owners/*" element={<OwnerApp />} />
@@ -403,6 +412,7 @@ function AppRoutes() {
           <Route path="settings" element={<CrmSettingsPage />} />
           <Route path="areas" element={<CrmAreasPage />} />
           <Route path="society-prospects" element={<CrmSocietyProspectsPage />} />
+          <Route path="deals" element={<CrmDealsPage />} />
           <Route path="society-prospects/:id" element={<CrmSocietyProspectsPage />} />
         </Route>
         <Route

@@ -36,6 +36,24 @@ export const TEMPERATURES = [
 export const tempColor = (id) => TEMPERATURES.find((t) => t.id === id)?.color ?? "#3C5A54";
 export const tempLabel = (id) => TEMPERATURES.find((t) => t.id === id)?.label ?? "Unset";
 
+/* ── Lead types (lead_types.sql) ─────────────────────────────────────────── */
+
+export const LEAD_TYPES = [
+  { id: "active", label: "Active", hint: "Filled in what they need, booked a visit, liked a flat or asked if one is free" },
+  { id: "probable", label: "Probable", hint: "Gave a number and only browsed — out of the daily work until they act" },
+  { id: "dormant", label: "Dormant", hint: "Marked dormant by the team" },
+];
+/** A client's lead type; rows from before lead_types.sql are Active. */
+export const leadTypeOf = (c) => c?.lead_type || "active";
+
+/** The team marks a client Dormant, or brings them back. */
+export async function setLeadType(clientId, type) {
+  requireDb();
+  const { data, error } = await supabase.rpc("crm_lead_type_set", { p_client: clientId, p_type: type });
+  if (error) throw error;
+  return data;
+}
+
 /* ── Reads ────────────────────────────────────────────────────────────────── */
 
 /**
@@ -86,7 +104,9 @@ export const fetchClients = () =>
       "brokerage_amount,expected_credit_date,payment_status,payment_marked_by,payment_marked_at," +
       "payment_approved_by,payment_approved_at,created_at,updated_at,via,via_broker," +
       // The next step (crm_follow_ups.sql).
-      "follow_up_note,follow_up_by,follow_up_set_at,last_outcome,last_outcome_at,no_answer_streak",
+      "follow_up_note,follow_up_by,follow_up_set_at,last_outcome,last_outcome_at,no_answer_streak," +
+      // Active / Probable / Dormant, and what they asked to be told about (lead_types.sql).
+      "lead_type,lead_type_at,lead_type_by,interests",
     // MovEazy's own leads, plus tenants from a partner's QR poster (via = 'qr',
     // partner_qr_leads.sql), which both MovEazy and the broker follow up. Any
     // other number that first came through a partner broker is theirs

@@ -172,7 +172,7 @@ function PartnersTab({ onToast, onOpen }) {
 export default function CrmFollowUpsPage() {
   const crm = useCrm();
   const navigate = useNavigate();
-  const { clients, touches, engagement, ownAnswers, requirements, access } = crm;
+  const { activeClients: clients, touches, engagement, ownAnswers, requirements, access } = crm;
   const [picked, setTab] = useState("");
   const [who, setWho] = useState("all");
   const [q, setQ] = useState("");

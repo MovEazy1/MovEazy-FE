@@ -18,7 +18,7 @@ import { Link, NavLink, Navigate, Outlet, useLocation } from "react-router-dom";
 import { useAuth } from "../../context/AuthContext";
 import { useCrmAccess } from "../../hooks/useCrmAccess";
 import {
-  fetchClients, fetchClientRequirements, fetchEngagement, fetchShortlists, fetchLastTouch, fetchLeadActivity,
+  fetchClients, fetchClientRequirements, leadTypeOf, fetchEngagement, fetchShortlists, fetchLastTouch, fetchLeadActivity,
   fetchClientOwnAnswers,
 } from "../../lib/crmClients";
 import { DEFAULT_CRM_SETTINGS, fetchCrmSettings } from "../../lib/crmSettings";
@@ -217,6 +217,7 @@ const NEEDS = {
   "broker-leads": [],
   "qr-scans": [],
   "lead-requests": [],
+  deals: ["inventory"],
   "owner-qr": [],
   societies: [],
   buildings: ["inventory"],
@@ -338,9 +339,12 @@ export default function CrmShell() {
     return () => clearInterval(t);
   }, [phone, access.loading, access.isStaff, loadSummary]);
 
+  // The daily work (Follow-ups, Pipeline, Priority closures, the day's tasks)
+  // is Active leads only; Probable and Dormant live under Clients (lead_types.sql).
+  const activeClients = useMemo(() => (data.clients ?? []).filter((c) => leadTypeOf(c) === "active"), [data.clients]);
   const value = useMemo(
-    () => ({ ...PENDING, ...data, access, user, reload, patchClient, setData, phone, summary, summaryBusy, loadSummary }),
-    [data, access, user, reload, patchClient, phone, summary, summaryBusy, loadSummary],
+    () => ({ ...PENDING, ...data, activeClients, access, user, reload, patchClient, setData, phone, summary, summaryBusy, loadSummary }),
+    [data, activeClients, access, user, reload, patchClient, phone, summary, summaryBusy, loadSummary],
   );
 
   if (phone) {

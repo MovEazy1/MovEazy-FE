@@ -44,7 +44,7 @@ export default function TenantProfilePage() {
         initial={profile}
         onSave={save}
         onClose={() => navigate("/")}
-        onFind={() => navigate("/?search=1")}
+        onFind={() => navigate("/find")}
       />
       {error && (
         <div role="status" style={{ position: "fixed", left: 16, right: 16, bottom: 20, zIndex: 50, maxWidth: 480, margin: "0 auto", padding: "12px 16px",

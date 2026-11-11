@@ -62,7 +62,7 @@ function Card({ client, requirement, engagement, lastTouch, canWrite, onOpen, on
 
 export default function CrmPipelinePage() {
   const crm = useCrm();
-  const { clients, requirements, engagement, touches, access } = crm;
+  const { activeClients: clients, requirements, engagement, touches, access } = crm;
   const navigate = useNavigate();
 
   const [toast, setToast] = useState(null);

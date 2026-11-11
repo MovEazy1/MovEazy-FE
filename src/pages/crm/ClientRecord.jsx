@@ -8,7 +8,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import {
   STATUSES, TEMPERATURES, CLOSED_STATUSES, fetchActivities, logActivity,
-  setClientNote, setClientStatus, setClientTemperature,
+  setClientNote, setClientStatus, setClientTemperature, setLeadType, leadTypeOf, LEAD_TYPES,
 } from "../../lib/crmClients";
 import { buildTemplateVars, renderTemplate, whatsappUrl } from "../../lib/crmSettings";
 import { CURATED_STATUS_LABEL } from "../../lib/curatedShares";
@@ -668,6 +668,20 @@ export default function ClientRecord({
     }
   };
 
+  // Active · Probable · Dormant (lead_types.sql). Dormant is only ever the team's call.
+  const applyLeadType = async (type) => {
+    if (type === leadTypeOf(client)) return;
+    setBusy(true);
+    try {
+      onPatch({ ...client, ...(await setLeadType(client.id, type)) });
+      refreshActivities();
+    } catch (e) {
+      onToast(e?.message || "Could not change the lead type", "error");
+    } finally {
+      setBusy(false);
+    }
+  };
+
   const initials = (client.name || client.email || "?")
     .split(/\s+/).map((w) => w[0]).slice(0, 2).join("").toUpperCase();
 
@@ -775,6 +789,21 @@ export default function ClientRecord({
           ))}
           {!client.temperature && (
             <span className="crm-mute" style={{ fontSize: 11 }}>set by hand · not set yet</span>
+          )}
+        </div>
+
+        <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
+          <span className="crm-label">Lead</span>
+          {LEAD_TYPES.map((t) => (
+            <Chip key={t.id} on={leadTypeOf(client) === t.id} title={t.hint} disabled={!canWrite || busy}
+              onClick={() => applyLeadType(t.id)}>
+              {t.label}
+            </Chip>
+          ))}
+          {(client.interests ?? []).length > 0 && (
+            <span className="crm-mute" style={{ fontSize: 11 }}>
+              Wants to hear about: {client.interests.map((i) => (i === "society_map" ? "Society map" : i === "renting_guide" ? "Renting guide" : i)).join(", ")}
+            </span>
           )}
         </div>
 

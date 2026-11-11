@@ -18,6 +18,7 @@ const CurateScreen = lazy(() => import("./CurateScreen"));
 import {
   TEMPERATURES, createClient, fetchShortlists, markContacted,
   saveClientRequirement, resetClientRequirement, statusLabel, tempColor, syncClientsFromSignups, fetchPartnerNames, CLOSED_STATUSES,
+  LEAD_TYPES, leadTypeOf,
 } from "../../lib/crmClients";
 import { formatDuration } from "../../lib/sessionSync";
 import {
@@ -215,8 +216,17 @@ function QrMark({ broker }) {
 export default function CrmClientsPage() {
   const crm = useCrm();
   const {
-    clients, requirements, inventory, engagement, shortlists, touches, settings, access, user, ownAnswers, interest, leads,
+    clients: allClients, requirements, inventory, engagement, shortlists, touches, settings, access, user, ownAnswers, interest, leads,
   } = crm;
+
+  // Active · Probable · Dormant (lead_types.sql). Search reaches all three.
+  const [leadTab, setLeadTab] = useState("active");
+  const leadCounts = useMemo(() => {
+    const n = { active: 0, probable: 0, dormant: 0 };
+    for (const c of allClients ?? []) n[leadTypeOf(c)] += 1;
+    return n;
+  }, [allClients]);
+  const clients = useMemo(() => (allClients ?? []).filter((c) => leadTypeOf(c) === leadTab), [allClients, leadTab]);
 
   const [params, setParams] = useSearchParams();
   const selectedId = params.get("client") || "";
@@ -334,10 +344,10 @@ export default function CrmClientsPage() {
    * flat sent from the Matches pane moves the lead out of Fresh at once.
    */
   const summaries = useMemo(
-    () => summariseClients(clients, {
+    () => summariseClients(allClients, {
       activities: touches, shortlists: localShortlists, engagement, ownAnswers, leads, requirements, interest,
     }),
-    [clients, touches, localShortlists, engagement, ownAnswers, leads, requirements, interest],
+    [allClients, touches, localShortlists, engagement, ownAnswers, leads, requirements, interest],
   );
 
   const bucketCounts = useMemo(() => {
@@ -361,7 +371,7 @@ export default function CrmClientsPage() {
     const needle = q.trim().toLowerCase();
     // A search spans every tab: someone typing a phone number wants that
     // person wherever they are, not only if they happen to be under this tab.
-    let rows = needle ? clients : clients.filter((c) => bucketOf(summaries.get(c.id)) === tab);
+    let rows = needle ? allClients : clients.filter((c) => bucketOf(summaries.get(c.id)) === tab);
     // Asking for Contacted's "Closed" filter is asking to see them, whatever Hide says.
     if (hide.has("closed") && !(tab === "contacted" && extras.has("closed") && !needle)) {
       rows = rows.filter((c) => !CLOSED_STATUSES.includes(c.status));
@@ -401,12 +411,12 @@ export default function CrmClientsPage() {
       moveIn: (c) => moveInTs(reqByClient.get(c.id)?.move_in || ownAnswersByUser.get(c.user_id)?.notes?.moveInDate),
       due: (c) => shortlistDueTs(ownAnswersByUser.get(c.user_id)?.notes),
     });
-  }, [clients, q, tab, freshSort, contactedSort, stageFilter, tempFilter, extras, summaries, reqByClient, actorEmail,
+  }, [allClients, clients, q, tab, freshSort, contactedSort, stageFilter, tempFilter, extras, summaries, reqByClient, actorEmail,
     ownAnswersByUser, inferredByClient, hide, activePriority]);
 
   const selected = useMemo(
-    () => clients.find((c) => c.id === selectedId) ?? visible[0] ?? null,
-    [clients, selectedId, visible],
+    () => allClients.find((c) => c.id === selectedId) ?? visible[0] ?? null,
+    [allClients, selectedId, visible],
   );
 
   /* ── Requirement: DB row, or a blank one held locally until first save ──── */
@@ -597,6 +607,13 @@ export default function CrmClientsPage() {
       )}
 
       <div style={{ padding: "9px 12px 6px", display: "flex", flexDirection: "column", gap: 7, flex: "none" }}>
+        <div role="tablist" aria-label="Lead type" style={{ display: "flex", gap: 4 }}>
+          {LEAD_TYPES.map((t) => (
+            <Chip key={t.id} on={leadTab === t.id} onClick={() => setLeadTab(t.id)} title={t.hint}>
+              {t.label} · {leadCounts[t.id]}
+            </Chip>
+          ))}
+        </div>
         <input className="crm-input" placeholder="Search every tab: name, phone, area…" value={q}
           onChange={(e) => setQ(e.target.value)} />
         <div style={{ display: "flex", gap: 5, alignItems: "center", flexWrap: "wrap" }}>

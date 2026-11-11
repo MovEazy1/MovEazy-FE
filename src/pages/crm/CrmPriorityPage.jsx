@@ -54,7 +54,7 @@ const allIds = (pool) => new Set([...(POOLS.find((x) => x.id === pool)?.brackets
 
 export default function CrmPriorityPage() {
   const crm = useCrm();
-  const { clients, requirements, inventory, shortlists, touches, ownAnswers, interest, settings, priority, access, user, phone } = crm;
+  const { activeClients: clients, requirements, inventory, shortlists, touches, ownAnswers, interest, settings, priority, access, user, phone } = crm;
   const canWrite = access.has(SCOPES.CLIENTS_WRITE);
   const actorEmail = access.email;
   const agentName = user?.name || access.email?.split("@")[0] || "MovEazy";

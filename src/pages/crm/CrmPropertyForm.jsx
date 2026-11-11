@@ -20,6 +20,7 @@ import { InternalDetails, VisitWindow } from "./CrmPropertyInternalFields";
 import CrmPartnerFields from "./CrmPartnerFields";
 import CrmOwnerFields from "./CrmOwnerFields";
 import CrmFlatQr from "./CrmFlatQr";
+import { CrmDealShortcut } from "./CrmDealsPage";
 import { PropertyTenantViews } from "./CrmTenantViews";
 import CrmAdLink from "./CrmAdLink";
 import { fetchPartnerListingMap } from "../../lib/partners";
@@ -1198,6 +1199,14 @@ export default function CrmPropertyForm() {
               "next available slot", which lands on you to arrange by hand.
             </p>
             <PropertyVisitSlots propertyId={editId} hideMarkSold />
+          </div>
+        )}
+
+        {/* /find's deals: this week's Steal Deals, or a day's Deal of the Day (CRM → Deals). */}
+        {isEdit && (
+          <div style={{ padding: "0 16px 24px", maxWidth: 980 }}>
+            <span className="crm-label">Deals</span>
+            <CrmDealShortcut propertyId={editId} flatType={f.flat_type} onToast={showToast} />
           </div>
         )}
 

@@ -85,6 +85,20 @@ export function leadSnapshot() {
   return { ...empty(), ...(readLocal(SNAPSHOT_STORAGE) || {}) };
 }
 
+/**
+ * "Notify me when it's live" on a coming-soon card ('society_map' |
+ * 'renting_guide'): noted on their CRM record (lead_types.sql). Best-effort.
+ */
+export async function addLeadInterest(interest) {
+  if (!isSupabaseConfigured || !supabase) return false;
+  try {
+    const { data, error } = await supabase.rpc("lead_interest_add", { p_lead_key: leadKey(), p_interest: interest });
+    return !error && data === true;
+  } catch {
+    return false;
+  }
+}
+
 /** Has this browser given us a number yet? The phone gate's whole question. */
 export function hasLeadPhone() {
   return Boolean(leadSnapshot().phone);
