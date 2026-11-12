@@ -34,17 +34,33 @@ const out = join(root, ".prerender");
 // font. The first is the headline's — the page's largest paint — and loads
 // first. (Embedding it in the page was measured: the bigger page cost more
 // than the request it saved.)
+// (Listed from the fonts each copy actually requests, JS off — re-check when a
+// page's first screen changes. Preloading them was measured ~30 ms slower than
+// not, but without it the headline first draws in a system font, then jumps.)
 const PAGES = [
   { page: "home", file: "home.html", host: "www.moveazy.co.in",
-    fonts: ["sora-latin-800", "manrope-latin-600", "manrope-latin-700", "manrope-latin-800", "inter-latin-700"] },
+    fonts: ["sora-latin-800", "manrope-latin-700", "manrope-latin-600", "manrope-latin-800", "manrope-latin-400", "inter-latin-700"] },
   { page: "partners", file: "partners-home.html", host: "partners.moveazy.co.in",
-    fonts: ["sora-latin-700", "sora-latin-800", "inter-latin-600", "inter-latin-700"] },
+    fonts: ["sora-latin-800", "inter-latin-700", "inter-latin-600", "inter-latin-500", "inter-latin-400"] },
   // Signed-out landings of the owner and society apps, at every path of their hosts (vercel.json);
   // each page hands over itself (usePrerenderHandoff). A returning society visitor skips the splash,
   // so isn't shown it (SKIP: a localStorage key that means the page opens elsewhere).
-  { page: "owners", file: "owners-home.html", host: "owners.moveazy.co.in", fonts: [], handoff: "page" },
-  { page: "society", file: "society-home.html", host: "society.moveazy.co.in", fonts: [], handoff: "page", skip: "mz_society_splash" },
+  { page: "owners", file: "owners-home.html", host: "owners.moveazy.co.in", handoff: "page",
+    fonts: ["sora-latin-800", "inter-latin-700", "inter-latin-600", "inter-latin-400"] },
+  { page: "society", file: "society-home.html", host: "society.moveazy.co.in", handoff: "page", skip: "mz_society_splash",
+    fonts: ["sora-latin-500", "manrope-latin-700", "manrope-latin-400"] },
 ];
+
+/** The info pages' and sign-in's first-screen fonts (src/entry-prerender.jsx ROUTES), as above. */
+const POLICY_FONTS = ["sora-latin-800", "manrope-latin-500", "sora-latin-700", "manrope-latin-400", "manrope-latin-700"];
+const ROUTE_FONTS = {
+  "/how-it-works": ["sora-latin-800", "manrope-latin-600", "manrope-latin-700", "manrope-latin-800", "manrope-latin-400", "inter-latin-700"],
+  "/about": ["sora-latin-800", "manrope-latin-600", "manrope-latin-700", "manrope-latin-800", "manrope-latin-400", "inter-latin-700"],
+  "/contact": ["sora-latin-800", "manrope-latin-700", "manrope-latin-400", "manrope-latin-600", "inter-latin-700"],
+  "/terms": POLICY_FONTS, "/privacy": POLICY_FONTS, "/refund-policy": POLICY_FONTS, "/delivery-policy": POLICY_FONTS,
+  "/auth": ["inter-latin-600", "inter-latin-400", "inter-latin-500"],
+  "/matches": ["manrope-latin-400", "manrope-latin-700"],
+};
 
 // In <head>, so it runs before the first paint: a signed-in visitor
 // (Supabase keeps the session in localStorage as sb-<project>-auth-token) or
@@ -156,7 +172,7 @@ try {
   // The info pages and sign-in (src/entry-prerender.jsx ROUTES), at
   // www.moveazy.co.in/<path> (vercel.json rewrites each to <path>.html).
   for (const path of Object.keys(mod.ROUTES ?? {})) {
-    PAGES.push({ page: path, file: `${path.slice(1)}.html`, host: "www.moveazy.co.in", fonts: [], handoff: mod.SELF_HANDOFF?.has(path) ? "page" : "route" });
+    PAGES.push({ page: path, file: `${path.slice(1)}.html`, host: "www.moveazy.co.in", fonts: ROUTE_FONTS[path] ?? [], handoff: mod.SELF_HANDOFF?.has(path) ? "page" : "route" });
   }
   for (const p of PAGES) {
     try {
@@ -195,8 +211,9 @@ for (const p of PAGES) {
       console.warn(`prerender: ${p.file} keeps its blocking stylesheet —`, e?.message || e);
     }
     // After Beasties: its rules for html.mz-pre must stay though nothing in the file has the class yet.
-    page = page.replace("</head>", `${HEAD}${fontPreloads(p.fonts)}
-</head>`);
+    // The fonts first in <head>, ahead of the app's ~30 module files: the copy's text waits for them.
+    page = page.replace("</head>", `${HEAD}
+</head>`).replace(/<head>/, (m) => `${m}${fontPreloads(p.fonts)}`);
   }
   writeFileSync(join(dist, p.file), page);
 }
