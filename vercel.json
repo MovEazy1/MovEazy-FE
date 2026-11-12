@@ -43,6 +43,10 @@
       "destination": "/api/share?kind=c&id=:token"
     },
     {
+      "source": "/curated/:token",
+      "destination": "/api/share?kind=curated&id=:token"
+    },
+    {
       "source": "/building/:code",
       "destination": "/api/share?kind=building&id=:code"
     },

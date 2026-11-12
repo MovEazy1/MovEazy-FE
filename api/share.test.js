@@ -111,6 +111,56 @@ describe("a partner's shortlist", () => {
   });
 });
 
+describe("our team's shortlist (/curated/<token>)", () => {
+  afterEach(() => vi.unstubAllGlobals());
+  const tok = `mz${"ab".repeat(12)}`;
+  const open = { ok: true, client_name: "Ravi Kumar", agent_name: "Asha", property_ids: ["MZ-1", "MZ-2", "MZ-GONE", "MZ-3"], reactions: { "MZ-1": "liked" } };
+  const rows = [
+    { property_id: "MZ-3", rent: 30000, flat_type: "1 BHK" },
+    { property_id: "MZ-2", rent: 41000, flat_type: "2 BHK", furnishing: "Semi-furnished", bedrooms: 2, bathrooms: 2, floor_number: 3, area: "HSR Layout", is_verified: true, amenities: ["Lift", "Gym"], images: [`${B}a/v.mp4`, `${B}a/1.jpg`] },
+    { property_id: "MZ-1", rent: 25000, flat_type: "1 BHK" },
+  ];
+  it("opens on the first home not yet answered, in the list's order", async () => {
+    const { teamCuratedPrepaint, teamListRows, teamListStart, teamCardPhoto } = await import("./_teamCuratedPrepaint.js");
+    const list = teamListRows(open, rows);
+    expect(list.map((r) => r.property_id)).toEqual(["MZ-1", "MZ-2", "MZ-3"]);
+    expect(teamListStart(open, list)).toBe(1);
+    expect(teamCardPhoto(list[1])).toBe(`${B}a/1.jpg`);
+    const html = teamCuratedPrepaint(open, list, "p.jpg");
+    expect(html).toContain("3 homes shortlisted for you");
+    expect(html).toContain("Picked by Asha · MovEazy");
+    expect(html).toContain("Ravi, we found these for you");
+    expect(html).toContain("Viewing 2 out of 3 shortlisted properties");
+    expect(html).toContain("₹41,000");
+    expect(html).toContain("2 BHK · Semi-furnished");
+    expect(html).toContain("Floor 3");
+    expect(html).not.toMatch(/<input|<form|<button/);
+  });
+  it("opened once, for a person only — the open and the homes handed to the page", async () => {
+    process.env.VITE_SUPABASE_URL = "https://x.supabase.co";
+    process.env.VITE_SUPABASE_PUBLISHABLE_KEY = "k";
+    vi.resetModules();
+    const calls = [];
+    vi.stubGlobal("fetch", vi.fn(async (u) => {
+      calls.push(String(u));
+      if (String(u).endsWith("/app.html")) return new Response(SHELL);
+      return new Response(JSON.stringify(String(u).includes("/rest/v1/inventory") ? rows : open));
+    }));
+    const { default: handler } = await import("./share.js");
+    const person = await (await handler(new Request(`https://www.moveazy.co.in/api/share?kind=curated&id=${tok}`, { headers: { "user-agent": "Mozilla/5.0 (Linux; Android 13) Chrome/130 Mobile" } }))).text();
+    expect(calls.filter((u) => u.endsWith("/rpc/curated_share_open"))).toHaveLength(1);
+    expect(calls.find((u) => u.includes("/rest/v1/inventory"))).toContain(encodeURIComponent('"MZ-1","MZ-2","MZ-GONE","MZ-3"'));
+    expect(person).toContain(`"key":"curated_share_open:${tok}"`);
+    expect(person).toContain("Ravi, we found these for you");
+    expect(person).toContain(`href="${thumbUrl(`${B}a/1.jpg`)}" fetchpriority="high"`);
+    calls.length = 0;
+    const robot = await (await handler(new Request(`https://www.moveazy.co.in/api/share?kind=curated&id=${tok}`, { headers: { "user-agent": "WhatsApp/2.23" } }))).text();
+    expect(calls.some((u) => u.includes("/rpc/"))).toBe(false);
+    expect(robot).not.toContain("__MZ_PAGE__");
+    delete process.env.VITE_SUPABASE_URL; delete process.env.VITE_SUPABASE_PUBLISHABLE_KEY;
+  });
+});
+
 describe("the page takes it once", () => {
   afterEach(() => { delete globalThis.window; });
   it("for its own read only", () => {

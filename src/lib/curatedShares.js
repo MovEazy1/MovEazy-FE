@@ -16,6 +16,7 @@
 import { supabase, isSupabaseConfigured } from "./supabase";
 import { generateShareToken } from "./crmSettings";
 import { linkVisitor } from "./tenantViews";
+import { takePageData } from "./pageData";
 
 
 /** Where a curated link points. Attributed like every other share we send. */
@@ -156,6 +157,10 @@ function shape(row, fallbackToken = "") {
 export async function openCuratedShare(token) {
   if (!isSupabaseConfigured || !supabase || !token) return { ...EMPTY };
   linkVisitor(token); // this phone's opens are that client's tenant views
+  // Opened from the link, the edge has made this open for the person, and read
+  // the homes too (api/share.js teamListRead): taken instead of asking again.
+  const early = takePageData(`curated_share_open:${token}`);
+  if (early?.open) return { ...shape(early.open, token), ...(Array.isArray(early.rows) ? { rows: early.rows } : {}) };
   try {
     const { data, error } = await supabase.rpc("curated_share_open", { token });
     if (error) {

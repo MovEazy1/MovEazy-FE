@@ -9,12 +9,18 @@
  *
  * Reads only side-effect-free functions (a preview must not count as an
  * open). Any failure serves the page untouched.
+ *
+ * People also get the page's first read inside it, and most pages drawn before
+ * the app's code arrives — /curated/<token> (our team's list for one person)
+ * among them, its open made here once for the person.
  */
 import { isPreviewRobot } from "./_bots.js";
 import { withAdPrepaint } from "./_adPrepaint.js";
 import { withBuildingPrepaint } from "./_buildingPrepaint.js";
 import { withStorefrontPrepaint } from "./_storefrontPrepaint.js";
 import { withCuratedPrepaint } from "./_curatedPrepaint.js";
+import { teamCardPhoto, teamListRows, teamListStart, withTeamCuratedPrepaint } from "./_teamCuratedPrepaint.js";
+import { APP_LISTING_COLS } from "./_listing.js";
 
 export const config = { runtime: "edge" };
 
@@ -165,6 +171,27 @@ export function withPageData(html, key, data, lead) {
 /** Never longer than `ms`: a slow read must not hold the page up — the app asks for itself. */
 const within = (p, ms) => Promise.race([p, new Promise((r) => setTimeout(() => r(null), ms))]);
 
+/** A list our team sent (/curated/<token>, src/lib/crmSettings.js generateShareToken). */
+export const TEAM_LIST_TOKEN = /^mz[0-9a-f]{24}$/;
+
+/**
+ * The team list's two reads, as CuratedProperties makes them: the open
+ * (counted — made here once, for the person) and then its homes. The page
+ * takes both (`rows` null: it fetches the homes itself). Null when the open
+ * didn't answer in time — the app then opens it.
+ */
+export async function teamListRead(token) {
+  const open = await within(rpc("curated_share_open", { token }).catch(() => null), 700);
+  if (!open) return null;
+  const ids = open.ok ? (open.property_ids || []).map(String) : [];
+  if (!ids.length) return { open, rows: [] };
+  const rows = await within(fetch(
+    `${SUPABASE_URL}/rest/v1/inventory?select=${encodeURIComponent(APP_LISTING_COLS)}&property_id=in.(${encodeURIComponent(ids.map((id) => `"${id.replace(/"/g, "")}"`).join(","))})`,
+    { headers: { apikey: SUPABASE_KEY, authorization: `Bearer ${SUPABASE_KEY}` } },
+  ).then((r) => (r.ok ? r.json() : null)).catch(() => null), 500);
+  return { open, rows: Array.isArray(rows) ? rows : null };
+}
+
 export default async function handler(req) {
   const url = new URL(req.url);
   const kind = url.searchParams.get("kind") || "";
@@ -177,6 +204,25 @@ export default async function handler(req) {
   // A broker's page is drawn from what anyone may see; the app makes its own
   // read (it knows the viewer's likes), so this one isn't handed over.
   const storefront = !robot && kind === "b" && /^[A-Za-z0-9]{6}$/.test(id);
+  if (kind === "curated") {
+    // A robot gets the shell as it is, and never opens the list.
+    const [page, data] = await Promise.all([
+      fetch(`${url.origin}/app.html`),
+      !robot && TEAM_LIST_TOKEN.test(id) ? teamListRead(id) : null,
+    ]);
+    let html = await page.text();
+    if (data && page.ok) {
+      try {
+        html = withPageData(html, `curated_share_open:${id}`, data, "");
+        const rows = data.rows ? teamListRows(data.open, data.rows) : [];
+        if (rows.length) {
+          const photo = teamCardPhoto(rows[teamListStart(data.open, rows)]);
+          html = withTeamCuratedPrepaint(html, data.open, rows, photo ? thumbUrl(photo) : "");
+        }
+      } catch { /* the plain shell */ }
+    }
+    return new Response(html, { status: 200, headers: { "content-type": "text/html; charset=utf-8", "cache-control": "private, no-store" } });
+  }
   const [page, data] = await Promise.all([
     // The app's shell (dist/app.html; "/" itself may be a pre-built landing page).
     fetch(`${url.origin}/app.html`),

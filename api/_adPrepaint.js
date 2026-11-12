@@ -99,7 +99,7 @@ export function withPrepaint(html, css, body, logo = "/moveazy-logo-mint-light.p
   return html
     .replace(/<link rel="stylesheet" crossorigin href="([^"]+)">/, (_, href) =>
       `<link rel="preload" as="style" crossorigin href="${href}"><link rel="stylesheet" crossorigin href="${href}" media="print" onload="this.media='all'">`)
-    .replace("</head>", `<link rel="preload" as="image" href="${logo}">${HEAD_SCRIPT}<style>${css}</style></head>`)
+    .replace("</head>", `${logo ? `<link rel="preload" as="image" href="${logo}">` : ""}${HEAD_SCRIPT}<style>${css}</style></head>`)
     .replace('<div id="root"></div>', `<div id="prerender">${body}</div><div id="root"></div>`);
 }
 

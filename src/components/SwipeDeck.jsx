@@ -4,6 +4,7 @@ import { X, Heart, BedDouble, Bath, Layers, ShieldCheck, MapPin, CalendarCheck, 
 import { coverMedia, isVideoUrl, orderListingMedia } from "../lib/listingMedia";
 import { formatPostedAgo } from "../lib/formatTime";
 import { commuteMinutes, formatCommute } from "../lib/commute";
+import SharpenedImg from "./SharpenedImg";
 
 /**
  * One-card-at-a-time swipeable browsing surface. Right swipe = shortlist,
@@ -131,7 +132,9 @@ function SwipeCard({ listing, index, top, onSwiped, onOpenDetails, position, off
             coverIsVideo ? (
               <video src={cover} muted playsInline preload="metadata" style={{ width: "100%", height: "100%", objectFit: "cover" }} />
             ) : (
-              <img src={cover} alt={listing.title} loading="lazy" draggable={false} style={{ width: "100%", height: "100%", objectFit: "cover", pointerEvents: "none" }} />
+              // Its 480 px copy first (the one a shortlist link's HTML already
+              // fetched, api/_teamCuratedPrepaint.js), then the full photo.
+              <SharpenedImg src={cover} alt={listing.title} loading="lazy" draggable={false} style={{ width: "100%", height: "100%", objectFit: "cover", pointerEvents: "none" }} />
             )
           ) : (
             /* A listing with no photos yet read as a card that failed to load —

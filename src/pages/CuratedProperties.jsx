@@ -13,7 +13,7 @@
  * the token, so "did not like" is something the agent can see rather than
  * something they have to ask about.
  */
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import { ArrowLeft, Heart, Sparkles } from "lucide-react";
 import PropertyModal from "../components/PropertyModal";
@@ -30,6 +30,7 @@ import { logSavedListingChange } from "../lib/crmSync";
 import { setReaction } from "../lib/visits";
 import { persistRequestedMoreFlats } from "../lib/userRequirements";
 import { MOVEAZY_TEAM_WHATSAPP } from "../config/contactChannels";
+import { dropPrerender } from "../lib/prerender";
 
 const T = { ink: "#04211D", teal: "#0E7C68", gold: "#E8A33D", text: "#171412", textDim: "#5c554e", line: "#e9e3db" };
 
@@ -141,7 +142,8 @@ export default function CuratedProperties() {
     let alive = true;
     const ids = share.propertyIds || [];
     if (!ids.length) { setListings([]); setLoading(false); return undefined; }
-    fetchInventoryByIds(ids)
+    // Opened from the link, the homes came inside the page with the open.
+    (share.rows ? Promise.resolve(share.rows) : fetchInventoryByIds(ids))
       .then((rows) => {
         if (!alive) return;
         const byId = new Map((rows || []).map((r) => [String(r.property_id), r]));
@@ -150,6 +152,9 @@ export default function CuratedProperties() {
       .finally(() => { if (alive) setLoading(false); });
     return () => { alive = false; };
   }, [share]);
+
+  // Drawn: the copy the link's HTML showed (api/_teamCuratedPrepaint.js) steps aside.
+  useLayoutEffect(() => { if (!loading) dropPrerender(); }, [loading]);
 
   const total = listings.length;
   /** Nothing to look up without either a link or an account. */
