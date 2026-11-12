@@ -51,27 +51,41 @@ const PAGES = [
 // one with a query string or a sign-in hash (deep links, Google sign-in
 // returns) gets the plain page.
 // Otherwise <html> gets mz-pre: the pre-built copy shows, #root renders
-// hidden beneath it until the app hands over.
+// hidden beneath it until the app hands over. The copy shows its animations
+// on their last frame, still (an entrance held on its first frame — opacity
+// 0 — is invisible); the app's wait to play until it is shown.
 const HEAD = `<script>(function(){try{var q=location.search.replace(/[?&](utm_[a-z]+|fbclid|gclid)=[^&]*/g,"").replace(/^[?&]+/,"");for(var i=0;i<localStorage.length;i++){if(/^sb-.*-auth-token$/.test(localStorage.key(i)))return;}if(q||/access_token|error_description|type=recovery/.test(location.hash))return;document.documentElement.classList.add("mz-pre");setTimeout(function(){document.documentElement.classList.remove("mz-pre");var p=document.getElementById("prerender");if(p)p.remove();},15000);}catch(e){}})();</script>
-<style>html:not(.mz-pre) #prerender{display:none}html.mz-pre #root{position:absolute;top:0;left:0;right:0;visibility:hidden;pointer-events:none}html.mz-pre #prerender *,html.mz-pre #root *{animation-play-state:paused!important}html.mz-pre #prerender section:nth-of-type(n+2),html.mz-pre #prerender footer{content-visibility:auto;contain-intrinsic-size:auto 700px}</style>`;
+<style>html:not(.mz-pre) #prerender{display:none}html.mz-pre #root{position:absolute;top:0;left:0;right:0;visibility:hidden;pointer-events:none}html.mz-pre #prerender *,html.mz-pre #prerender *::before,html.mz-pre #prerender *::after{animation-delay:-60s!important;animation-play-state:paused!important}html.mz-pre #root *{animation-play-state:paused!important}</style>`;
 
 /**
  * The copy is on screen for a moment, until the app has drawn: below the first
- * screen it costs layout and downloads nobody sees. Its sections after the
- * first (and the footer) skip layout until scrolled to (HEAD), and its images
- * after the first two load only when near the screen.
+ * screen it costs layout and downloads nobody sees. It keeps only its first
+ * screen, and its images after the first two load only when near the screen.
+ * (Skipping layout with content-visibility instead stopped margins collapsing:
+ * the policies' sections sat 24 px lower than the app draws them.)
  */
 function lighter(html) {
   let n = 0;
   const lazy = html.replace(/<img (?![^>]*loading=)/g, (m) => (++n > 2 ? '<img loading="lazy" ' : m));
-  // Only the first two sections at all: a slow phone still styles a skipped
-  // section (measured: home's first layout 328 ms at 4x CPU with ~1,000 nodes).
-  // The app, a moment later, draws the rest.
+  // Only the first screen at all: a slow phone still styles a skipped section
+  // (measured: home's first layout 328 ms at 4x CPU with ~1,000 nodes; the
+  // partners landing's first paint 0.93–1.8 s with its sections, 0.5 s with
+  // its hero alone). A page that opens on a hero (<header class="…hero…">)
+  // keeps just that; others their first two sections. The app, a moment
+  // later, draws the rest.
   try {
     const frag = JSDOM.fragment(lazy);
     const sections = [...frag.querySelectorAll("section")].filter((s) => !s.parentElement?.closest("section"));
-    if (sections.length > 2) {
-      for (const s of sections.slice(2)) s.remove();
+    // An entrance rendered at its start (framer-motion's initial: opacity 0,
+    // shifted) shows where it ends: the copy never plays it.
+    for (const el of frag.querySelectorAll('[style*="opacity:0"]')) {
+      if (el.style.opacity !== "0") continue;
+      el.style.opacity = "";
+      el.style.transform = "";
+    }
+    const keep = frag.querySelector('header[class*="hero"]') ? 0 : 2;
+    if (sections.length > keep) {
+      for (const s of sections.slice(keep)) s.remove();
       for (const f of frag.querySelectorAll("footer")) f.remove();
     }
     const box = new JSDOM("").window.document.createElement("div");
@@ -162,7 +176,8 @@ try {
 // files are usable at once. Font preloads stay ours (PAGES above).
 const beasties = new Beasties({
   path: dist, publicPath: "/", preload: "swap-high", pruneSource: false, mergeStylesheets: true,
-  inlineFonts: true, preloadFonts: false, reduceInlineStyles: false, logLevel: "warn",
+  // The page's own <style>s (its components' CSS) cut to the rules it uses too.
+  inlineFonts: true, preloadFonts: false, reduceInlineStyles: true, logLevel: "warn",
 });
 
 for (const p of PAGES) {
@@ -171,8 +186,7 @@ for (const p of PAGES) {
     ? `<script>try{if(localStorage.getItem(${JSON.stringify(p.skip)}))document.documentElement.classList.remove("mz-pre")}catch(e){}</script>`
     : "";
   let page = html
-    ? lowPriorityScripts(shell).replace("</head>", `${HEAD}${fontPreloads(p.fonts)}
-</head>`).replace('<div id="root"></div>', `${skip}<div id="prerender"${p.handoff ? ` data-handoff="${p.handoff}"` : ""}>${lighter(html)}</div><div id="root"></div>`)
+    ? lowPriorityScripts(shell).replace('<div id="root"></div>', `${skip}<div id="prerender"${p.handoff ? ` data-handoff="${p.handoff}"` : ""}>${lighter(html)}</div><div id="root"></div>`)
     : shell;
   if (html) {
     try {
@@ -180,6 +194,9 @@ for (const p of PAGES) {
     } catch (e) {
       console.warn(`prerender: ${p.file} keeps its blocking stylesheet —`, e?.message || e);
     }
+    // After Beasties: its rules for html.mz-pre must stay though nothing in the file has the class yet.
+    page = page.replace("</head>", `${HEAD}${fontPreloads(p.fonts)}
+</head>`);
   }
   writeFileSync(join(dist, p.file), page);
 }

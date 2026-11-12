@@ -30,6 +30,8 @@ import Privacy from "./pages/Privacy";
 import { DeliveryPolicy, RefundPolicy } from "./pages/Policies";
 import SupabaseLogin from "./pages/SupabaseLogin";
 import { PartnerStyles } from "./pages/partners/partnerUi";
+import { OwnerStyles } from "./pages/owners/ownerUi";
+import { SocietyStyles } from "./pages/society/societyUi";
 
 function Shell({ children, location = "/" }) {
   return (
@@ -53,9 +55,20 @@ const PAGES = {
       <PartnerLanding />
     </div>
   ),
-  // owners.moveazy.co.in and society.moveazy.co.in, signed out: their landing / first splash.
-  owners: () => <OwnerLanding />,
-  society: () => <SocietyWelcome />,
+  // owners.moveazy.co.in and society.moveazy.co.in, signed out: their landing / first splash,
+  // inside their app's frame and styles (OwnerApp, SocietyApp) as the app draws them.
+  owners: () => (
+    <div className="oz">
+      <OwnerStyles />
+      <OwnerLanding />
+    </div>
+  ),
+  society: () => (
+    <div className="sx">
+      <SocietyStyles />
+      <SocietyWelcome />
+    </div>
+  ),
 };
 
 /** www pages drawn at their own path: path → the page. */
