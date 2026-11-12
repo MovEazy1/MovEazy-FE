@@ -29,6 +29,9 @@ import Terms from "./pages/Terms";
 import Privacy from "./pages/Privacy";
 import { DeliveryPolicy, RefundPolicy } from "./pages/Policies";
 import SupabaseLogin from "./pages/SupabaseLogin";
+import FindHub from "./pages/find/FindHub";
+import StealDeals from "./pages/find/StealDeals";
+import DealOfTheDay from "./pages/find/DealOfTheDay";
 import { PartnerStyles } from "./pages/partners/partnerUi";
 import { OwnerStyles } from "./pages/owners/ownerUi";
 import { SocietyStyles } from "./pages/society/societyUi";
@@ -81,6 +84,10 @@ export const ROUTES = {
   "/refund-policy": () => <RefundPolicy />,
   "/delivery-policy": () => <DeliveryPolicy />,
   "/auth": () => <SupabaseLogin />,
+  // Find my home (pages/find): signed out, its header band — the cards wait for the phone gate.
+  "/find": () => <FindHub />,
+  "/find/steal-deals": () => <StealDeals />,
+  "/find/deal-of-the-day": () => <DealOfTheDay />,
   // A signed-out visitor's /matches (TopMatches, no preferences); signed-in ones get the plain page.
   "/matches": () => (
     <div style={{ minHeight: "100vh", background: "#fff" }}>

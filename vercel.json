@@ -153,6 +153,36 @@
       "destination": "/matches.html"
     },
     {
+      "source": "/find",
+      "has": [
+        {
+          "type": "host",
+          "value": "www.moveazy.co.in"
+        }
+      ],
+      "destination": "/find.html"
+    },
+    {
+      "source": "/find/steal-deals",
+      "has": [
+        {
+          "type": "host",
+          "value": "www.moveazy.co.in"
+        }
+      ],
+      "destination": "/find-steal-deals.html"
+    },
+    {
+      "source": "/find/deal-of-the-day",
+      "has": [
+        {
+          "type": "host",
+          "value": "www.moveazy.co.in"
+        }
+      ],
+      "destination": "/find-deal-of-the-day.html"
+    },
+    {
       "source": "/((?!api/|assets/|join/).*)",
       "has": [
         {

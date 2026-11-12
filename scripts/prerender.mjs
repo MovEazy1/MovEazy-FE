@@ -53,9 +53,10 @@ const PAGES = [
 
 /** The info pages' and sign-in's first-screen fonts (src/entry-prerender.jsx ROUTES), as above. */
 const POLICY_FONTS = ["sora-latin-800", "manrope-latin-500", "sora-latin-700", "manrope-latin-400", "manrope-latin-700"];
+const SITE_FONTS = ["sora-latin-800", "manrope-latin-600", "manrope-latin-700", "manrope-latin-800", "manrope-latin-400", "inter-latin-700"];
 const ROUTE_FONTS = {
-  "/how-it-works": ["sora-latin-800", "manrope-latin-600", "manrope-latin-700", "manrope-latin-800", "manrope-latin-400", "inter-latin-700"],
-  "/about": ["sora-latin-800", "manrope-latin-600", "manrope-latin-700", "manrope-latin-800", "manrope-latin-400", "inter-latin-700"],
+  "/how-it-works": SITE_FONTS, "/about": SITE_FONTS,
+  "/find": SITE_FONTS, "/find/steal-deals": SITE_FONTS, "/find/deal-of-the-day": SITE_FONTS,
   "/contact": ["sora-latin-800", "manrope-latin-700", "manrope-latin-400", "manrope-latin-600", "inter-latin-700"],
   "/terms": POLICY_FONTS, "/privacy": POLICY_FONTS, "/refund-policy": POLICY_FONTS, "/delivery-policy": POLICY_FONTS,
   "/auth": ["inter-latin-600", "inter-latin-400", "inter-latin-500"],
@@ -100,10 +101,9 @@ function lighter(html) {
       el.style.transform = "";
     }
     const keep = frag.querySelector('header[class*="hero"]') ? 0 : 2;
-    if (sections.length > keep) {
-      for (const s of sections.slice(keep)) s.remove();
-      for (const f of frag.querySelectorAll("footer")) f.remove();
-    }
+    for (const s of sections.slice(keep)) s.remove();
+    // The site footer is never on the first screen.
+    for (const f of frag.querySelectorAll("footer")) if (!f.parentElement?.closest("footer")) f.remove();
     const box = new JSDOM("").window.document.createElement("div");
     box.append(frag);
     return box.innerHTML;
@@ -172,7 +172,7 @@ try {
   // The info pages and sign-in (src/entry-prerender.jsx ROUTES), at
   // www.moveazy.co.in/<path> (vercel.json rewrites each to <path>.html).
   for (const path of Object.keys(mod.ROUTES ?? {})) {
-    PAGES.push({ page: path, file: `${path.slice(1)}.html`, host: "www.moveazy.co.in", fonts: ROUTE_FONTS[path] ?? [], handoff: mod.SELF_HANDOFF?.has(path) ? "page" : "route" });
+    PAGES.push({ page: path, file: `${path.slice(1).replace(/\//g, "-")}.html`, host: "www.moveazy.co.in", fonts: ROUTE_FONTS[path] ?? [], handoff: mod.SELF_HANDOFF?.has(path) ? "page" : "route" });
   }
   for (const p of PAGES) {
     try {
