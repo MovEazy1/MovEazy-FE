@@ -205,7 +205,9 @@ export const PHONE_CSS = `
    and side-by-side panes stacked. */
 /* A screen is one page that scrolls, not panes that each scroll on their own. */
 .crm-ph-main > * { flex:none !important; min-height:auto !important; }
-.crm--phone .crm-scroll { overflow:visible; }
+/* …but a list given its own height (a flat picker, a side list) keeps scrolling inside it:
+   made visible, its rows spilled over what's below and couldn't be scrolled to. */
+.crm--phone .crm-scroll:not([style*="max-height"]) { overflow:visible; }
 .crm--phone .crm-col { min-height:auto; }
 .crm--phone input.crm-input, .crm--phone select.crm-input, .crm--phone textarea.crm-input { font-size:16px; padding:9px 11px; }
 .crm--phone .crm-btn { padding:8px 13px; font-size:13px; }
