@@ -1,6 +1,6 @@
 import { lazy, Suspense, useState, useEffect, useRef, useMemo } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { coverPhoto, isVideoUrl, orderListingMedia } from "../lib/listingMedia";
+import { coverPhoto, isVideoUrl, orderListingMediaViewer } from "../lib/listingMedia";
 import { formatPostedAgo } from "../lib/formatTime";
 import { propertyLink, shareVia } from "../lib/crmSettings";
 import { useAuth } from "../context/AuthContext";
@@ -527,7 +527,10 @@ export default function PropertyModal({
   // from the map, a share link and the CRM, and only one of those paths is
   // guaranteed to have come through mapInventoryToListing. Ordering is
   // idempotent, so a second pass costs nothing.
-  const ordered = orderListingMedia(uniqueMedia);
+  // Viewer order, not storage order: the walkthrough leads on the property
+  // page itself (orderListingMediaViewer); photos follow in the poster's
+  // order. Covers and share cards still come from coverPhoto, untouched.
+  const ordered = orderListingMediaViewer(uniqueMedia);
   const images = ordered.length > 0 ? ordered : [PLACEHOLDER_IMAGE];
   const firstImageUrl = coverPhoto(images) || PLACEHOLDER_IMAGE;
 
