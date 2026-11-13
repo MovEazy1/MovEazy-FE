@@ -1091,7 +1091,10 @@ export default function PropertyModal({
                             src={src}
                             alt=""
                             style={{ width: "100%", height: "100%", objectFit: "cover" }}
-                            onError={(e) => {
+                            onBroken={(e) => {
+                              // Both the thumbnail and the full photo failed —
+                              // drop this tile. A missing thumbnail alone falls
+                              // back to the full photo inside ThumbImg.
                               const btn = e.currentTarget.closest("button");
                               if (btn) btn.style.display = "none";
                             }}
