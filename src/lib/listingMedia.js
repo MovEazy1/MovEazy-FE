@@ -73,6 +73,24 @@ export function orderListingMedia(urls = []) {
 }
 
 /**
+ * The order the property page's own viewer uses: the walkthrough first, then
+ * every photo in the poster's own order. The renter asked to watch the flat
+ * before scrolling stills, so on the listing page itself the video leads.
+ *
+ * This is a viewer-only rule. Cards, covers, share images and the CRM keep
+ * orderListingMedia / coverPhoto / coverMedia: a still must stay the first
+ * thing any surface that can't play video sees, and the stored images column
+ * keeps photos first so the cover never turns into a video frame.
+ *
+ * Idempotent, so it is safe to apply again at any layer.
+ */
+export function orderListingMediaViewer(urls = []) {
+  const { photos, videos } = splitMedia(urls);
+  if (!videos.length) return photos;
+  return [...videos, ...photos];
+}
+
+/**
  * The first photo, or nothing. Use where only a still will do — an Open Graph
  * card, a CSS background — because those can't render a video at all.
  */

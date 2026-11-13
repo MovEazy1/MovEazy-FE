@@ -4,7 +4,7 @@
  */
 import { describe, expect, it } from "vitest";
 import {
-  coverMedia, coverPhoto, describeMedia, isVideoUrl, orderListingMedia, splitMedia,
+  coverMedia, coverPhoto, describeMedia, isVideoUrl, orderListingMedia, orderListingMediaViewer, splitMedia,
 } from "./listingMedia";
 
 const p = (n) => `https://cdn.test/inventory/MZ-1/photo-${n}.jpg`;
@@ -54,6 +54,38 @@ describe("display order", () => {
 
   it("drops empty slots rather than rendering a broken tile", () => {
     expect(orderListingMedia([p(1), "", null, v(1)])).toEqual([p(1), v(1)]);
+  });
+});
+
+describe("the property page viewer order", () => {
+  it("puts the video first and every photo after it", () => {
+    const ordered = orderListingMediaViewer([p(1), p(2), p(3), v(1), p(4)]);
+    expect(ordered).toEqual([v(1), p(1), p(2), p(3), p(4)]);
+  });
+
+  it("keeps several videos together at the front, in their own order", () => {
+    expect(orderListingMediaViewer([p(1), v(2), p(2), v(1)]))
+      .toEqual([v(2), v(1), p(1), p(2)]);
+  });
+
+  it("leaves a photo-only listing exactly as the poster ordered it", () => {
+    const only = [p(3), p(1), p(2)];
+    expect(orderListingMediaViewer(only)).toEqual(only);
+  });
+
+  it("is idempotent, so applying it at more than one layer is safe", () => {
+    const once = orderListingMediaViewer([v(1), p(1), p(2), p(3), p(4), p(5)]);
+    expect(orderListingMediaViewer(once)).toEqual(once);
+  });
+
+  it("never changes what a cover picks: covers stay photos", () => {
+    const viewerOrder = orderListingMediaViewer([p(1), p(2), v(1), p(3)]);
+    expect(coverPhoto(viewerOrder)).toBe(p(1));
+    expect(coverMedia(viewerOrder)).toBe(p(1));
+  });
+
+  it("drops empty slots rather than rendering a broken tile", () => {
+    expect(orderListingMediaViewer([p(1), "", null, v(1)])).toEqual([v(1), p(1)]);
   });
 });
 
