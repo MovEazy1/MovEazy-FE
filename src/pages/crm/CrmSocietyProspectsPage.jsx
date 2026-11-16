@@ -22,8 +22,9 @@ import { useCrm } from "./CrmShell";
 import { Btn, C, Chip, Empty, Loading, Toast, relTime, shortDate } from "./crmUi";
 import { isSuperAdminEmail, SCOPES } from "../../lib/adminScopes";
 import {
-  CONTACT_KINDS, ROADS, STATUSES, fetchOsm, fetchProspect, fetchProspects, importProspects, importRows, osmRows, prospectError,
-  removeProspectContact, rentRange, roadLabel, saveProspect, saveProspectContact, statusOf, sweepGoogle, sweepCells,
+  CONTACT_KINDS, ROADS, STATUSES, ZONES, fetchOsm, fetchOsmPlaces, fetchProspect, fetchProspects, importProspects, importRows, nearbyFor,
+  osmRows, prospectError, removeProspectContact, rentRange, roadLabel, saveNearby, saveProspect, saveProspectContact, statusOf, sweepGoogle,
+  sweepCells, zoneOf,
 } from "../../lib/societyProspects";
 import { brochureAssets, brochureFileName, brochurePdf, drawBrochurePage } from "../../lib/societyBrochure";
 import { zipStore } from "../../lib/zipStore";
@@ -90,6 +91,7 @@ function List() {
   const superAdmin = isSuperAdminEmail(access.email);
   const [rows, setRows] = useState(null);
   const [err, setErr] = useState("");
+  const [zone, setZone] = useState("all");
   const [road, setRoad] = useState("all");
   const [status, setStatus] = useState("all");
   const [view, setView] = useState("active");
@@ -110,10 +112,11 @@ function List() {
       && (view !== "onboarding" || (r.onboard_status && r.onboard_status !== "approved"))
       && (view !== "live" || r.live)
       && (view !== "unresearched" || !r.researched)
+      && (zone === "all" || zoneOf(r.road) === zone)
       && (road === "all" || r.road === road)
       && (status === "all" || r.status === status)
       && (!needle || `${r.name} ${r.area}`.toLowerCase().includes(needle)));
-  }, [rows, road, status, view, q]);
+  }, [rows, zone, road, status, view, q]);
   const count = (pred) => (rows ?? []).filter((r) => !r.hidden && pred(r)).length;
 
   const runImport = async () => {
@@ -132,13 +135,32 @@ function List() {
       setJob(null);
     }
   };
-  // The free import: OpenStreetMap, no key and no bill. Nothing is saved until checked.
+  // The free import: OpenStreetMap, no key and no bill, the city part by part. Nothing is saved until checked.
   const runOsmImport = async () => {
-    setJob({ label: "Asking OpenStreetMap (can take a minute)", done: 0, total: 1 });
+    setJob({ label: "Asking OpenStreetMap", done: 0, total: 1 });
     try {
-      const found = osmRows(await fetchOsm());
+      const { elements, failed } = await fetchOsm((done, total, part) => setJob({ label: `Asking OpenStreetMap${part ? ` · ${part}` : ""} (a minute each)`, done, total }));
+      const found = osmRows(elements);
       const known = new Set((rows ?? []).map((r) => r.place_id));
-      setPreview({ rows: found, fresh: found.filter((r) => !known.has(r.place_id)).length, failed: 0 });
+      setPreview({ rows: found, fresh: found.filter((r) => !known.has(r.place_id)).length, failed: failed.length, failedParts: failed });
+    } catch (e) {
+      say(prospectError(e), "error");
+    } finally {
+      setJob(null);
+    }
+  };
+  // What's nearby (schools, hospitals, groceries, metro) from OpenStreetMap, for societies with nothing there yet.
+  const fillNearby = async (list) => {
+    const need = (list ?? []).filter((r) => !r.hidden && !Object.keys(r.nearby || {}).length && r.lat != null);
+    if (!need.length) { say("Every society already has what's nearby."); return; }
+    setJob({ label: "Finding what's nearby", done: 0, total: 1 });
+    try {
+      const { pois, failed } = await fetchOsmPlaces((done, total, part) => setJob({ label: `Finding what's nearby${part ? ` · ${part}` : ""}`, done, total }));
+      const out = need.map((r) => ({ id: r.id, nearby: nearbyFor(r, pois) })).filter((r) => r.nearby);
+      setJob({ label: "Saving what's nearby", done: 0, total: out.length });
+      const n = await saveNearby(out, (done, total) => setJob({ label: "Saving what's nearby", done, total }));
+      say(`What's nearby filled for ${n} societies${failed.length ? ` · ${failed.join(", ")} didn't answer, run it again later` : ""}.`);
+      await load();
     } catch (e) {
       say(prospectError(e), "error");
     } finally {
@@ -152,7 +174,10 @@ function List() {
     try {
       const r = await importProspects(list, (done, total) => setJob({ label: "Saving", done, total }));
       say(`${r.added} new societies added${r.updated ? `, ${r.updated} refreshed` : ""}.`);
-      await load();
+      // Then what's nearby for the new ones, from the same free source.
+      const fresh = await fetchProspects();
+      setRows(fresh ?? []);
+      await fillNearby(fresh);
     } catch (e) {
       say(prospectError(e), "error");
     } finally {
@@ -181,7 +206,7 @@ function List() {
         }
       };
       await Promise.all([worker(), worker(), worker()]);
-      const tag = road === "all" ? "All roads" : roadLabel(road);
+      const tag = road !== "all" ? roadLabel(road) : zone !== "all" ? ZONES.find((z) => z.key === zone)?.label : "All areas";
       download(new Blob([zipStore(files)], { type: "application/zip" }), `MovEazy society brochures - ${tag}.zip`);
     } catch (e) {
       say(prospectError(e), "error");
@@ -197,6 +222,7 @@ function List() {
     <>
       <div style={{ display: "flex", gap: 10, flexWrap: "wrap", alignItems: "center" }}>
         {superAdmin && <Btn variant="primary" disabled={!!job} onClick={runOsmImport}>{rows.length ? "Refresh from OpenStreetMap (free)" : "Import from OpenStreetMap (free)"}</Btn>}
+        {superAdmin && rows.length > 0 && <Btn disabled={!!job} onClick={() => fillNearby(rows)}>Fill what&apos;s nearby (free)</Btn>}
         {superAdmin && <Btn disabled={!!job} onClick={runImport} title="Needs GOOGLE_MAPS_API_KEY on Vercel">Google import</Btn>}
         <Btn disabled={!!job || !shown.length} onClick={zipAll}><Download size={14} style={{ verticalAlign: -2 }} /> Brochures (ZIP) · {shown.filter((r) => !r.hidden).length}</Btn>
         <input className="crm-input" style={{ flex: "1 1 200px", minWidth: 0, maxWidth: 320 }} placeholder="Search a society or area" value={q} onChange={(e) => setQ(e.target.value)} aria-label="Search societies" />
@@ -215,8 +241,8 @@ function List() {
         <div style={{ ...card, borderColor: C.accent, display: "grid", gap: 8 }}>
           <div style={{ fontWeight: 800 }}>Found {preview.rows.length} societies — {preview.fresh} new.</div>
           <div className="crm-mute" style={{ fontSize: 12.5 }}>
-            {ROADS.map((r) => `${r.label} ${preview.rows.filter((x) => x.road === r.key).length}`).join(" · ")}
-            {preview.failed ? ` · ${preview.failed} areas didn't answer (run again later to fill them)` : ""}
+            {ROADS.map((r) => [r.label, preview.rows.filter((x) => x.road === r.key).length]).filter(([, n]) => n).map(([l, n]) => `${l} ${n}`).join(" · ")}
+            {preview.failed ? ` · ${(preview.failedParts || []).join(", ") || `${preview.failed} areas`} didn't answer (run again later to fill them)` : ""}
           </div>
           <div style={{ maxHeight: 160, overflow: "auto", fontSize: 12.5, lineHeight: 1.6 }} className="crm-mute">
             {preview.rows.slice(0, 400).map((r) => r.name).join(" · ")}
@@ -229,8 +255,18 @@ function List() {
       )}
 
       <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
-        <Chip on={road === "all"} onClick={() => setRoad("all")}>All roads · {count(() => true)}</Chip>
-        {ROADS.map((r) => <Chip key={r.key} on={road === r.key} onClick={() => setRoad(r.key)}>{r.label} · {count((x) => x.road === r.key)}</Chip>)}
+        <Chip on={zone === "all"} onClick={() => { setZone("all"); setRoad("all"); }}>All of Bangalore · {count(() => true)}</Chip>
+        {ZONES.map((z) => {
+          const n = count((x) => zoneOf(x.road) === z.key);
+          return n ? <Chip key={z.key} on={zone === z.key} onClick={() => { setZone(z.key); setRoad("all"); }}>{z.label} · {n}</Chip> : null;
+        })}
+        <select className="crm-input" style={{ flex: "0 1 240px", minWidth: 0 }} value={road} onChange={(e) => setRoad(e.target.value)} aria-label="Area">
+          <option value="all">Every area{zone !== "all" ? ` in ${ZONES.find((z) => z.key === zone)?.label}` : ""}</option>
+          {ROADS.filter((r) => zone === "all" || r.zone === zone).map((r) => {
+            const n = count((x) => x.road === r.key);
+            return n ? <option key={r.key} value={r.key}>{r.label} · {n}</option> : null;
+          })}
+        </select>
       </div>
       <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
         <Chip on={status === "all"} onClick={() => setStatus("all")}>Any status</Chip>
@@ -564,7 +600,7 @@ function Detail({ id }) {
     setBusy("live");
     try {
       const b = await saveCrmBuilding({
-        name: p.name, kind: "society", area: ROAD_AREA[s.road] || p.area, landmark: p.area, full_address: s.address,
+        name: p.name, kind: "society", area: ROAD_AREA[s.road] || p.area || roadLabel(s.road), landmark: p.area, full_address: s.address,
         latitude: s.lat, longitude: s.lng, amenities: p.amenities, photos: s.photos || [], description: p.facts.about || "",
       });
       await saveProspect({ id, building_id: b.id, status: "onboarded" });
@@ -601,7 +637,7 @@ function Detail({ id }) {
               {STATUSES.map((x) => <option key={x.key} value={x.key}>{x.label}</option>)}
             </select>
           </label>
-          <label style={{ flex: "0 1 170px" }}><span style={label}>Road</span>
+          <label style={{ flex: "0 1 170px" }}><span style={label}>Area (map)</span>
             <select className="crm-input" style={{ width: "100%" }} value={draft.road} onChange={(e) => set({ road: e.target.value })}>
               {ROADS.map((r) => <option key={r.key} value={r.key}>{r.label}</option>)}
             </select>

@@ -48,7 +48,8 @@ export default function ProspectsMap({ rows = [], selectedId = null, onPick }) {
   const lines = useMemo(() => Object.entries(CORRIDORS).map(([key, p]) => [key, chain(p)]), []);
   const focus = selectedId ? pts.find((p) => p.id === selectedId) : null;
   return (
-    <MapContainer center={HSR_CENTRE} zoom={13} scrollWheelZoom style={{ width: "100%", height: "100%" }}>
+    // Canvas, not one SVG element per society: thousands of them across the city stay smooth.
+    <MapContainer center={HSR_CENTRE} zoom={13} scrollWheelZoom preferCanvas style={{ width: "100%", height: "100%" }}>
       <TileLayer url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png" attribution="&copy; OpenStreetMap" maxZoom={19} />
       <FitTo points={pts} focus={focus} />
       {lines.map(([key, line]) => (

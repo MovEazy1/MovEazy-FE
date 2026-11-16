@@ -8,18 +8,30 @@
  * complexes and the real-estate agencies in each. The roads' shapes are
  * OpenStreetMap's, sampled every 300 m; a cell is swept when its middle is
  * within a kilometre of a road, or inside HSR.
+ *
+ * Since 2026-11-17 the rest of Bangalore's renting areas too (BTM, Electronic
+ * City, Koramangala, Whitefield, Hebbal… — lib/bangaloreAreas.js): the free
+ * OpenStreetMap import asks zone by zone, and fills what's nearby (schools,
+ * hospitals, groceries, metro) from OpenStreetMap as well. `road` holds the
+ * area's key.
  */
 import { supabase, isSupabaseConfigured } from "./supabase";
 import { haversineKm } from "./geo";
+import { CITY_AREAS, ZONES, cityAreaFor, zoneBoxes } from "./bangaloreAreas";
 
+export { ZONES };
+/** Every area a society can be in: the six roads around HSR, then the city's. */
 export const ROADS = [
-  { key: "hsr", label: "HSR Layout", color: "#0E7C68" },
-  { key: "sarjapur", label: "Sarjapur Road", color: "#CC3F28" },
-  { key: "haralur", label: "Haralur Road", color: "#7C3AED" },
-  { key: "silver", label: "Silver County Road", color: "#0369A1" },
-  { key: "hosa", label: "Hosa Road", color: "#B45309" },
-  { key: "kudlu", label: "Kudlu Road", color: "#BE185D" },
+  { key: "hsr", label: "HSR Layout", color: "#0E7C68", zone: "southeast" },
+  { key: "sarjapur", label: "Sarjapur Road", color: "#CC3F28", zone: "southeast" },
+  { key: "haralur", label: "Haralur Road", color: "#7C3AED", zone: "southeast" },
+  { key: "silver", label: "Silver County Road", color: "#0369A1", zone: "southeast" },
+  { key: "hosa", label: "Hosa Road", color: "#B45309", zone: "southeast" },
+  { key: "kudlu", label: "Kudlu Road", color: "#BE185D", zone: "southeast" },
+  ...CITY_AREAS.map(({ key, label, color, zone }) => ({ key, label, color, zone })),
 ];
+/** The zone an area is in ("southeast" for the six roads). */
+export const zoneOf = (key) => ROADS.find((r) => r.key === key)?.zone ?? null;
 export const roadLabel = (key) => ROADS.find((r) => r.key === key)?.label ?? key;
 
 export const STATUSES = [
@@ -75,11 +87,16 @@ export function sweepCells() {
   return cells;
 }
 
-/** Which road a society belongs to: HSR if inside it, else the nearest road (null past 1.5 km). */
+/**
+ * Which area a society belongs to: HSR if inside it; a road around HSR when
+ * within a kilometre of it; else the city area it's deepest inside; else a
+ * road around HSR up to 1.5 km; else none.
+ */
 export function roadFor(lat, lng) {
   if (inHsr(lat, lng)) return "hsr";
   const [key, km] = roadDistances(lat, lng).sort((a, b) => a[1] - b[1])[0];
-  return km <= 1.5 ? key : null;
+  if (km <= NEAR_ROAD_KM) return key;
+  return cityAreaFor(lat, lng) || (km <= 1.5 ? key : null);
 }
 
 const SOCIETY_TYPES = new Set(["apartment_complex", "apartment_building", "condominium_complex", "housing_complex"]);
@@ -184,6 +201,11 @@ const OVERPASS = [
 
 // A named area that is a neighbourhood, a government campus or an empty plot, not a society.
 const NOT_A_SOCIETY_AREA = /\b(layout|colony|quarters|nagar|village|extension|sector|stage|empty|site|police|slum|homestay|campus|battalion|cpwd|ksrp|kssidc|hostel|colive|plots?|arcade|tea|spice|cafe|restaurant|work)\b|\(u\/c\)|under construction/i;
+// A standalone building smaller than this (its outline, m²) is left out: a
+// dozen flats, not a society.
+const MIN_BUILDING_M2 = 1500;
+const footprintM2 = (b) => (b ? Math.abs(b.maxlat - b.minlat) * 111000 * Math.abs(b.maxlon - b.minlon) * 111000 * Math.cos((b.minlat * Math.PI) / 180) : 0);
+
 // A building named like one tower of something bigger, or a house.
 const ONE_TOWER = /\b(tower|block|wing|phase|club ?house|building|complex|house|nivas|nilaya|mansion|bhavan|bhavana)\b|^[\w\s./&,()-]{0,6}$|^\d/i;
 
@@ -210,7 +232,8 @@ export function osmRows(elements) {
   const inside = (p) => areas.some((a) => a.bounds && p.lat >= a.bounds.minlat && p.lat <= a.bounds.maxlat && p.lng >= a.bounds.minlon && p.lng <= a.bounds.maxlon);
   const buildings = els
     .filter((e) => /^(apartments|residential)$/.test(e.tags.building || "") && e.tags.landuse !== "residential" && e.tags.name
-      && !ONE_TOWER.test(e.tags.name) && !NOT_A_SOCIETY.test(e.tags.name) && /[a-z]{3}/i.test(e.tags.name))
+      && !ONE_TOWER.test(e.tags.name) && !NOT_A_SOCIETY.test(e.tags.name) && /[a-z]{3}/i.test(e.tags.name)
+      && footprintM2(e.bounds) >= MIN_BUILDING_M2)
     .map(toPlace)
     .filter((p) => !inside(p));
   const agents = els.filter((e) => e.tags.office === "estate_agent" || e.tags.shop === "estate_agent")
@@ -225,19 +248,107 @@ export function osmRows(elements) {
     }));
 }
 
-/** Ask OpenStreetMap (free, no key), trying a second server if the first is busy. */
-export async function fetchOsm() {
+/** One question to OpenStreetMap (free, no key), trying the next server while one is busy. */
+async function overpass(query, waitMs = 90000) {
   for (const url of OVERPASS) {
     const stop = new AbortController();
-    const timer = setTimeout(() => stop.abort(), 60000);
+    const timer = setTimeout(() => stop.abort(), waitMs);
     try {
-      const r = await fetch(url, { method: "POST", body: new URLSearchParams({ data: OSM_QUERY }), signal: stop.signal });
+      const r = await fetch(url, { method: "POST", body: new URLSearchParams({ data: query }), signal: stop.signal });
       if (r.ok) return (await r.json()).elements || [];
     } catch { /* the next server */ } finally {
       clearTimeout(timer);
     }
   }
-  throw new Error("OpenStreetMap didn't answer. Try again in a minute.");
+  return null;
+}
+
+/** The parts of the city the import asks about, one at a time: the six roads, then each zone. */
+export function osmParts() {
+  return [{ label: "HSR & its roads", box: OSM_BOX }, ...zoneBoxes().map((z) => ({ label: z.label, box: z.box.join(",") }))];
+}
+const societiesQuery = (box) => OSM_QUERY.split(OSM_BOX).join(box).replace("[timeout:120]", "[timeout:180]");
+
+/**
+ * Every part of the city from OpenStreetMap. → { elements, failed: [labels] }.
+ * Calls onProgress(done, total, label).
+ */
+export async function fetchOsm(onProgress) {
+  const parts = osmParts();
+  const seen = new Map();
+  const failed = [];
+  for (let i = 0; i < parts.length; i++) {
+    onProgress?.(i, parts.length, parts[i].label);
+    const els = await overpass(societiesQuery(parts[i].box));
+    if (!els) { failed.push(parts[i].label); continue; }
+    for (const e of els) seen.set(`${e.type}/${e.id}`, e);
+  }
+  onProgress?.(parts.length, parts.length, "");
+  if (!seen.size) throw new Error("OpenStreetMap didn't answer. Try again in a minute.");
+  return { elements: [...seen.values()], failed };
+}
+
+/* ── What's nearby, from OpenStreetMap ────────────────────────────────────── */
+
+const NEARBY_KINDS = {
+  schools: (t) => t.amenity === "school" || t.amenity === "college",
+  hospitals: (t) => t.amenity === "hospital",
+  supermarkets: (t) => t.shop === "supermarket" || t.shop === "mall",
+  transit: (t) => t.station === "subway" || t.railway === "station" || t.amenity === "bus_station",
+};
+const nearbyQuery = (box) => `[out:json][timeout:180];
+(
+  nwr["name"]["amenity"~"^(school|college|hospital|bus_station)$"](${box});
+  nwr["name"]["shop"~"^(supermarket|mall)$"](${box});
+  nwr["name"]["railway"="station"](${box});
+);
+out center tags;`;
+
+/** Schools, hospitals, groceries and stations across the city. → { pois, failed }. */
+export async function fetchOsmPlaces(onProgress) {
+  const parts = osmParts();
+  const pois = new Map();
+  const failed = [];
+  for (let i = 0; i < parts.length; i++) {
+    onProgress?.(i, parts.length, parts[i].label);
+    const els = await overpass(nearbyQuery(parts[i].box));
+    if (!els) { failed.push(parts[i].label); continue; }
+    for (const e of els) {
+      const lat = e.center?.lat ?? e.lat;
+      const lng = e.center?.lon ?? e.lon;
+      const kind = Object.keys(NEARBY_KINDS).find((k) => NEARBY_KINDS[k](e.tags || {}));
+      if (kind && e.tags?.name && Number.isFinite(lat)) pois.set(`${e.type}/${e.id}`, { kind, name: String(e.tags.name).trim(), lat, lng });
+    }
+  }
+  onProgress?.(parts.length, parts.length, "");
+  return { pois: [...pois.values()], failed };
+}
+
+/** The 3 nearest of each kind within 3 km: { schools: [{ name, km }], … }, or null when none. */
+export function nearbyFor(soc, pois) {
+  const out = {};
+  for (const kind of Object.keys(NEARBY_KINDS)) {
+    const names = new Set();
+    const list = pois.filter((p) => p.kind === kind)
+      .map((p) => ({ name: p.name, km: haversineKm(Number(soc.lat), Number(soc.lng), p.lat, p.lng) }))
+      .filter((p) => p.km <= 3)
+      .sort((a, b) => a.km - b.km)
+      .filter((p) => !names.has(p.name.toLowerCase()) && names.add(p.name.toLowerCase()))
+      .slice(0, 3)
+      .map((p) => ({ name: p.name, km: Math.round(p.km * 10) / 10 }));
+    if (list.length) out[kind] = list;
+  }
+  return Object.keys(out).length ? out : null;
+}
+
+/** Save what's nearby for societies that have nothing there yet, 500 at a time. → how many filled. */
+export async function saveNearby(rows, onProgress) {
+  let n = 0;
+  for (let i = 0; i < rows.length; i += 500) {
+    n += Number(await rpc("society_prospects_nearby", { p_rows: rows.slice(i, i + 500) })) || 0;
+    onProgress?.(Math.min(rows.length, i + 500), rows.length);
+  }
+  return n;
 }
 
 function mergeAgents(list) {

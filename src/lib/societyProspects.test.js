@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { areaFromAddress, baseName, importRows, isSociety, mergeSocieties, nearestAgents, osmRows, rentRange, roadFor, sweepCells } from "./societyProspects";
+import { areaFromAddress, baseName, importRows, isSociety, mergeSocieties, nearbyFor, nearestAgents, osmRows, rentRange, roadFor, sweepCells } from "./societyProspects";
 
 describe("sweepCells", () => {
   it("covers the six corridors in about 130 cells of ~650 m", () => {
@@ -114,5 +114,51 @@ describe("osmRows", () => {
     expect(sobha).toMatchObject({ place_id: "osm-way-1", road: "haralur", maps_url: "https://www.openstreetmap.org/way/1" });
     expect(sobha.agents[0].name).toBe("Haralur Homes");
     expect(rows.find((r) => r.name.startsWith("Aishwarya")).area).toBe("HSR Layout");
+  });
+});
+
+describe("roadFor across Bangalore", () => {
+  it("puts a society in the city area it sits in", () => {
+    expect(roadFor(12.9166, 77.6101)).toBe("btm");
+    expect(roadFor(12.9352, 77.6245)).toBe("koramangala");
+    expect(roadFor(12.9698, 77.75)).toBe("whitefield");
+    expect(roadFor(13.04, 77.597)).toBe("hebbal");
+    expect(roadFor(12.8452, 77.6602)).toBe("ecity");
+    expect(roadFor(12.93, 77.678)).toBe("bellandur");
+  });
+  it("keeps the six roads around HSR as they were", () => {
+    expect(roadFor(12.9116, 77.6474)).toBe("hsr");
+    expect(roadFor(12.8801, 77.6551)).toBe("haralur");
+  });
+  it("leaves places outside every area out", () => {
+    expect(roadFor(12.7, 77.4)).toBe(null);
+  });
+});
+
+describe("nearbyFor", () => {
+  it("lists the 3 nearest of each kind within 3 km, no repeats", () => {
+    const soc = { lat: 12.93, lng: 77.62 };
+    const pois = [
+      { kind: "schools", name: "A School", lat: 12.931, lng: 77.62 },
+      { kind: "schools", name: "A School", lat: 12.932, lng: 77.62 },
+      { kind: "schools", name: "B School", lat: 12.94, lng: 77.62 },
+      { kind: "schools", name: "Far School", lat: 13.1, lng: 77.62 },
+      { kind: "transit", name: "Metro", lat: 12.935, lng: 77.62 },
+    ];
+    const n = nearbyFor(soc, pois);
+    expect(n.schools.map((x) => x.name)).toEqual(["A School", "B School"]);
+    expect(n.transit[0]).toEqual({ name: "Metro", km: 0.6 });
+    expect(n.hospitals).toBeUndefined();
+    expect(nearbyFor(soc, [])).toBe(null);
+  });
+});
+
+describe("osmRows leaves small standalone buildings out", () => {
+  const b = (id, name, dLat, dLng) => ({ type: "way", id, tags: { building: "apartments", name },
+    bounds: { minlat: 12.9166, minlon: 77.6101, maxlat: 12.9166 + dLat, maxlon: 77.6101 + dLng } });
+  it("keeps a big apartment building, drops a small one", () => {
+    const rows = osmRows([b(1, "Sobha Big Apartments", 0.0006, 0.0006), b(2, "Sai Residency", 0.0002, 0.0002)]);
+    expect(rows.map((r) => r.name)).toEqual(["Sobha Big Apartments"]);
+    expect(rows[0].road).toBe("btm");
   });
 });
