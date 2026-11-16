@@ -80,11 +80,13 @@ const CONFETTI = Array.from({ length: 36 }, (_, i) => ({
 
 export function WelcomePremium() {
   const navigate = useNavigate();
-  const { me, status } = usePartner();
+  const { me, status, reloadStatus } = usePartner();
   const s = useLandingSettings();
   const [plans, setPlans] = useState([]);
   const [ref, setRef] = useState(null);
-  useEffect(() => { markCongratsSeen(); }, []);
+  // Seen: saved, then the app's status refreshed so it stops asking for this page.
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  useEffect(() => { markCongratsSeen().then(() => reloadStatus?.()); }, []);
   useEffect(() => { fetchPlans().then(setPlans, () => {}); fetchMyReferrals().then(setRef, () => {}); }, []);
 
   const plan = plans.find((p) => p.id === status?.plan?.plan_id) || { price: 4999, months: 5, label: "Premium" };

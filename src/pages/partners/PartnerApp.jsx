@@ -231,10 +231,16 @@ function PartnerWorkspace({ me, reloadMe }) {
     return () => clearTimeout(t);
   }, [settled, uid, inventory, groups, leads, status, saved]);
 
-  // A plan just started: the congratulations page, once.
+  // A plan just started: the congratulations page, once. Once per visit even
+  // while the server still says it's due (the status in hand is from before
+  // "seen" was saved, and viewing as a partner never saves it) — otherwise
+  // "Start using" went home and was sent straight back here.
   const rel = pathname.slice(pp("/").replace(/\/$/, "").length) || "/";
+  const congratsShown = useRef(false);
   useEffect(() => {
-    if (status?.congrats_due && !rel.startsWith("/welcome") && !rel.startsWith("/premium/return")) navigate(pp("/welcome"));
+    if (!status?.congrats_due || congratsShown.current || rel.startsWith("/premium/return")) return;
+    congratsShown.current = true;
+    if (!rel.startsWith("/welcome")) navigate(pp("/welcome"));
   }, [status?.congrats_due, rel, navigate]);
 
   // An invite opened before sign-in is redeemed here, once.
