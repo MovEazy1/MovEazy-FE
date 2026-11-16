@@ -16,6 +16,7 @@ import { CompleteProfileSheet } from "./PremiumJourney";
 import { PaymentCheckBanner, TrialBanner } from "./TrialPremium";
 import { InstallBanner } from "./InstallApp";
 import NewLeadCard from "./NewLeadCard";
+import SocietiesHomeCard from "./SocietiesHomeCard";
 import { TodayPanel } from "./TenantKit";
 import { useTenants } from "./tenantData";
 import { useMatcherRows } from "./AiMatcher";
@@ -115,6 +116,7 @@ export default function PartnerHome() {
         <PaymentCheckBanner payment={status?.payment} />
         <TrialBanner trial={status?.trial} />
         <NewLeadCard />
+        <SocietiesHomeCard />
         <InstallBanner />
 
         <section className="ph-me" aria-label="Your profile">

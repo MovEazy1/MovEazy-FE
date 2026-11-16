@@ -218,6 +218,7 @@ const NEEDS = {
   "qr-scans": [],
   "lead-requests": [],
   deals: ["inventory"],
+  "society-leads": [],
   "owner-qr": [],
   societies: [],
   buildings: ["inventory"],

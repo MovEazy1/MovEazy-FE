@@ -25,6 +25,7 @@ import { useLandingSettings } from "../../lib/landingSettings";
 import { SCOPES } from "../../lib/adminScopes";
 import { whatsappUrl } from "../../lib/crmSettings";
 import { formatForDisplay } from "../../lib/mobile";
+import { fetchSocietyPartnerIds, setSocietyPartner } from "../../lib/societyPartners";
 import {
   adminGrantPremium, adminListPartners, adminSetAutoApprove, adminSetClientShare, adminSetRating, adminSetReferralRate, adminSetStatus,
   fetchProgramSettings,
@@ -49,6 +50,8 @@ export default function CrmPartnersSection({ access }) {
   const [leadsFor, setLeadsFor] = useState(null);
   const loaded = useLandingSettings();
   const [savedProgram, setSavedProgram] = useState(null);
+  // Society partners: onboard societies from the partner app (society_partners.sql).
+  const [societyIds, setSocietyIds] = useState(() => new Set());
   const program = savedProgram || loaded;
 
   const showToast = useCallback((message, tone = "ok") => {
@@ -58,8 +61,10 @@ export default function CrmPartnersSection({ access }) {
 
   const load = useCallback(async () => {
     try {
-      const [list, s, ls] = await Promise.all([adminListPartners(), fetchProgramSettings(), fetchCrmPartnerLeads().catch(() => ({}))]);
+      const [list, s, ls, sp] = await Promise.all([adminListPartners(), fetchProgramSettings(), fetchCrmPartnerLeads().catch(() => ({})),
+        fetchSocietyPartnerIds().catch(() => new Set())]);
       setRows(list);
+      setSocietyIds(sp);
       setSettings(s);
       setLeadStats(ls || {});
       setError("");
@@ -84,18 +89,18 @@ export default function CrmPartnersSection({ access }) {
   };
 
   const counts = useMemo(() => {
-    const c = { "": rows?.length ?? 0, pending: 0, approved: 0, suspended: 0, premium: 0 };
-    for (const r of rows ?? []) { c[r.status] += 1; if (r.premium_until) c.premium += 1; }
+    const c = { "": rows?.length ?? 0, pending: 0, approved: 0, suspended: 0, premium: 0, society: 0 };
+    for (const r of rows ?? []) { c[r.status] += 1; if (r.premium_until) c.premium += 1; if (societyIds.has(r.user_id)) c.society += 1; }
     return c;
-  }, [rows]);
+  }, [rows, societyIds]);
 
   const shown = useMemo(() => {
     const needle = q.trim().toLowerCase();
     return (rows ?? []).filter((r) => {
-      if (filter === "premium" ? !r.premium_until : filter && r.status !== filter) return false;
+      if (filter === "premium" ? !r.premium_until : filter === "society" ? !societyIds.has(r.user_id) : filter && r.status !== filter) return false;
       return !needle || [r.name, r.phone, r.email, r.agency].join(" ").toLowerCase().includes(needle);
     });
-  }, [rows, filter, q]);
+  }, [rows, filter, q, societyIds]);
 
   const partnerUrl = "https://partners.moveazy.co.in";
 
@@ -143,7 +148,7 @@ export default function CrmPartnersSection({ access }) {
 
       <div style={{ padding: "10px 12px", display: "flex", gap: 7, alignItems: "center", flexWrap: "wrap", flex: "none" }}>
         <input className="crm-input" style={{ maxWidth: 260 }} placeholder="Search name, phone, email…" value={q} onChange={(e) => setQ(e.target.value)} />
-        {[["", "All"], ["pending", "Pending"], ["approved", "Approved"], ["suspended", "Suspended"], ["premium", "Premium"]].map(([k, label]) => (
+        {[["", "All"], ["pending", "Pending"], ["approved", "Approved"], ["suspended", "Suspended"], ["premium", "Premium"], ["society", "Society partners"]].map(([k, label]) => (
           <Chip key={k || "all"} on={filter === k} onClick={() => setFilter(k)}>{label} · {counts[k]}</Chip>
         ))}
         <Btn sm onClick={load}>Refresh</Btn>
@@ -262,6 +267,17 @@ export default function CrmPartnersSection({ access }) {
                   <td>
                     <div style={{ display: "flex", gap: 5, flexWrap: "wrap" }}>
                       {r.status === "approved" && <Btn sm onClick={() => setQrFor(r)}>QR</Btn>}
+                      {r.status === "approved" && (
+                        <Btn sm variant={societyIds.has(r.user_id) ? "primary" : undefined} disabled={!canManage || !!busy}
+                          title="Society partners onboard gated societies from the partner app, and get every tenant who asks for a flat in them"
+                          onClick={() => {
+                            const on = !societyIds.has(r.user_id);
+                            if (!on && !window.confirm(`Take ${r.name} off society partners? The societies they onboarded stay theirs.`)) return;
+                            act(r.user_id, () => setSocietyPartner(r.user_id, on), on ? `${r.name} is a society partner` : `${r.name} is no longer a society partner`);
+                          }}>
+                          {societyIds.has(r.user_id) ? "Society partner ✓" : "Make society partner"}
+                        </Btn>
+                      )}
                       {r.status !== "approved" && (
                         <Btn sm variant="primary" disabled={!canManage || !!busy}
                           onClick={() => act(r.user_id, () => adminSetStatus(r.user_id, "approved"), `${r.name} approved`)}>

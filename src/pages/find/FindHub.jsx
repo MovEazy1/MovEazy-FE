@@ -3,7 +3,7 @@
  * to find a flat.
  *
  *   1  Build my curated flat list — FREE (the AI chat → top matches, as before)
- *   2  Society map — coming soon, Notify me
+ *   2  Societies — the ones MovEazy partners onboarded (society_partners.sql)
  *   3  Steal Deals of the Week — this week's dates
  *   4  Deal of the Day — one per flat type, ends at midnight
  *   5  Bangalore Flat Renting Guide — coming soon, Notify me
@@ -17,6 +17,7 @@ import { ArrowRight, BellRing, BookOpen, Check, Flame, ListChecks, Map as MapIco
 import { FindShell, useFindGate } from "./findKit";
 import { DAY_KINDS, fetchDealsFeed, untilMidnightIst, weekLabel } from "../../lib/deals";
 import { addLeadInterest } from "../../lib/leadIntake";
+import { fetchLiveSocieties } from "../../lib/societyPartners";
 
 const SOON_KEY = "mz-notify-me";
 const readSoon = () => { try { return JSON.parse(localStorage.getItem(SOON_KEY) || "[]"); } catch { return []; } };
@@ -51,6 +52,8 @@ export default function FindHub() {
   const navigate = useNavigate();
   const { allowed, gate } = useFindGate();
   const [feed, setFeed] = useState(null);
+  const [societies, setSocieties] = useState(0);
+  useEffect(() => { fetchLiveSocieties().then((r) => setSocieties(r.length), () => {}); }, []);
   const [left, setLeft] = useState(() => untilMidnightIst());
   useEffect(() => { fetchDealsFeed().then(setFeed, () => setFeed({ steal: [], day: [] })); }, []);
   useEffect(() => { const t = setInterval(() => setLeft(untilMidnightIst()), 30000); return () => clearInterval(t); }, []);
@@ -73,8 +76,12 @@ export default function FindHub() {
             <span className="fh-cta fh-cta--mint">Start — it&apos;s free <ArrowRight size={18} /></span>
           </button>
 
-          <SoonCard id="society_map" icon={MapIcon} title="Society map"
-            text="Every gated society around HSR and Sarjapur Road on one map — amenities, rents and real photos, side by side." />
+          <button type="button" className="fh-card" onClick={() => navigate("/find/societies")}>
+            <div className="fh-card-head"><span className="fh-ic"><MapIcon size={22} /></span>{societies > 0 && <span className="fh-tag">{societies} live</span>}</div>
+            <h2>Societies</h2>
+            <p>Gated societies checked in person by a MovEazy partner — real photos of the amenities and a sample flat, and typical rents.</p>
+            <span className="fh-cta">See the societies <ArrowRight size={17} /></span>
+          </button>
 
           <button type="button" className="fh-card" onClick={() => navigate("/find/steal-deals")}>
             <div className="fh-card-head"><span className="fh-ic"><Flame size={22} /></span>{week && <span className="fh-tag">{week}</span>}</div>

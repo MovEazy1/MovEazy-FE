@@ -30,6 +30,7 @@ import { zipStore } from "../../lib/zipStore";
 import { googlePhotoUri } from "../../lib/society";
 import { uploadInventoryPhotos } from "../../lib/inventory";
 import { saveCrmBuilding } from "../../lib/crmPropertyInternal";
+import { ONBOARD_STATUS, RENT_TYPES, decideSocietyOnboard, setSocietyLive, slotLabel } from "../../lib/societyPartners";
 import logoOnLight from "../../assets/logo/moveazy-logo-mint-light.png";
 
 const ProspectsMap = lazy(() => import("./ProspectsMap"));
@@ -105,6 +106,9 @@ function List() {
     const needle = q.trim().toLowerCase();
     return (rows ?? []).filter((r) => (view === "hidden" ? r.hidden : !r.hidden)
       && (view !== "verify" || (r.researched && !r.verified))
+      && (view !== "review" || r.onboard_status === "submitted")
+      && (view !== "onboarding" || (r.onboard_status && r.onboard_status !== "approved"))
+      && (view !== "live" || r.live)
       && (view !== "unresearched" || !r.researched)
       && (road === "all" || r.road === road)
       && (status === "all" || r.status === status)
@@ -234,7 +238,7 @@ function List() {
           <Chip key={s.key} on={status === s.key} onClick={() => setStatus(s.key)}><StatusDot status={s.key} size={8} /> {s.label} · {count((x) => x.status === s.key)}</Chip>
         ))}
         <span style={{ width: 10 }} />
-        {[["active", "On the list"], ["verify", `To verify · ${count((x) => x.researched && !x.verified)}`], ["unresearched", `Not researched · ${count((x) => !x.researched)}`], ["hidden", "Not societies"]].map(([k, l]) => (
+        {[["active", "On the list"], ["verify", `To verify · ${count((x) => x.researched && !x.verified)}`], ["unresearched", `Not researched · ${count((x) => !x.researched)}`], ["review", `To review · ${count((x) => x.onboard_status === "submitted")}`], ["onboarding", `Partner onboarding · ${count((x) => x.onboard_status && x.onboard_status !== "approved")}`], ["live", `Live for tenants · ${count((x) => x.live)}`], ["hidden", "Not societies"]].map(([k, l]) => (
           <Chip key={k} on={view === k} onClick={() => setView(k)}>{l}</Chip>
         ))}
       </div>
@@ -265,6 +269,11 @@ function List() {
                 <div style={{ textAlign: "right", fontSize: 11, lineHeight: 1.5 }} className="crm-mute">
                   <div>{r.contacts} contact{r.contacts === 1 ? "" : "s"}</div>
                   <div style={{ color: r.verified ? C.accent : r.researched ? C.gold : C.textMute, fontWeight: 700 }}>{r.verified ? "Verified" : r.researched ? "To verify" : "No research"}</div>
+                  {r.onboard_status && (
+                    <div style={{ color: r.onboard_status === "submitted" ? "#1D4ED8" : r.live ? C.accent : C.gold, fontWeight: 700 }}>
+                      {r.live ? "Live" : ONBOARD_STATUS[r.onboard_status]?.label}{r.onboard_by_name ? ` · ${r.onboard_by_name}` : ""}
+                    </div>
+                  )}
                 </div>
                 {picked === r.id && <Link to={`${BASE}/${r.id}`} onClick={(e) => e.stopPropagation()}><Btn sm variant="primary">Open</Btn></Link>}
               </div>
@@ -348,6 +357,7 @@ function Contacts({ s, onChange, say }) {
               <span style={{ fontWeight: 600 }}>{c.name || "—"}</span>
               {c.note && <span className="crm-mute" style={{ fontSize: 12 }}>{c.note}</span>}
               {c.source === "google" && <span className="crm-mute" style={{ fontSize: 11 }}>· Google</span>}
+              {c.source === "partner" && <span className="crm-mute" style={{ fontSize: 11 }}>· added by {c.partner_name || "a partner"}</span>}
               <span style={{ flex: 1 }} />
               <Btn sm disabled={busy} onClick={() => { setEditing(c.id); setF({ kind: c.kind, name: c.name, phone: c.phone, note: c.note }); }}>Edit</Btn>
               <Btn sm variant="danger" disabled={busy} onClick={() => window.confirm(`Remove ${c.name || c.phone}?`) && run(() => removeProspectContact(c.id), "Removed")}><Trash2 size={13} /></Btn>
@@ -365,6 +375,93 @@ function Contacts({ s, onChange, say }) {
         <Btn variant="primary" disabled={busy || f.phone.replace(/\D/g, "").length < 8} onClick={save}>{editing ? "Save" : "+ Add"}</Btn>
         {editing && <Btn onClick={() => { setEditing(null); setF(blank); }}>Cancel</Btn>}
       </div>
+    </div>
+  );
+}
+
+/** What a society partner sent in: their photos (with when they were taken), rents, and Approve / Send back. */
+function OnboardShot({ p, caption }) {
+  return (
+    <a href={p.url} target="_blank" rel="noreferrer" style={{ flexShrink: 0, textAlign: "center", textDecoration: "none" }}>
+      <img src={p.url} alt="" style={{ height: 84, width: 112, objectFit: "cover", borderRadius: 8, border: `1px solid ${C.line}` }} />
+      <div className="crm-mute" style={{ fontSize: 10.5 }}>{caption}{p.at ? ` · ${shortDate(p.at)}` : ""}</div>
+    </a>
+  );
+}
+
+function PartnerOnboarding({ s, onChange, say }) {
+  const [busy, setBusy] = useState(false);
+  const run = async (fn, ok) => {
+    setBusy(true);
+    try { onChange(await fn()); say(ok); } catch (e) { say(prospectError(e), "error"); } finally { setBusy(false); }
+  };
+  const approve = () => window.confirm(`Approve ${s.name}? It goes live on moveazy.co.in, and every tenant who asks for flats there goes to ${s.onboard_by_name}.`)
+    && run(() => decideSocietyOnboard(s.id, true), "Approved — it's live for tenants");
+  const sendBack = () => {
+    const note = window.prompt(`What should ${s.onboard_by_name} fix? They'll see this.`, s.onboard_note || "");
+    if (note && note.trim()) run(() => decideSocietyOnboard(s.id, false, note.trim()), "Sent back to the partner");
+  };
+  const st = ONBOARD_STATUS[s.onboard_status] || ONBOARD_STATUS.draft;
+  const amenityPhotos = Object.entries(s.amenity_photos || {});
+  const firstFlat = (s.flat_photos ?? [])[0];
+  return (
+    <div style={{ ...card, display: "grid", gap: 10, borderColor: s.onboard_status === "submitted" ? "#1D4ED8" : C.line }}>
+      <div style={{ display: "flex", gap: 10, alignItems: "center", flexWrap: "wrap" }}>
+        <div style={{ fontWeight: 800, flex: 1 }}>
+          Partner onboarding · <span style={{ color: st.tone }}>{s.live ? "Live" : st.label}</span>
+          <div className="crm-mute" style={{ fontSize: 12, fontWeight: 500 }}>
+            {s.onboard_by_name}{s.onboard_by_phone ? ` · ${s.onboard_by_phone}` : ""}
+            {s.submitted_at ? ` · submitted ${relTime(s.submitted_at)}` : ""}
+            {s.onboard_status === "draft" && s.onboard_locked_until ? ` · locked till ${shortDate(s.onboard_locked_until)}` : ""}
+            {s.added_by_partner ? " · added by the partner" : ""}
+          </div>
+        </div>
+        {s.onboard_status === "submitted" && (
+          <>
+            <Btn variant="primary" disabled={busy} onClick={approve}>Approve · put live</Btn>
+            <Btn disabled={busy} onClick={sendBack}>Send back</Btn>
+          </>
+        )}
+        {s.onboard_status === "approved" && (
+          <>
+            {s.public_code && <a href={`https://www.moveazy.co.in/find/societies/${s.public_code}`} target="_blank" rel="noreferrer"><Btn>Tenant page <ExternalLink size={12} /></Btn></a>}
+            <Btn disabled={busy} onClick={() => run(() => setSocietyLive(s.id, !s.live), s.live ? "Taken off the site" : "Back on the site")}>
+              {s.live ? "Take off the site" : "Put back on the site"}
+            </Btn>
+            <Btn disabled={busy} onClick={sendBack}>Send back</Btn>
+          </>
+        )}
+      </div>
+      {s.onboard_note && s.onboard_status === "sent_back" && <div style={{ fontSize: 12.5, color: "#B91C1C" }}>Sent back: {s.onboard_note}</div>}
+      {(s.missing ?? []).length > 0 && s.onboard_status !== "approved" && (
+        <div className="crm-mute" style={{ fontSize: 12 }}>Still to add: {s.missing.join(" · ")}</div>
+      )}
+      {(s.partner_amenities ?? []).length > 0 && (
+        <div style={{ fontSize: 12.5 }}><span style={label}>Amenities the partner ticked</span>{s.partner_amenities.join(", ")}</div>
+      )}
+      {amenityPhotos.length > 0 && (
+        <div><span style={label}>Amenity photos</span>
+          <div style={{ display: "flex", gap: 8, overflowX: "auto", paddingBottom: 4 }}>
+            {amenityPhotos.flatMap(([a, list]) => list.map((p) => <OnboardShot key={p.url} p={p} caption={a} />))}
+          </div>
+        </div>
+      )}
+      {(s.flat_photos ?? []).length > 0 && (
+        <div><span style={label}>Sample flat · {s.flat_photos.length} photos</span>
+          <div style={{ display: "flex", gap: 8, overflowX: "auto", paddingBottom: 4 }}>
+            {s.flat_photos.map((p) => <OnboardShot key={p.url} p={p} caption={slotLabel(p.slot)} />)}
+          </div>
+        </div>
+      )}
+      {firstFlat?.lat != null && (
+        <a href={`https://www.openstreetmap.org/?mlat=${firstFlat.lat}&mlon=${firstFlat.lng}#map=18/${firstFlat.lat}/${firstFlat.lng}`}
+          target="_blank" rel="noreferrer" style={{ fontSize: 12, color: C.accent }}>Where the photos were taken</a>
+      )}
+      {Object.keys(s.partner_rents || {}).length > 0 && (
+        <div style={{ fontSize: 12.5 }}><span style={label}>Rents from the partner</span>
+          {RENT_TYPES.filter((t) => s.partner_rents[t.id]).map((t) => `${t.label} ${rentRange(s.partner_rents[t.id])}`).join(" · ")}
+        </div>
+      )}
     </div>
   );
 }
@@ -522,6 +619,8 @@ function Detail({ id }) {
             placeholder="Who you spoke to, what they said, the next step…" />
         </label>
       </div>
+
+      {s.onboard_status && <PartnerOnboarding s={s} onChange={(row) => keep(row, [])} say={say} />}
 
       <Contacts s={s} onChange={(row) => keep(row, [])} say={say} />
 

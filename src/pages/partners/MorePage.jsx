@@ -1,7 +1,7 @@
 /** More — profile, QR poster, plan, saved, help, activity. */
 import { useState } from "react";
 import { Link } from "react-router-dom";
-import { BarChart3, Bookmark, Building2, ChevronRight, Crown, Eye, Gift, HelpCircle, Home, LayoutDashboard, Lock, LogOut, Pencil, QrCode, TrendingUp, Trophy, WandSparkles } from "lucide-react";
+import { BarChart3, Bookmark, Building2, ChevronRight, Crown, Eye, Gift, HelpCircle, Home, LayoutDashboard, Lock, LogOut, MapPinned, Pencil, QrCode, TrendingUp, Trophy, WandSparkles } from "lucide-react";
 import { useAuth } from "../../context/AuthContext";
 import { usePartner } from "./PartnerApp";
 import { Avatar, Sheet, TopBar, WhatsAppIcon, formatPhone, toast } from "./partnerUi";
@@ -95,6 +95,7 @@ export default function MorePage() {
           {row(pp("/ai-matcher"), <WandSparkles size={19} color="#6B4EFF" />, "AI Property Matcher", "A shortlist for every client")}
           {row(pp("/qr"), <QrCode size={19} color="var(--g)" />, "My QR poster", "Print it · see who viewed and liked your flats")}
           {row(pp("/building-leads"), <Building2 size={19} color="var(--g)" />, "Building visits", "Owner properties MovEazy assigned to you")}
+          {me?.partner?.society_partner && row(pp("/societies"), <MapPinned size={19} color="var(--g)" />, "Societies", "Onboard societies near you · my societies · their leads")}
           {status?.trial?.active && !status?.plan?.active
             ? row(pp("/premium"), <Crown size={19} color="#8A6419" />, "Trial Premium — active",
               `${status.trial.days_left} day${status.trial.days_left === 1 ? "" : "s"} left · take Premium to keep it`)

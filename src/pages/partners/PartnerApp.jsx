@@ -52,6 +52,9 @@ const PartnerLanding = lazy(loadPartnerLanding);
 if (typeof window !== "undefined" && !hasStoredSession()) loadPartnerLanding().catch(() => {});
 
 const PartnerHome = lazy(() => import("./PartnerHome"));
+// Society partners: onboard societies, my societies, their leads (society_partners.sql).
+const Societies = lazy(() => import("./Societies"));
+const SocietyOnboard = lazy(() => import("./SocietyOnboard"));
 const InventoryHome = lazy(() => import("./InventoryHome"));
 const PropertyDetail = lazy(() => import("./PropertyDetail"));
 const PropertyContacts = lazy(() => import("./PropertyContacts"));
@@ -315,6 +318,9 @@ function PartnerWorkspace({ me, reloadMe }) {
             <Route path="ai-matcher/:slug" element={<Shortlist />} />
             <Route path="insights" element={<Insights />} />
             <Route path="building-leads" element={<BuildingLeads />} />
+            <Route path="societies" element={<Societies />} />
+            <Route path="societies/leads" element={<Navigate to={pp("/societies?tab=leads")} replace />} />
+            <Route path="societies/:id" element={<SocietyOnboard />} />
             <Route path="curated/:id" element={<CuratedListPage />} />
             <Route path="qr" element={<MyQrPage />} />
             <Route path="saved" element={<SavedPage />} />
