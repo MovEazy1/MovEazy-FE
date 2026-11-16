@@ -17,6 +17,7 @@ import { PaymentCheckBanner, TrialBanner } from "./TrialPremium";
 import { InstallBanner } from "./InstallApp";
 import NewLeadCard from "./NewLeadCard";
 import SocietiesHomeCard from "./SocietiesHomeCard";
+import PartnerVisitCards from "./PartnerVisitCards";
 import { TodayPanel } from "./TenantKit";
 import { useTenants } from "./tenantData";
 import { useMatcherRows } from "./AiMatcher";
@@ -115,6 +116,7 @@ export default function PartnerHome() {
       <div className="pz-pad ph">
         <PaymentCheckBanner payment={status?.payment} />
         <TrialBanner trial={status?.trial} />
+        <PartnerVisitCards />
         <NewLeadCard />
         <SocietiesHomeCard />
         <InstallBanner />

@@ -103,6 +103,9 @@ const DealOfTheDay = lazy(() => import("./pages/find/DealOfTheDay"));
 // Societies MovEazy partners onboarded, and each one's page (society_partners.sql).
 const FindSocieties = lazy(() => import("./pages/find/FindSocieties"));
 const FindSocietyPage = lazy(() => import("./pages/find/FindSocietyPage"));
+// A visit with a MovEazy partner: meeting spot, "I am coming", live map (partner_live_visits.sql).
+const TenantLiveVisit = lazy(() => import("./pages/TenantLiveVisit"));
+const TenantVisitBubble = lazy(() => import("./pages/TenantLiveVisit").then((m) => ({ default: m.TenantVisitBubble })));
 const SocietyPage = lazy(() => import("./pages/societies/SocietyPage"));
 // The owner app: /owners here, the root of owners.moveazy.co.in.
 const OwnerApp = lazy(() => import("./pages/owners/OwnerApp"));
@@ -250,9 +253,22 @@ function SessionTrackerComponent() {
       <RequirePhoneModal />
       <ClaimEarlierViews />
       <AppRoutes />
+      <TenantVisitBubbleSlot />
       <ViewAsBannerSlot />
     </>
   );
+}
+
+/**
+ * The live-visit bubble on the tenant site, for a signed-in tenant only — not
+ * on the partner, owner or society apps, nor in the CRM.
+ */
+function TenantVisitBubbleSlot() {
+  const { user } = useAuth();
+  const { pathname } = useLocation();
+  if (!user || IS_OWNER_HOST || IS_SOCIETY_HOST || IS_PARTNER_HOST) return null;
+  if (/^\/(crm|partners|owners|society|admin)(\/|$)/.test(pathname)) return null;
+  return <Suspense fallback={null}><TenantVisitBubble /></Suspense>;
 }
 
 /** Loads the view-as bar only while the super admin is viewing as someone. */
@@ -315,6 +331,7 @@ function AppRoutes() {
         <Route path="/find/deal-of-the-day" element={<DealOfTheDay />} />
         <Route path="/find/societies" element={<FindSocieties />} />
         <Route path="/find/societies/:code" element={<FindSocietyPage />} />
+        <Route path="/my-visit/:id" element={<TenantLiveVisit />} />
         <Route path="/societies" element={<ExploreSocieties />} />
         <Route path="/societies/:code" element={<SocietyPage />} />
         <Route path="/owners/*" element={<OwnerApp />} />

@@ -55,6 +55,9 @@ const PartnerHome = lazy(() => import("./PartnerHome"));
 // Society partners: onboard societies, my societies, their leads (society_partners.sql).
 const Societies = lazy(() => import("./Societies"));
 const SocietyOnboard = lazy(() => import("./SocietyOnboard"));
+// A visit the MovEazy team gave this partner: meeting spot, live map, how it went (partner_live_visits.sql).
+const PartnerLiveVisit = lazy(() => import("./PartnerLiveVisit"));
+const PartnerVisitBubble = lazy(() => import("./PartnerVisitCards").then((m) => ({ default: m.PartnerVisitBubble })));
 const InventoryHome = lazy(() => import("./InventoryHome"));
 const PropertyDetail = lazy(() => import("./PropertyDetail"));
 const PropertyContacts = lazy(() => import("./PropertyContacts"));
@@ -327,6 +330,7 @@ function PartnerWorkspace({ me, reloadMe }) {
             <Route path="societies" element={<Societies />} />
             <Route path="societies/leads" element={<Navigate to={pp("/societies?tab=leads")} replace />} />
             <Route path="societies/:id" element={<SocietyOnboard />} />
+            <Route path="visits/:id" element={<PartnerLiveVisit />} />
             <Route path="curated/:id" element={<CuratedListPage />} />
             <Route path="qr" element={<MyQrPage />} />
             <Route path="saved" element={<SavedPage />} />
@@ -339,6 +343,7 @@ function PartnerWorkspace({ me, reloadMe }) {
         {FAB_ON.test(rel) && <AddFab onClick={() => setPlusOpen(true)} raised={showBar} />}
         <MenuDrawer open={menuOpen} onClose={closeMenu} />
         <InstallHost />
+        {!rel.startsWith("/welcome") && <Suspense fallback={null}><PartnerVisitBubble /></Suspense>}
         {showBar && <JoinPremiumBar />}
         {plusOpen && <CreateSheet onClose={() => setPlusOpen(false)} />}
         <PremiumExplainer what={explaining} onClose={() => setExplaining(null)} />

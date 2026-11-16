@@ -27,6 +27,7 @@ import { buildTemplateVars, renderTemplate, whatsappUrl } from "../../lib/crmSet
 import { adDid, adSourceLabel, fetchAdVisits, stampAdVisit } from "../../lib/visitAds";
 import { SCOPES } from "../../lib/adminScopes";
 import { Btn, C, Chip, Empty, Loading, Toast, inr } from "./crmUi";
+import CrmLiveVisits from "./CrmLiveVisits";
 
 const VIEWS = [
   { id: "date", label: "By date" },
@@ -372,6 +373,9 @@ export default function CrmVisitsPage() {
           <Btn sm onClick={load}>Refresh</Btn>
         </div>
       </div>
+
+      {/* Visits given to partners: meeting spot, live map, both answers (partner_live_visits.sql). */}
+      <CrmLiveVisits say={showToast} />
 
       <div style={{ padding: "9px 12px", display: "flex", gap: 7, alignItems: "center", flexWrap: "wrap", flex: "none" }}>
         {VIEWS.map((v) => (
