@@ -6,22 +6,19 @@ import "./index.css";
 import "./styles/home-marketing.css";
 // Leaflet's CSS comes with the components that draw a map, not with every page.
 import App from "./App.jsx";
+import { isStaleChunkError, reloadForUpdate, watchForUpdates } from "./lib/appUpdate.js";
 
 /*
  * After a deploy, a page opened earlier asks for screens whose files the new
- * version no longer has. Load the new version — once, so a file that is
- * really missing shows the error page instead of reloading forever.
+ * version no longer has. Load the new version (at most once every 30 s, so a
+ * file that is really missing shows the error page instead of reloading
+ * forever). And an app left open — the installed partner app — moves to the
+ * new version when it comes back to the screen (lib/appUpdate.js).
  */
 window.addEventListener("vite:preloadError", (e) => {
-  try {
-    if (sessionStorage.getItem("mz-reloaded-for") === location.pathname) return;
-    sessionStorage.setItem("mz-reloaded-for", location.pathname);
-  } catch {
-    return;
-  }
-  e.preventDefault();
-  location.reload();
+  if (reloadForUpdate()) e.preventDefault();
 });
+if (import.meta.env.PROD) watchForUpdates();
 
 /** Old links used HashRouter (#/checkout). Convert once so BrowserRouter sees the path. */
 (function migrateLegacyHashRoutes() {
@@ -46,6 +43,8 @@ class RootErrorBoundary extends Component {
   }
 
   componentDidCatch(error, errorInfo) {
+    // A screen from the old version after a deploy: load the new one.
+    if (isStaleChunkError(error) && reloadForUpdate()) return;
     captureException(error, { contexts: { react: { componentStack: errorInfo?.componentStack } } });
   }
 
