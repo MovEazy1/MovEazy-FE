@@ -36,10 +36,22 @@ export const fetchViewAsHistory = (limit = 40) => rpc("view_as_history", { p_lim
 export const fetchViewAsChanges = (session) => rpc("view_as_session_changes", { p_session: session }).then((r) => r ?? []);
 export const keepViewAsChanges = (session) => rpc("view_as_keep", { p_session: session });
 
+/**
+ * The admin's sign-in with a freshly issued access token. The stored one can be
+ * past its expiry (a tab left open, a laptop woken from sleep), and the server
+ * then can't tell it's you.
+ */
+async function freshAdminSession() {
+  const { data: { session } = {} } = await supabase.auth.getSession();
+  if (!session?.refresh_token) return null;
+  const { data, error } = await supabase.auth.refreshSession();
+  return (!error && data?.session) || session;
+}
+
 /** Puts back what the session changed, and removes the files it uploaded. → { reverted, skipped, removed } */
 export async function revertViewAs(session) {
   const out = await rpc("view_as_revert", { p_session: session });
-  const { data: { session: auth } = {} } = await supabase.auth.getSession();
+  const auth = await freshAdminSession();
   let removed = 0;
   try {
     const r = await fetch("/api/view-as", {
@@ -55,8 +67,8 @@ export async function revertViewAs(session) {
 /** Become `user` ({ id, email, name, roles }) and open `path`. */
 export async function startViewAs(user, path = "/") {
   if (viewAsState()) throw new Error("You're already viewing as someone — exit first.");
-  const { data: { session: admin } = {} } = await supabase.auth.getSession();
-  if (!admin?.refresh_token) throw new Error("Sign in again.");
+  const admin = await freshAdminSession();
+  if (!admin?.refresh_token) throw new Error("Your sign-in has expired. Sign out, sign in again, then try.");
   const r = await fetch("/api/view-as", {
     method: "POST",
     headers: { "content-type": "application/json", authorization: `Bearer ${admin.access_token}` },
