@@ -9,7 +9,8 @@ describe("ad and building pages: the first photo and the data inside the page", 
   it("the photo each page puts at the top", () => {
     expect(PAGE_READS.building.lead({ photos: [`${B}b/1.jpg`], flats: [{ images: [`${B}f/1.jpg`] }] })).toBe(`${B}b/1.jpg`);
     expect(PAGE_READS.building.lead({ photos: [], flats: [{ images: [`${B}f/tour.mp4`, `${B}f/1.jpg`] }] })).toBe(`${B}f/1.jpg`);
-    expect(PAGE_READS.building.lead({ cover_video: "v.mp4", photos: [`${B}b/1.jpg`] })).toBe("");
+    // A video building opens on its poster photo; the video starts once the page has loaded.
+    expect(PAGE_READS.building.lead({ cover_video: "v.mp4", photos: [`${B}b/1.jpg`] })).toBe(`${B}b/1.jpg`);
     expect(PAGE_READS["visit-b"].lead({ photos: [`${B}b/2.jpg`] })).toBe(`${B}b/2.jpg`);
     // A typed cover leads a flat's gallery; a made (framed) one doesn't.
     expect(PAGE_READS.visit.lead({ cover_image_url: `${B}c.jpg`, images: [`${B}1.jpg`] })).toBe(`${B}c.jpg`);

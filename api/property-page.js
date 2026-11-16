@@ -185,7 +185,11 @@ export default async function handler(req) {
   const [shellRes, row] = await Promise.all([
     fetch(new URL("/app.html", url.origin)),
     // Other hosts (partners., owners., society.) draw their own apps at this path.
-    /^(www\.)?moveazy\.co\.in$|\.vercel\.app$/i.test(url.hostname) ? fetchAppListingRow(id) : Promise.resolve(null),
+    // Never longer than 800 ms: a slow database moment once held this page blank for 15 s.
+    // Without the row the app draws the page and reads the flat itself.
+    /^(www\.)?moveazy\.co\.in$|\.vercel\.app$/i.test(url.hostname)
+      ? Promise.race([fetchAppListingRow(id), new Promise((r) => setTimeout(() => r(null), 800))])
+      : Promise.resolve(null),
   ]);
   const shell = await shellRes.text();
   let html = shell;

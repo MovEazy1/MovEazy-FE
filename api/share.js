@@ -151,8 +151,8 @@ export const PAGE_READS = {
     key: (id) => `partner_curated_open:${id}`, lead: () => "" },
   building: { fn: "building_page", args: (id) => ({ p_code: id }), ok: (id) => /^[A-Za-z0-9]{6}$/.test(id),
     key: (id) => `building_page:${id}`,
-    // BuildingPage: its own photos, else its flats' — none when a video leads.
-    lead: (d) => (d.cover_video ? "" : firstPhoto((d.photos ?? []).filter(Boolean).length ? d.photos : (d.flats ?? []).flatMap(flatMedia))) },
+    // BuildingPage: its own photos, else its flats' — when a video leads, its poster (the same photo).
+    lead: (d) => firstPhoto((d.photos ?? []).filter(Boolean).length ? d.photos : (d.flats ?? []).flatMap(flatMedia)) },
   "visit-b": { fn: "visit_ad_page", args: (id) => ({ p_kind: "building", p_ref: id }), ok: (id) => /^[A-HJ-NP-Z2-9]{6}$/i.test(id),
     key: (id) => `visit_ad_page:building:${id}`, lead: (d) => firstPhoto(d.photos) },
   visit: { fn: "visit_ad_page", args: (id) => ({ p_kind: "flat", p_ref: id }), ok: (id) => /^MZ-[A-Z0-9]{4,12}$/i.test(id),
@@ -254,8 +254,9 @@ export default async function handler(req) {
         } else if (read === PAGE_READS.c && !data.known) {
           // First visit to a shortlist: the number form, drawn (api/_curatedPrepaint.js).
           html = withCuratedPrepaint(html, id, data);
-        } else if (read === PAGE_READS.building && !data.cover_video) {
+        } else if (read === PAGE_READS.building) {
           // A building's own page, drawn too (api/_buildingPrepaint.js): its photos, else its flats'.
+          // A video building is drawn with the video's poster photo; the video starts once the page has loaded.
           const own = (data.photos ?? []).filter(Boolean);
           const media = own.length ? own : (data.flats ?? []).flatMap(flatMedia).slice(0, 8);
           const lead = read.lead(data);

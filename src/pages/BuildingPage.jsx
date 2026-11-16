@@ -30,6 +30,8 @@ import { OTP_LENGTH, RESEND_AFTER_S, accountHasVerifiedMobile, phoneOtpAvailable
 import { trackPixelOnce } from "../lib/metaPixel";
 import RequirePhoneFirst from "../components/RequirePhoneFirst";
 import { dropPrerender } from "../lib/prerender";
+import { isVideoUrl } from "../lib/listingMedia";
+import { thumbUrl } from "../lib/imageShrink";
 // From public/, at a fixed address: the page drawn before the app (api/_buildingPrepaint.js) shows the same file.
 const logo = "/moveazy-logo-mint-light.png";
 
@@ -229,6 +231,19 @@ function Shell({ children }) {
 /** The building's walk-through video first, its photos a tap away. */
 function VideoHero({ src, photos, name }) {
   const [showPhotos, setShowPhotos] = useState(false);
+  // The video starts once the page and its photos are in, not with them: a 20 MB walk-through
+  // fetched at once took the whole connection and the page sat unfinished for ~20 s on 4G.
+  // Until then its poster shows — the photo's small copy the link's HTML already fetched.
+  const [play, setPlay] = useState(false);
+  useEffect(() => {
+    let t;
+    const go = () => { t = setTimeout(() => setPlay(true), 1200); };
+    if (document.readyState === "complete") go();
+    else window.addEventListener("load", go, { once: true });
+    return () => { clearTimeout(t); window.removeEventListener("load", go); };
+  }, []);
+  const still = photos.find((p) => !isVideoUrl(p));
+  const poster = still ? thumbUrl(still) : undefined;
   if (showPhotos && photos.length) {
     return (
       <div className="bp-gwrap">
@@ -240,7 +255,7 @@ function VideoHero({ src, photos, name }) {
   return (
     <div className="bp-gwrap">
       <div className="bp-gallery bp-video">
-        <video src={src} autoPlay muted loop playsInline controls preload="metadata" poster={photos[0] || undefined} aria-label={`${name} — video`} />
+        <video src={play ? src : undefined} autoPlay muted loop playsInline controls preload={play ? "auto" : "none"} poster={poster} aria-label={`${name} — video`} />
       </div>
       {photos.length > 0 && (
         <button type="button" className="bp-heroswitch" onClick={() => setShowPhotos(true)}><Images size={14} /> Photos · {photos.length}</button>
