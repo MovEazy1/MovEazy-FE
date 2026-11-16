@@ -10,11 +10,15 @@ import { pp } from "../../lib/partners";
 import { VISIT_STATUS, fetchPartnerLiveVisits, pingPartner, useLivePing, visitTime } from "../../lib/liveVisits";
 import LiveVisitBubble, { bubbleVisit } from "../../components/LiveVisitBubble";
 
-/** The partner's open visits, kept fresh (every 20 s while one is live, else every 2 min). */
+/**
+ * The partner's open visits, kept fresh: every 20 s while one is live or
+ * waiting for the tenant to set off (so live location starts as soon as they
+ * tap "I am coming"), else every 2 min.
+ */
 export function usePartnerLiveVisits() {
   const [rows, setRows] = useState([]);
   const load = useCallback(() => fetchPartnerLiveVisits().then(setRows, () => {}), []);
-  const live = rows.some((v) => v.live);
+  const live = rows.some((v) => v.live || v.status === "shared");
   useEffect(() => {
     load();
     const t = setInterval(load, live ? 20000 : 120000);
@@ -23,8 +27,8 @@ export function usePartnerLiveVisits() {
   return [rows, setRows];
 }
 
-export default function PartnerVisitCards() {
-  const [rows] = usePartnerLiveVisits();
+/** `rows`: the partner's visits (usePartnerLiveVisits, held by Home). */
+export default function PartnerVisitCards({ rows = [] }) {
   const open = rows.filter((v) => v.status !== "done");
   if (!open.length) return null;
   return (

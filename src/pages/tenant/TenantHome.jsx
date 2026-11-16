@@ -23,6 +23,7 @@ import { profileScore, scoreLabel } from "../../lib/tenantProfile";
 import { ScoreRing, TN_CSS, TenantCard } from "./tenantUi";
 import YourPartner from "./YourPartner";
 import ExploreSocietiesCard from "../societies/ExploreSocietiesCard";
+import MyVisitCard from "../../components/MyVisitCard";
 
 
 function greeting() {
@@ -111,6 +112,8 @@ export default function TenantHome({ name = "", profile = {}, onFind, onList, on
 
       <header className="tn-head">
         <div className="tn-col">
+          {/* On top: a visit with a MovEazy partner, when there is one. */}
+          <MyVisitCard />
           <p className="tn-hello">{greeting()},</p>
           <h1 className="tn-name">{first}</h1>
           <div className="tn-profile">

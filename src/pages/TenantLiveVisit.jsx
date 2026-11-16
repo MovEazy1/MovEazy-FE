@@ -116,16 +116,26 @@ export default function TenantLiveVisit() {
               partnerLabel={partnerFirst} tenantLabel="You" height={320} />
           </Suspense>
           {v.live && (
-            <p style={{ margin: "10px 0 0", color: "#5C6B67" }}>
+            <p style={{ margin: "10px 0 0", color: "#04211D", fontWeight: 800 }}>You and {partnerFirst} can now see each other live.</p>
+          )}
+          {v.live && (
+            <p style={{ margin: "6px 0 0", color: "#5C6B67" }}>
               {v.broker_loc ? `${partnerFirst} is ${distanceText(away)} from the meeting spot · ${seenAgo(v.broker_loc.at)}` : `Waiting for ${partnerFirst}'s location…`}
               {" "}Keep this page open so {partnerFirst} can see you coming.
             </p>
           )}
           {v.status === "shared" && (
             <button type="button" style={{ ...btn(true), width: "100%", marginTop: 12 }} disabled={busy === "coming"}
-              onClick={() => run("coming", () => tenantComing(v.id))}>
+              onClick={() => {
+                // Ask for location from the tap itself (phones only prompt from a tap), so sharing starts at once.
+                navigator.geolocation?.getCurrentPosition(() => {}, () => {}, { enableHighAccuracy: true, timeout: 15000, maximumAge: 60000 });
+                run("coming", () => tenantComing(v.id));
+              }}>
               {busy === "coming" ? "Telling them…" : "I am coming"}
             </button>
+          )}
+          {v.status === "shared" && (
+            <p style={{ margin: "8px 0 0", textAlign: "center", color: "#5C6B67", fontSize: 14 }}>Tap to see your partner&apos;s live location</p>
           )}
           {v.live && (
             <button type="button" style={{ ...btn(false), width: "100%", marginTop: 10 }} disabled={!!busy}

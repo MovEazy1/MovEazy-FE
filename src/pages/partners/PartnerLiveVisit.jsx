@@ -9,7 +9,7 @@
  */
 import { lazy, Suspense, useCallback, useEffect, useState } from "react";
 import { useParams } from "react-router-dom";
-import { CircleAlert, MapPin, Navigation, Phone } from "lucide-react";
+import { CircleAlert, LocateFixed, MapPin, Navigation, Phone } from "lucide-react";
 import { usePartner } from "./PartnerApp";
 import { Empty, Loading, TopBar, WhatsAppIcon, formatPhone, toast } from "./partnerUi";
 import { pp } from "../../lib/partners";
@@ -22,6 +22,30 @@ import {
 const LiveVisitMap = lazy(() => import("../../components/LiveVisitMap"));
 const errText = (e) => e?.message || "Something went wrong.";
 
+/** Asks the phone for location now (from the tap), so live sharing later needs no prompt. → true when allowed. */
+const askLocation = () => new Promise((resolve) => {
+  if (!navigator.geolocation) { resolve(false); return; }
+  navigator.geolocation.getCurrentPosition(() => resolve(true), (e) => resolve(e?.code !== 1), { enableHighAccuracy: true, timeout: 15000, maximumAge: 60000 });
+});
+
+/** "granted" | "denied" | "prompt" | null (unknown), kept current. */
+function useLocationPermission() {
+  const [state, setState] = useState(null);
+  useEffect(() => {
+    let status = null;
+    let alive = true;
+    const onChange = () => alive && setState(status.state);
+    navigator.permissions?.query?.({ name: "geolocation" }).then((s) => {
+      if (!alive) return;
+      status = s;
+      setState(s.state);
+      s.addEventListener?.("change", onChange);
+    }, () => {});
+    return () => { alive = false; status?.removeEventListener?.("change", onChange); };
+  }, []);
+  return state;
+}
+
 export default function PartnerLiveVisit() {
   const { id } = useParams();
   const { me } = usePartner();
@@ -30,6 +54,7 @@ export default function PartnerLiveVisit() {
   const [link, setLink] = useState("");
   const [busy, setBusy] = useState("");
   const [editing, setEditing] = useState(false);
+  const locPerm = useLocationPermission();
 
   const load = useCallback(() => fetchPartnerLiveVisits().then((rows) => setV(rows.find((x) => x.id === id) || null), () => setV(null)), [id]);
   useEffect(() => { load(); }, [load]);
@@ -65,8 +90,11 @@ export default function PartnerLiveVisit() {
     } finally { setBusy(""); }
   };
   const share = async () => {
+    // Asked from the tap itself (phones only prompt from a tap), alongside sharing the spot.
+    const allowed = askLocation();
     const row = await run("share", () => sharePartnerSpot(v.id, pick.lat, pick.lng, link.trim().startsWith("http") ? link.trim() : ""), "Meeting spot shared");
     if (row) setEditing(false);
+    if (!(await allowed)) toast("Location is blocked. Allow location for this app so the tenant can see you coming.", "error");
   };
   const st = VISIT_STATUS[v.status] || VISIT_STATUS.assigned;
   const tenantFirst = String(v.client?.name || "Tenant").split(" ")[0];
@@ -78,8 +106,8 @@ export default function PartnerLiveVisit() {
       <TopBar title={`Visit · ${tenantFirst}`} back={pp("/")} />
       <div className="pz-pad">
         <div className="pz-section">
-          <div style={{ display: "flex", justifyContent: "space-between", gap: 8 }}>
-            <div style={{ minWidth: 0 }}>
+          <div style={{ display: "flex", justifyContent: "space-between", gap: 8, minWidth: 0 }}>
+            <div style={{ minWidth: 0, overflowWrap: "anywhere" }}>
               <b style={{ fontSize: 16 }}>{v.client?.name || "Tenant"}</b>
               <div className="pz-meta">{v.flat?.title} · {visitTime(v.visit_at)}</div>
             </div>
@@ -95,17 +123,22 @@ export default function PartnerLiveVisit() {
           <div className="pz-section">
             <b style={{ fontSize: 15 }}>Share where to meet</b>
             <p className="pz-hint" style={{ margin: "4px 0 10px" }}>Paste a Google Maps link, or tap the spot on the map.</p>
-            <div style={{ display: "flex", gap: 8, marginBottom: 10 }}>
-              <input className="pz-input" placeholder="Paste a Google Maps link" value={link} onChange={(e) => setLink(e.target.value)} aria-label="Google Maps link" />
-              <button type="button" className="pz-btn" disabled={busy === "link" || link.trim().length < 8} onClick={fromLink}>{busy === "link" ? "…" : "Use"}</button>
+            <div style={{ display: "flex", gap: 8, marginBottom: 10, minWidth: 0 }}>
+              <input className="pz-input" style={{ flex: 1, minWidth: 0, width: "auto" }} placeholder="Paste a Google Maps link" value={link}
+                onChange={(e) => setLink(e.target.value)} aria-label="Google Maps link" />
+              <button type="button" className="pz-btn" style={{ flex: "none" }} disabled={busy === "link" || link.trim().length < 8} onClick={fromLink}>{busy === "link" ? "…" : "Use"}</button>
             </div>
             <Suspense fallback={<Loading label="Loading the map…" />}>
               <LiveVisitMap flat={v.flat} meet={pick} onPick={(lat, lng) => { setPick({ lat, lng }); setLink(""); }} height={280} />
             </Suspense>
             {v.saved_spot && v.status === "assigned" && <p className="pz-hint" style={{ margin: "8px 0 0" }}>Filled in with your spot for this flat from last time.</p>}
             <div style={{ display: "flex", gap: 8, alignItems: "flex-start", margin: "10px 0", padding: 10, borderRadius: 10, background: "#FFF4E5", color: "#7A4A0B", fontSize: 13, lineHeight: 1.5 }}>
-              <CircleAlert size={17} style={{ flex: "none", marginTop: 1 }} /> {SPOT_WARNING}
+              <CircleAlert size={17} style={{ flex: "none", marginTop: 1 }} /> <span style={{ minWidth: 0 }}>{SPOT_WARNING}</span>
             </div>
+            <p className="pz-hint" style={{ margin: "0 0 10px", display: "flex", gap: 6, alignItems: "flex-start" }}>
+              <LocateFixed size={15} style={{ flex: "none", marginTop: 2 }} />
+              <span>Your phone will ask for your location — tap Allow. When {tenantFirst} taps &quot;I am coming&quot;, you both see each other live automatically. Keep this app open.</span>
+            </p>
             <button type="button" className="pz-btn pz-btn--primary pz-btn--block" disabled={!pick || busy === "share"} onClick={share}>
               <MapPin size={16} /> {busy === "share" ? "Sharing…" : "Share this spot"}
             </button>
@@ -113,6 +146,17 @@ export default function PartnerLiveVisit() {
           </div>
         ) : (
           <div className="pz-section">
+            {locPerm === "denied" && v.status !== "done" && (
+              <div style={{ display: "flex", gap: 8, alignItems: "flex-start", marginBottom: 10, padding: 10, borderRadius: 10, background: "#FEE2E2", color: "#991B1B", fontSize: 13, lineHeight: 1.5 }}>
+                <CircleAlert size={17} style={{ flex: "none", marginTop: 1 }} />
+                <span style={{ minWidth: 0 }}>Location is blocked for this app, so {tenantFirst} can&apos;t see you. Allow it in your browser&apos;s site settings, then come back.</span>
+              </div>
+            )}
+            {locPerm === "prompt" && v.status !== "done" && (
+              <button type="button" className="pz-btn pz-btn--block" style={{ marginBottom: 10 }} onClick={askLocation}>
+                <LocateFixed size={16} /> Allow my location for live sharing
+              </button>
+            )}
             <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 8, marginBottom: 8 }}>
               <b style={{ fontSize: 15 }}>{v.live ? "Live" : "Meeting spot"}</b>
               {v.status !== "done" && <button type="button" className="pz-btn pz-btn--sm" onClick={() => setEditing(true)}>Change spot</button>}
@@ -121,6 +165,11 @@ export default function PartnerLiveVisit() {
               <LiveVisitMap flat={v.flat} meet={v.meet} partner={v.live ? v.broker_loc : null} tenant={v.live ? v.tenant_loc : null}
                 partnerLabel="You" tenantLabel={tenantFirst} height={300} />
             </Suspense>
+            {v.status === "shared" && (
+              <div className="pz-meta" style={{ marginTop: 8 }}>
+                When {tenantFirst} taps &quot;I am coming&quot;, you&apos;ll both see each other here, live.
+              </div>
+            )}
             {v.live && (
               <div className="pz-meta" style={{ marginTop: 8 }}>
                 {v.tenant_loc ? `${tenantFirst} is ${distanceText(tenantFar)} from the spot · ${seenAgo(v.tenant_loc.at)}` : `Waiting for ${tenantFirst}'s location…`}

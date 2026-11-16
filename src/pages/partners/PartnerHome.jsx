@@ -17,7 +17,8 @@ import { PaymentCheckBanner, TrialBanner } from "./TrialPremium";
 import { InstallBanner } from "./InstallApp";
 import NewLeadCard from "./NewLeadCard";
 import SocietiesHomeCard from "./SocietiesHomeCard";
-import PartnerVisitCards from "./PartnerVisitCards";
+import PartnerVisitCards, { usePartnerLiveVisits } from "./PartnerVisitCards";
+import { bubbleVisit } from "../../components/LiveVisitBubble";
 import { TodayPanel } from "./TenantKit";
 import { useTenants } from "./tenantData";
 import { useMatcherRows } from "./AiMatcher";
@@ -81,6 +82,7 @@ export default function PartnerHome() {
   const navigate = useNavigate();
   const { me, inventory, groups, saved, status, reloadStatus, demo, explain } = usePartner();
   const { board } = useTenants();
+  const [visits] = usePartnerLiveVisits();
   const p = me?.partner ?? {};
   const [rating, setRating] = useState(null);
   const [leadTotal, setLeadTotal] = useState(null);
@@ -116,8 +118,9 @@ export default function PartnerHome() {
       <div className="pz-pad ph">
         <PaymentCheckBanner payment={status?.payment} />
         <TrialBanner trial={status?.trial} />
-        <PartnerVisitCards />
-        <NewLeadCard />
+        <PartnerVisitCards rows={visits} />
+        {/* A slim floating pill; above the visit bubble when that shows. */}
+        <NewLeadCard raised={Boolean(bubbleVisit(visits, "partner"))} />
         <SocietiesHomeCard />
         <InstallBanner />
 
