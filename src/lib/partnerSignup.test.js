@@ -55,3 +55,32 @@ describe("a referral link counts for 24 hours, on every MovEazy site", () => {
     expect(refFromCookie(`mz_partner_ref=${encodeURIComponent(`as<ha.${at}`)}`, at)).toEqual({ ref: "ASHA", at });
   });
 });
+
+describe("a group invite is kept until it is used", () => {
+  beforeEach(() => store.clear());
+  const TOKEN = "0123456789abcdef0123456789abcdef";
+
+  it("kept on this site for its 7 days, then dropped", async () => {
+    const { INVITE_TTL, pendingGroupInvite, rememberGroupInvite, forgetGroupInvite } = await import("./partnerSignup");
+    const at = 1_800_000_000_000;
+    rememberGroupInvite(TOKEN, at);
+    expect(pendingGroupInvite(at + 60_000, "")).toBe(TOKEN);
+    expect(pendingGroupInvite(at + INVITE_TTL + 1, "")).toBe("");
+    forgetGroupInvite();
+    expect(pendingGroupInvite(at + 60_000, "")).toBe("");
+  });
+
+  it("read from the cookie a link opened on another MovEazy site left", async () => {
+    const { INVITE_TTL, pendingGroupInvite } = await import("./partnerSignup");
+    const at = 1_800_000_000_000;
+    const cookie = `x=1; mz_group_invite=${encodeURIComponent(`${TOKEN}.${at}`)}`;
+    expect(pendingGroupInvite(at + 3_600_000, cookie)).toBe(TOKEN);
+    expect(pendingGroupInvite(at + INVITE_TTL + 1, cookie)).toBe("");
+  });
+
+  it("ignores anything that isn't an invite code", async () => {
+    const { pendingGroupInvite, rememberGroupInvite } = await import("./partnerSignup");
+    rememberGroupInvite("<script>");
+    expect(pendingGroupInvite(Date.now(), "")).toBe("");
+  });
+});

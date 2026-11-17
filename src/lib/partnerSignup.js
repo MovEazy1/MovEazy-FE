@@ -155,3 +155,50 @@ export function startReferralJoin(rawPhone) {
   }
   return `https://wa.me/91${JOIN_DESK}?text=${encodeURIComponent(joinMessage(phone, src.ref))}`;
 }
+
+/* ── A group invite (/join/:token) ───────────────────────────────────────── */
+
+/**
+ * The group invite this browser opened, kept until it is used — 7 days, the
+ * invite's own life. It used to live only in the tab (sessionStorage): a
+ * broker whose Google sign-in finished in another tab or browser window — a
+ * link opened inside WhatsApp, a closed tab, coming back later — lost it and
+ * never joined. Now it is kept in this site's storage and in a cookie for
+ * .moveazy.co.in, and the partner app redeems it whenever they are signed in.
+ */
+export const INVITE_TTL = 7 * 24 * 60 * 60 * 1000;
+const INVITE_LOCAL = "mz_partner_invite_v2";
+const INVITE_COOKIE = "mz_group_invite";
+const TOKEN_RE = /^[A-Za-z0-9_-]{8,128}$/;
+
+export function rememberGroupInvite(token, now = Date.now()) {
+  const t = String(token || "").trim();
+  if (!TOKEN_RE.test(t)) return;
+  try { sessionStorage.setItem("mz_partner_invite", t); } catch { /* private tab */ }
+  write(INVITE_LOCAL, { token: t, at: now });
+  try {
+    document.cookie = `${INVITE_COOKIE}=${encodeURIComponent(`${t}.${now}`)}; Max-Age=${INVITE_TTL / 1000}; Path=/; SameSite=Lax${cookieDomain()}${window.location.protocol === "https:" ? "; Secure" : ""}`;
+  } catch { /* cookies off */ }
+}
+
+/** The invite waiting to be used in this browser, or "". */
+export function pendingGroupInvite(now = Date.now(), cookie = typeof document === "undefined" ? "" : document.cookie) {
+  const local = read(INVITE_LOCAL);
+  if (local?.token && now - Number(local.at) < INVITE_TTL && TOKEN_RE.test(local.token)) return local.token;
+  try {
+    const s = sessionStorage.getItem("mz_partner_invite");
+    if (s && TOKEN_RE.test(s)) return s;
+  } catch { /* ignore */ }
+  const m = new RegExp(`(?:^|;\\s*)${INVITE_COOKIE}=([^;]+)`).exec(cookie || "");
+  if (!m) return "";
+  const raw = decodeURIComponent(m[1]);
+  const dot = raw.lastIndexOf(".");
+  const t = raw.slice(0, dot);
+  return TOKEN_RE.test(t) && now - Number(raw.slice(dot + 1)) < INVITE_TTL ? t : "";
+}
+
+export function forgetGroupInvite() {
+  try { sessionStorage.removeItem("mz_partner_invite"); } catch { /* ignore */ }
+  try { localStorage.removeItem(INVITE_LOCAL); } catch { /* ignore */ }
+  try { document.cookie = `${INVITE_COOKIE}=; Max-Age=0; Path=/; SameSite=Lax${cookieDomain()}`; } catch { /* ignore */ }
+}

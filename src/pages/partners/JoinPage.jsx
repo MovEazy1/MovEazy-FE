@@ -10,8 +10,7 @@ import { Navigate, useParams } from "react-router-dom";
 import { Users } from "lucide-react";
 import { previewInvite, pp } from "../../lib/partners";
 import { GoogleButton } from "./PartnerWelcome";
-import { INVITE_KEY } from "./PartnerApp";
-import { captureSource } from "../../lib/partnerSignup";
+import { captureSource, rememberGroupInvite } from "../../lib/partnerSignup";
 import logo from "../../assets/logo/moveazy-logo-light.png";
 
 export default function JoinPage({ redirectWhenReady = false }) {
@@ -19,7 +18,8 @@ export default function JoinPage({ redirectWhenReady = false }) {
   const [preview, setPreview] = useState(undefined);
 
   useEffect(() => {
-    try { sessionStorage.setItem(INVITE_KEY, token); } catch { /* private tab: joining still works signed in */ }
+    // Kept until used (7 days), whichever tab or MovEazy site the sign-in finishes on.
+    rememberGroupInvite(token);
     captureSource("group_invite");
   }, [token]);
 

@@ -29,7 +29,7 @@ import { claimCrmListings, fetchPartnerStatus } from "../../lib/partnerPlans";
 import { JoinPremiumBar, PremiumExplainer } from "./demoMode";
 import { useUnreadCount } from "./PartnerInbox";
 import { MOVEAZY_TEAM_WHATSAPP } from "../../config/contactChannels";
-import { clearPendingSignup, pendingSignupPhone, stampPartnerSignup } from "../../lib/partnerSignup";
+import { clearPendingSignup, forgetGroupInvite, pendingGroupInvite, pendingSignupPhone, stampPartnerSignup } from "../../lib/partnerSignup";
 import { CreateSheet, Loading, PartnerStyles, ToastHost, WhatsAppIcon, toast } from "./partnerUi";
 import { AddFab, BottomNav, CHROME_CSS, FAB_ON, MenuDrawer } from "./PartnerChrome";
 import { InstallHost } from "./InstallApp";
@@ -246,12 +246,11 @@ function PartnerWorkspace({ me, reloadMe }) {
     if (!rel.startsWith("/welcome")) navigate(pp("/welcome"));
   }, [status?.congrats_due, rel, navigate]);
 
-  // An invite opened before sign-in is redeemed here, once.
+  // An invite opened before sign-in (lib/partnerSignup.js keeps it 7 days, in any tab or MovEazy site) is redeemed here.
   const redeemed = useRef(false);
   useEffect(() => {
     if (redeemed.current) return;
-    let token = "";
-    try { token = sessionStorage.getItem(INVITE_KEY) || ""; } catch { /* ignore */ }
+    const token = pendingGroupInvite();
     if (!token) return;
     redeemed.current = true;
     (async () => {
@@ -260,10 +259,11 @@ function PartnerWorkspace({ me, reloadMe }) {
         toast("You're in the group");
         await Promise.all([reloadGroups(), reloadInventory()]);
         navigate(pp(`/groups/${gid}`), { replace: true });
+        forgetGroupInvite();
       } catch (e) {
         toast(friendlyError(e, "Could not join that group."), "error");
-      } finally {
-        try { sessionStorage.removeItem(INVITE_KEY); } catch { /* ignore */ }
+        // An expired or used link is dropped; a dropped connection tries again next time.
+        if (e?.code) forgetGroupInvite();
       }
     })();
   }, [navigate, reloadGroups, reloadInventory]);
