@@ -278,6 +278,26 @@ export const setMemberRole = (groupId, userId, role) =>
   rpc("partner_set_member_role", { p_group: groupId, p_user: userId, p_role: role });
 
 /**
+ * Add a partner by mobile number (partner_group_add.sql) → { status, name, phone, signed_up }.
+ * status 'added' (in now), 'already', or 'invited' (joins when that number is an approved partner, within 30 days).
+ */
+export const addMemberByPhone = (groupId, phone) => rpc("partner_add_member_by_phone", { p_group: groupId, p_phone: phone });
+/** Numbers waiting to join: all for the owner/admins (and CRM), your own for everyone else. */
+export const fetchGroupPending = (groupId) =>
+  rpc("partner_group_pending_list", { p_group: groupId }).then((r) => r ?? [], () => []);
+export const cancelPendingMember = (pendingId) => rpc("partner_cancel_pending", { p_id: pendingId });
+
+/** The WhatsApp telling someone they were added — or, if not a partner yet, how to get in. */
+export function addedMessage({ groupName, groupId, fromName = "", invited = false, phone = "", name = "" }) {
+  const hi = `Hi${name ? ` ${String(name).split(" ")[0]}` : ""},`;
+  const who = fromName ? `${fromName} has` : "I've";
+  if (invited) {
+    return `${hi} ${who} added you to *${groupName}* on MovEazy Partners — shared rental inventory for brokers, with brokerage shown on every flat.\n\nSign up here with this number${phone ? ` (${phone})` : ""} and you'll be in the group automatically:\nhttps://partners.moveazy.co.in`;
+  }
+  return `${hi} ${who} added you to *${groupName}* on MovEazy Partners. Open the app to see the flats the group shares:\nhttps://partners.moveazy.co.in/groups/${groupId}`;
+}
+
+/**
  * The join link, on whichever host the inviter is using — partners.moveazy.co.in
  * or moveazy.co.in/partners both serve the app, so either opens it.
  */
@@ -415,3 +435,17 @@ export function describeSharing(info) {
   for (const g of info.groups ?? []) parts.push(`${g.name} ${g.pct}%`);
   return parts.length ? parts.join(" · ") : "Only them (not shared)";
 }
+
+/* ── CRM: Brokers → Unions (partner_group_add.sql) ───────────────────────── */
+
+/** Every partner group, with its owner and admins ([{ user_id, name, phone, role }]). Any CRM staff. */
+export const crmListUnions = () => rpc("crm_partner_groups").then((r) => r ?? []);
+/** → { status: 'added' | 'already' | 'invited', name, phone, signed_up }, as addMemberByPhone. */
+export const crmUnionAdd = (groupId, phone) => rpc("crm_group_add_member", { p_group: groupId, p_phone: phone });
+export const crmUnionRemove = (groupId, userId) => rpc("crm_group_remove_member", { p_group: groupId, p_user: userId });
+/** 'admin' | 'member' | 'owner' (hands the group over; the old owner stays as an admin). */
+export const crmUnionSetRole = (groupId, userId, role) => rpc("crm_group_set_role", { p_group: groupId, p_user: userId, p_role: role });
+export const crmCreateUnion = (name, description, ownerPhone) =>
+  rpc("crm_create_group", { p_name: name, p_description: description, p_owner_phone: ownerPhone });
+export const crmUpdateUnion = (groupId, name, description) =>
+  rpc("crm_update_group", { p_group: groupId, p_name: name, p_description: description });

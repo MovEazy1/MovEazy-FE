@@ -4,17 +4,19 @@
  * Any member may invite (the association grows by word of mouth); only the
  * owner and admins remove people. An invite is a single-use link valid for 7
  * days — the invitee taps it, signs in with Google, verifies their mobile, and
- * is in.
+ * is in. Or add them by mobile number (AddMemberSheet): a partner is in at
+ * once; anyone else is "Invited" until they sign up with that number.
  */
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
-import { Copy, LogOut, MoreVertical, UserPlus } from "lucide-react";
+import { Clock, Copy, LogOut, MoreVertical, Phone, UserPlus } from "lucide-react";
 import { usePartner } from "./PartnerApp";
 import { Avatar, Empty, Loading, PropertyCard, Sheet, TopBar, WhatsAppIcon, formatPhone, toast } from "./partnerUi";
 import FlatActions from "./FlatActions";
+import AddMemberSheet from "./AddMemberSheet";
 import {
-  createInvite, customerMessage, fetchGroupMembers, friendlyError, inviteLink, inviteMessage, pp, removeMember,
-  setMemberRole, waLink,
+  addedMessage, cancelPendingMember, createInvite, customerMessage, fetchGroupMembers, fetchGroupPending, friendlyError, inviteLink, inviteMessage, pp,
+  removeMember, setMemberRole, waLink,
 } from "../../lib/partners";
 
 export default function GroupDetail() {
@@ -26,14 +28,28 @@ export default function GroupDetail() {
   const [members, setMembers] = useState(null);
   const [inviting, setInviting] = useState(false);
   const [manage, setManage] = useState(null);
+  const [adding, setAdding] = useState(false);
+  const [pending, setPending] = useState([]);
 
-  const loadMembers = useCallback(() => fetchGroupMembers(id).then(setMembers, () => setMembers([])), [id]);
+  const loadMembers = useCallback(() => Promise.all([
+    fetchGroupMembers(id).then(setMembers, () => setMembers([])),
+    fetchGroupPending(id).then(setPending),
+  ]), [id]);
   useEffect(() => { loadMembers(); }, [loadMembers]);
 
   const listings = useMemo(() => (inventory ?? []).filter((l) => l.group_ids.includes(id)), [inventory, id]);
   const myId = me?.partner?.user_id;
   const myRole = group?.my_role;
   const canManage = myRole === "owner" || myRole === "admin" || me?.can_manage;
+
+  // Just added to this group (a notification tapped while the app was open): the list is from before.
+  const refreshed = useRef(false);
+  useEffect(() => {
+    if (group || refreshed.current) return;
+    refreshed.current = true;
+    reloadGroups();
+    reloadInventory();
+  }, [group, reloadGroups, reloadInventory]);
 
   if (!group) return <><TopBar title="Group" back={pp("/groups")} />{groups.length ? <Empty>You're not in this group.</Empty> : <Loading />}</>;
 
@@ -77,6 +93,17 @@ export default function GroupDetail() {
     }
   };
 
+  const cancelPending = async (p) => {
+    if (!window.confirm(`Cancel the invite for ${formatPhone(p.phone)}? They won't join when they sign up.`)) return;
+    try {
+      await cancelPendingMember(p.id);
+      setPending((cur) => cur.filter((x) => x.id !== p.id));
+      toast("Invite cancelled");
+    } catch (e) {
+      toast(friendlyError(e), "error");
+    }
+  };
+
   const toggleAdmin = async (m) => {
     try {
       await setMemberRole(id, m.user_id, m.role === "admin" ? "member" : "admin");
@@ -98,9 +125,10 @@ export default function GroupDetail() {
           <button type="button" className="pz-btn pz-wa" style={{ flex: 1 }} disabled={inviting} onClick={() => invite("wa")}>
             <WhatsAppIcon /> Invite via WhatsApp
           </button>
+          <button type="button" className="pz-btn" onClick={() => setAdding(true)}><Phone size={16} /> Add by number</button>
           <button type="button" className="pz-btn" disabled={inviting} onClick={() => invite("copy")} aria-label="Copy invite link"><Copy size={17} /></button>
         </div>
-        <p className="pz-hint" style={{ margin: "8px 0 0" }}>Each invite link works once and expires in 7 days.</p>
+        <p className="pz-hint" style={{ margin: "8px 0 0" }}>Each invite link works once and expires in 7 days. Or add a partner by their mobile number.</p>
       </div>
       <div className="pz-tabs" role="tablist">
         {[["inventory", `Inventory (${listings.length})`], ["members", `Members (${group.member_count})`]].map(([k, label]) => (
@@ -150,12 +178,45 @@ export default function GroupDetail() {
                 </div>
               ))}
             </div>
+            {pending.length > 0 && (
+              <>
+                <p className="pz-label" style={{ margin: "16px 0 6px" }}>Invited ({pending.length}) — join when they sign up</p>
+                <div className="pz-card">
+                  {pending.map((p, i) => (
+                    <div key={p.id} className="pz-row" style={{ padding: 12, borderTop: i ? "1px solid var(--line)" : 0 }}>
+                      <span className="pz-avatar" style={{ background: "#FFF3D6", color: "#8A6419" }}><Clock size={16} /></span>
+                      <span style={{ flex: 1, minWidth: 0 }}>
+                        <strong style={{ display: "block" }}>{formatPhone(p.phone)}</strong>
+                        <span className="pz-meta">Added by {p.mine ? "you" : p.added_by_label || "a partner"} · until {new Date(p.expires_at).toLocaleDateString("en-IN", { day: "numeric", month: "short" })}</span>
+                      </span>
+                      <a className="pz-iconbtn" aria-label={`WhatsApp ${formatPhone(p.phone)}`} target="_blank" rel="noreferrer"
+                        href={waLink(p.phone, addedMessage({ groupName: group.name, groupId: id, invited: true, phone: formatPhone(p.phone) }))}>
+                        <WhatsAppIcon color="#16A34A" size={20} />
+                      </a>
+                      {(p.mine || canManage) && (
+                        <button type="button" className="pz-btn pz-btn--ghost" style={{ padding: "6px 10px", color: "var(--red)" }} onClick={() => cancelPending(p)}>Cancel</button>
+                      )}
+                    </div>
+                  ))}
+                </div>
+              </>
+            )}
             </>
           )}
-          <button type="button" className="pz-btn" style={{ width: "100%", marginTop: 12 }} onClick={() => invite("wa")} disabled={inviting}>
-            <UserPlus size={17} /> Invite another broker
-          </button>
+          <div className="pz-row" style={{ marginTop: 12 }}>
+            <button type="button" className="pz-btn" style={{ flex: 1 }} onClick={() => setAdding(true)}>
+              <Phone size={16} /> Add by number
+            </button>
+            <button type="button" className="pz-btn" style={{ flex: 1 }} onClick={() => invite("wa")} disabled={inviting}>
+              <UserPlus size={17} /> Invite link
+            </button>
+          </div>
         </div>
+      )}
+
+      {adding && (
+        <AddMemberSheet group={group} onClose={() => setAdding(false)}
+          onAdded={(r) => { loadMembers(); if (r?.status === "added") reloadGroups(); }} />
       )}
 
       {manage && (
