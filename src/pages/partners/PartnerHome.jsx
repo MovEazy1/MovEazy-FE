@@ -26,6 +26,7 @@ import { DEMO_COUNTS } from "./demoMode";
 import { hasRequirement } from "../../lib/partnerMatch";
 import { fetchLeadStats } from "../../lib/partnerLeads";
 import { fetchMyRating, fetchMyStorefront } from "../../lib/storefront";
+import { TEAM_CSS, TeamCard, WhoInvitedCard, useMyTeam } from "./TeamCard";
 import { stageCounts } from "../../lib/partnerTenants";
 import { pp } from "../../lib/partners";
 
@@ -88,6 +89,7 @@ export default function PartnerHome() {
   const [leadTotal, setLeadTotal] = useState(null);
   const [sf, setSf] = useState(null);
   const [profileOpen, setProfileOpen] = useState(false);
+  const [team, setTeam] = useMyTeam(demo);
 
   useEffect(() => {
     let alive = true;
@@ -113,7 +115,7 @@ export default function PartnerHome() {
 
   return (
     <>
-      <style>{CSS}</style>
+      <style>{CSS}{TEAM_CSS}</style>
       <PartnerHeader />
       <div className="pz-pad ph">
         <PaymentCheckBanner payment={status?.payment} />
@@ -123,6 +125,7 @@ export default function PartnerHome() {
         <NewLeadCard raised={Boolean(bubbleVisit(visits, "partner"))} />
         <SocietiesHomeCard />
         <InstallBanner />
+        <WhoInvitedCard team={team} onClaimed={(claim) => setTeam((t) => ({ ...t, claim, claim_until: null }))} />
 
         <section className="ph-me" aria-label="Your profile">
           {Number(rating) > 0 && (
@@ -164,6 +167,8 @@ export default function PartnerHome() {
           <Tile to={pp("/premium")} icon={<Crown size={24} />} tone="gold" title="Premium"
             sub={status?.plan?.active ? `Till ${shortDate(status.plan.until)}` : status?.trial?.active ? `${plural(status.trial.days_left, "day")} of trial` : "Plans & benefits"} />
         </nav>
+
+        <TeamCard team={team} />
 
         <TodayPanel />
 

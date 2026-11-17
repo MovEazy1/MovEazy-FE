@@ -98,6 +98,14 @@ export default function Wallet() {
 
         {/* ── How your partners are doing ── */}
         <h2 className="wl-h">Your partners{r.joined.length ? ` · ${r.joined.length}` : ""}</h2>
+        {r.joined.length > 0 && r.team && (
+          <div className="wl-team" aria-label="Your partners in total">
+            <div><b>{r.team.listings ?? 0}</b><span>Flats uploaded</span></div>
+            <div><b>{r.team.visits_done ?? 0}</b><span>Visits done</span></div>
+            <div><b>{r.team.visits_on_flats ?? 0}</b><span>Visits on their flats</span></div>
+            <div><b>{r.team.closures ?? 0}</b><span>Closures</span></div>
+          </div>
+        )}
         {r.joined.length === 0 ? (
           <p className="pz-meta" style={{ margin: "0 0 14px" }}>Nobody yet. Share your link on your broker WhatsApp groups; every partner you bring keeps earning for you.</p>
         ) : r.joined.map((j, i) => <PartnerCard key={i} j={j} rate={direct} />)}
@@ -169,6 +177,7 @@ function Estimator({ rate }) {
 function PartnerCard({ j, rate }) {
   const [open, setOpen] = useState(false);
   const deals = j.deals ?? [];
+  const st = j.stats ?? {};
   const earned = deals.filter((d) => ["due", "paid"].includes(d.status)).reduce((s, d) => s + (Number(d.amount) || 0), 0);
   const plan = j.premium_until ? ["Premium", `till ${shortDate(j.premium_until)}`, "on"]
     : j.trial_until ? ["Trial", `till ${shortDate(j.trial_until)}`, "on"]
@@ -186,8 +195,11 @@ function PartnerCard({ j, rate }) {
         <span className={`wl-plan ${plan[2]}`}>{plan[0]}<small>{plan[1]}</small></span>
       </div>
       <div className="wl-stats">
+        <div><b>{st.listings ?? 0}</b><span>Flats uploaded</span></div>
+        <div><b>{st.visits_done ?? 0}</b><span>Visits done</span></div>
+        <div><b>{st.visits_on_flats ?? 0}</b><span>Visits on their flats</span></div>
         <div><b>{j.working ?? 0}</b><span>Leads in hand</span></div>
-        <div><b>{deals.length}</b><span>Deals closed</span></div>
+        <div><b>{st.closures ?? deals.length}</b><span>Closures</span></div>
         <div><b>{rs(earned)}</b><span>You earned</span></div>
       </div>
       {plan[2] === "off" && phone.length === 10 && (
@@ -287,6 +299,10 @@ const CSS = `
 .wl-stats > div { display: grid; gap: 1px; padding: 8px; border-radius: 10px; background: var(--bg); }
 .wl-stats b { font-size: 15px; }
 .wl-stats span { font-size: 11px; color: var(--dim); }
+.wl-team { display: grid; grid-template-columns: repeat(4, 1fr); gap: 6px; margin: 0 0 12px; }
+.wl-team > div { display: grid; gap: 1px; padding: 9px 7px; border-radius: 12px; background: var(--card); border: 1px solid var(--line); }
+.wl-team b { font-size: 16px; }
+.wl-team span { font-size: 10.5px; color: var(--dim); line-height: 1.25; }
 .wl-nudge { display: flex; align-items: center; justify-content: center; gap: 7px; min-height: 40px; margin-top: 10px; border-radius: 11px;
   background: #22C55E; color: #fff; font-size: 13.5px; font-weight: 800; text-decoration: none; }
 .wl-pot { margin: 8px 0 0; font-size: 12.5px; color: var(--dim); }

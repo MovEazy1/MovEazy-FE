@@ -21,6 +21,8 @@ import CrmProgramSettings from "./CrmProgramSettings";
 import CrmBrokerQr from "./CrmBrokerQr";
 import CrmTrialPanel from "./CrmTrialPanel";
 import { PremiumPayments, ReferralCommissions, ReferralPayouts } from "./CrmPremiumPayments";
+import { ReferralClaims, ReferrerSelect } from "./CrmReferrals";
+import { crmPartnerReferrers } from "../../lib/partnerPlans";
 import { useLandingSettings } from "../../lib/landingSettings";
 import { SCOPES } from "../../lib/adminScopes";
 import { whatsappUrl } from "../../lib/crmSettings";
@@ -52,6 +54,8 @@ export default function CrmPartnersSection({ access }) {
   const [savedProgram, setSavedProgram] = useState(null);
   // Society partners: onboard societies from the partner app (society_partners.sql).
   const [societyIds, setSocietyIds] = useState(() => new Set());
+  // user_id → { referrer_id, referrer_name, via } (partner_referral_mapping.sql).
+  const [referrers, setReferrers] = useState({});
   const program = savedProgram || loaded;
 
   const showToast = useCallback((message, tone = "ok") => {
@@ -61,9 +65,10 @@ export default function CrmPartnersSection({ access }) {
 
   const load = useCallback(async () => {
     try {
-      const [list, s, ls, sp] = await Promise.all([adminListPartners(), fetchProgramSettings(), fetchCrmPartnerLeads().catch(() => ({})),
-        fetchSocietyPartnerIds().catch(() => new Set())]);
+      const [list, s, ls, sp, refs] = await Promise.all([adminListPartners(), fetchProgramSettings(), fetchCrmPartnerLeads().catch(() => ({})),
+        fetchSocietyPartnerIds().catch(() => new Set()), crmPartnerReferrers().catch(() => [])]);
       setRows(list);
+      setReferrers(Object.fromEntries(refs.map((x) => [x.user_id, x])));
       setSocietyIds(sp);
       setSettings(s);
       setLeadStats(ls || {});
@@ -140,6 +145,7 @@ export default function CrmPartnersSection({ access }) {
         <CrmTrialPanel canManage={canManage} onToast={showToast} onChanged={load} />
         <ReferralPayouts canManage={canManage} onToast={showToast} />
         <ReferralCommissions canManage={canManage} onToast={showToast} />
+        <ReferralClaims canManage={canManage} onToast={showToast} onChanged={load} />
         <span className="crm-mute" style={{ fontSize: 11.5 }}>
           Partner app: <a href={partnerUrl} target="_blank" rel="noreferrer" style={{ color: C.accent }}>{partnerUrl.replace("https://", "")}</a>
           {" "}(also at moveazy.co.in/partners). Premium is granted by hand here until online payment is live.
@@ -161,7 +167,7 @@ export default function CrmPartnersSection({ access }) {
           <table className="crm-table">
             <thead>
               <tr>
-                <th>Partner</th><th>Mobile</th><th>Status</th><th>Joined</th><th>Listings</th><th title="MovEazy leads given to them (website, milestones, packs); how many they haven't called yet">Leads</th><th>Groups</th><th>Premium</th><th>Client share</th><th title="What this partner earns, % of the rent, on every MovEazy lead closed by partners they referred">Referral commission</th><th title="Shown on their To-Let poster and public page until 10 tenants have rated them">Rating</th><th />
+                <th>Partner</th><th>Mobile</th><th>Status</th><th>Joined</th><th title="The partner who brought them in — earns lifetime commission on their MovEazy deals">Referred by</th><th>Listings</th><th title="MovEazy leads given to them (website, milestones, packs); how many they haven't called yet">Leads</th><th>Groups</th><th>Premium</th><th>Client share</th><th title="What this partner earns, % of the rent, on every MovEazy lead closed by partners they referred">Referral commission</th><th title="Shown on their To-Let poster and public page until 10 tenants have rated them">Rating</th><th />
               </tr>
             </thead>
             <tbody>
@@ -196,6 +202,10 @@ export default function CrmPartnersSection({ access }) {
                     {r.approved_by === "auto" && <div className="crm-mute" style={{ fontSize: 10.5 }}>auto-approved</div>}
                   </td>
                   <td className="crm-mute crm-num">{shortDate(r.created_at)}</td>
+                  <td>
+                    <ReferrerSelect partner={r} current={referrers[r.user_id]} partners={rows} canManage={canManage}
+                      onToast={showToast} onChanged={load} />
+                  </td>
                   <td className="crm-num">{r.listing_count}</td>
                   <td className="crm-num"><LeadCountCell s={leadStats[r.user_id]} onOpen={() => setLeadsFor(r)} /></td>
                   <td className="crm-num">{r.group_count}</td>

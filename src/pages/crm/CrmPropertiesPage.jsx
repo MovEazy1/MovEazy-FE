@@ -6,7 +6,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { useCrm } from "./CrmShell";
-import { describeSharing, fetchPartnerListingMap } from "../../lib/partners";
+import { fetchPartnerListingMap } from "../../lib/partners";
 import { matchListingToRequirements } from "../../lib/inventoryMatch";
 import {
   SHARE_COMPOSERS,
@@ -30,6 +30,7 @@ import { whatsappUrl } from "../../lib/crmSettings";
 import { formatForDisplay } from "../../lib/mobile";
 import { Btn, C, Chip, Empty, ScoreRing, Toast, inr, shortDate } from "./crmUi";
 import CrmBuildingPicker from "./CrmBuildingPicker";
+import ListingPartner, { usePartnerOptions } from "./CrmListingPartner";
 import ThumbImg from "../../components/ThumbImg";
 import {
   bySoldOutDesc, markSoldOut, relistProperty, soldOutDate, soldOutMonth, soldOutMonths, todayInIndia,
@@ -618,6 +619,13 @@ export default function CrmPropertiesPage() {
   const [internalMap, setInternalMap] = useState({});
   /** property_id → the partner who added it and their sharing (partner app listings only). */
   const [partnerMap, setPartnerMap] = useState({});
+  // Approved partners for the "Map to a partner" dropdown (editors only).
+  const partnerOptions = usePartnerOptions(canEdit);
+  const refreshPartner = (pid) => fetchPartnerListingMap([pid]).then((m) => setPartnerMap((cur) => {
+    const next = { ...cur };
+    if (m[pid]) next[pid] = m[pid]; else delete next[pid];
+    return next;
+  }), () => {});
   /** Ticked flats, for "Group into building". */
   const [picked, setPicked] = useState(() => new Set());
   const [buildings, setBuildings] = useState([]);
@@ -800,9 +808,8 @@ export default function CrmPropertiesPage() {
                       <b style={{ fontSize: 14 }}>{[l.flat_type, l.area].filter(Boolean).join(" · ") || l.property_id}</b>
                       <div className="crm-ph-meta crm-num">{inr(l.rent)}{l.furnishing ? ` · ${l.furnishing}` : ""} · {shortDate(l.created_at)}</div>
                       <div className="crm-ph-meta">{l.poster_name || "—"}{l.phone ? ` · ${l.phone}` : ""}{l.source ? ` · ${l.source}` : ""}</div>
-                      {partnerMap[l.property_id] && (
-                        <div style={{ fontSize: 11.5, color: C.accent }}>Partner app · {describeSharing(partnerMap[l.property_id])}</div>
-                      )}
+                      <ListingPartner propertyId={l.property_id} info={partnerMap[l.property_id]} partners={partnerOptions}
+                        canEdit={canEdit} onChanged={refreshPartner} onToast={say} />
                       {l.building_id && (
                         <Link to={`/crm/buildings/${l.building_id}`} style={{ display: "block", fontSize: 11.5, color: C.gold, textDecoration: "none" }}>
                           {buildingById.get(l.building_id)?.kind === "society" ? "Society" : "Building"} · {buildingById.get(l.building_id)?.name || "…"}{l.unit_no ? ` · #${l.unit_no}` : ""}
@@ -869,12 +876,8 @@ export default function CrmPropertiesPage() {
                     <td className="crm-num">{inr(l.rent)}</td>
                     <td className="crm-num" style={{ maxWidth: 260 }}>
                       {l.poster_name || "—"}{l.phone ? ` · ${l.phone}` : ""}
-                      {partnerMap[l.property_id] && (
-                        <div style={{ fontSize: 10.5, color: C.accent, marginTop: 2 }}
-                          title="Added in the partner app — the broker chose who sees it">
-                          Partner app · {describeSharing(partnerMap[l.property_id])}
-                        </div>
-                      )}
+                      <ListingPartner propertyId={l.property_id} info={partnerMap[l.property_id]} partners={partnerOptions}
+                        canEdit={canEdit} onChanged={refreshPartner} onToast={say} small />
                     </td>
                     <td className="crm-mute">{l.source || "—"}</td>
                     <td className="crm-mute crm-num">{shortDate(l.created_at)}</td>

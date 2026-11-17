@@ -116,6 +116,22 @@ export const crmMarkCommissionPaid = (id) => rpc("crm_referral_commission_paid",
 export const fetchMyReferrals = () => rpc("partner_my_referrals");
 
 /**
+ * The Home dashboard's team card and "Who invited you?" (partner_referral_mapping.sql):
+ * { team: { partners, listings, visits_done, visits_on_flats, closures }, lifetime,
+ *   invited_by, claim: { status, referrer } | null, claim_until }.
+ */
+export const fetchMyTeam = () => rpc("partner_my_team");
+/** A referrer's code or mobile; the CRM approves it. → { referrer: first name } */
+export const claimReferrer = (input) => rpc("partner_claim_referrer", { p_input: String(input ?? "").trim() });
+/* CRM: referrers, the requests new partners send, and mapping listings. */
+export const crmPartnerReferrers = () => rpc("crm_partner_referrers").then((r) => r ?? []);
+export const crmSetReferrer = (userId, referrerId) => rpc("crm_partner_set_referrer", { p_user: userId, p_referrer: referrerId || null });
+export const crmReferralClaims = () => rpc("crm_referral_claims").then((r) => r ?? []);
+export const crmDecideReferralClaim = (userId, approve) => rpc("crm_referral_claim_decide", { p_user: userId, p_approve: approve });
+export const crmSetListingPartner = (propertyId, partnerId) =>
+  rpc("crm_listing_set_partner", { p_property: propertyId, p_partner: partnerId || null });
+
+/**
  * The Wallet's numbers from partner_my_referrals(): one-time Premium rewards
  * plus the lifetime commission. `available` is due to be paid out; `onTheWay`
  * is rewards in their 30 days and deals waiting for MovEazy's share; `held`

@@ -383,7 +383,7 @@ export async function fetchProgramSettings() {
 export async function fetchPartnerListingMap(propertyIds = []) {
   if (!isSupabaseConfigured || !supabase || !propertyIds.length) return {};
   const [listings, platform, groupShares, partners, groups] = await Promise.all([
-    supabase.from("partner_listings").select("property_id,broker_id"),
+    supabase.from("partner_listings").select("property_id,broker_id,mapped_by"),
     supabase.from("partner_platform_shares").select("property_id,share_pct"),
     supabase.from("partner_group_shares").select("property_id,group_id,share_pct"),
     supabase.from("broker_partners").select("user_id,name,phone,agency"),
@@ -396,7 +396,8 @@ export async function fetchPartnerListingMap(propertyIds = []) {
   const map = {};
   for (const l of listings.data ?? []) {
     if (!wanted.has(l.property_id)) continue;
-    map[l.property_id] = { broker: byUser.get(l.broker_id) ?? null, platformPct: null, groups: [] };
+    // mappedBy: the CRM user who gave it to this partner; "" = the partner added it themself.
+    map[l.property_id] = { broker: byUser.get(l.broker_id) ?? null, brokerId: l.broker_id, mappedBy: l.mapped_by ?? "", platformPct: null, groups: [] };
   }
   for (const s of platform.data ?? []) if (map[s.property_id]) map[s.property_id].platformPct = Number(s.share_pct);
   for (const s of groupShares.data ?? []) {
