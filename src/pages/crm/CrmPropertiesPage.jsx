@@ -563,6 +563,33 @@ function SocialShare({ listing }) {
   );
 }
 
+/**
+ * A row's less-used buttons, behind "More": a row with ten buttons wrapped to
+ * three lines and pushed the table past the screen. Stays open while one of its
+ * own popovers (sold out, building) is in use; closes on a tap outside.
+ */
+function MoreMenu({ children }) {
+  const [open, setOpen] = useState(false);
+  const ref = useRef(null);
+  useEffect(() => {
+    if (!open) return undefined;
+    const close = (e) => { if (ref.current && !ref.current.contains(e.target) && !e.target.closest?.(".crm-pop")) setOpen(false); };
+    document.addEventListener("pointerdown", close);
+    return () => document.removeEventListener("pointerdown", close);
+  }, [open]);
+  return (
+    <span ref={ref} style={{ position: "relative", display: "inline-flex" }}>
+      <Btn sm onClick={() => setOpen((o) => !o)} aria-expanded={open} aria-haspopup="true">More ▾</Btn>
+      {open && (
+        <span style={{ position: "absolute", right: 0, top: "calc(100% + 4px)", zIndex: 30, background: C.bg, border: `1px solid ${C.line}`,
+          borderRadius: 10, boxShadow: "0 12px 30px rgba(16,34,30,.16)", padding: 8, display: "flex", flexDirection: "column", alignItems: "flex-start", gap: 6, minWidth: 220 }}>
+          {children}
+        </span>
+      )}
+    </span>
+  );
+}
+
 export default function CrmPropertiesPage() {
   const { inventory, requirements, clients, access, reload, setData, phone } = useCrm();
   const navigate = useNavigate();
@@ -676,10 +703,12 @@ export default function CrmPropertiesPage() {
     [openListing, requirements],
   );
 
-  /** A row's buttons: in the table's last column, and under each card on a phone. */
+  /**
+   * A row's buttons: in the table's last column, and under each card on a phone.
+   * The four used most stay on the row; the rest are behind More (one line a row).
+   */
   const rowActions = (l) => (
-    <div style={{ display: "flex", gap: 5, flexWrap: "wrap" }}>
-      <SoldOut listing={l} canEdit={canEdit} onToast={say} onDone={(patch) => patchListing(l.property_id, patch)} />
+    <div style={{ display: "flex", gap: 5, flexWrap: "wrap", alignItems: "center" }}>
       <StealDealButton listing={l} steal={steal} />
       <Btn sm onClick={() => { setOpenId(l.property_id); if (phone) document.querySelector(".crm-ph-main")?.scrollTo({ top: 0, behavior: "smooth" }); }}>Who fits</Btn>
       {canEdit && (
@@ -688,16 +717,19 @@ export default function CrmPropertiesPage() {
       )}
       <a className="crm-btn crm-btn--sm" href={propertyLink(l.property_id)}
          target="_blank" rel="noopener noreferrer" style={{ textDecoration: "none" }}>Open</a>
-      <PocMessage
-        listing={l}
-        internal={internalMap[l.property_id]}
-        canEdit={canEdit}
-      />
-      <SocialShare listing={l} />
-      {canEdit && (
-        <CrmBuildingPicker listing={l} buildings={buildings} onToast={say}
-          onDone={() => Promise.all([reload?.(), loadBuildings()])} />
-      )}
+      <MoreMenu>
+        <SoldOut listing={l} canEdit={canEdit} onToast={say} onDone={(patch) => patchListing(l.property_id, patch)} />
+        <PocMessage
+          listing={l}
+          internal={internalMap[l.property_id]}
+          canEdit={canEdit}
+        />
+        <SocialShare listing={l} />
+        {canEdit && (
+          <CrmBuildingPicker listing={l} buildings={buildings} onToast={say}
+            onDone={() => Promise.all([reload?.(), loadBuildings()])} />
+        )}
+      </MoreMenu>
     </div>
   );
 
@@ -835,7 +867,7 @@ export default function CrmPropertiesPage() {
                     </td>
                     <td>{l.area || "—"}</td>
                     <td className="crm-num">{inr(l.rent)}</td>
-                    <td className="crm-num">
+                    <td className="crm-num" style={{ maxWidth: 260 }}>
                       {l.poster_name || "—"}{l.phone ? ` · ${l.phone}` : ""}
                       {partnerMap[l.property_id] && (
                         <div style={{ fontSize: 10.5, color: C.accent, marginTop: 2 }}

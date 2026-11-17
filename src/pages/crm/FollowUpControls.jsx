@@ -34,7 +34,7 @@ export function SideSheet({ title, onClose, children, footer }) {
   return (
     <div role="dialog" aria-label={title} onClick={onClose}
       style={{ position: "fixed", inset: 0, zIndex: 90, background: "rgba(16,34,30,.35)", display: "flex", justifyContent: "flex-end" }}>
-      <div onClick={(e) => e.stopPropagation()}
+      <div onClick={(e) => e.stopPropagation()} className="crm-drawer"
         style={{ width: "min(480px, 100%)", height: "100%", background: C.bg, display: "flex", flexDirection: "column", boxShadow: "-12px 0 34px rgba(16,34,30,.18)" }}>
         <div className="crm-colhead">
           <span className="crm-label" style={{ minWidth: 0, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{title}</span>

@@ -151,6 +151,31 @@ textarea.crm-input { resize:vertical; line-height:1.55; }
 .crm .crm-step--win { color:${C.accent}; border-color:#B7D8CF; }
 .crm .crm-step--out { color:${C.textMute}; border-color:${C.line}; }
 
+/* A side drawer (FollowUpControls, tenant tracker / views) always scrolls inside
+   itself: it is fixed to the screen, so content let out of it can't be reached.
+   Outranks the "screen scrolls as one page" rules below and the phone's. */
+.crm .crm-drawer .crm-scroll { overflow-y:auto !important; overflow-x:hidden !important; min-height:0; }
+
+/* ── Desktop layout (the phone layout has its own, mobile/phoneUi.jsx) ───────
+   A wide screen: a page stops at a width that reads, centred; a board
+   (.crm-wide, the Pipeline) keeps the whole width. */
+.crm:not(.crm--phone) main > *:not(.crm-wide) { width:100%; max-width:1600px; align-self:center; }
+
+/* A short screen (a small laptop, ~768 px tall): panes that each scrolled on
+   their own left a sliver of every list, and a box below the fold could not be
+   reached. The page scrolls as one instead; a side pane (a client's record,
+   matches, Who fits) stays in view beside the list at the screen's height. A
+   list given its own height (a picker) keeps scrolling inside it. */
+@media (max-height: 820px) {
+  .crm:not(.crm--phone) main > :not(.crm-wide) { flex:none !important; min-height:100%; }
+  .crm:not(.crm--phone) main > :not(.crm-wide) .crm-scroll:not([style*="max-height"]) { overflow:visible; }
+  .crm:not(.crm--phone) main > :not(.crm-wide) .crm-col { min-height:auto; }
+  .crm:not(.crm--phone) main > :not(.crm-wide) .crm-col ~ .crm-col { position:sticky; top:0; align-self:flex-start; max-height:100vh; overflow-y:auto; }
+  .crm:not(.crm--phone) main > :not(.crm-wide) .crm-col ~ .crm-col .crm-scroll { overflow:visible; }
+}
+/* (A board — .crm-wide — keeps its columns scrolling inside the screen: let out,
+   its sideways scrollbar would sit under thousands of pixels of cards.) */
+
 @media (prefers-reduced-motion: reduce) { .crm * { transition:none !important; animation:none !important; } }
 `;
 

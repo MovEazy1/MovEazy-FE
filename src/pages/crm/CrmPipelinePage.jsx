@@ -123,7 +123,8 @@ export default function CrmPipelinePage() {
   );
 
   return (
-    <div style={{ display: "flex", flexDirection: "column", flex: 1, minHeight: 0 }}>
+    // crm-wide: the board keeps the screen's whole width (crmUi.jsx caps other pages).
+    <div className="crm-wide" style={{ display: "flex", flexDirection: "column", flex: 1, minHeight: 0 }}>
       <div className="crm-colhead">
         <span className="crm-label">Pipeline · {rows.length} clients</span>
         <Chip on={mineOnly} onClick={() => setMineOnly((v) => !v)}>Mine</Chip>
