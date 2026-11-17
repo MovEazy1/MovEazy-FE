@@ -95,7 +95,12 @@ export default function CrmUnionsSection() {
                 <tr key={g.id} style={{ cursor: "pointer" }} onClick={() => setOpen(g.id)}>
                   <td>
                     <div style={{ fontWeight: 600 }}>{g.name}</div>
-                    {g.description && <div className="crm-mute" style={{ fontSize: 11, maxWidth: 260 }}>{g.description}</div>}
+                    {g.description && (
+                      <div className="crm-mute" title={g.description}
+                        style={{ fontSize: 11, maxWidth: 280, display: "-webkit-box", WebkitLineClamp: 2, WebkitBoxOrient: "vertical", overflow: "hidden" }}>
+                        {g.description}
+                      </div>
+                    )}
                   </td>
                   <td>
                     {g.admins.length === 0 ? <span className="crm-mute">—</span> : g.admins.map((a) => (
