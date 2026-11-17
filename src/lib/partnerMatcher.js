@@ -138,6 +138,24 @@ export function flatLine(l) {
   return [l.flat_type || (l.bedrooms ? `${l.bedrooms} BHK` : ""), l.area, rent].filter(Boolean).join(" · ");
 }
 
+const bhkOf = (l) => l?.flat_type || (Number(l?.bedrooms) > 0 ? `${l.bedrooms} BHK` : "");
+const squash = (t) => String(t || "").toLowerCase().replace(/[^a-z0-9]/g, "");
+
+/** The flat's own name: its title, else "2 BHK in HSR Layout". */
+export function flatName(l) {
+  const t = String(l?.title || "").trim();
+  if (t) return t;
+  const bhk = bhkOf(l);
+  return [bhk || "Flat", l?.area].filter(Boolean).join(" in ");
+}
+
+/** BHK, when the name doesn't already say it (so it isn't lost under a custom name). */
+export function flatBhkIfMissing(l) {
+  const bhk = bhkOf(l);
+  if (!bhk) return "";
+  return squash(flatName(l)).includes(squash(bhk)) ? "" : bhk;
+}
+
 /** The WhatsApp that turns likes into visits. */
 export function visitsMessage(name, flats = []) {
   const first = String(name || "").trim().split(/\s+/)[0];

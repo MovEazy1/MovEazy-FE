@@ -14,13 +14,13 @@ import { useEffect, useMemo, useState } from "react";
 import { Link } from "react-router-dom";
 import { Building2, CheckCircle2, Globe, Plus, Search, Sparkles, X } from "lucide-react";
 import { usePartner } from "./PartnerApp";
-import { Empty, Loading } from "./partnerUi";
+import { Empty, FlatHead, Loading } from "./partnerUi";
 import { PartnerHeader } from "./PartnerChrome";
 import MilestoneBar from "./MilestoneBar";
 import { pp } from "../../lib/partners";
 import { EMPTY_FILTERS, applyFilters } from "../../lib/partnerFilters";
 import { flatDetailScore, myFlats } from "../../lib/partnerTenants";
-import { flatLine } from "../../lib/partnerMatcher";
+import { flatName } from "../../lib/partnerMatcher";
 import { fetchPoolCount, fetchUploadProgress, isFlatComplete, liveOnWebsite } from "../../lib/partnerPool";
 import { SmartListingImage } from "./partnerMedia";
 import FlatActions from "./FlatActions";
@@ -64,19 +64,21 @@ function MyInventory({ inventory, query }) {
         <div className="pz-card ih-mine">
           {rows.map(({ l, sc, ok }) => (
             <div key={l.property_id} className="ih-flat">
-              <Link to={pp(`/property/${l.property_id}`)} className="ih-thumb" aria-label={flatLine(l) || "Open flat"}>
+              <Link to={pp(`/property/${l.property_id}`)} className="ih-thumb" aria-label={flatName(l)}>
                 {(l.cover_image_url || (l.images ?? []).length) ? <SmartListingImage listing={l} thumb /> : <Building2 size={22} />}
               </Link>
-              <Link to={pp(`/property/${l.property_id}`)} className="ih-flat-txt">
-                <strong>{flatLine(l) || l.title || l.property_id}</strong>
+              <div className="ih-flat-txt">
+                <FlatHead listing={l} to={pp(`/property/${l.property_id}`)} />
                 {liveOnWebsite(l) && <span className="ih-web"><Globe size={11} /> Live on MovEazy Website</span>}
                 <span className={`ih-bar${ok ? " ih-bar--ok" : ""}`} aria-hidden><i style={{ width: `${ok ? 100 : (sc.done / sc.total) * 100}%` }} /></span>
-                <span className="pz-hint">{ok ? "All details in" : `${sc.done}/${sc.total} details · add ${sc.missing.slice(0, 2).join(", ").toLowerCase()}`}</span>
-              </Link>
-              {!ok
-                ? <Link to={pp(`/property/${l.property_id}/edit`)} className="pz-btn pz-btn--sm pz-btn--gold" style={{ flex: "none" }}>Add details</Link>
-                : <CheckCircle2 size={20} color="var(--g)" style={{ flex: "none" }} aria-label="All details in" />}
-              <FlatActions listing={l} mine />
+                <div className="ih-flat-foot">
+                  <span className="pz-hint">{ok ? "All details in" : `${sc.done}/${sc.total} details · add ${sc.missing.slice(0, 2).join(", ").toLowerCase()}`}</span>
+                  {!ok
+                    ? <Link to={pp(`/property/${l.property_id}/edit`)} className="pz-btn pz-btn--sm pz-btn--gold" style={{ flex: "none" }}>Add details</Link>
+                    : <CheckCircle2 size={20} color="var(--g)" style={{ flex: "none" }} aria-label="All details in" />}
+                  <FlatActions listing={l} mine />
+                </div>
+              </div>
             </div>
           ))}
         </div>
@@ -169,12 +171,13 @@ const FILTER_CSS = `
 .ih-nudge--ok { background: var(--gl); border-color: var(--gl2); color: var(--g2); }
 .ih-nudge--ok svg { color: var(--g); }
 .ih-mine { padding: 0; overflow: hidden; }
-.ih-flat { display: flex; align-items: center; gap: 12px; padding: 12px; border-top: 1px solid var(--line); }
+.ih-flat { display: flex; align-items: flex-start; gap: 12px; padding: 12px; border-top: 1px solid var(--line); }
 .ih-flat:first-child { border-top: 0; }
 .ih-thumb { width: 58px; height: 58px; border-radius: 12px; overflow: hidden; flex: none; background: var(--bg); display: grid; place-items: center; color: var(--mute); }
 .ih-thumb img { width: 100%; height: 100%; object-fit: cover; }
-.ih-flat-txt { flex: 1; min-width: 0; color: inherit; text-decoration: none; display: grid; gap: 4px; }
-.ih-flat-txt strong { font-size: 14.5px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.ih-flat-txt { flex: 1; min-width: 0; display: grid; gap: 6px; }
+.ih-flat-foot { display: flex; align-items: center; gap: 8px; }
+.ih-flat-foot .pz-hint { flex: 1; min-width: 0; }
 .ih-bar { display: block; height: 6px; border-radius: 99px; background: #EFECE6; overflow: hidden; }
 .ih-bar i { display: block; height: 100%; background: var(--gold); border-radius: 99px; }
 .ih-bar--ok i { background: var(--g); }

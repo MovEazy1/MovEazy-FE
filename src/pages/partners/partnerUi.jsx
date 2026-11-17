@@ -13,6 +13,7 @@ import {
 } from "lucide-react";
 import { SmartListingImage } from "./partnerMedia";
 import { bhkLabel, inr, pp } from "../../lib/partners";
+import { flatBhkIfMissing, flatName } from "../../lib/partnerMatcher";
 
 export const G = "#15803D";
 
@@ -98,6 +99,12 @@ const CSS = `
   padding: 11px 4px 10px; border-bottom: 2px solid transparent; cursor: pointer; }
 .pz-tab--on { color: var(--ink); border-bottom-color: var(--gold); }
 .pz-list > * + * { margin-top: 12px; }
+.pz-fh { display: flex; align-items: flex-start; gap: 10px; color: inherit; text-decoration: none; }
+.pz-fh-name { flex: 1; min-width: 0; font-size: 14.5px; font-weight: 700; line-height: 1.3; overflow-wrap: anywhere; }
+.pz-fh-bhk { display: block; margin-top: 2px; font-size: 12px; font-weight: 500; color: var(--dim); }
+.pz-fh-side { flex: none; max-width: 42%; display: grid; justify-items: end; text-align: right; gap: 1px; }
+.pz-fh-side b { font-size: 14.5px; font-weight: 800; white-space: nowrap; }
+.pz-fh-side span { font-size: 12px; color: var(--dim); line-height: 1.3; overflow-wrap: anywhere; }
 .pz-prop { overflow: hidden; }
 .pz-prop-img { position: relative; aspect-ratio: 16/9; background: #E9E6DF; overflow: hidden; }
 .pz-prop-img img, .pz-prop-img video { width: 100%; height: 100% !important; object-fit: cover; display: block; }
@@ -288,6 +295,23 @@ export function BrokeragePill({ listing }) {
   if (!Number.isFinite(pct) || listing?.brokerage_pct == null) return null;
   // "50% Brokerage"; on a narrow card just "50%" (the word goes, partnerUi CSS).
   return <span className="pz-pill" title={`${pct}% Brokerage`}>{pct}%<span className="pz-pill-long"> Brokerage</span></span>;
+}
+
+/**
+ * A flat's header in the partner's own lists: the full name on the left (it
+ * wraps, never cut off), the rent and area on the right.
+ */
+export function FlatHead({ listing: l, to }) {
+  const bhk = flatBhkIfMissing(l);
+  return (
+    <Link to={to} className="pz-fh">
+      <span className="pz-fh-name">{flatName(l)}{bhk && <span className="pz-fh-bhk">{bhk}</span>}</span>
+      <span className="pz-fh-side">
+        {Number(l.rent) > 0 && <b>{inr(l.rent)}</b>}
+        {l.area && <span>{l.area}</span>}
+      </span>
+    </Link>
+  );
 }
 
 /** Another partner's (or MovEazy's) flat from the pool, not unlocked yet. */

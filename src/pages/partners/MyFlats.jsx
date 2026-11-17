@@ -10,11 +10,11 @@ import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import { BarChart3, Building2, ChevronRight, Crown, Plus, Sparkles, Trophy } from "lucide-react";
 import { usePartner } from "./PartnerApp";
-import { Empty, Loading, TopBar, toast } from "./partnerUi";
+import { Empty, FlatHead, Loading, TopBar, toast } from "./partnerUi";
 import { SmartListingImage } from "./partnerMedia";
 import FlatActions from "./FlatActions";
 import { friendlyError, hasPremium, pp, setListingStatus } from "../../lib/partners";
-import { flatLine } from "../../lib/partnerMatcher";
+import { flatName } from "../../lib/partnerMatcher";
 import { flatDetailScore, myFlats } from "../../lib/partnerTenants";
 import { fetchMySocieties } from "../../lib/societyPartners";
 import { AdviceNudge } from "./societyContacts";
@@ -23,14 +23,16 @@ function FlatRow({ l, action }) {
   const sc = flatDetailScore(l);
   return (
     <div className="mf-row">
-      <Link to={pp(`/property/${l.property_id}`)} className="mf-thumb">{(l.cover_image_url || (l.images ?? []).length) ? <SmartListingImage listing={l} thumb /> : <Building2 size={20} />}</Link>
-      <Link to={pp(`/property/${l.property_id}`)} style={{ flex: 1, minWidth: 0, color: "inherit", textDecoration: "none" }}>
-        <strong style={{ display: "block", fontSize: 14.5 }}>{flatLine(l) || l.property_id}</strong>
+      <Link to={pp(`/property/${l.property_id}`)} className="mf-thumb" aria-label={flatName(l)}>{(l.cover_image_url || (l.images ?? []).length) ? <SmartListingImage listing={l} thumb /> : <Building2 size={20} />}</Link>
+      <div style={{ flex: 1, minWidth: 0 }}>
+        <FlatHead listing={l} to={pp(`/property/${l.property_id}`)} />
         <span className="mf-bar" aria-label={`${sc.done} of ${sc.total} details`}><i style={{ width: `${(sc.done / sc.total) * 100}%` }} /></span>
-        <span className="pz-hint">{sc.done}/{sc.total} details{sc.missing.length ? ` · add ${sc.missing.slice(0, 2).join(", ").toLowerCase()}` : " · complete"}</span>
-      </Link>
-      {action}
-      <FlatActions listing={l} mine />
+        <div className="mf-foot">
+          <span className="pz-hint">{sc.done}/{sc.total} details{sc.missing.length ? ` · add ${sc.missing.slice(0, 2).join(", ").toLowerCase()}` : " · complete"}</span>
+          {action}
+          <FlatActions listing={l} mine />
+        </div>
+      </div>
     </div>
   );
 }
@@ -149,9 +151,11 @@ const CSS = `
 .mf-tip { display: flex; gap: 10px; align-items: flex-start; padding: 12px 14px; margin-bottom: 12px; border-radius: 14px;
   background: linear-gradient(135deg, #FFFBEB, #FFF3D6); border: 1px solid #F1D99B; font-size: 13.5px; color: #5C3F05; line-height: 1.45; }
 .mf-tip svg { color: #8A6419; flex: none; margin-top: 1px; }
-.mf-row { display: flex; gap: 10px; align-items: center; padding: 10px 14px; border-top: 1px solid var(--line); }
+.mf-row { display: flex; gap: 10px; align-items: flex-start; padding: 10px 14px; border-top: 1px solid var(--line); }
 .mf-thumb { width: 64px; height: 50px; border-radius: 8px; overflow: hidden; flex: none; background: #E9E6DF; display: grid; place-items: center; color: var(--dim); }
 .mf-thumb img, .mf-thumb video { width: 100%; height: 100% !important; object-fit: cover; display: block; }
+.mf-foot { display: flex; align-items: center; gap: 8px; }
+.mf-foot .pz-hint { flex: 1; min-width: 0; }
 .mf-bar { display: block; height: 5px; border-radius: 99px; background: var(--line); margin: 5px 0 3px; overflow: hidden; }
 .mf-bar i { display: block; height: 100%; background: var(--goldg); border-radius: 99px; }
 .mf-perf { text-align: center; padding: 26px 18px; border-radius: 20px; color: #fff;
