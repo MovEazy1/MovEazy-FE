@@ -371,6 +371,28 @@ function SoldOut({ listing, canEdit, onDone, onToast }) {
   const today = todayInIndia();
   const yearAgo = todayInIndia(new Date(Date.now() - 365 * 864e5));
 
+  // A partner deleted it from their inventory (partner app): kept here, off the site; Restore puts it back.
+  if (listing.status === "deleted") {
+    const restore = async () => {
+      if (!window.confirm(`Restore ${listing.property_id}? It goes back on the site and into the partner's inventory.`)) return;
+      setBusy(true);
+      try {
+        await relistProperty(listing.property_id);
+        onToast(`${listing.property_id} is restored.`);
+        onDone({ status: "published" });
+      } catch (e) {
+        onToast(e.message || "Couldn't restore it.", "error");
+      } finally {
+        setBusy(false);
+      }
+    };
+    return (
+      <>
+        <span className="crm-chip crm-chip--bad" style={{ pointerEvents: "none" }} title="Deleted by the partner in their app">Deleted by partner</span>
+        {canEdit && <Btn sm onClick={restore} disabled={busy}>{busy ? "…" : "Restore"}</Btn>}
+      </>
+    );
+  }
   if (listing.status === "rented") {
     const when = soldOutDate(listing.sold_out_at);
     const relist = async () => {
@@ -717,6 +739,7 @@ export default function CrmPropertiesPage() {
    */
   const rowActions = (l) => (
     <div style={{ display: "flex", gap: 5, flexWrap: "wrap", alignItems: "center" }}>
+      {l.status === "deleted" && <SoldOut listing={l} canEdit={canEdit} onToast={say} onDone={(patch) => patchListing(l.property_id, patch)} />}
       <StealDealButton listing={l} steal={steal} />
       <Btn sm onClick={() => { setOpenId(l.property_id); if (phone) document.querySelector(".crm-ph-main")?.scrollTo({ top: 0, behavior: "smooth" }); }}>Who fits</Btn>
       {canEdit && (
@@ -726,7 +749,7 @@ export default function CrmPropertiesPage() {
       <a className="crm-btn crm-btn--sm" href={propertyLink(l.property_id)}
          target="_blank" rel="noopener noreferrer" style={{ textDecoration: "none" }}>Open</a>
       <MoreMenu>
-        <SoldOut listing={l} canEdit={canEdit} onToast={say} onDone={(patch) => patchListing(l.property_id, patch)} />
+        {l.status !== "deleted" && <SoldOut listing={l} canEdit={canEdit} onToast={say} onDone={(patch) => patchListing(l.property_id, patch)} />}
         <PocMessage
           listing={l}
           internal={internalMap[l.property_id]}
@@ -780,7 +803,7 @@ export default function CrmPropertiesPage() {
           {/* dormant is written by the Prop follow-up queue. Without a chip
               for it those listings would be reachable only under "All", which
               is where a flat goes to be forgotten a second time. */}
-          {["published", "paused", "rented", "dormant", ""].map((s) => (
+          {["published", "paused", "rented", "dormant", "deleted", ""].map((s) => (
             <Chip key={s || "all"} on={status === s} onClick={() => { setStatus(s); setMonth(""); }}>
               {s === "rented" ? "sold out" : s || "All"}
             </Chip>

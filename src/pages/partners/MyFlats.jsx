@@ -12,6 +12,7 @@ import { BarChart3, Building2, ChevronRight, Crown, Plus, Sparkles, Trophy } fro
 import { usePartner } from "./PartnerApp";
 import { Empty, Loading, TopBar, toast } from "./partnerUi";
 import { SmartListingImage } from "./partnerMedia";
+import FlatActions from "./FlatActions";
 import { friendlyError, hasPremium, pp, setListingStatus } from "../../lib/partners";
 import { flatLine } from "../../lib/partnerMatcher";
 import { flatDetailScore, myFlats } from "../../lib/partnerTenants";
@@ -29,6 +30,7 @@ function FlatRow({ l, action }) {
         <span className="pz-hint">{sc.done}/{sc.total} details{sc.missing.length ? ` · add ${sc.missing.slice(0, 2).join(", ").toLowerCase()}` : " · complete"}</span>
       </Link>
       {action}
+      <FlatActions listing={l} mine />
     </div>
   );
 }

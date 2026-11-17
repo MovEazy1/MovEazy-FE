@@ -139,7 +139,8 @@ export const SOURCES = [
 
 export async function fetchPartnerInventory() {
   const rows = await rpc("partner_inventory");
-  return (rows ?? []).map((r) => ({ ...r, group_ids: r.group_ids ?? [] }));
+  // A flat the broker deleted is kept for MovEazy (the CRM can restore it), never shown here.
+  return (rows ?? []).filter((r) => r.status !== "deleted").map((r) => ({ ...r, group_ids: r.group_ids ?? [] }));
 }
 
 /** Which tab(s) a row belongs to. A listing shared both ways shows in both. */

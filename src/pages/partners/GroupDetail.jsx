@@ -11,6 +11,7 @@ import { useNavigate, useParams } from "react-router-dom";
 import { Copy, LogOut, MoreVertical, UserPlus } from "lucide-react";
 import { usePartner } from "./PartnerApp";
 import { Avatar, Empty, Loading, PropertyCard, Sheet, TopBar, WhatsAppIcon, formatPhone, toast } from "./partnerUi";
+import FlatActions from "./FlatActions";
 import {
   createInvite, customerMessage, fetchGroupMembers, friendlyError, inviteLink, inviteMessage, pp, removeMember,
   setMemberRole, waLink,
@@ -113,7 +114,8 @@ export default function GroupDetail() {
             <Empty>Nothing shared here yet. When adding a property, pick <strong>My Groups → {group.name}</strong>.</Empty>
           ) : listings.map((l) => (
             <PropertyCard key={l.property_id} listing={l} saved={saved.has(l.property_id)} onToggleSave={() => toggleSave(l.property_id)}
-              onWhatsApp={() => window.open(waLink("", customerMessage(l)), "_blank", "noopener")} />
+              onWhatsApp={() => window.open(waLink("", customerMessage(l)), "_blank", "noopener")}
+              extra={<FlatActions listing={l} mine={l.source === "mine"} />} />
           ))}
         </div>
       ) : (

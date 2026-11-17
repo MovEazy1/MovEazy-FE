@@ -23,6 +23,7 @@ import { flatDetailScore, myFlats } from "../../lib/partnerTenants";
 import { flatLine } from "../../lib/partnerMatcher";
 import { fetchPoolCount, fetchUploadProgress, isFlatComplete, liveOnWebsite } from "../../lib/partnerPool";
 import { SmartListingImage } from "./partnerMedia";
+import FlatActions from "./FlatActions";
 
 /** My inventory: the partner's live flats, each with how complete its details are. */
 function MyInventory({ inventory, query }) {
@@ -75,6 +76,7 @@ function MyInventory({ inventory, query }) {
               {!ok
                 ? <Link to={pp(`/property/${l.property_id}/edit`)} className="pz-btn pz-btn--sm pz-btn--gold" style={{ flex: "none" }}>Add details</Link>
                 : <CheckCircle2 size={20} color="var(--g)" style={{ flex: "none" }} aria-label="All details in" />}
+              <FlatActions listing={l} mine />
             </div>
           ))}
         </div>
