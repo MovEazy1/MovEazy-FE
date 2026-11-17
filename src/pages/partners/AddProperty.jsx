@@ -59,6 +59,7 @@ import { withParentArea } from "../../data/preferenceOptions";
 import { freeLeadsTopup } from "../../lib/partnerTenants";
 import { fetchUploadProgress, hasPhoto, justAwarded } from "../../lib/partnerPool";
 import PhotoReview from "../../components/PhotoReview";
+import { moveByKey, useDragReorder } from "../../hooks/useDragReorder";
 import { initialCoverFor, keptCover, photosChanged, savedCoverUrl } from "../../lib/photoReview";
 import {
   DEFAULT_PARTNER_AMENITIES, FLOOR_CHIPS, POSTING_AMENITIES, depositOptions, maintenanceValue, occupantsFor,
@@ -204,37 +205,10 @@ function PostFlat({ onAnother, edit = null }) {
     setPhotos((cur) => [...cur, ...take]);
     take.forEach(upload);
   };
-  // Drag to reorder: works with a finger or a mouse. A few pixels of movement
-  // starts the drag, so the × and ↻ on a photo stay simple taps.
-  const [dragKey, setDragKey] = useState(null);
-  const drag = useRef(null);
-  const onThumbDown = (e, key) => {
-    if (e.button > 0 || e.target.closest("button")) return;
-    drag.current = { key, x: e.clientX, y: e.clientY, id: e.pointerId, el: e.currentTarget, on: false };
-  };
-  const onThumbMove = (e) => {
-    const d = drag.current;
-    if (!d) return;
-    if (!d.on) {
-      if (Math.hypot(e.clientX - d.x, e.clientY - d.y) < 6) return;
-      d.on = true;
-      setDragKey(d.key);
-      try { d.el.setPointerCapture(d.id); } catch { /* fine without it */ }
-      navigator.vibrate?.(10);
-    }
-    const to = document.elementFromPoint(e.clientX, e.clientY)?.closest("[data-photo]")?.getAttribute("data-photo");
-    if (!to || to === d.key) return;
-    setPhotos((cur) => {
-      const from = cur.findIndex((p) => p.key === d.key);
-      const at = cur.findIndex((p) => p.key === to);
-      if (from < 0 || at < 0) return cur;
-      const next = [...cur];
-      const [moved] = next.splice(from, 1);
-      next.splice(at, 0, moved);
-      return next;
-    });
-  };
-  const onThumbUp = () => { drag.current = null; setDragKey(null); };
+  // Drag to reorder (hooks/useDragReorder): a mouse drags straight away; a finger
+  // swipes to scroll past the photos and holds one for a moment to move it. The
+  // × and ↻ on a photo stay simple taps.
+  const sort = useDragReorder((from, to) => setPhotos((cur) => moveByKey(cur, from, to, (p) => p.key)));
 
   const removePhoto = (k) => setPhotos((cur) => {
     const hit = cur.find((p) => p.key === k);
@@ -458,8 +432,8 @@ function PostFlat({ onAnother, edit = null }) {
             <>
               <div className="ap-thumbs">
                 {photos.map((p, i) => (
-                  <figure key={p.key} data-photo={p.key} className={`ap-thumb ap-drag ${p.status}${dragKey === p.key ? " dragging" : ""}`}
-                    onPointerDown={(e) => onThumbDown(e, p.key)} onPointerMove={onThumbMove} onPointerUp={onThumbUp} onPointerCancel={onThumbUp}>
+                  <figure key={p.key} data-photo={p.key} className={`ap-thumb ap-drag ${p.status}${sort.dragKey === p.key ? " dragging" : ""}`}
+                    {...sort.bind(p.key)} style={sort.dragStyle(p.key)}>
                     {isVid(p) ? <video src={p.preview} muted playsInline /> : <img src={p.preview} alt="" />}
                     {i === 0 && <span className="ap-cover">Cover</span>}
                     <span className="ap-state" aria-label={p.status}>
@@ -474,7 +448,7 @@ function PostFlat({ onAnother, edit = null }) {
                   <button type="button" className="ap-thumb ap-add" onClick={() => fileRef.current?.click()} aria-label="Add more photos"><Camera size={20} /><span>Add</span></button>
                 )}
               </div>
-              {photos.length > 1 && <p className="ap-drag-hint">Drag photos to change the order — the first one is the cover.</p>}
+              {photos.length > 1 && <p className="ap-drag-hint">To change the order, hold a photo, then drag it — the first one is the cover.</p>}
               {ed && reviewItems.some((m) => !m.isVideo) && (
                 <button type="button" className="pz-btn pz-btn--sm" style={{ marginTop: 8 }} onClick={() => setReviewing("adjust")} disabled={uploading}>
                   <Crop size={14} /> Adjust cover & order{settled ? " · set" : ""}
@@ -743,7 +717,7 @@ const CSS = `
 .ap-thumb { position: relative; margin: 0; aspect-ratio: 1; border-radius: 10px; overflow: hidden; background: #E5E7EB; }
 .ap-thumb img, .ap-thumb video { width: 100%; height: 100% !important; object-fit: cover; display: block; }
 .ap-thumb.uploading img, .ap-thumb.uploading video { opacity: .55; }
-.ap-drag { touch-action: none; cursor: grab; user-select: none; -webkit-user-select: none; transition: transform .15s ease, box-shadow .15s ease; }
+.ap-drag { cursor: grab; user-select: none; -webkit-user-select: none; transition: transform .15s ease, box-shadow .15s ease; }
 .ap-drag img, .ap-drag video { pointer-events: none; -webkit-user-drag: none; }
 .ap-drag.dragging { cursor: grabbing; transform: scale(1.08); box-shadow: 0 10px 24px rgba(0,0,0,.28); z-index: 3; outline: 2px solid var(--gold, #D4A437); }
 .ap-drag-hint { margin: 8px 0 0; font-size: 12px; color: var(--dim, #6B7280); }

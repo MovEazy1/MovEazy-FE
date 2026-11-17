@@ -3,7 +3,8 @@
  * channel (CRM, owner app, partner app, List my flat; flats and buildings).
  *
  *   - swipe through the photos full-size, the way a renter will see them;
- *   - drag the strip at the bottom to change their order;
+ *   - swipe the strip at the bottom to see them all; hold a photo in it, then
+ *     drag, to change their order (a mouse drags straight away);
  *   - pick the cover and frame it: a 4:3 frame, slid and zoomed (pinch, wheel
  *     or the slider) until the right part shows. It starts on the first photo,
  *     centred, so a poster who only reorders still gets a sensible cover.
@@ -234,7 +235,7 @@ export default function PhotoReview({ items, initialCover = null, onConfirm, onC
               );
             })}
           </div>
-          <p className="pr-hint" style={{ textAlign: "center" }}>Swipe to look through · drag the photos below to change their order</p>
+          <p className="pr-hint" style={{ textAlign: "center" }}>Swipe to look through · to change the order, hold a photo below, then drag it</p>
         </div>
       )}
     </div>
@@ -265,7 +266,7 @@ const CSS = `
 .pr-cover { display: flex; flex-direction: column; align-items: center; gap: 4px; background: none; border: 0; padding: 0; color: #F5C542; font: inherit; font-size: 11.5px; font-weight: 700; cursor: pointer; }
 .pr-cover > div { border-radius: 8px; box-shadow: 0 0 0 2px #F5C542; }
 .pr-hint { color: #a1a1aa; font-size: 12.5px; margin: 0; padding: 0 16px; }
-.pr-strip { display: flex; gap: 8px; overflow-x: auto; padding: 4px 16px; max-width: 100%; }
+.pr-strip { display: flex; gap: 8px; overflow-x: auto; padding: 4px 16px; max-width: 100%; -webkit-overflow-scrolling: touch; overscroll-behavior-x: contain; scroll-behavior: smooth; }
 .pr-thumb { position: relative; flex: none; width: 64px; height: 64px; border-radius: 10px; overflow: hidden; border: 2px solid transparent; background: #222; }
 .pr-thumb.is-on { border-color: #fff; }
 .pr-thumb img, .pr-thumb video { width: 100%; height: 100%; object-fit: cover; pointer-events: none; }

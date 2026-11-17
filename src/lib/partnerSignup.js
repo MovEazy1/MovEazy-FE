@@ -21,6 +21,33 @@ const UTM_KEYS = ["utm_source", "utm_medium", "utm_campaign", "utm_content", "ut
 const read = (k) => { try { return JSON.parse(localStorage.getItem(k) || "null"); } catch { return null; } };
 const write = (k, v) => { try { localStorage.setItem(k, JSON.stringify(v)); } catch { /* private mode */ } };
 
+/**
+ * A partner's referral link counts for 24 hours, in this browser, on every
+ * MovEazy site: kept in a cookie for .moveazy.co.in as well as this site's
+ * storage, so a broker who opens the link on partners.moveazy.co.in and signs
+ * up a few hours later on www.moveazy.co.in (or the other way round) is still
+ * theirs. After 24 hours it is dropped (and the database won't credit a link
+ * to anyone who was a partner before it — partner_referral_mapping.sql).
+ */
+export const REF_TTL = 24 * 60 * 60 * 1000;
+const REF_COOKIE = "mz_partner_ref";
+const cookieDomain = () => {
+  try { return /(^|\.)moveazy\.co\.in$/.test(window.location.hostname) ? "; Domain=.moveazy.co.in" : ""; } catch { return ""; }
+};
+function writeRefCookie(code, at) {
+  try {
+    document.cookie = `${REF_COOKIE}=${encodeURIComponent(`${code}.${at}`)}; Max-Age=${REF_TTL / 1000}; Path=/; SameSite=Lax${cookieDomain()}${window.location.protocol === "https:" ? "; Secure" : ""}`;
+  } catch { /* cookies off */ }
+}
+/** The referral this browser opened within 24 hours, from any MovEazy site: { ref, at } or null. */
+export function refFromCookie(cookie = typeof document === "undefined" ? "" : document.cookie, now = Date.now()) {
+  const m = new RegExp(`(?:^|;\\s*)${REF_COOKIE}=([^;]+)`).exec(cookie || "");
+  if (!m) return null;
+  const [code, at] = decodeURIComponent(m[1]).split(".");
+  const ref = String(code || "").toUpperCase().replace(/[^A-Z0-9]/g, "").slice(0, 12);
+  return ref && now - Number(at) < REF_TTL ? { ref, at: Number(at) } : null;
+}
+
 /** Remember where this visitor came from, the first time only. `hint` names a channel the URL can't (e.g. group_invite). */
 export function captureSource(hint = "") {
   if (typeof window === "undefined") return null;
@@ -28,8 +55,10 @@ export function captureSource(hint = "") {
   const q = new URLSearchParams(window.location.search);
   const ref = (q.get("ref") || "").trim().toUpperCase().slice(0, 12);
   const utm = Object.fromEntries(UTM_KEYS.map((k) => [k, (q.get(k) || "").slice(0, 100)]).filter(([, v]) => v));
-  // A referral link is worth recording even over an earlier plain visit.
-  if (have && !(ref && !have.ref)) return have;
+  // A referral link is worth recording even over an earlier plain visit — or over a
+  // referral whose 24 hours are up. The first link stands while it lasts.
+  const haveRefLive = Boolean(have?.ref) && Date.now() - Number(have.refAt || have.at || 0) < REF_TTL;
+  if (have && (!ref || haveRefLive)) return have;
   let channel = hint || (ref ? "referral" : utm.utm_source || q.get("src") || "");
   if (!channel) {
     try {
@@ -39,12 +68,28 @@ export function captureSource(hint = "") {
       channel = "direct";
     }
   }
-  const src = { channel: channel.slice(0, 40), ref: ref || have?.ref || "", utm: Object.keys(utm).length ? utm : have?.utm || {}, at: Date.now() };
+  const now = Date.now();
+  const src = {
+    channel: channel.slice(0, 40), ref: ref || have?.ref || "", refAt: ref ? now : have?.refAt || have?.at || now,
+    utm: Object.keys(utm).length ? utm : have?.utm || {}, at: now,
+  };
   write(SOURCE_KEY, src);
+  if (ref) writeRefCookie(ref, now);
   return src;
 }
 
-export const signupSource = () => read(SOURCE_KEY) || { channel: "direct", ref: "", utm: {} };
+/**
+ * Where this visitor came from, as sign-up stamps it. The referral code only
+ * while its 24 hours last — from this site's storage, or the cookie a link
+ * opened on another MovEazy site left.
+ */
+export function signupSource(now = Date.now()) {
+  const src = read(SOURCE_KEY) || { channel: "direct", ref: "", utm: {} };
+  const local = src.ref && now - Number(src.refAt || src.at || 0) < REF_TTL ? src.ref : "";
+  const cookie = local ? null : refFromCookie(undefined, now);
+  const ref = local || cookie?.ref || "";
+  return { ...src, ref, channel: ref && (!src.channel || src.channel === "direct") ? "referral" : src.channel || "direct" };
+}
 
 /** The number typed into Become Partner, if it is recent. */
 export function pendingSignupPhone() {
