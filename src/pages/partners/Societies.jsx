@@ -20,6 +20,7 @@ import {
 } from "../../lib/societyPartners";
 
 const SocietiesMap = lazy(() => import("./SocietiesMap"));
+import SocietyPreview from "./SocietyPreview";
 const errText = (e) => e?.message || "Something went wrong.";
 
 /** What a partner signs up to, shown wherever they start or work a society. */
@@ -86,6 +87,7 @@ function Nearby() {
     } catch (e) { toast(errText(e), "error"); } finally { setBusy(""); }
   };
 
+  const picked = focus ? (rows ?? []).find((s) => s.id === focus) : null;
   return (
     <>
       <div style={{ height: 300, position: "relative", isolation: "isolate", background: "#E7E1D2" }}>
@@ -127,6 +129,12 @@ function Nearby() {
           </div>
         )}
       </div>
+      {/* Tap a society: its card over the bottom of the screen, Google Maps style. */}
+      {picked && !adding && (
+        <SocietyPreview society={picked} state={stateLine(picked)} busy={busy === picked.id}
+          onAction={() => open(picked)} onClose={() => setFocus(null)} />
+      )}
+      {picked && <div style={{ height: "22vh" }} aria-hidden />}
       {adding && (
         <Sheet title="Add a society" onClose={() => setAdding(false)}
           action={<button type="button" className="pz-btn pz-btn--primary pz-btn--block" disabled={busy === "add" || name.trim().length < 3} onClick={add}>

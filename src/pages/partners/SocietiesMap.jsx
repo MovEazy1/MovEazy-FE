@@ -22,7 +22,7 @@ export default function SocietiesMap({ spot, societies = [], focusId, onPick }) 
   const focus = focusId ? societies.find((s) => s.id === focusId) : null;
   const centre = spot ? [spot.lat, spot.lng] : [12.9116, 77.6474];
   return (
-    <MapContainer center={centre} zoom={15} scrollWheelZoom style={{ width: "100%", height: "100%" }}>
+    <MapContainer center={centre} zoom={15} scrollWheelZoom tap={false} style={{ width: "100%", height: "100%" }}>
       <TileLayer url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png" attribution="&copy; OpenStreetMap" maxZoom={19} />
       <Centre spot={spot} focus={focus} />
       {spot && (
@@ -34,9 +34,11 @@ export default function SocietiesMap({ spot, societies = [], focusId, onPick }) 
         </>
       )}
       {societies.filter((s) => s.lat != null).map((s) => (
-        <CircleMarker key={s.id} center={[Number(s.lat), Number(s.lng)]} radius={s.id === focusId ? 11 : 7}
-          pathOptions={{ color: "#fff", weight: 2, fillColor: TONE[s.state] || TONE.open, fillOpacity: 0.95 }}
-          eventHandlers={{ click: () => onPick?.(s.id) }}>
+        // Big enough to hit with a thumb; a tap opens the society's card.
+        <CircleMarker key={s.id} center={[Number(s.lat), Number(s.lng)]} radius={s.id === focusId ? 13 : 10}
+          pathOptions={{ color: s.id === focusId ? "#04211D" : "#fff", weight: s.id === focusId ? 3 : 2, fillColor: TONE[s.state] || TONE.open, fillOpacity: 0.95 }}
+          bubblingMouseEvents={false}
+          eventHandlers={{ click: (e) => { e.originalEvent?.stopPropagation?.(); onPick?.(s.id); } }}>
           <Tooltip>{s.name}</Tooltip>
         </CircleMarker>
       ))}
