@@ -20,7 +20,7 @@ async function rpc(fn, args) {
 }
 
 /* ── Words ───────────────────────────────────────────────────────────────── */
-export const VIEW_SOURCES = { share: "Link we sent", website: "Website", qr: "QR", team: "Team added", partner: "Partner" };
+export const VIEW_SOURCES = { share: "Link we sent", website: "Website", qr: "QR", team: "Team added", partner: "Partner", deal: "Deals page" };
 export const RESPONDERS = { team: "MovEazy team", partner: "Partner", tenant: "Tenant" };
 
 /** "Visit done · Liked · Will pay token", "Did not like · Size is small", or "No response yet". */

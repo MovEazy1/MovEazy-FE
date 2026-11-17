@@ -13,11 +13,18 @@
  * Properties); Deal of the Day needs crm.properties.write. The database checks.
  */
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { ArrowLeft, ArrowRight, Flame, Plus, X } from "lucide-react";
+import { Link } from "react-router-dom";
+import { ArrowLeft, ArrowRight, CalendarCheck, Copy, Eye, Flame, Heart, Link2, Plus, X } from "lucide-react";
 import { useCrm } from "./CrmShell";
 import { Btn, C, Chip, Empty, Toast, inr } from "./crmUi";
 import { SCOPES } from "../../lib/adminScopes";
-import { DAY_KINDS, addDays, addStealDeal, addStealKind, dayKindLabel, dealKind, fetchCrmDeals, setDayDeal, setStealDeals, weekLabel } from "../../lib/deals";
+import { whatsappUrl } from "../../lib/crmSettings";
+import { logActivity } from "../../lib/crmClients";
+import { fetchNotifications, markNotificationRead } from "../../lib/crmPayments";
+import {
+  DAY_KINDS, addDays, addStealDeal, addStealKind, dayKindLabel, dealKind, dealLink, dealMessage, fetchCrmDeals, fetchDealPeople,
+  fetchDealStats, setDayDeal, setStealDeals, weekLabel,
+} from "../../lib/deals";
 
 const istToday = () => new Date().toLocaleDateString("en-CA", { timeZone: "Asia/Kolkata" });
 
@@ -71,6 +78,162 @@ function FlatPicker({ kind = null, exclude = [], onPick, onClose }) {
   );
 }
 
+/**
+ * New on the deals: a client liked a deal flat, or booked a visit for one
+ * (find_deals_tracking.sql deal_notify) — this person's unread ones, with a
+ * way to their record. Seen clears it.
+ */
+function DealAlerts() {
+  const [notes, setNotes] = useState([]);
+  useEffect(() => { fetchNotifications({ unreadOnly: true, type: "deal" }).then(setNotes); }, []);
+  if (!notes.length) return null;
+  const seen = (ids) => {
+    setNotes((cur) => cur.filter((n) => !ids.includes(n.id)));
+    ids.forEach((id) => markNotificationRead(id).catch(() => {}));
+  };
+  return (
+    <div style={{ ...card, padding: 12, display: "grid", gap: 6, borderColor: "#F2C9C0", background: "#FFF8F6" }}>
+      <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+        <b style={{ fontSize: 13 }}>New on the deals · {notes.length}</b>
+        <span style={{ flex: 1 }} />
+        <Btn sm onClick={() => seen(notes.map((n) => n.id))}>Mark all seen</Btn>
+      </div>
+      {notes.slice(0, 12).map((n) => (
+        <div key={n.id} style={{ display: "flex", gap: 10, alignItems: "center", flexWrap: "wrap", fontSize: 12.5 }}>
+          <span style={{ flex: "1 1 260px", minWidth: 0 }}><b>{n.title}</b> <span className="crm-mute">· {n.body} · {when(n.created_at)}</span></span>
+          {n.client_id && <Link to={`/crm/clients?client=${n.client_id}`} className="crm-btn crm-btn--sm" style={{ textDecoration: "none" }}>Record</Link>}
+          <Btn sm onClick={() => seen([n.id])}>Seen</Btn>
+        </div>
+      ))}
+    </div>
+  );
+}
+
+/** The general link for a deals page: copy it, or send it on WhatsApp. */
+function ShareBar({ deal, say }) {
+  const link = dealLink(deal);
+  const copy = async () => {
+    try { await navigator.clipboard.writeText(link); say("Link copied"); } catch { window.prompt("Copy the link", link); }
+  };
+  return (
+    <div style={{ ...card, padding: "10px 12px", display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap" }}>
+      <Link2 size={15} style={{ color: C.accent, flex: "none" }} />
+      <b style={{ fontSize: 12.5 }}>Share {deal === "steal" ? "this week's Steal Deals" : "today's Deal of the Day"}</b>
+      <span className="crm-mute" style={{ fontSize: 11.5, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", flex: "1 1 220px", minWidth: 0 }}>{link}</span>
+      <Btn sm onClick={copy}><Copy size={13} /> Copy link</Btn>
+      <a className="crm-btn crm-btn--sm crm-btn--wa" href={`https://wa.me/?text=${encodeURIComponent(dealMessage(deal))}`}
+        target="_blank" rel="noopener noreferrer" style={{ textDecoration: "none" }}>WhatsApp</a>
+    </div>
+  );
+}
+
+/** Numbers for deals periods from..to (find_deals_tracking.sql crm_deal_stats). */
+function useDealStats(deal, from, to) {
+  const [s, setS] = useState(null);
+  useEffect(() => {
+    let live = true;
+    if (!from || !to) return undefined;
+    fetchDealStats(deal, from, to).then((r) => live && setS(r), () => live && setS({ periods: [], flats: [] }));
+    return () => { live = false; };
+  }, [deal, from, to]);
+  return {
+    ready: Boolean(s),
+    period: (key) => s?.periods?.find((p) => p.key === key) || { people: 0, identified: 0 },
+    cell: (key, pid) => s?.flats?.find((f) => f.key === key && f.property_id === pid) || { opens: 0, likes: 0, visits: 0 },
+    flatsOn: (key) => (s?.flats ?? []).filter((f) => f.key === key),
+  };
+}
+
+function Visitors({ p, label }) {
+  return (
+    <div style={{ display: "flex", gap: 14, alignItems: "baseline", flexWrap: "wrap" }}>
+      <span className="crm-mute" style={{ fontSize: 12 }}>{label}</span>
+      <span style={{ fontSize: 13 }}><b style={{ fontSize: 17 }}>{p.people}</b> people opened the page</span>
+      <span style={{ fontSize: 13 }}><b style={{ fontSize: 17 }}>{p.identified}</b> gave their number</span>
+    </div>
+  );
+}
+
+const when = (t) => (t ? new Date(t).toLocaleString("en-IN", { day: "numeric", month: "short", hour: "numeric", minute: "2-digit" }) : "");
+
+/** Who opened, liked or booked one deal flat in one period. */
+function DealPeople({ deal, k, pid }) {
+  const [rows, setRows] = useState(null);
+  useEffect(() => {
+    let live = true;
+    fetchDealPeople(deal, k, pid).then((r) => live && setRows(r ?? []), () => live && setRows([]));
+    return () => { live = false; };
+  }, [deal, k, pid]);
+  if (!rows) return <div className="crm-mute" style={{ fontSize: 12, padding: "6px 0" }}>Loading…</div>;
+  if (!rows.length) return <div className="crm-mute" style={{ fontSize: 12, padding: "6px 0" }}>Nobody has opened, liked or booked it yet.</div>;
+  return (
+    <div style={{ display: "grid", gap: 2, padding: "4px 0", width: "100%" }}>
+      {rows.map((p, i) => (
+        <div key={p.client_id || i} style={{ display: "flex", gap: 10, alignItems: "center", flexWrap: "wrap", fontSize: 12, padding: "5px 8px", background: C.surface, borderRadius: 6 }}>
+          {p.client_id
+            ? <Link to={`/crm/clients?client=${p.client_id}`} style={{ fontWeight: 700, color: C.text, textDecoration: "none", minWidth: 140 }}>{p.name || "Client"}</Link>
+            : <span className="crm-mute" style={{ minWidth: 140 }}>Visitor · no number yet</span>}
+          {p.phone && <span className="crm-num">{p.phone}</span>}
+          {p.opens > 0 && <span className="crm-mute">Opened {p.opens}×</span>}
+          {p.liked && <span style={{ color: C.coral, fontWeight: 600 }}>♥ Liked{p.liked_at ? ` · ${when(p.liked_at)}` : ""}</span>}
+          {p.booked_at && <span style={{ color: C.accent, fontWeight: 600 }}>Visit{p.visit_at ? ` ${when(p.visit_at)}` : " — time to fix"}{p.visit_status ? ` · ${p.visit_status}` : ""}</span>}
+        </div>
+      ))}
+    </div>
+  );
+}
+
+/** A deal flat's opens · likes · visits, and Who (the list opens under the row). */
+function FlatNumbers({ n, onWho, open }) {
+  return (
+    <span style={{ display: "inline-flex", gap: 10, alignItems: "center", fontSize: 12 }}>
+      <span title="Opened from the deals page"><Eye size={12} /> {n.opens}</span>
+      <span title="Liked" style={{ color: n.likes ? C.coral : undefined }}><Heart size={12} /> {n.likes}</span>
+      <span title="Visits booked for it in the period, from anywhere" style={{ color: n.visits ? C.accent : undefined }}><CalendarCheck size={12} /> {n.visits}</span>
+      <Btn sm onClick={onWho}>{open ? "Hide" : "Who"}</Btn>
+    </span>
+  );
+}
+
+/** Deal of the Day, the last 7 days: who came each day, and each flat's numbers. */
+function DayStats() {
+  const { inventory } = useCrm();
+  const [today] = useState(istToday);
+  const from = addDays(today, -6);
+  const st = useDealStats("day", from, today);
+  const [who, setWho] = useState("");
+  const byId = useMemo(() => new Map((inventory ?? []).map((r) => [r.property_id, r])), [inventory]);
+  if (!st.ready) return <Empty>Loading the numbers…</Empty>;
+  const days = Array.from({ length: 7 }, (_, i) => addDays(today, -i));
+  return (
+    <div style={{ ...card, padding: 12, display: "grid", gap: 10 }}>
+      <b style={{ fontSize: 13 }}>The last 7 days</b>
+      {days.map((day) => {
+        const flats = st.flatsOn(day);
+        return (
+          <div key={day} style={{ display: "grid", gap: 6, paddingTop: 8, borderTop: `1px solid ${C.lineSoft}` }}>
+            <Visitors p={st.period(day)} label={new Date(`${day}T00:00:00`).toLocaleDateString("en-IN", { weekday: "short", day: "numeric", month: "short" }) + (day === today ? " · today" : "")} />
+            {flats.map((f) => {
+              const r = byId.get(f.property_id);
+              const id = `${day}|${f.property_id}`;
+              return (
+                <div key={id} style={{ display: "flex", gap: 10, alignItems: "center", flexWrap: "wrap", paddingLeft: 8 }}>
+                  <span style={{ flex: "1 1 260px", minWidth: 0, fontSize: 12.5 }}>
+                    <b>{r?.title || f.property_id}</b>
+                    <span className="crm-mute"> · {[f.property_id, r?.flat_type, r?.area].filter(Boolean).join(" · ")}</span>
+                  </span>
+                  <FlatNumbers n={f} open={who === id} onWho={() => setWho(who === id ? "" : id)} />
+                  {who === id && <DealPeople deal="day" k={day} pid={f.property_id} />}
+                </div>
+              );
+            })}
+          </div>
+        );
+      })}
+    </div>
+  );
+}
+
 function StealTab({ canEdit, say }) {
   const { inventory } = useCrm();
   const [week, setWeek] = useState(null);
@@ -102,6 +265,9 @@ function StealTab({ canEdit, say }) {
     for (const x of d?.steal ?? []) if (x.kind) n[x.kind] = (n[x.kind] || 0) + 1;
     return n;
   }, [d]);
+  // Who looked (find_deals_tracking.sql): the week on screen.
+  const st = useDealStats("steal", week, week);
+  const [who, setWho] = useState("");
 
   if (!d) return <Empty>Loading the deals…</Empty>;
   const run = async (fn, ok) => {
@@ -126,6 +292,7 @@ function StealTab({ canEdit, say }) {
 
   return (
     <div style={{ display: "grid", gap: 12 }}>
+      {thisWeek && <ShareBar deal="steal" say={say} />}
       <div style={{ display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap" }}>
         <Btn sm onClick={() => load(addDays(week, -7))} aria-label="Previous week"><ArrowLeft size={14} /></Btn>
         <b style={{ fontSize: 15, minWidth: 130, textAlign: "center" }}>{weekLabel(week, addDays(week, 6))}</b>
@@ -135,6 +302,7 @@ function StealTab({ canEdit, say }) {
         <span style={{ flex: 1 }} />
         {editable && <Btn sm variant="primary" disabled={busy} onClick={() => setPicking(true)}><Plus size={14} /> Add a flat</Btn>}
       </div>
+      {st.ready && <Visitors p={st.period(week)} label={thisWeek ? "This week" : "That week"} />}
       {editable && (
         <div style={{ display: "flex", gap: 6, alignItems: "center", flexWrap: "wrap" }}>
           <span className="crm-mute" style={{ fontSize: 12 }}>Add every live flat of a type:</span>
@@ -173,9 +341,11 @@ function StealTab({ canEdit, say }) {
                 <div className="crm-mute" style={{ fontSize: 11.5 }}>{[x.property_id, x.flat_type, x.area, x.rent ? inr(x.rent) : ""].filter(Boolean).join(" · ")}</div>
                 <div style={{ fontSize: 11.5, color: x.reason ? C.accent : C.textMute }}>{x.reason || "No below-average comparison — the card shows its best facts"}</div>
               </div>
+              <FlatNumbers n={st.cell(week, x.property_id)} open={who === x.property_id} onWho={() => setWho(who === x.property_id ? "" : x.property_id)} />
               {editable && (
                 <Btn sm variant="danger" disabled={busy} onClick={() => save(ids.filter((y) => y !== x.property_id))} aria-label="Remove"><X size={13} /></Btn>
               )}
+              {who === x.property_id && <DealPeople deal="steal" k={week} pid={x.property_id} />}
             </div>
           ))}
         </div>
@@ -214,6 +384,8 @@ function DayTab({ canEdit, say }) {
 
   return (
     <div style={{ display: "grid", gap: 12 }}>
+      <ShareBar deal="day" say={say} />
+      <DayStats />
       <div className="crm-mute" style={{ fontSize: 12, lineHeight: 1.5 }}>
         One flat per type per day, live on the site from midnight. A day left empty keeps the last deal for that type (shown faded).
       </div>
@@ -291,6 +463,7 @@ export default function CrmDealsPage() {
           <Chip on={tab === "steal"} onClick={() => setTab("steal")}>Steal Deals of the Week</Chip>
           <Chip on={tab === "day"} onClick={() => setTab("day")}>Deal of the Day</Chip>
         </div>
+        <DealAlerts />
         {tab === "steal" ? <StealTab canEdit={canEditSteal} say={say} /> : <DayTab canEdit={canEdit} say={say} />}
       </div>
       {toast && <Toast {...toast} />}
@@ -368,5 +541,27 @@ export function CrmDealShortcut({ propertyId, flatType, onToast }) {
         </>
       ) : <span className="crm-mute" style={{ fontSize: 11.5 }}>Deal of the Day is for 1 RK, 1 BHK, 2 BHK and 3 BHK+ flats.</span>}
     </div>
+  );
+}
+
+/**
+ * On a client (Clients, Priority closures): send this week's Steal Deals or
+ * today's Deal of the Day on WhatsApp — the general link; their number on the
+ * page ties what they like back to them. Logged on the client's timeline.
+ */
+export function SendDealsButtons({ client, actorEmail = "", onToast, sm = false }) {
+  if (!client?.phone) return null;
+  const send = (deal) => {
+    const url = whatsappUrl(client.phone, dealMessage(deal, client.name));
+    if (!url) return;
+    window.open(url, "_blank", "noopener");
+    logActivity(client.id, { type: "whatsapp", body: deal === "steal" ? "Sent this week's Steal Deals" : "Sent today's Deal of the Day", actorEmail })
+      .catch(() => onToast?.("Sent — couldn't note it on the timeline", "error"));
+  };
+  return (
+    <>
+      <Btn sm={sm} onClick={() => send("steal")} title="WhatsApp them this week's Steal Deals link"><Flame size={13} /> Send Steal Deals</Btn>
+      <Btn sm={sm} onClick={() => send("day")} title="WhatsApp them today's Deal of the Day link"><CalendarCheck size={13} /> Send Deal of the Day</Btn>
+    </>
   );
 }

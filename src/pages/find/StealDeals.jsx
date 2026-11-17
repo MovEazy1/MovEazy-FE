@@ -5,12 +5,12 @@
  * mid-week stays, marked rented.
  */
 import { useEffect, useMemo, useState } from "react";
-import { DealCard, FindShell, KindChips, useFindGate, useLikes } from "./findKit";
+import { DealCard, FindShell, KindChips, useDealActions } from "./findKit";
 import { DAY_KINDS, fetchDealsFeed, weekLabel } from "../../lib/deals";
 
 export default function StealDeals() {
-  const { allowed, gate } = useFindGate();
-  const likes = useLikes();
+  // Shown at once; the number is asked on the first open, ♥ or visit.
+  const likes = useDealActions("steal");
   const [feed, setFeed] = useState(null);
   const [kinds, setKinds] = useState([]); // picked flat types; none = all
   useEffect(() => { fetchDealsFeed().then(setFeed, () => setFeed({ steal: [], weekStart: "", weekEnd: "" })); }, []);
@@ -31,8 +31,8 @@ export default function StealDeals() {
   return (
     <FindShell kicker={week ? `This week · ${week}` : "This week"} title="Steal Deals of the Week"
       sub="Hand-picked flats priced below what's around them. New picks every Monday.">
-      {gate}
-      {allowed && (feed === null ? (
+      {likes.gate}
+      {feed === null ? (
         <div className="fd-empty">Loading this week&apos;s deals…</div>
       ) : all.length === 0 ? (
         <div className="fd-empty"><b>This week&apos;s deals drop soon</b>Check back shortly, or build your free curated list meanwhile.</div>
@@ -44,7 +44,7 @@ export default function StealDeals() {
             {shown.map((d) => <DealCard key={d.listing.id} deal={d} label="Steal Deal of the Week" badge="Steal Deal" likes={likes} />)}
           </div>
         </>
-      ))}
+      )}
     </FindShell>
   );
 }

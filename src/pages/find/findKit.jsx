@@ -7,15 +7,13 @@ import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { CalendarCheck, Heart, MapPin, Share2, Sparkles } from "lucide-react";
 import { useAuth } from "../../context/AuthContext";
-import { useLoginModal } from "../../context/LoginModalContext";
 import RequirePhoneFirst from "../../components/RequirePhoneFirst";
 import ThumbImg from "../../components/ThumbImg";
 import MovEazyNav from "../../components/layout/MovEazyNav";
 import { LandingStyles } from "../landing/landingKit";
 import { SITE_CSS, SiteFooter } from "../home/homeKit";
 import { hasLeadPhone } from "../../lib/leadIntake";
-import { fetchReactions, setReaction } from "../../lib/visits";
-import { dealFacts, dealShareUrl } from "../../lib/deals";
+import { dealFacts, dealShareUrl, dealTrack } from "../../lib/deals";
 
 /**
  * The number first, before any option (signed-in accounts go straight in).
@@ -36,26 +34,42 @@ export function useFindGate() {
   return { allowed: !loading && allowed, gate };
 }
 
-/** The signed-in tenant's likes, and a toggle that asks a visitor to sign in first. */
-export function useLikes() {
+/**
+ * A deals page (Steal Deals, Deal of the Day — the links the team shares): the
+ * flats show at once; the number is asked the first time someone opens a flat,
+ * taps ♥ or books, and then what they tapped goes ahead. ♥ needs no sign-in.
+ * Every open and ♥ is recorded for the team (lib/deals.js dealTrack).
+ * → { gate, liked(id), toggle(id), open(id, { visit }) }.
+ */
+export function useDealActions(deal) {
   const { user } = useAuth();
-  const { openLogin } = useLoginModal();
-  const [likes, setLikes] = useState({});
+  const navigate = useNavigate();
+  const [known, setKnown] = useState(() => hasLeadPhone());
+  const [pending, setPending] = useState(null); // the action waiting on the number
+  const [likes, setLikes] = useState(() => new Set());
   useEffect(() => {
     let alive = true;
-    if (!user?.uid) { setLikes({}); return undefined; }
-    fetchReactions(user.uid).then((r) => { if (alive) setLikes(r); });
+    dealTrack(deal, "page").then((r) => { if (alive && r?.likes) setLikes(new Set(r.likes)); });
     return () => { alive = false; };
-  }, [user?.uid]);
-  const toggle = async (id) => {
-    if (!user?.uid) {
-      openLogin({ title: "Sign in to save this flat", subtitle: "Your liked flats stay with you, and we'll keep you posted if it goes." });
-      return;
-    }
-    const next = await setReaction(user.uid, id, "like", likes[id] ?? null);
-    setLikes((cur) => ({ ...cur, [id]: next }));
-  };
-  return { liked: (id) => likes[id] === "like", toggle };
+  }, [deal]);
+  const ask = (fn) => { if (known || user) fn(); else setPending(() => fn); };
+  const toggle = (id) => ask(() => {
+    const on = !likes.has(id);
+    setLikes((cur) => { const next = new Set(cur); if (on) next.add(id); else next.delete(id); return next; });
+    dealTrack(deal, on ? "like" : "unlike", id).then((r) => { if (r?.likes) setLikes(new Set(r.likes)); });
+  });
+  const open = (id, { visit = false } = {}) => ask(() => {
+    dealTrack(deal, "open", id);
+    navigate(`/property/${encodeURIComponent(id)}${visit ? "?visit=1" : ""}`);
+  });
+  const gate = (
+    <RequirePhoneFirst
+      open={Boolean(pending)}
+      onDone={() => { setKnown(true); const fn = pending; setPending(null); fn?.(); }}
+      onClose={() => setPending(null)}
+    />
+  );
+  return { gate, liked: (id) => likes.has(id), toggle, open };
 }
 
 /** The page frame: nav, the green band with the title, the body, the footer. */
@@ -84,10 +98,9 @@ export function FindShell({ kicker, title, sub, aside = null, children }) {
 
 /** One deal: photo, type and area, rent, why it's a steal, and Schedule visit · Like · Share. */
 export function DealCard({ deal, label = "Steal Deal", badge = null, likes }) {
-  const navigate = useNavigate();
   const { listing: l, reason, rented } = deal;
   const why = reason || dealFacts(l);
-  const open = () => navigate(`/property/${encodeURIComponent(l.id)}`);
+  const open = () => likes.open(l.id);
   return (
     <article className={`fd-deal${rented ? " fd-deal--gone" : ""}`}>
       <button type="button" className="fd-deal-photo" onClick={open} aria-label={`Open ${l.title}`}>
@@ -109,7 +122,7 @@ export function DealCard({ deal, label = "Steal Deal", badge = null, likes }) {
         {why && <p className="fd-deal-why"><Sparkles size={14} /> {why}</p>}
         <div className="fd-deal-acts">
           <button type="button" className="fd-btn fd-btn--go" disabled={rented}
-            onClick={() => navigate(`/property/${encodeURIComponent(l.id)}?visit=1`)}>
+            onClick={() => likes.open(l.id, { visit: true })}>
             <CalendarCheck size={16} /> {rented ? "Rented" : "Schedule visit"}
           </button>
           <a className="fd-btn fd-btn--wa" href={dealShareUrl(l, label)} target="_blank" rel="noreferrer" aria-label="Share on WhatsApp">

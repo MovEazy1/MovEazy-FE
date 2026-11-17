@@ -5,12 +5,12 @@
  */
 import { useEffect, useState } from "react";
 import { Timer } from "lucide-react";
-import { DealCard, FindShell, useFindGate, useLikes } from "./findKit";
+import { DealCard, FindShell, useDealActions } from "./findKit";
 import { DAY_KINDS, fetchDealsFeed, untilMidnightIst } from "../../lib/deals";
 
 export default function DealOfTheDay() {
-  const { allowed, gate } = useFindGate();
-  const likes = useLikes();
+  // Shown at once; the number is asked on the first open, ♥ or visit.
+  const likes = useDealActions("day");
   const [feed, setFeed] = useState(null);
   const [left, setLeft] = useState(() => untilMidnightIst());
   useEffect(() => { fetchDealsFeed().then(setFeed, () => setFeed({ day: [] })); }, []);
@@ -22,8 +22,8 @@ export default function DealOfTheDay() {
   return (
     <FindShell kicker={today} title="Deal of the Day" sub="One standout flat for each flat type, picked by our team every day."
       aside={<span className="fd-timer"><Timer size={17} /> Ends in {left}</span>}>
-      {gate}
-      {allowed && (feed === null ? (
+      {likes.gate}
+      {feed === null ? (
         <div className="fd-empty">Loading today&apos;s deals…</div>
       ) : deals.length === 0 ? (
         <div className="fd-empty"><b>Today&apos;s deals are on their way</b>Check back soon, or see this week&apos;s Steal Deals.</div>
@@ -33,7 +33,7 @@ export default function DealOfTheDay() {
             <DealCard key={kind.id} deal={deal} label={`${kind.label} Deal of the Day`} badge={`${kind.label} · Deal of the Day`} likes={likes} />
           ))}
         </div>
-      ))}
+      )}
     </FindShell>
   );
 }

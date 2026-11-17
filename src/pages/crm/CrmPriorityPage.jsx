@@ -30,6 +30,7 @@ import { coverPhoto } from "../../lib/listingMedia";
 import { fetchShortlists, logActivity, saveClientRequirement, tempColor } from "../../lib/crmClients";
 import { buildTemplateVars, renderTemplate, whatsappUrl } from "../../lib/crmSettings";
 import { FollowUpActions } from "./FollowUpControls";
+import { SendDealsButtons } from "./CrmDealsPage";
 import { effectiveFacts, groupInterestByClient, inferRequirement, requirementForMatching } from "../../lib/crmPropertyInterest";
 import { summariseClients } from "../../lib/crmLeadBuckets";
 import { scoreMatch } from "../../lib/inventoryMatch";
@@ -253,7 +254,7 @@ export default function CrmPriorityPage() {
         {people.length === 0 ? (
           <Empty>No one in Priority closures yet. Add clients from Suggested, from a client&apos;s record, or tick several in Clients.</Empty>
         ) : shownClients.length === 0 ? <Empty>Nobody here.</Empty> : shownClients.map((p) => (
-          <ClientCard key={p.c.id} p={p} on={picked === p.c.id} now={now} canWrite={canWrite}
+          <ClientCard key={p.c.id} p={p} on={picked === p.c.id} now={now} canWrite={canWrite} actorEmail={actorEmail} say={say}
             onPick={() => { setPicked(picked === p.c.id ? "" : p.c.id); setTray([]); if (phone) setSide("flats"); }}
             onContact={(type) => contact(p, type)} onCurate={() => openCurate(p)}
             onFresh={() => openCurate(p, p.fresh.slice(0, 10).map((l) => l.property_id), `${Math.min(10, p.fresh.length)} new since the last list`)}
@@ -399,7 +400,7 @@ function MoreBrackets({ pool, picked, counts, kind, onToggle }) {
   );
 }
 
-function ClientCard({ p, on, now, canWrite, onPick, onContact, onCurate, onFresh, onFollowUp, onRemove }) {
+function ClientCard({ p, on, now, canWrite, actorEmail, say, onPick, onContact, onCurate, onFresh, onFollowUp, onRemove }) {
   const { c, facts, fu, signal, hot, silent, fresh, sent } = p;
   const [more, setMore] = useState(false);
   const [date, setDate] = useState(() => dayInput(now + 2 * DAY));
@@ -427,6 +428,7 @@ function ClientCard({ p, on, now, canWrite, onPick, onContact, onCurate, onFresh
       <div style={{ display: "flex", gap: 5, flexWrap: "wrap" }}>
         <Btn sm variant="call" onClick={() => onContact("call")}><Phone size={12} /> Call</Btn>
         <Btn sm variant="wa" onClick={() => onContact("whatsapp")}><MessageCircle size={12} /> WhatsApp</Btn>
+        <SendDealsButtons client={c} actorEmail={actorEmail} onToast={say} sm />
         {canWrite && <Btn sm variant="primary" onClick={onCurate}><Send size={12} /> Curate & send</Btn>}
         {canWrite && fresh.length > 0 && <Btn sm onClick={onFresh}><Sparkles size={12} /> {fresh.length} new flat{fresh.length === 1 ? "" : "s"}</Btn>}
         <Link to={`/crm/clients?client=${c.id}`} className="crm-btn crm-btn--sm" style={{ textDecoration: "none" }}>Record</Link>

@@ -21,6 +21,7 @@ import PriorityControl from "./PriorityControl";
 import { FollowUpActions } from "./FollowUpControls";
 import PropertyQuickView from "./PropertyQuickView";
 import { ClientBrokerActivity, ClientTenantViews } from "./CrmTenantViews";
+import { SendDealsButtons } from "./CrmDealsPage";
 
 /* ── Small pieces ─────────────────────────────────────────────────────────── */
 
@@ -719,6 +720,7 @@ export default function ClientRecord({
           <Btn variant="call" onClick={handleCall} disabled={!client.phone}>
             {copied ? "Copied" : "Call"}
           </Btn>
+          <SendDealsButtons client={client} actorEmail={actorEmail} onToast={onToast} sm />
         </div>
 
         {onCurate && canWrite && (

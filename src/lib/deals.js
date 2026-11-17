@@ -118,3 +118,40 @@ export function dealShareUrl(listing, what = "Steal Deal") {
   const text = `${what} on MovEazy: ${listing.title} · ${listing.price}\n${link}`;
   return `https://wa.me/?text=${encodeURIComponent(text)}`;
 }
+
+/* ── Who looks at the deals (find_deals_tracking.sql) ─────────────────────── */
+
+/**
+ * What a visitor did on a deals page — "page", "open", "like", "unlike" — from
+ * this browser (lib/leadIntake.js key; the number it gave makes it a CRM
+ * client). → { likes: [property ids] } or null. Never throws.
+ */
+export async function dealTrack(deal, kind, propertyId = null) {
+  // Loaded here, not at the top: it reads the browser as it loads.
+  const { leadKey } = await import("./leadIntake");
+  const key = leadKey();
+  if (!isSupabaseConfigured || !supabase || !key) return null;
+  const { data, error } = await supabase.rpc("deal_track", { p_lead_key: key, p_deal: deal, p_kind: kind, p_property: propertyId });
+  return error ? null : data;
+}
+
+/** The general links the team shares, with where they came from. */
+export const DEAL_LINKS = {
+  steal: "https://www.moveazy.co.in/find/steal-deals",
+  day: "https://www.moveazy.co.in/find/deal-of-the-day",
+};
+export const dealLink = (deal, source = "crm") =>
+  `${DEAL_LINKS[deal]}?utm_source=${encodeURIComponent(source)}&utm_medium=whatsapp&utm_campaign=${deal === "steal" ? "steal_deals" : "deal_of_the_day"}`;
+
+/** The WhatsApp message a deals link goes out with; `name` greets a client. */
+export function dealMessage(deal, name = "") {
+  const hi = name ? `Hi ${String(name).trim().split(/\s+/)[0]},` : "Hi,";
+  return deal === "steal"
+    ? `${hi} this week's Steal Deals on MovEazy — hand-picked flats priced below what's around them. Tap ♥ on the ones you like and we'll set up the visits:\n${dealLink("steal")}`
+    : `${hi} today's Deal of the Day on MovEazy — one standout flat for each type, today only. Tap ♥ if you like it and we'll set up a visit:\n${dealLink("day")}`;
+}
+
+/** CRM: numbers per period (Mondays / days) and per deal flat. */
+export const fetchDealStats = (deal, from, to) => rpc("crm_deal_stats", { p_deal: deal, p_from: from, p_to: to });
+/** CRM: who opened, liked or booked one deal flat in one period. */
+export const fetchDealPeople = (deal, key, propertyId) => rpc("crm_deal_people", { p_deal: deal, p_key: key, p_property: propertyId });

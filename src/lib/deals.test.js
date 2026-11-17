@@ -33,3 +33,14 @@ describe("deals", () => {
     expect(decodeURIComponent(url)).toContain("https://www.moveazy.co.in/property/MZ-AB12CD");
   });
 });
+
+describe("sharing the deals", () => {
+  it("one general link per deals page, tagged with where it was sent from", async () => {
+    const { dealLink, dealMessage } = await import("./deals");
+    expect(dealLink("steal")).toBe("https://www.moveazy.co.in/find/steal-deals?utm_source=crm&utm_medium=whatsapp&utm_campaign=steal_deals");
+    expect(dealLink("day")).toContain("/find/deal-of-the-day?");
+    expect(dealMessage("steal", "Ravi Kumar")).toMatch(/^Hi Ravi, this week's Steal Deals/);
+    expect(dealMessage("day")).toMatch(/^Hi, today's Deal of the Day/);
+    expect(dealMessage("day")).toContain(dealLink("day"));
+  });
+});
