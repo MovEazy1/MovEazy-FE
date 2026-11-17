@@ -17,6 +17,7 @@ import {
 import { groupByPlatform } from "../../lib/marketing";
 import { SCOPES } from "../../lib/adminScopes";
 import { COLUMNS, listingIdIn, matchesFilters, matchesSearch, optionsFor } from "./propertyColumns";
+import { StealDealButton, useWeekSteal } from "./CrmDealsPage";
 
 // One stable empty set, so an unfiltered column does not hand ColumnFilter a
 // brand-new Set on every render and re-run its effects for nothing.
@@ -597,6 +598,8 @@ export default function CrmPropertiesPage() {
   useEffect(() => { loadBuildings(); }, []);
   const [toast, setToast] = useState(null);
   const say = (message, tone = "ok") => { setToast({ message, tone }); setTimeout(() => setToast(null), 3200); };
+  // This week's Steal Deals: any CRM user adds a live flat from its row (find_deals.sql).
+  const steal = useWeekSteal(say);
   const buildingById = useMemo(() => new Map(buildings.map((b) => [b.id, b])), [buildings]);
   // One row changed — patched in place rather than refetching the whole CRM.
   const patchListing = (pid, patch) => setData((d) => (d
@@ -677,6 +680,7 @@ export default function CrmPropertiesPage() {
   const rowActions = (l) => (
     <div style={{ display: "flex", gap: 5, flexWrap: "wrap" }}>
       <SoldOut listing={l} canEdit={canEdit} onToast={say} onDone={(patch) => patchListing(l.property_id, patch)} />
+      <StealDealButton listing={l} steal={steal} />
       <Btn sm onClick={() => { setOpenId(l.property_id); if (phone) document.querySelector(".crm-ph-main")?.scrollTo({ top: 0, behavior: "smooth" }); }}>Who fits</Btn>
       {canEdit && (
         <Link to={`/crm/properties/${l.property_id}/edit`}

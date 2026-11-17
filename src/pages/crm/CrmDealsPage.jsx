@@ -8,10 +8,11 @@
  *                  per day. A day left empty rolls the last one over.
  *
  * Why each is a steal is worked out from our own listings (shown here as the
- * site will show it). Needs crm.properties.write to change; the database checks.
+ * site will show it). Any CRM user changes the Steal Deals (and adds a flat from
+ * Properties); Deal of the Day needs crm.properties.write. The database checks.
  */
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { ArrowDown, ArrowLeft, ArrowRight, ArrowUp, Plus, X } from "lucide-react";
+import { ArrowDown, ArrowLeft, ArrowRight, ArrowUp, Flame, Plus, X } from "lucide-react";
 import { useCrm } from "./CrmShell";
 import { Btn, C, Chip, Empty, Toast, inr } from "./crmUi";
 import { SCOPES } from "../../lib/adminScopes";
@@ -20,6 +21,8 @@ import { DAY_KINDS, addDays, addStealDeal, dayKindLabel, dealKind, fetchCrmDeals
 const istToday = () => new Date().toLocaleDateString("en-CA", { timeZone: "Asia/Kolkata" });
 
 const DAYS_AHEAD = 14;
+/** The most Steal Deals a week (find_deals.sql). */
+const STEAL_MAX = 20;
 const card = { border: `1px solid ${C.line}`, borderRadius: 12, background: C.bg };
 
 function useToast() {
@@ -30,7 +33,7 @@ function useToast() {
 
 function Thumb({ src }) {
   return <span style={{ width: 52, height: 40, borderRadius: 8, background: C.surface, overflow: "hidden", flex: "none", display: "block" }}>
-    {src && <img src={src} alt="" style={{ width: "100%", height: "100%", objectFit: "cover" }} />}
+    {src && <img src={src} alt="" loading="lazy" style={{ width: "100%", height: "100%", objectFit: "cover" }} />}
   </span>;
 }
 
@@ -42,8 +45,7 @@ function FlatPicker({ kind = null, exclude = [], onPick, onClose }) {
     const needle = q.trim().toLowerCase();
     return (inventory ?? [])
       .filter((r) => r.status === "published" && !exclude.includes(r.property_id) && (!kind || dealKind(r.flat_type) === kind))
-      .filter((r) => !needle || `${r.property_id} ${r.title} ${r.area} ${r.flat_type}`.toLowerCase().includes(needle))
-      .slice(0, 30);
+      .filter((r) => !needle || `${r.property_id} ${r.title} ${r.area} ${r.flat_type}`.toLowerCase().includes(needle));
   }, [inventory, q, kind, exclude]);
   return (
     <div style={{ ...card, padding: 12, display: "grid", gap: 8 }}>
@@ -52,6 +54,7 @@ function FlatPicker({ kind = null, exclude = [], onPick, onClose }) {
           placeholder={`Search live ${kind ? dayKindLabel(kind) + " " : ""}flats: id, title, area…`} aria-label="Search flats" />
         <Btn sm onClick={onClose}><X size={14} /></Btn>
       </div>
+      <span className="crm-mute" style={{ fontSize: 11.5 }}>{rows.length} live flat{rows.length === 1 ? "" : "s"}{q.trim() ? " match" : ""} — scroll for all of them</span>
       <div className="crm-scroll" style={{ maxHeight: 320, display: "grid", gap: 4 }}>
         {rows.length === 0 ? <span className="crm-mute" style={{ fontSize: 12, padding: 6 }}>No live flats match.</span> : rows.map((r) => (
           <button key={r.property_id} type="button" className="crm-btn" onClick={() => onPick(r.property_id)}
@@ -100,16 +103,16 @@ function StealTab({ canEdit, say }) {
         <b style={{ fontSize: 15, minWidth: 130, textAlign: "center" }}>{weekLabel(week, addDays(week, 6))}</b>
         <Btn sm onClick={() => load(addDays(week, 7))} aria-label="Next week"><ArrowRight size={14} /></Btn>
         {thisWeek ? <Chip on>This week · live now</Chip> : <Btn sm onClick={() => load(d.this_monday)}>Back to this week</Btn>}
-        <span className="crm-mute" style={{ fontSize: 12 }}>{ids.length} / 20</span>
+        <span className="crm-mute" style={{ fontSize: 12 }}>{ids.length} / {STEAL_MAX}</span>
         <span style={{ flex: 1 }} />
-        {canEdit && !past && ids.length < 20 && <Btn sm variant="primary" disabled={busy} onClick={() => setPicking(true)}><Plus size={14} /> Add a flat</Btn>}
+        {canEdit && !past && ids.length < STEAL_MAX && <Btn sm variant="primary" disabled={busy} onClick={() => setPicking(true)}><Plus size={14} /> Add a flat</Btn>}
       </div>
       {!thisWeek && !ids.length && (
         <div className="crm-mute" style={{ fontSize: 12 }}>
           Nothing picked for this week{past ? "" : " yet — until you add some, the site keeps showing the last week that had deals"}.
         </div>
       )}
-      {picking && <FlatPicker exclude={ids} onClose={() => setPicking(false)} onPick={(id) => { setPicking(false); save([...ids, id]); }} />}
+      {picking && <FlatPicker exclude={ids} onClose={() => setPicking(false)} onPick={(id) => { if (ids.length + 1 >= STEAL_MAX) setPicking(false); save([...ids, id]); }} />}
       {ids.length === 0 ? <Empty>No Steal Deals for this week.</Empty> : (
         <div style={{ ...card, overflow: "hidden" }}>
           {d.steal.map((x, i) => (
@@ -225,6 +228,8 @@ const td = { padding: "8px", borderBottom: `1px solid ${C.lineSoft}`, verticalAl
 
 export default function CrmDealsPage() {
   const { access } = useCrm();
+  // Steal Deals: anyone in the CRM. Deal of the Day: those who edit properties.
+  const canEditSteal = Boolean(access.isStaff);
   const canEdit = access.has(SCOPES.PROPERTIES_WRITE);
   const [tab, setTab] = useState("steal");
   const [toast, say] = useToast();
@@ -236,17 +241,61 @@ export default function CrmDealsPage() {
           <p style={{ color: C.textDim, fontSize: 13.5, margin: 0, maxWidth: "75ch", lineHeight: 1.6 }}>
             What tenants see under Find my home: this week&apos;s Steal Deals (moveazy.co.in/find/steal-deals) and today&apos;s
             Deal of the Day (/find/deal-of-the-day). Best-value picks at the flat&apos;s own rent; why each is a steal is worked out
-            from our listings.{!canEdit && " You can look; changing them needs permission to edit properties."}
+            from our listings.{tab === "day" && !canEdit && " You can look; changing the Deal of the Day needs permission to edit properties."}
           </p>
         </div>
         <div style={{ display: "flex", gap: 6 }}>
           <Chip on={tab === "steal"} onClick={() => setTab("steal")}>Steal Deals of the Week</Chip>
           <Chip on={tab === "day"} onClick={() => setTab("day")}>Deal of the Day</Chip>
         </div>
-        {tab === "steal" ? <StealTab canEdit={canEdit} say={say} /> : <DayTab canEdit={canEdit} say={say} />}
+        {tab === "steal" ? <StealTab canEdit={canEditSteal} say={say} /> : <DayTab canEdit={canEdit} say={say} />}
       </div>
       {toast && <Toast {...toast} />}
     </div>
+  );
+}
+
+/**
+ * This week's Steal Deals, for "Add to Steal Deals" on a property: which flats
+ * are in, and add / take one out. Any CRM user (find_deals.sql crm_deal_staff).
+ */
+export function useWeekSteal(onToast) {
+  const [week, setWeek] = useState(null); // { week, ids: Set } once read
+  const [busy, setBusy] = useState("");
+  useEffect(() => {
+    let live = true;
+    fetchCrmDeals(null).then((d) => live && setWeek({ week: d.week_start, ids: new Set((d.steal ?? []).map((x) => x.property_id)) }), () => {});
+    return () => { live = false; };
+  }, []);
+  const toggle = async (propertyId) => {
+    if (!week || busy) return;
+    setBusy(propertyId);
+    try {
+      const inNow = week.ids.has(propertyId);
+      const d = inNow
+        ? await setStealDeals(week.week, [...week.ids].filter((x) => x !== propertyId))
+        : await addStealDeal(week.week, propertyId);
+      setWeek({ week: d.week_start, ids: new Set((d.steal ?? []).map((x) => x.property_id)) });
+      onToast?.(inNow ? "Taken out of this week's Steal Deals" : "Added to this week's Steal Deals");
+    } catch (e) {
+      onToast?.(e?.message || "Couldn't save", "error");
+    } finally {
+      setBusy("");
+    }
+  };
+  return { has: (id) => Boolean(week?.ids.has(id)), count: week?.ids.size ?? 0, ready: Boolean(week), busy, toggle };
+}
+
+/** The button: "Add to Steal Deals", or "In Steal Deals ✓" (a tap takes it out). Live flats only. */
+export function StealDealButton({ listing, steal }) {
+  if (!steal.ready || listing.status !== "published") return null;
+  const on = steal.has(listing.property_id);
+  return (
+    <Btn sm variant={on ? "primary" : undefined} disabled={steal.busy === listing.property_id}
+      onClick={() => steal.toggle(listing.property_id)}
+      title={on ? "In this week's Steal Deals — tap to take it out" : `Add to this week's Steal Deals (${steal.count}/${STEAL_MAX})`}>
+      <Flame size={13} /> {on ? "In Steal Deals" : "Add to Steal Deals"}
+    </Btn>
   );
 }
 
@@ -256,7 +305,8 @@ export function CrmDealShortcut({ propertyId, flatType, onToast }) {
   const kind = dealKind(flatType);
   const [day, setDay] = useState(istToday);
   const [busy, setBusy] = useState(false);
-  if (!access.has(SCOPES.PROPERTIES_WRITE)) return null;
+  if (!access.isStaff) return null;
+  const canDay = access.has(SCOPES.PROPERTIES_WRITE);
   const run = async (fn, ok) => {
     setBusy(true);
     try { await fn(); onToast?.(ok); } catch (e) { onToast?.(e?.message || "Couldn't save", "error"); } finally { setBusy(false); }
@@ -266,7 +316,7 @@ export function CrmDealShortcut({ propertyId, flatType, onToast }) {
       <Btn disabled={busy} onClick={() => run(() => addStealDeal(null, propertyId), "Added to this week's Steal Deals")}>
         Add to this week&apos;s Steal Deals
       </Btn>
-      {kind ? (
+      {!canDay ? null : kind ? (
         <>
           <input type="date" className="crm-input" value={day} onChange={(e) => setDay(e.target.value)} style={{ width: 150 }} aria-label="Deal of the Day date" />
           <Btn disabled={busy || !day} onClick={() => run(() => setDayDeal(day, kind, propertyId), `${dayKindLabel(kind)} Deal of the Day set`)}>
