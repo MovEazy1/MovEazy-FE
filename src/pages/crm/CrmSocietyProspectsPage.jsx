@@ -380,7 +380,7 @@ function Contacts({ s, onChange, say }) {
     if (done) { setF(blank); setEditing(null); }
   };
   const byKind = CONTACT_KINDS.map((k) => [k, s.contacts.filter((c) => c.kind === k.key)]);
-  const brokers = s.contacts.filter((c) => c.kind === "broker").length;
+  const brokers = s.contacts.filter((c) => c.kind === "broker" && !c.removed_at).length;
   return (
     <div style={{ ...card, display: "grid", gap: 10 }}>
       <div style={{ fontWeight: 800 }}>People to call</div>
@@ -394,6 +394,12 @@ function Contacts({ s, onChange, say }) {
               {c.note && <span className="crm-mute" style={{ fontSize: 12 }}>{c.note}</span>}
               {c.source === "google" && <span className="crm-mute" style={{ fontSize: 11 }}>· Google</span>}
               {c.source === "partner" && <span className="crm-mute" style={{ fontSize: 11 }}>· added by {c.partner_name || "a partner"}</span>}
+              {/* Removed (or replaced) in the partner app: kept here, no longer shown to the partner. */}
+              {c.removed_at && (
+                <span style={{ fontSize: 11, fontWeight: 700, color: "#B91C1C", background: "#FEE2E2", borderRadius: 99, padding: "1px 7px" }}>
+                  {String(c.removed_by || "").endsWith(":changed") ? "Number changed by partner" : "Removed by partner"} · {shortDate(c.removed_at)}
+                </span>
+              )}
               <span style={{ flex: 1 }} />
               <Btn sm disabled={busy} onClick={() => { setEditing(c.id); setF({ kind: c.kind, name: c.name, phone: c.phone, note: c.note }); }}>Edit</Btn>
               <Btn sm variant="danger" disabled={busy} onClick={() => window.confirm(`Remove ${c.name || c.phone}?`) && run(() => removeProspectContact(c.id), "Removed")}><Trash2 size={13} /></Btn>

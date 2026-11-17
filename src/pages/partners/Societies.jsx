@@ -21,6 +21,7 @@ import {
 
 const SocietiesMap = lazy(() => import("./SocietiesMap"));
 import SocietyPreview from "./SocietyPreview";
+import { AdviceNudge } from "./societyContacts";
 const errText = (e) => e?.message || "Something went wrong.";
 
 /** What a partner signs up to, shown wherever they start or work a society. */
@@ -175,6 +176,7 @@ function Mine() {
                     {s.new_leads ? ` (${s.new_leads} new)` : ""}
                   </span>
                   {s.status === "sent_back" && s.note && <span className="pz-meta" style={{ display: "block", color: "#B91C1C" }}>Fix: {s.note}</span>}
+                  {(s.status === "submitted" || s.status === "approved") && <AdviceNudge counts={s.contact_counts} compact style={{ marginTop: 4 }} />}
                 </span>
                 <ChevronRight size={18} color="var(--dim)" />
               </button>

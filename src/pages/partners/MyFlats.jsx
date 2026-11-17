@@ -6,15 +6,17 @@
  * Also the Performance page (/performance): comparing a partner with others is
  * coming for Premium; free partners see what it is and how to get it.
  */
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
-import { BarChart3, Building2, Crown, Plus, Sparkles, Trophy } from "lucide-react";
+import { BarChart3, Building2, ChevronRight, Crown, Plus, Sparkles, Trophy } from "lucide-react";
 import { usePartner } from "./PartnerApp";
 import { Empty, Loading, TopBar, toast } from "./partnerUi";
 import { SmartListingImage } from "./partnerMedia";
 import { friendlyError, hasPremium, pp, setListingStatus } from "../../lib/partners";
 import { flatLine } from "../../lib/partnerMatcher";
 import { flatDetailScore, myFlats } from "../../lib/partnerTenants";
+import { fetchMySocieties } from "../../lib/societyPartners";
+import { AdviceNudge } from "./societyContacts";
 
 function FlatRow({ l, action }) {
   const sc = flatDetailScore(l);
@@ -27,6 +29,45 @@ function FlatRow({ l, action }) {
         <span className="pz-hint">{sc.done}/{sc.total} details{sc.missing.length ? ` · add ${sc.missing.slice(0, 2).join(", ").toLowerCase()}` : " · complete"}</span>
       </Link>
       {action}
+    </div>
+  );
+}
+
+/**
+ * The societies this partner onboarded (submitted or live), on top of My
+ * flats: "Ask for inventory" — tap for the tenants who asked and the numbers
+ * to ask for flats. Only for society partners (the call fails quietly for others).
+ */
+function SocietyCards() {
+  const [rows, setRows] = useState([]);
+  useEffect(() => {
+    let alive = true;
+    fetchMySocieties().then((r) => alive && setRows(r.filter((x) => x.status === "submitted" || x.status === "approved")), () => {});
+    return () => { alive = false; };
+  }, []);
+  if (!rows.length) return null;
+  return (
+    <div className="pz-section" style={{ padding: 0 }}>
+      <h2 style={{ padding: "14px 14px 4px" }}>My societies · {rows.length}</h2>
+      {rows.map((x) => (
+        <Link key={x.id} to={pp(`/societies/${x.id}`)} style={{ display: "block", padding: "10px 14px", borderTop: "1px solid var(--line)", color: "inherit", textDecoration: "none" }}>
+          <span style={{ display: "flex", alignItems: "center", gap: 10 }}>
+            <span style={{ width: 44, height: 44, borderRadius: 10, background: "#ECE9E2", overflow: "hidden", flex: "none", display: "grid", placeItems: "center" }}>
+              {x.cover ? <img src={x.cover} alt="" style={{ width: "100%", height: "100%", objectFit: "cover" }} /> : <Building2 size={20} color="var(--dim)" />}
+            </span>
+            <span style={{ flex: 1, minWidth: 0 }}>
+              <b style={{ display: "block", fontSize: 14.5, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{x.name}</b>
+              <span className="pz-meta" style={{ display: "block" }}>
+                {x.status === "approved" ? "Live" : "With MovEazy for review"}
+                {x.leads ? ` · ${x.leads} tenant enquir${x.leads === 1 ? "y" : "ies"}${x.new_leads ? ` (${x.new_leads} new)` : ""}` : ""}
+              </span>
+            </span>
+            <span className="pz-pill" style={{ background: "#FFF1D6", color: "#8A6419", borderColor: "transparent", flex: "none" }}>Ask for inventory</span>
+            <ChevronRight size={16} color="var(--dim)" style={{ flex: "none" }} />
+          </span>
+          <AdviceNudge counts={x.contact_counts} compact style={{ marginTop: 6 }} />
+        </Link>
+      ))}
     </div>
   );
 }
@@ -55,6 +96,7 @@ export default function MyFlats() {
           <Sparkles size={18} />
           <span>The more flats you upload, the better the tenants you’re matched with — and the more details on each, the better the AI maps it to the right tenant.</span>
         </div>
+        <SocietyCards />
         {section("Available", f.live, (l) => (
           <button type="button" className="pz-btn pz-btn--sm" disabled={busy === l.property_id} onClick={() => setStatus(l, "rented", "Marked let out — it won't be matched any more")}>Let out</button>
         ), "No available flats. Add one — it takes a minute.")}

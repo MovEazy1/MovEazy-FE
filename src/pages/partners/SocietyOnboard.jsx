@@ -1,8 +1,11 @@
 /**
  * Partner app → Societies → one society: onboarding it, saved at every step.
  *
- *   1  Numbers: the property manager, the guards, the brokers (only this
- *      partner and MovEazy see them)
+ *   1  Numbers: the society manager, the guards, the brokers — one under the
+ *      other, each saving itself (societyContacts.jsx). One of any kind is
+ *      enough to submit; 1 manager, 2–3 guards and 4–5 brokers are advised.
+ *      Once submitted or live this is "Ask for inventory": the tenants who
+ *      asked come first, then the numbers to ask for flats.
  *   2  Amenities: tick each, then a photo of it, taken there
  *   3  A sample flat: 5+ photos, room by room, taken there
  *   4  Rent ranges per flat type — optional, add when a tenant asks
@@ -13,14 +16,15 @@
  */
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
-import { Camera, Check, CircleAlert, Phone, Plus, Trash2, X } from "lucide-react";
+import { Camera, Check, CircleAlert, X } from "lucide-react";
 import { usePartner } from "./PartnerApp";
-import { Chip, Empty, Loading, TopBar, formatPhone, toast } from "./partnerUi";
+import { Chip, Empty, Loading, TopBar, toast } from "./partnerUi";
+import { AdviceNudge, ContactSections, SocietyEnquiries } from "./societyContacts";
 import { SocietyPromise } from "./Societies";
 import { pp } from "../../lib/partners";
 import {
-  CONTACT_KINDS, FLAT_SLOTS, ONBOARD_STATUS, RENT_TYPES, addSocietyPhoto, fetchMySociety, removeSocietyContact, removeSocietyPhoto,
-  saveSociety, saveSocietyContact, slotLabel, startSociety, submitSociety,
+  FLAT_SLOTS, ONBOARD_STATUS, RENT_TYPES, addSocietyPhoto, fetchMySociety, removeSocietyPhoto,
+  saveSociety, slotLabel, startSociety, submitSociety,
 } from "../../lib/societyPartners";
 
 const errText = (e) => e?.message || "Something went wrong.";
@@ -66,51 +70,6 @@ function Step({ n, title, done, optional, children }) {
       </div>
       {children}
     </div>
-  );
-}
-
-function Contacts({ s, editable, onSaved }) {
-  const [f, setF] = useState({ kind: "manager", name: "", phone: "" });
-  const [busy, setBusy] = useState(false);
-  const byKind = (k) => s.contacts.filter((c) => c.kind === k);
-  const add = async () => {
-    setBusy(true);
-    try { onSaved(await saveSocietyContact({ ...f, society_id: s.id })); setF({ kind: f.kind, name: "", phone: "" }); toast("Saved"); }
-    catch (e) { toast(errText(e), "error"); } finally { setBusy(false); }
-  };
-  const remove = async (c) => {
-    if (!window.confirm(`Remove ${c.name || formatPhone(c.phone)}?`)) return;
-    try { onSaved(await removeSocietyContact(c.id)); } catch (e) { toast(errText(e), "error"); }
-  };
-  return (
-    <>
-      {CONTACT_KINDS.map((k) => (
-        <div key={k.id} style={{ marginBottom: 10 }}>
-          <div className="pz-label" style={{ marginBottom: 4 }}>{k.label}{k.many ? "s" : ""} {byKind(k.id).length === 0 && <span className="pz-hint">· none yet</span>}</div>
-          {byKind(k.id).map((c) => (
-            <div key={c.id} style={{ display: "flex", alignItems: "center", gap: 8, padding: "6px 0", fontSize: 14 }}>
-              <Phone size={14} color="var(--dim)" />
-              <span style={{ flex: 1, minWidth: 0 }}><b>{formatPhone(c.phone)}</b>{c.name ? ` · ${c.name}` : ""}</span>
-              {editable && <button type="button" className="pz-iconbtn" onClick={() => remove(c)} aria-label="Remove"><Trash2 size={16} /></button>}
-            </div>
-          ))}
-        </div>
-      ))}
-      {editable && (
-        <div style={{ borderTop: "1px solid var(--line)", paddingTop: 10, display: "grid", gap: 8 }}>
-          <div className="pz-chips">
-            {CONTACT_KINDS.map((k) => <Chip key={k.id} on={f.kind === k.id} onClick={() => setF({ ...f, kind: k.id })}>{k.label}</Chip>)}
-          </div>
-          <input className="pz-input" placeholder={f.kind === "broker" ? "Broker's name" : "Name (optional)"} value={f.name} maxLength={80}
-            onChange={(e) => setF({ ...f, name: e.target.value })} aria-label="Name" />
-          <input className="pz-input" placeholder="Mobile number" inputMode="tel" value={f.phone} maxLength={14}
-            onChange={(e) => setF({ ...f, phone: e.target.value })} aria-label="Mobile number" />
-          <button type="button" className="pz-btn pz-btn--primary" disabled={busy || f.phone.replace(/\D/g, "").length < 10} onClick={add}>
-            <Plus size={16} /> {busy ? "Saving…" : "Add number"}
-          </button>
-        </div>
-      )}
-    </>
   );
 }
 
@@ -170,6 +129,14 @@ export default function SocietyOnboard() {
   const flatCount = (s.flat_photos ?? []).length;
   const lockDays = s.locked_until ? Math.ceil((new Date(s.locked_until) - Date.now()) / 86400000) : null;
 
+  const contactCount = Object.values(s.contact_counts ?? {}).reduce((a, b) => a + Number(b || 0), 0);
+  const numbers = (
+    <Step n={1} title={editable ? "Society numbers: manager, guards, brokers" : "Ask for inventory"} done={contactCount > 0}>
+      {!editable && <AdviceNudge counts={s.contact_counts} style={{ marginBottom: 10 }} />}
+      <ContactSections society={s} partnerName={me?.partner?.name} onSaved={take} />
+    </Step>
+  );
+
   return (
     <>
       <TopBar title={s.name} back={pp("/societies?tab=mine")} />
@@ -196,11 +163,13 @@ export default function SocietyOnboard() {
           )}
         </div>
 
+        {/* Submitted or live: tenants who asked first, then the numbers to ask for flats. */}
+        {!editable && <SocietyEnquiries societyId={s.id} />}
+        {!editable && numbers}
+
         <SocietyPromise />
 
-        <Step n={1} title="Numbers: manager, guards, brokers" done={!s.missing?.some((m) => /manager|guard|broker/i.test(m))}>
-          <Contacts s={s} editable={editable} onSaved={take} />
-        </Step>
+        {editable && numbers}
 
         <Step n={2} title="Amenities, each with a photo" done={!s.missing?.some((m) => /amenit|photo of the/i.test(m))}>
           <p className="pz-hint" style={{ marginTop: 0 }}>Tick what the society has, then take a photo of each, standing there.</p>

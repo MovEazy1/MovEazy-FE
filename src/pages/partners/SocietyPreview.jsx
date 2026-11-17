@@ -7,6 +7,7 @@
 import { Navigation, X } from "lucide-react";
 import { distanceLabel, RENT_TYPES } from "../../lib/societyPartners";
 import { rentRange, roadLabel } from "../../lib/societyProspects";
+import { AdviceNudge } from "./societyContacts";
 
 const directions = (s) => `https://www.google.com/maps/dir/?api=1&destination=${s.lat},${s.lng}`;
 
@@ -43,6 +44,8 @@ export default function SocietyPreview({ society: s, state, busy, onAction, onCl
           Rent (approx): {rents.map(([l, r]) => `${l} ${r}`).join(" · ")}
         </div>
       )}
+
+      {(s.state === "mine_live" || (s.state === "mine" && s.status === "submitted")) && <AdviceNudge counts={s.contact_counts} compact style={{ marginTop: 6 }} />}
 
       <div style={{ display: "flex", gap: 8, marginTop: 10 }}>
         {state.action && (
