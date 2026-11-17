@@ -9,6 +9,7 @@ import { CalendarCheck, Heart, MapPin, Share2, Sparkles } from "lucide-react";
 import { useAuth } from "../../context/AuthContext";
 import { useLoginModal } from "../../context/LoginModalContext";
 import RequirePhoneFirst from "../../components/RequirePhoneFirst";
+import ThumbImg from "../../components/ThumbImg";
 import MovEazyNav from "../../components/layout/MovEazyNav";
 import { LandingStyles } from "../landing/landingKit";
 import { SITE_CSS, SiteFooter } from "../home/homeKit";
@@ -90,7 +91,7 @@ export function DealCard({ deal, label = "Steal Deal", badge = null, likes }) {
   return (
     <article className={`fd-deal${rented ? " fd-deal--gone" : ""}`}>
       <button type="button" className="fd-deal-photo" onClick={open} aria-label={`Open ${l.title}`}>
-        {l.image ? <img src={l.image} alt="" loading="lazy" /> : <span className="fd-deal-nophoto">{l.bhk || "Flat"}</span>}
+        {l.image ? <ThumbImg src={l.image} alt="" /> : <span className="fd-deal-nophoto">{l.bhk || "Flat"}</span>}
         {badge && <span className="fd-deal-badge">{badge}</span>}
         {rented && <span className="fd-deal-stamp">Rented — you missed it</span>}
       </button>
@@ -121,13 +122,15 @@ export function DealCard({ deal, label = "Steal Deal", badge = null, likes }) {
 }
 
 /** BHK filter chips. */
-export function KindChips({ kinds, value, onChange, counts }) {
+/** Flat-type chips: tap as many types as you like; "All" (or none picked) shows every type. */
+export function KindChips({ kinds, value = [], onChange, counts }) {
+  const toggle = (id) => onChange(value.includes(id) ? value.filter((x) => x !== id) : [...value, id]);
   return (
-    <div className="fd-chips" role="tablist" aria-label="Flat type">
-      <button type="button" className={`fd-chip${!value ? " is-on" : ""}`} onClick={() => onChange("")}>All · {counts.all}</button>
+    <div className="fd-chips" role="group" aria-label="Flat type — pick one or more">
+      <button type="button" className={`fd-chip${!value.length ? " is-on" : ""}`} aria-pressed={!value.length} onClick={() => onChange([])}>All · {counts.all}</button>
       {kinds.map((k) => (
-        <button key={k.id} type="button" className={`fd-chip${value === k.id ? " is-on" : ""}`} disabled={!counts[k.id]}
-          onClick={() => onChange(k.id)}>
+        <button key={k.id} type="button" className={`fd-chip${value.includes(k.id) ? " is-on" : ""}`} aria-pressed={value.includes(k.id)}
+          disabled={!counts[k.id]} onClick={() => toggle(k.id)}>
           {k.label} · {counts[k.id] || 0}
         </button>
       ))}
@@ -148,7 +151,8 @@ export const FIND_CSS = `
   border: 1px solid rgba(94,234,212,.32); color: #5EEAD4; font-weight: 800; font-size: 15px; white-space: nowrap; }
 
 .fd-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(290px, 1fr)); gap: 18px; }
-.fd-chips { display: flex; gap: 8px; flex-wrap: wrap; margin: 0 0 20px; }
+.fd-chips { display: flex; gap: 8px; flex-wrap: wrap; margin: 0 0 10px; }
+.fd-sortnote { margin: 0 0 18px; font-size: 13px; font-weight: 600; color: var(--dim); }
 .fd-chip { border: 1.5px solid var(--line); background: #fff; color: var(--ink); border-radius: 999px; padding: 9px 16px; font: inherit; font-weight: 700; font-size: 14px; cursor: pointer; }
 .fd-chip.is-on { background: #04211D; border-color: #04211D; color: #fff; }
 .fd-chip:disabled { opacity: .45; cursor: default; }

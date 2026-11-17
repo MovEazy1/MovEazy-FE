@@ -1,9 +1,10 @@
 /**
  * CRM → Deals (find_deals.sql): what /find shows tenants.
  *
- *   Steal Deals    pick a Monday–Sunday week; up to 20 live flats, in the
- *                  order you set. A week with nothing picked keeps showing the
- *                  last week that had some.
+ *   Steal Deals    pick a Monday–Sunday week; any number of live flats (one at
+ *                  a time, or every live flat of a type), shown cheapest rent
+ *                  first as tenants see them. A week with nothing picked keeps
+ *                  showing the last week that had some.
  *   Deal of the Day  a calendar, one flat per type (1 RK, 1 BHK, 2 BHK, 3 BHK+)
  *                  per day. A day left empty rolls the last one over.
  *
@@ -12,17 +13,15 @@
  * Properties); Deal of the Day needs crm.properties.write. The database checks.
  */
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { ArrowDown, ArrowLeft, ArrowRight, ArrowUp, Flame, Plus, X } from "lucide-react";
+import { ArrowLeft, ArrowRight, Flame, Plus, X } from "lucide-react";
 import { useCrm } from "./CrmShell";
 import { Btn, C, Chip, Empty, Toast, inr } from "./crmUi";
 import { SCOPES } from "../../lib/adminScopes";
-import { DAY_KINDS, addDays, addStealDeal, dayKindLabel, dealKind, fetchCrmDeals, setDayDeal, setStealDeals, weekLabel } from "../../lib/deals";
+import { DAY_KINDS, addDays, addStealDeal, addStealKind, dayKindLabel, dealKind, fetchCrmDeals, setDayDeal, setStealDeals, weekLabel } from "../../lib/deals";
 
 const istToday = () => new Date().toLocaleDateString("en-CA", { timeZone: "Asia/Kolkata" });
 
 const DAYS_AHEAD = 14;
-/** The most Steal Deals a week (find_deals.sql). */
-const STEAL_MAX = 20;
 const card = { border: `1px solid ${C.line}`, borderRadius: 12, background: C.bg };
 
 function useToast() {
@@ -73,28 +72,57 @@ function FlatPicker({ kind = null, exclude = [], onPick, onClose }) {
 }
 
 function StealTab({ canEdit, say }) {
+  const { inventory } = useCrm();
   const [week, setWeek] = useState(null);
   const [d, setD] = useState(null);
   const [busy, setBusy] = useState(false);
   const [picking, setPicking] = useState(false);
+  const [kind, setKind] = useState(""); // the list filtered to one flat type; "" = all
   const load = useCallback((wk) => fetchCrmDeals(wk, null, null).then((r) => { setD(r); setWeek(r.week_start); }, (e) => say(e?.message || "Couldn't load the deals", "error")), [say]);
   useEffect(() => { load(null); }, [load]);
 
+  const ids = useMemo(() => (d?.steal ?? []).map((x) => x.property_id), [d]);
+  // Live flats of each type not in the week yet, for "Add all".
+  const addable = useMemo(() => {
+    const inWeek = new Set(ids);
+    const n = {};
+    for (const r of inventory ?? []) {
+      const k = r.status === "published" && !inWeek.has(r.property_id) ? dealKind(r.flat_type) : null;
+      if (k) n[k] = (n[k] || 0) + 1;
+    }
+    return n;
+  }, [inventory, ids]);
+  // As tenants see it: cheapest rent first, optionally one type.
+  const shown = useMemo(() => {
+    const rent = (x) => Number(x.rent) || Infinity;
+    return (d?.steal ?? []).filter((x) => !kind || x.kind === kind).slice().sort((a, b) => rent(a) - rent(b));
+  }, [d, kind]);
+  const counts = useMemo(() => {
+    const n = {};
+    for (const x of d?.steal ?? []) if (x.kind) n[x.kind] = (n[x.kind] || 0) + 1;
+    return n;
+  }, [d]);
+
   if (!d) return <Empty>Loading the deals…</Empty>;
-  const ids = d.steal.map((x) => x.property_id);
-  const save = async (next) => {
+  const run = async (fn, ok) => {
     setBusy(true);
-    try { setD(await setStealDeals(week, next)); } catch (e) { say(e?.message || "Couldn't save", "error"); } finally { setBusy(false); }
+    try { setD(await fn()); if (ok) say(ok); } catch (e) { say(e?.message || "Couldn't save", "error"); } finally { setBusy(false); }
   };
-  const move = (i, by) => {
-    const next = [...ids];
-    const j = i + by;
-    if (j < 0 || j >= next.length) return;
-    [next[i], next[j]] = [next[j], next[i]];
-    save(next);
+  const save = (next, ok) => run(() => setStealDeals(week, next), ok);
+  const plural = (n) => (n === 1 ? "" : "s");
+  const addAll = (k) => {
+    const n = addable[k] || 0;
+    if (!n || !window.confirm(`Add all ${n} live ${dayKindLabel(k)} flat${plural(n)} to the Steal Deals for ${weekLabel(week, addDays(week, 6))}?`)) return;
+    run(() => addStealKind(week, k), `Added ${n} ${dayKindLabel(k)} flat${plural(n)}`);
+  };
+  const removeShown = () => {
+    if (!window.confirm(`Take all ${shown.length} ${dayKindLabel(kind)} flat${plural(shown.length)} out of this week's Steal Deals?`)) return;
+    const out = new Set(shown.map((x) => x.property_id));
+    save(ids.filter((x) => !out.has(x)), `Took out ${out.size} flat${plural(out.size)}`);
   };
   const thisWeek = week === d.this_monday;
   const past = week < d.this_monday;
+  const editable = canEdit && !past;
 
   return (
     <div style={{ display: "grid", gap: 12 }}>
@@ -103,21 +131,40 @@ function StealTab({ canEdit, say }) {
         <b style={{ fontSize: 15, minWidth: 130, textAlign: "center" }}>{weekLabel(week, addDays(week, 6))}</b>
         <Btn sm onClick={() => load(addDays(week, 7))} aria-label="Next week"><ArrowRight size={14} /></Btn>
         {thisWeek ? <Chip on>This week · live now</Chip> : <Btn sm onClick={() => load(d.this_monday)}>Back to this week</Btn>}
-        <span className="crm-mute" style={{ fontSize: 12 }}>{ids.length} / {STEAL_MAX}</span>
+        <span className="crm-mute" style={{ fontSize: 12 }}>{ids.length} flat{plural(ids.length)}</span>
         <span style={{ flex: 1 }} />
-        {canEdit && !past && ids.length < STEAL_MAX && <Btn sm variant="primary" disabled={busy} onClick={() => setPicking(true)}><Plus size={14} /> Add a flat</Btn>}
+        {editable && <Btn sm variant="primary" disabled={busy} onClick={() => setPicking(true)}><Plus size={14} /> Add a flat</Btn>}
       </div>
+      {editable && (
+        <div style={{ display: "flex", gap: 6, alignItems: "center", flexWrap: "wrap" }}>
+          <span className="crm-mute" style={{ fontSize: 12 }}>Add every live flat of a type:</span>
+          {DAY_KINDS.map((k) => (
+            <Btn key={k.id} sm disabled={busy || !addable[k.id]} onClick={() => addAll(k.id)}>
+              <Plus size={13} /> All {k.label} · {addable[k.id] || 0}
+            </Btn>
+          ))}
+        </div>
+      )}
       {!thisWeek && !ids.length && (
         <div className="crm-mute" style={{ fontSize: 12 }}>
           Nothing picked for this week{past ? "" : " yet — until you add some, the site keeps showing the last week that had deals"}.
         </div>
       )}
-      {picking && <FlatPicker exclude={ids} onClose={() => setPicking(false)} onPick={(id) => { if (ids.length + 1 >= STEAL_MAX) setPicking(false); save([...ids, id]); }} />}
-      {ids.length === 0 ? <Empty>No Steal Deals for this week.</Empty> : (
+      {picking && <FlatPicker exclude={ids} onClose={() => setPicking(false)} onPick={(id) => save([...ids, id])} />}
+      {ids.length > 0 && (
+        <div style={{ display: "flex", gap: 6, alignItems: "center", flexWrap: "wrap" }}>
+          <Chip on={!kind} onClick={() => setKind("")}>All · {ids.length}</Chip>
+          {DAY_KINDS.map((k) => <Chip key={k.id} on={kind === k.id} onClick={() => setKind(k.id)}>{k.label} · {counts[k.id] || 0}</Chip>)}
+          <span className="crm-mute" style={{ fontSize: 11.5 }}>Cheapest rent first, as tenants see it</span>
+          <span style={{ flex: 1 }} />
+          {editable && kind && shown.length > 0 && <Btn sm variant="danger" disabled={busy} onClick={removeShown}><X size={13} /> Take out all {dayKindLabel(kind)}</Btn>}
+        </div>
+      )}
+      {ids.length === 0 ? <Empty>No Steal Deals for this week.</Empty> : shown.length === 0 ? <Empty>No {dayKindLabel(kind)} flats in this week&apos;s Steal Deals.</Empty> : (
         <div style={{ ...card, overflow: "hidden" }}>
-          {d.steal.map((x, i) => (
+          {shown.map((x, i) => (
             <div key={x.property_id} style={{ display: "flex", gap: 10, alignItems: "center", padding: "9px 12px", borderTop: i ? `1px solid ${C.lineSoft}` : "none", flexWrap: "wrap" }}>
-              <b className="crm-mute" style={{ width: 18, fontSize: 12 }}>{i + 1}</b>
+              <b className="crm-mute" style={{ width: 22, fontSize: 12 }}>{i + 1}</b>
               <Thumb src={x.cover} />
               <div style={{ flex: "1 1 240px", minWidth: 0 }}>
                 <div style={{ fontWeight: 700, fontSize: 13.5 }}>{x.title || x.property_id}
@@ -126,12 +173,8 @@ function StealTab({ canEdit, say }) {
                 <div className="crm-mute" style={{ fontSize: 11.5 }}>{[x.property_id, x.flat_type, x.area, x.rent ? inr(x.rent) : ""].filter(Boolean).join(" · ")}</div>
                 <div style={{ fontSize: 11.5, color: x.reason ? C.accent : C.textMute }}>{x.reason || "No below-average comparison — the card shows its best facts"}</div>
               </div>
-              {canEdit && !past && (
-                <span style={{ display: "flex", gap: 3 }}>
-                  <Btn sm disabled={busy || i === 0} onClick={() => move(i, -1)} aria-label="Move up"><ArrowUp size={13} /></Btn>
-                  <Btn sm disabled={busy || i === ids.length - 1} onClick={() => move(i, 1)} aria-label="Move down"><ArrowDown size={13} /></Btn>
-                  <Btn sm variant="danger" disabled={busy} onClick={() => save(ids.filter((y) => y !== x.property_id))} aria-label="Remove"><X size={13} /></Btn>
-                </span>
+              {editable && (
+                <Btn sm variant="danger" disabled={busy} onClick={() => save(ids.filter((y) => y !== x.property_id))} aria-label="Remove"><X size={13} /></Btn>
               )}
             </div>
           ))}
@@ -293,7 +336,7 @@ export function StealDealButton({ listing, steal }) {
   return (
     <Btn sm variant={on ? "primary" : undefined} disabled={steal.busy === listing.property_id}
       onClick={() => steal.toggle(listing.property_id)}
-      title={on ? "In this week's Steal Deals — tap to take it out" : `Add to this week's Steal Deals (${steal.count}/${STEAL_MAX})`}>
+      title={on ? "In this week's Steal Deals — tap to take it out" : `Add to this week's Steal Deals (${steal.count} in now)`}>
       <Flame size={13} /> {on ? "In Steal Deals" : "Add to Steal Deals"}
     </Btn>
   );

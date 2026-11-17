@@ -108,6 +108,8 @@ async function rpc(fn, args) {
 export const fetchCrmDeals = (week, from, to) => rpc("crm_deals", { p_week: week || null, p_from: from || null, p_to: to || null });
 export const setStealDeals = (week, ids) => rpc("crm_deal_steal_set", { p_week: week, p_ids: ids });
 export const addStealDeal = (week, propertyId) => rpc("crm_deal_steal_add", { p_week: week || null, p_property: propertyId });
+/** Every live flat of one type ("1rk" | "1bhk" | "2bhk" | "3bhk") into a week's Steal Deals. */
+export const addStealKind = (week, kind) => rpc("crm_deal_steal_add_kind", { p_week: week || null, p_kind: kind });
 export const setDayDeal = (day, kind, propertyId) => rpc("crm_deal_day_set", { p_day: day, p_kind: kind, p_property: propertyId || null });
 
 /** WhatsApp text for sharing a deal. */
