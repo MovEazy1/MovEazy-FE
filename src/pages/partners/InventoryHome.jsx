@@ -71,7 +71,7 @@ function MyInventory({ inventory, query }) {
                 <FlatHead listing={l} to={pp(`/property/${l.property_id}`)} />
                 {liveOnWebsite(l) && <span className="ih-web"><Globe size={11} /> Live on MovEazy Website</span>}
                 <span className={`ih-bar${ok ? " ih-bar--ok" : ""}`} aria-hidden><i style={{ width: `${ok ? 100 : (sc.done / sc.total) * 100}%` }} /></span>
-                <div className="ih-flat-foot">
+                <div className="pz-fr-foot">
                   <span className="pz-hint">{ok ? "All details in" : `${sc.done}/${sc.total} details · add ${sc.missing.slice(0, 2).join(", ").toLowerCase()}`}</span>
                   {!ok
                     ? <Link to={pp(`/property/${l.property_id}/edit`)} className="pz-btn pz-btn--sm pz-btn--gold" style={{ flex: "none" }}>Add details</Link>
@@ -171,14 +171,12 @@ const FILTER_CSS = `
 .ih-nudge--ok { background: var(--gl); border-color: var(--gl2); color: var(--g2); }
 .ih-nudge--ok svg { color: var(--g); }
 .ih-mine { padding: 0; overflow: hidden; }
-.ih-flat { display: flex; align-items: flex-start; gap: 12px; padding: 12px; border-top: 1px solid var(--line); }
+.ih-flat { display: flex; align-items: flex-start; gap: 10px; padding: 10px 12px; border-top: 1px solid var(--line); }
 .ih-flat:first-child { border-top: 0; }
-.ih-thumb { width: 58px; height: 58px; border-radius: 12px; overflow: hidden; flex: none; background: var(--bg); display: grid; place-items: center; color: var(--mute); }
+.ih-thumb { width: 54px; height: 54px; border-radius: 12px; overflow: hidden; flex: none; background: var(--bg); display: grid; place-items: center; color: var(--mute); }
 .ih-thumb img { width: 100%; height: 100%; object-fit: cover; }
-.ih-flat-txt { flex: 1; min-width: 0; display: grid; gap: 6px; }
-.ih-flat-foot { display: flex; align-items: center; gap: 8px; }
-.ih-flat-foot .pz-hint { flex: 1; min-width: 0; }
-.ih-bar { display: block; height: 6px; border-radius: 99px; background: #EFECE6; overflow: hidden; }
+.ih-flat-txt { flex: 1; min-width: 0; display: grid; gap: 5px; }
+.ih-bar { display: block; height: 4px; border-radius: 99px; background: #EFECE6; overflow: hidden; }
 .ih-bar i { display: block; height: 100%; background: var(--gold); border-radius: 99px; }
 .ih-bar--ok i { background: var(--g); }
 .ih-filters { position: relative; }

@@ -27,7 +27,7 @@ function FlatRow({ l, action }) {
       <div style={{ flex: 1, minWidth: 0 }}>
         <FlatHead listing={l} to={pp(`/property/${l.property_id}`)} />
         <span className="mf-bar" aria-label={`${sc.done} of ${sc.total} details`}><i style={{ width: `${(sc.done / sc.total) * 100}%` }} /></span>
-        <div className="mf-foot">
+        <div className="pz-fr-foot">
           <span className="pz-hint">{sc.done}/{sc.total} details{sc.missing.length ? ` · add ${sc.missing.slice(0, 2).join(", ").toLowerCase()}` : " · complete"}</span>
           {action}
           <FlatActions listing={l} mine />
@@ -154,9 +154,7 @@ const CSS = `
 .mf-row { display: flex; gap: 10px; align-items: flex-start; padding: 10px 14px; border-top: 1px solid var(--line); }
 .mf-thumb { width: 64px; height: 50px; border-radius: 8px; overflow: hidden; flex: none; background: #E9E6DF; display: grid; place-items: center; color: var(--dim); }
 .mf-thumb img, .mf-thumb video { width: 100%; height: 100% !important; object-fit: cover; display: block; }
-.mf-foot { display: flex; align-items: center; gap: 8px; }
-.mf-foot .pz-hint { flex: 1; min-width: 0; }
-.mf-bar { display: block; height: 5px; border-radius: 99px; background: var(--line); margin: 5px 0 3px; overflow: hidden; }
+.mf-bar { display: block; height: 4px; border-radius: 99px; background: var(--line); margin: 5px 0 2px; overflow: hidden; }
 .mf-bar i { display: block; height: 100%; background: var(--goldg); border-radius: 99px; }
 .mf-perf { text-align: center; padding: 26px 18px; border-radius: 20px; color: #fff;
   background: radial-gradient(120% 90% at 50% 0%, rgba(212,164,55,.3), transparent 62%), #0E0D12; border: 1px solid rgba(212,164,55,.4); }

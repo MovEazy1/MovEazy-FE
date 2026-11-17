@@ -99,12 +99,17 @@ const CSS = `
   padding: 11px 4px 10px; border-bottom: 2px solid transparent; cursor: pointer; }
 .pz-tab--on { color: var(--ink); border-bottom-color: var(--gold); }
 .pz-list > * + * { margin-top: 12px; }
-.pz-fh { display: flex; align-items: flex-start; gap: 10px; color: inherit; text-decoration: none; }
-.pz-fh-name { flex: 1; min-width: 0; font-size: 14.5px; font-weight: 700; line-height: 1.3; overflow-wrap: anywhere; }
-.pz-fh-bhk { display: block; margin-top: 2px; font-size: 12px; font-weight: 500; color: var(--dim); }
-.pz-fh-side { flex: none; max-width: 42%; display: grid; justify-items: end; text-align: right; gap: 1px; }
-.pz-fh-side b { font-size: 14.5px; font-weight: 800; white-space: nowrap; }
-.pz-fh-side span { font-size: 12px; color: var(--dim); line-height: 1.3; overflow-wrap: anywhere; }
+.pz-fh { display: flex; align-items: flex-start; gap: 8px; color: inherit; text-decoration: none; }
+.pz-fh-name { flex: 1; min-width: 0; font-size: 14px; font-weight: 700; line-height: 1.25; overflow-wrap: anywhere; }
+.pz-fh-bhk { font-size: 11.5px; font-weight: 500; color: var(--dim); white-space: nowrap; }
+.pz-fh-bhk::before { content: " · "; }
+.pz-fh-side { flex: none; max-width: 40%; display: grid; justify-items: end; text-align: right; line-height: 1.25; }
+.pz-fh-side b { font-size: 14px; font-weight: 800; white-space: nowrap; }
+.pz-fh-side span { font-size: 11.5px; color: var(--dim); max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.pz-fr-foot { display: flex; align-items: center; gap: 6px; min-height: 28px; }
+.pz-fr-foot .pz-hint { flex: 1; min-width: 0; font-size: 11.5px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.pz-fr-foot .pz-btn--sm { min-height: 26px; padding: 3px 10px; font-size: 12px; border-radius: 8px; }
+.pz-fr-foot .pz-iconbtn { width: 28px; height: 28px; min-width: 28px; margin-right: -4px; }
 .pz-prop { overflow: hidden; }
 .pz-prop-img { position: relative; aspect-ratio: 16/9; background: #E9E6DF; overflow: hidden; }
 .pz-prop-img img, .pz-prop-img video { width: 100%; height: 100% !important; object-fit: cover; display: block; }
