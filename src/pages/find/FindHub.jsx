@@ -3,7 +3,7 @@
  * to find a flat.
  *
  *   1  Build my curated flat list — FREE (the AI chat → top matches, as before)
- *   2  Societies — the ones MovEazy partners onboarded (society_partners.sql)
+ *   2  Societies — partner-onboarded and researched ones, with filters (society_public.sql)
  *   3  Steal Deals of the Week — this week's dates
  *   4  Deal of the Day — one per flat type, ends at midnight
  *   5  Bangalore Flat Renting Guide — coming soon, Notify me
@@ -77,9 +77,9 @@ export default function FindHub() {
           </button>
 
           <button type="button" className="fh-card" onClick={() => navigate("/find/societies")}>
-            <div className="fh-card-head"><span className="fh-ic"><MapIcon size={22} /></span>{societies > 0 && <span className="fh-tag">{societies} live</span>}</div>
+            <div className="fh-card-head"><span className="fh-ic"><MapIcon size={22} /></span>{societies > 0 && <span className="fh-tag">{societies} societies</span>}</div>
             <h2>Societies</h2>
-            <p>Gated societies checked in person by a MovEazy partner — real photos of the amenities and a sample flat, and typical rents.</p>
+            <p>Gated societies across Bangalore — amenities, typical rents and what&apos;s nearby. Filter by what you need and your budget.</p>
             <span className="fh-cta">See the societies <ArrowRight size={17} /></span>
           </button>
 

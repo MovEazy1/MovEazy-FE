@@ -14,7 +14,6 @@ import { FindShell, useFindGate } from "./findKit";
 import { rentLine } from "./FindSocieties";
 import { enquireSociety, fetchLiveSociety, partnerWhatsApp, slotLabel } from "../../lib/societyPartners";
 import { rentRange } from "../../lib/societyProspects";
-import { MOVEAZY_TEAM_WHATSAPP } from "../../config/contactChannels";
 
 const ApproxMap = lazy(() => import("../curated/ApproxMap"));
 const NEARBY = [["schools", "Schools"], ["hospitals", "Hospitals"], ["supermarkets", "Groceries & malls"], ["transit", "Metro & bus"]];
@@ -35,8 +34,9 @@ export default function FindSocietyPage() {
     setErr("");
     try {
       const r = await enquireSociety(code);
-      const url = r?.partner_phone ? partnerWhatsApp(r.partner_phone, r.partner_first_name, r.society)
-        : `${MOVEAZY_TEAM_WHATSAPP}?text=${encodeURIComponent(`Hi, I am Interested in a flat in ${r?.society || s.name} & got your contact via MovEazy. Can you please share the available options at the earliest.`)}`;
+      // No partner for this society yet: the MovEazy team follows up from the CRM.
+      if (!r?.partner_phone) { setSent({ team: true, society: r?.society || s.name }); return; }
+      const url = partnerWhatsApp(r.partner_phone, r.partner_first_name, r.society);
       setSent({ url, name: r?.partner_first_name || "our team" });
       window.location.href = url;
     } catch (e) {
@@ -59,7 +59,7 @@ export default function FindSocietyPage() {
 
   return (
     <FindShell kicker={s ? [s.area, "Gated society"].filter(Boolean).join(" · ") : "Societies"} title={s?.name || "Loading…"}
-      sub={s ? [rentLine(s.rents), `${s.amenity_count} amenities`, "photos taken there by a MovEazy partner"].filter(Boolean).join(" · ") : ""}>
+      sub={s ? [rentLine(s.rents), s.amenity_count ? `${s.amenity_count} amenities` : "", s.verified ? "verified by a MovEazy partner" : ""].filter(Boolean).join(" · ") : ""}>
       {gate}
       {allowed && s && (
         <div className="sp-page">
@@ -79,7 +79,12 @@ export default function FindSocietyPage() {
           )}
 
           <section className="sp-cta">
-            {sent ? (
+            {sent?.team ? (
+              <>
+                <b><Check size={18} /> Got it</b>
+                <span>Our team will WhatsApp you the flats free in {sent.society} shortly.</span>
+              </>
+            ) : sent ? (
               <>
                 <b><Check size={18} /> Sent to {sent.name}</b>
                 <span>They&apos;ll share the flats free in {s.name}. WhatsApp didn&apos;t open?</span>
@@ -88,7 +93,7 @@ export default function FindSocietyPage() {
             ) : (
               <>
                 <b>Want a flat in {s.name}?</b>
-                <span>Your MovEazy partner{s.partner_first_name ? `, ${s.partner_first_name},` : ""} knows every flat free here.</span>
+                <span>{s.verified ? `Your MovEazy partner${s.partner_first_name ? `, ${s.partner_first_name},` : ""} knows every flat free here.` : "Tell us and our team will share the flats free here."}</span>
                 <button type="button" className="fd-btn fd-btn--go" disabled={busy} onClick={getFlats}>
                   <MessageCircle size={17} /> {busy ? "Connecting…" : "Get flats"}
                 </button>
@@ -96,6 +101,10 @@ export default function FindSocietyPage() {
             )}
             {err && <span style={{ color: "#B91C1C" }}>{err}</span>}
           </section>
+
+          {!s.verified && (
+            <p className="sp-note" style={{ margin: 0 }}>Details from public sources — rents are approximate and may vary. A MovEazy partner hasn&apos;t visited this society yet.</p>
+          )}
 
           {facts.length > 0 && (
             <section className="sp-facts">

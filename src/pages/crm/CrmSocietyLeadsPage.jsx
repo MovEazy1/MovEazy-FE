@@ -39,8 +39,9 @@ export default function CrmSocietyLeadsPage() {
         <div>
           <h1 style={{ fontSize: 21, fontWeight: 800, margin: "0 0 6px" }}>Society leads</h1>
           <p style={{ color: C.textDim, fontSize: 13.5, margin: 0, maxWidth: "80ch", lineHeight: 1.6 }}>
-            Tenants who tapped Get flats on a live society&apos;s page. Each goes to the partner who onboarded that society on WhatsApp;
-            the partner updates it in their app. Flagged when nobody has called within {OVERDUE_MIN} minutes.
+            Tenants who tapped Get flats on a society&apos;s page. A society a partner onboarded sends them to that partner on WhatsApp,
+            who updates it in their app; one no partner has onboarded yet shows &quot;No partner yet&quot; — the team follows up.
+            Flagged when nobody has called within {OVERDUE_MIN} minutes.
           </p>
         </div>
         <div style={{ display: "flex", gap: 6, flexWrap: "wrap", alignItems: "center" }}>
@@ -65,7 +66,7 @@ export default function CrmSocietyLeadsPage() {
                       <span className="crm-mute" style={{ display: "block", fontSize: 12 }}>{l.society}{l.area ? ` · ${l.area}` : ""}</span>
                     </span>
                     <span style={{ flex: "0 1 200px", fontSize: 12.5 }}>
-                      → <b>{l.partner}</b>
+                      {l.partner ? <>→ <b>{l.partner}</b></> : <b style={{ color: "#B45309" }}>No partner yet · team to follow up</b>}
                       {l.partner_phone && <span className="crm-mute crm-num" style={{ display: "block", fontSize: 11.5 }}>{formatForDisplay(l.partner_phone)}</span>}
                     </span>
                     <span style={{ flex: "0 0 auto", textAlign: "right", fontSize: 12 }}>
@@ -79,7 +80,7 @@ export default function CrmSocietyLeadsPage() {
                     <div style={{ padding: "0 12px 12px 12px", display: "grid", gap: 8 }}>
                       <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
                         {l.client_id && <Link to={`/crm/clients?client=${l.client_id}`}><Btn sm>Open client</Btn></Link>}
-                        <a href={`tel:+91${String(l.partner_phone || "").slice(-10)}`}><Btn sm><Phone size={12} /> Call partner</Btn></a>
+                        {l.partner_phone && <a href={`tel:+91${String(l.partner_phone).slice(-10)}`}><Btn sm><Phone size={12} /> Call partner</Btn></a>}
                         <a href={`tel:+91${String(l.phone || "").slice(-10)}`}><Btn sm><Phone size={12} /> Call tenant</Btn></a>
                       </div>
                       <div style={{ borderLeft: `2px solid ${C.line}`, paddingLeft: 12, display: "grid", gap: 6 }}>
