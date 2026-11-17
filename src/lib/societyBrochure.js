@@ -218,7 +218,7 @@ function drawPage1(ctx, s, { photo, photoCredit, map, logoImg }) {
   ctx.fillStyle = g;
   ctx.fillRect(0, 0, W, coverH);
   logo(ctx, logoImg, 44, 40, 150);
-  if (photo && photoCredit) text(ctx, `Photo: ${photoCredit} · Google`, W - 30, 30, { size: 10, weight: 600, color: "rgba(255,255,255,.85)", align: "right", maxWidth: 380 });
+  if (photo && photoCredit) text(ctx, `Photo: ${photoCredit}`, W - 30, 30, { size: 10, weight: 600, color: "rgba(255,255,255,.85)", align: "right", maxWidth: 380 });
   if (!photo && map) text(ctx, "© OpenStreetMap contributors", W - 30, coverH - 14, { size: 10, weight: 600, color: "rgba(255,255,255,.8)", align: "right" });
 
   const where = [roadLabel(s.road), s.area].filter((v, i, a) => v && a.indexOf(v) === i).join(" · ");
@@ -405,16 +405,19 @@ export function drawBrochurePage(canvas, n, society, assets, scale = 1) {
 }
 
 /** The brochure's pictures: the cover photo (own → Google → none), the map, the logo. */
-export async function brochureAssets(society, { googlePhoto = null, logoSrc = "" } = {}) {
+export async function brochureAssets(society, { googlePhoto = null, logoSrc = "", fallback = null } = {}) {
   const own = (society.photos || [])[0];
-  const [ownImg, gImg, map, logoImg] = await Promise.all([
+  const [ownImg, gImg, fbImg, map, logoImg] = await Promise.all([
     own ? loadImage(own) : null,
     !own && googlePhoto?.uri ? loadImage(googlePhoto.uri) : null,
+    // `fallback`: { url, credit } — a representative photo (lib/amenityPhotos.js) when there's no real one.
+    !own && !googlePhoto?.uri && fallback?.url ? loadImage(fallback.url) : null,
     mapImage(society.lat, society.lng),
     logoSrc ? loadImage(logoSrc) : null,
   ]);
-  const photo = ownImg || gImg;
-  return { photo, photoCredit: !ownImg && gImg ? googlePhoto.attribution || "Google Maps user" : "", map, logoImg };
+  const photo = ownImg || gImg || fbImg;
+  const photoCredit = !ownImg && gImg ? `${googlePhoto.attribution || "Google Maps user"} · Google` : !ownImg && fbImg ? fallback.credit || "" : "";
+  return { photo, photoCredit, map, logoImg };
 }
 
 /** The two pages as one PDF Blob. */

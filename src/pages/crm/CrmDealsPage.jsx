@@ -16,6 +16,7 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import { Link } from "react-router-dom";
 import { ArrowLeft, ArrowRight, CalendarCheck, Copy, Eye, Flame, Heart, Link2, Plus, X } from "lucide-react";
 import { useCrm } from "./CrmShell";
+import CrmDealStandards from "./CrmDealStandards";
 import { Btn, C, Chip, Empty, Toast, inr } from "./crmUi";
 import { SCOPES } from "../../lib/adminScopes";
 import { whatsappUrl } from "../../lib/crmSettings";
@@ -455,8 +456,8 @@ export default function CrmDealsPage() {
           <h1 style={{ fontSize: 21, fontWeight: 800, margin: "0 0 6px" }}>Deals</h1>
           <p style={{ color: C.textDim, fontSize: 13.5, margin: 0, maxWidth: "75ch", lineHeight: 1.6 }}>
             What tenants see under Find my home: this week&apos;s Steal Deals (moveazy.co.in/find/steal-deals) and today&apos;s
-            Deal of the Day (/find/deal-of-the-day). Best-value picks at the flat&apos;s own rent; why each is a steal is worked out
-            from our listings.{tab === "day" && !canEdit && " You can look; changing the Deal of the Day needs permission to edit properties."}
+            Deal of the Day (/find/deal-of-the-day). Best-value picks at the flat&apos;s own rent; the “% lower” line on each is worked out
+            against the standard rents (Deal of the Day tab).{tab === "day" && !canEdit && " You can look; changing the Deal of the Day needs permission to edit properties."}
           </p>
         </div>
         <div style={{ display: "flex", gap: 6 }}>
@@ -465,6 +466,8 @@ export default function CrmDealsPage() {
         </div>
         <DealAlerts />
         {tab === "steal" ? <StealTab canEdit={canEditSteal} say={say} /> : <DayTab canEdit={canEdit} say={say} />}
+        {/* The standard rents every deal's "% lower" line uses (deal_standards.sql). */}
+        {tab === "day" && <CrmDealStandards canEdit={canEdit} say={say} />}
       </div>
       {toast && <Toast {...toast} />}
     </div>

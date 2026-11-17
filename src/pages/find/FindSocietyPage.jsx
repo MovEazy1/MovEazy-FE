@@ -9,11 +9,13 @@
  */
 import { lazy, Suspense, useEffect, useState } from "react";
 import { useParams } from "react-router-dom";
-import { Check, MapPin, MessageCircle } from "lucide-react";
+import { Check, Download, MapPin, MessageCircle } from "lucide-react";
 import { FindShell, useFindGate } from "./findKit";
 import { rentLine } from "./FindSocieties";
 import { enquireSociety, fetchLiveSociety, partnerWhatsApp, slotLabel } from "../../lib/societyPartners";
 import { rentRange } from "../../lib/societyProspects";
+import { amenityPhoto, coverFor, photoCredit } from "../../lib/amenityPhotos";
+import logoOnLight from "../../assets/logo/moveazy-logo-mint-light.png";
 
 const ApproxMap = lazy(() => import("../curated/ApproxMap"));
 const NEARBY = [["schools", "Schools"], ["hospitals", "Hospitals"], ["supermarkets", "Groceries & malls"], ["transit", "Metro & bus"]];
@@ -27,6 +29,29 @@ export default function FindSocietyPage() {
   const [sent, setSent] = useState(null); // { url, name }
   const [err, setErr] = useState("");
   const [shown, setShown] = useState(0);
+  const [making, setMaking] = useState(false);
+  // The brochure (lib/societyBrochure.js) — the same two A4 pages the team hands out; never anyone's number.
+  const brochure = async () => {
+    setMaking(true);
+    try {
+      const { brochureAssets, brochureFileName, brochurePdf } = await import("../../lib/societyBrochure");
+      const view = {
+        name: s.name, road: s.road, area: s.area, lat: s.lat, lng: s.lng, facts: { ...(s.facts_all || {}), about: s.about || "" },
+        rents: s.rents || {}, nearby: s.nearby || {}, amenities: s.amenities_all || [], photos: s.photos_all || [],
+      };
+      const assets = await brochureAssets(view, { logoSrc: logoOnLight, fallback: { url: coverFor(s.code).url, credit: `${coverFor(s.code).by}, ${coverFor(s.code).license} (representative)` } });
+      const blob = await brochurePdf(view, assets);
+      const a = document.createElement("a");
+      a.href = URL.createObjectURL(blob);
+      a.download = brochureFileName(s.name);
+      a.click();
+      setTimeout(() => URL.revokeObjectURL(a.href), 4000);
+    } catch (e) {
+      setErr(e?.message || "Couldn't make the brochure. Try again.");
+    } finally {
+      setMaking(false);
+    }
+  };
   useEffect(() => { fetchLiveSociety(code).then((r) => setS(r || null), () => setS(null)); }, [code]);
 
   const getFlats = async () => {
@@ -63,6 +88,12 @@ export default function FindSocietyPage() {
       {gate}
       {allowed && s && (
         <div className="sp-page">
+          {photos.length === 0 && (
+            <figure className="sp-gallery sp-rep">
+              <img src={coverFor(s.code).url} alt="" className="sp-main" />
+              <figcaption><a href={coverFor(s.code).page} target="_blank" rel="noreferrer">{photoCredit(coverFor(s.code))}</a></figcaption>
+            </figure>
+          )}
           {photos.length > 0 && (
             <section className="sp-gallery">
               <img src={photos[shown]} alt="" className="sp-main" />
@@ -97,6 +128,9 @@ export default function FindSocietyPage() {
                 <button type="button" className="fd-btn fd-btn--go" disabled={busy} onClick={getFlats}>
                   <MessageCircle size={17} /> {busy ? "Connecting…" : "Get flats"}
                 </button>
+                <button type="button" className="fd-btn" disabled={making} onClick={brochure}>
+                  <Download size={17} /> {making ? "Making the brochure…" : "Download brochure"}
+                </button>
               </>
             )}
             {err && <span style={{ color: "#B91C1C" }}>{err}</span>}
@@ -129,9 +163,13 @@ export default function FindSocietyPage() {
               <div className="sp-amen">
                 {s.amenities_all.map((a) => {
                   const ph = s.amenity_photos?.[a]?.[0];
+                  // No photo from the society yet: a representative one, marked as such.
+                  const rep = !ph ? amenityPhoto(a) : null;
                   return (
                     <div key={a} className="sp-am">
-                      {ph ? <img src={ph} alt="" loading="lazy" /> : <span className="sp-am-noimg"><Check size={18} /></span>}
+                      {ph ? <img src={ph} alt="" loading="lazy" />
+                        : rep ? <span className="sp-rep-img"><img src={rep.url} alt="" loading="lazy" /><i>Representative image</i></span>
+                          : <span className="sp-am-noimg"><Check size={18} /></span>}
                       <b>{a}</b>
                     </div>
                   );
@@ -182,6 +220,12 @@ export default function FindSocietyPage() {
 const PAGE_CSS = `
 .sp-page { display: grid; gap: 22px; }
 .sp-gallery { display: grid; gap: 8px; }
+.sp-rep { margin: 0; position: relative; }
+.sp-rep figcaption { position: absolute; left: 10px; bottom: 10px; font-size: 11.5px; background: rgba(0,0,0,.55); color: #fff; padding: 3px 8px; border-radius: 99px; }
+.sp-rep figcaption a { color: #fff; text-decoration: none; }
+.sp-rep-img { position: relative; display: block; }
+.sp-rep-img img { width: 100%; aspect-ratio: 4 / 3; object-fit: cover; display: block; }
+.sp-rep-img i { position: absolute; left: 6px; bottom: 6px; font-style: normal; font-size: 10.5px; font-weight: 700; background: rgba(0,0,0,.55); color: #fff; padding: 2px 7px; border-radius: 99px; }
 .sp-main { width: 100%; max-height: 520px; aspect-ratio: 16 / 9; object-fit: cover; border-radius: 22px; background: #E7E1D2; }
 .sp-strip { display: flex; gap: 8px; overflow-x: auto; padding-bottom: 4px; }
 .sp-strip button { flex: none; width: 92px; height: 66px; border-radius: 12px; overflow: hidden; border: 2px solid transparent; padding: 0; cursor: pointer; background: #E7E1D2; }

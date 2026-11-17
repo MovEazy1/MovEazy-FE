@@ -12,6 +12,7 @@ import { FindShell, useFindGate } from "./findKit";
 import { fetchLiveSocieties, distanceLabel, currentSpot } from "../../lib/societyPartners";
 import { rentRange } from "../../lib/societyProspects";
 import { AMENITY_FILTERS, BHK_FILTERS, BUDGETS, budgetLabel, filterSocieties } from "../../lib/societyFilters";
+import { coverFor } from "../../lib/amenityPhotos";
 
 /** "2 BHK ₹38k–45k", the most common type first. */
 export function rentLine(rents) {
@@ -42,7 +43,8 @@ export default function FindSocieties() {
   const card = (s) => (
     <article key={s.code} className="fd-deal">
       <button type="button" className="fd-deal-photo" onClick={() => navigate(`/find/societies/${s.code}`)} aria-label={`Open ${s.name}`}>
-        {s.cover ? <img src={s.cover} alt="" loading="lazy" /> : <span className="fd-deal-nophoto">{s.name}</span>}
+        {s.cover ? <img src={s.cover} alt="" loading="lazy" /> : <img src={coverFor(s.code).url} alt="" loading="lazy" />}
+        {!s.cover && <span className="fd-deal-badge" style={{ left: "auto", right: 10, background: "rgba(0,0,0,.55)", color: "#fff" }}>Representative image</span>}
         {s.verified && <span className="fd-deal-badge" style={{ display: "inline-flex", alignItems: "center", gap: 4 }}><BadgeCheck size={14} /> Verified by MovEazy partner</span>}
         {!s.verified && s.photos > 1 && <span className="fd-deal-badge">{s.photos} photos</span>}
       </button>
