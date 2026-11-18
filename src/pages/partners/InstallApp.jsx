@@ -75,7 +75,7 @@ export function InstallBanner() {
     <>
       <style>{CSS}</style>
       <section className="ia-card" aria-label="Install the app">
-        <img src="/partners-icon-192.png" alt="" width="48" height="48" className="ia-icon" />
+        <img src="/partners-icon-192.png?v=2" alt="" width="48" height="48" className="ia-icon" />
         <span className="ia-text">
           <b>Get the MovEazy Partners app</b>
           <span>Opens from your home screen, full screen and faster than the browser.</span>
