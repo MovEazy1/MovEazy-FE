@@ -45,7 +45,7 @@ import { Empty, Loading, Sheet, TopBar, WhatsAppIcon, toast } from "./partnerUi"
 import { useLocalities, usePopularAreas } from "./useLocalities";
 import ListingMapPicker from "../../components/ListingMapPicker";
 import { FURNISHING_CHIPS, HOUSE_TYPES, ROOM_LABEL } from "../../lib/partnerFilters";
-import { bedroomsOf } from "../../lib/partnerMatch";
+import { bedroomsOf, defaultWashrooms } from "../../lib/partnerMatch";
 import { geocodePlace } from "../../lib/geocode";
 import { generatePropertyId, mediaRejectionReason, uploadInventoryPhotos } from "../../lib/inventory";
 import { coverPhoto, isVideoFile, isVideoUrl, orderListingMedia } from "../../lib/listingMedia";
@@ -69,6 +69,8 @@ const RENT_CHIPS = [15000, 20000, 25000, 30000, 40000, 50000];
 const PREFS_KEY = "mz_partner_post";
 const typeLabel = (t) => (t === ROOM_LABEL ? "Room in a shared flat" : t);
 /** A photo's kind: a fresh pick has its file, a saved one only its address. */
+const WASHROOM_CHIPS = [1, 2, 3, 4];
+
 const isVid = (p) => (p.file ? isVideoFile(p.file) : isVideoUrl(p.url));
 /** occupants_allowed back to the form's choice: "" is both. */
 function tenantsOf(list) {
@@ -134,7 +136,11 @@ function PostFlat({ onAnother, edit = null }) {
 
   // { key, file, preview, status, url, why } — a saved photo has no file, only its url.
   const [photos, setPhotos] = useState(() => savedSrcs.map((url) => ({ key: url, url, preview: url, status: "done", file: null })));
-  const [type, setType] = useState(ed?.flat_type || "1 BHK");
+  const [type, setTypeRaw] = useState(ed?.flat_type || "1 BHK");
+  // Washrooms follow the type until the partner picks a number themselves.
+  const [baths, setBaths] = useState(() => Math.min(4, Number(ed?.bathrooms) || defaultWashrooms(ed?.flat_type || "1 BHK")));
+  const [bathsPicked, setBathsPicked] = useState(false);
+  const setType = (t) => { setTypeRaw(t); if (!bathsPicked) setBaths(defaultWashrooms(t)); };
   const [rent, setRent] = useState(ed ? String(Number(ed.rent) || "") : "");
   const [furnishing, setFurnishing] = useState(ed ? ed.furnishing || "" : prefs.furnishing || "");
   const [area, setArea] = useState(ed?.area || prefs.area || "HSR Layout");
@@ -281,6 +287,7 @@ function PostFlat({ onAnother, edit = null }) {
         propertyType: room ? "Shared Room" : "Apartment",
         flatType: type,
         bedrooms: room ? 1 : Math.max(1, Math.floor(bedroomsOf(type) || 1)),
+        bathrooms: baths,
         rent,
         furnishing,
         deposit: x.deposit,
@@ -348,6 +355,7 @@ function PostFlat({ onAnother, edit = null }) {
         flat_type: type,
         property_type: room ? "Shared Room" : (ed.property_type || "Apartment"),
         bedrooms: room ? 1 : Math.max(1, Math.floor(bedroomsOf(type) || 1)),
+        bathrooms: baths,
         rent: Number(rent),
         deposit: Number(x.deposit) || 0,
         maintenance: maintenanceValue(maintenance),
@@ -425,17 +433,18 @@ function PostFlat({ onAnother, edit = null }) {
           {photos.length === 0 ? (
             <button type="button" className="ap-drop" onClick={() => fileRef.current?.click()}>
               <span className="ap-drop-ic"><Camera size={26} /></span>
-              <b>Add photos</b>
-              <span>Pick from your gallery — they upload while you fill the rest</span>
+              <b>Add photos & videos</b>
+              <span>Pick from your gallery — they upload while you fill the rest. A video plays first when the flat is opened.</span>
             </button>
           ) : (
             <>
               <div className="ap-thumbs">
-                {photos.map((p, i) => (
+                {photos.map((p) => (
                   <figure key={p.key} data-photo={p.key} className={`ap-thumb ap-drag ${p.status}${sort.dragKey === p.key ? " dragging" : ""}`}
                     {...sort.bind(p.key)} style={sort.dragStyle(p.key)}>
                     {isVid(p) ? <video src={p.preview} muted playsInline /> : <img src={p.preview} alt="" />}
-                    {i === 0 && <span className="ap-cover">Cover</span>}
+                    {isVid(p) ? <span className="ap-cover">Video</span>
+                      : p.key === photos.find((x) => !isVid(x))?.key && <span className="ap-cover">Cover</span>}
                     <span className="ap-state" aria-label={p.status}>
                       {p.status === "uploading" && <i className="ap-spin" />}
                       {p.status === "done" && <Check size={13} />}
@@ -445,10 +454,10 @@ function PostFlat({ onAnother, edit = null }) {
                   </figure>
                 ))}
                 {photos.length < 20 && (
-                  <button type="button" className="ap-thumb ap-add" onClick={() => fileRef.current?.click()} aria-label="Add more photos"><Camera size={20} /><span>Add</span></button>
+                  <button type="button" className="ap-thumb ap-add" onClick={() => fileRef.current?.click()} aria-label="Add more photos or videos"><Camera size={20} /><span>Photo / video</span></button>
                 )}
               </div>
-              {photos.length > 1 && <p className="ap-drag-hint">To change the order, hold a photo, then drag it — the first one is the cover.</p>}
+              {photos.length > 1 && <p className="ap-drag-hint">To change the order, hold a photo, then drag it. The first 4 photos are the cover photos; a video always plays first when the flat is opened.</p>}
               {ed && reviewItems.some((m) => !m.isVideo) && (
                 <button type="button" className="pz-btn pz-btn--sm" style={{ marginTop: 8 }} onClick={() => setReviewing("adjust")} disabled={uploading}>
                   <Crop size={14} /> Adjust cover & order{settled ? " · set" : ""}
@@ -470,6 +479,16 @@ function PostFlat({ onAnother, edit = null }) {
           <div className="ap-chips">
             {(HOUSE_TYPES.includes(type) ? HOUSE_TYPES : [type, ...HOUSE_TYPES]).map((t) => (
               <button key={t} type="button" className={`ap-chip${type === t ? " on" : ""}`} onClick={() => setType(t)}>{t === ROOM_LABEL ? "Room (shared flat)" : t}</button>
+            ))}
+          </div>
+        </section>
+
+        <section className="ap-sec">
+          <h2>Washrooms</h2>
+          <div className="ap-chips">
+            {WASHROOM_CHIPS.map((n) => (
+              <button key={n} type="button" className={`ap-chip${baths === n ? " on" : ""}`} aria-pressed={baths === n}
+                onClick={() => { setBaths(n); setBathsPicked(true); }}>{n === 4 ? "4+" : n}</button>
             ))}
           </div>
         </section>

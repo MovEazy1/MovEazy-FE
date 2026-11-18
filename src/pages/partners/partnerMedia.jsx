@@ -6,7 +6,7 @@
 import { useState } from "react";
 import { Home } from "lucide-react";
 import SmartImage from "../../components/SmartImage";
-import { isVideoUrl, orderListingMedia } from "../../lib/listingMedia";
+import { isVideoUrl, orderListingMedia, orderListingMediaViewer } from "../../lib/listingMedia";
 import ThumbImg from "../../components/ThumbImg";
 import SharpenedImg from "../../components/SharpenedImg";
 import { galleryOf, isMadeCover } from "../../lib/coverCrop";
@@ -14,6 +14,15 @@ import { galleryOf, isMadeCover } from "../../lib/coverCrop";
 /** The gallery: every photo and video. A framed cover (lib/coverCrop.js) is a copy of one of them, so it isn't repeated here. */
 export function listingMedia(l) {
   return orderListingMedia(galleryOf(l?.cover_image_url, l?.images ?? []));
+}
+
+/**
+ * The property page's swipe gallery: the video first (it is what opens),
+ * then every photo in the order the partner set. Cards and posters keep
+ * listingMedia — the first photos are the cover photos.
+ */
+export function listingMediaVideoFirst(l) {
+  return orderListingMediaViewer(galleryOf(l?.cover_image_url, l?.images ?? []));
 }
 
 /** What a card shows: the framed cover, or else the gallery's first photo. */

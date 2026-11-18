@@ -13,7 +13,7 @@ import ShareSheet from "./ShareSheet";
 import PropertyDetailsSheet from "./PropertyDetailsSheet";
 import FlatCare from "./FlatCare";
 import { decideSoldOut, markSoldOut } from "../../lib/partnerCurated";
-import { MediaItem, listingMedia } from "./partnerMedia";
+import { MediaItem, listingMediaVideoFirst } from "./partnerMedia";
 import { useSnapTrack } from "../../hooks/useSnapTrack";
 import { usePhotoViewer } from "../../hooks/usePhotoViewer";
 import { Avatar, BrokeragePill, Empty, Loading, POOL_TAG, Sheet, TopBar, WhatsAppIcon, sourceLabel, toast } from "./partnerUi";
@@ -127,7 +127,8 @@ export default function PropertyDetail() {
       .then((all) => setSlots(all.filter((s) => new Date(s.slot_at) > new Date()).slice(0, 12)), () => setSlots([]));
   }, [id, l, demo]);
 
-  const media = useMemo(() => (l ? listingMedia(l) : []), [l]);
+  // Video first when the flat is opened; swipe for the photos.
+  const media = useMemo(() => (l ? listingMediaVideoFirst(l) : []), [l]);
   const { index: slide, trackProps } = useSnapTrack();
   const photos = usePhotoViewer(media, l?.title || "");
 

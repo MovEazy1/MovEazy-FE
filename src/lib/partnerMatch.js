@@ -30,6 +30,12 @@ export function bedroomsOf(label) {
   return m ? Number(m[1]) : null;
 }
 
+/** Washrooms a flat of this type usually has: 1 RK / 1 BHK / room 1, 2 BHK 2, 3 BHK 3, bigger 4 (shown "4+"). */
+export function defaultWashrooms(type) {
+  const n = Math.floor(bedroomsOf(type) || 1);
+  return Math.min(4, Math.max(1, n));
+}
+
 const listingBedrooms = (l) => bedroomsOf(l.flat_type) ?? num(l.bedrooms);
 
 /** Does the lead say anything we can match on? A bare name + number does not. */
