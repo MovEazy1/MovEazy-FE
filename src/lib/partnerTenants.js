@@ -29,6 +29,8 @@ export const addNote = (t, body) => rpc("partner_tenant_note_add", { ...ids(t), 
 export const fetchTimeline = (t) => rpc("partner_tenant_timeline", ids(t)).then((r) => r ?? []);
 export const fetchFlatInterest = (propertyId) => rpc("partner_flat_interest", { p_property: propertyId });
 export const freeLeadsTopup = () => rpc("partner_free_leads_topup").catch(() => 0);
+/** Everything a MovEazy tenant filled in, the team's corrections winning (partner_lead_details.sql); null if not yours. */
+export const fetchLeadProfile = (assignmentId) => rpc("partner_lead_profile", { p_assignment: assignmentId });
 
 /* ── Stages ─────────────────────────────────────────────────────────────── */
 

@@ -11,7 +11,7 @@ import { Avatar, Chip, Sheet, WhatsAppIcon, toast } from "./partnerUi";
 import { MzBadge, QrBadge, WebBadge } from "./AiMatcher";
 import VisitsToday from "./VisitsToday";
 import { useTenants } from "./tenantData";
-import { requirementLine } from "./leadBits";
+import { factLines } from "./leadBits";
 import { friendlyError, inr, patchLead, pp, waLink } from "../../lib/partners";
 import { logReachOut } from "../../lib/partnerLeads";
 import { flatLine } from "../../lib/partnerMatcher";
@@ -27,6 +27,7 @@ export const KIT_CSS = `
 .tk-row { display: flex; gap: 12px; align-items: flex-start; padding: 12px 14px; border-top: 1px solid var(--line); color: inherit; text-decoration: none; }
 .tk-row:first-child { border-top: 0; }
 .tk-meta { display: block; font-size: 12.5px; color: var(--dim); margin-top: 2px; }
+.tk-fact { color: var(--ink, #1f2937); font-weight: 500; }
 .tk-due { color: #B91C1C; font-weight: 700; }
 .tk-newbadge { display: inline-flex; align-items: center; gap: 3px; padding: 1px 7px; border-radius: 99px; background: #E11D48; color: #fff; font-size: 11px; font-weight: 800; }
 .tk-acts { display: flex; gap: 6px; flex: none; }
@@ -181,6 +182,7 @@ export function OutcomeSheet({ tenant, kind, flats = [], onClose, onSaved }) {
 export function TenantRow({ t, onReach }) {
   const r = t.next_reminder;
   const overdue = r && new Date(r.due_at) <= new Date();
+  const facts = factLines(t);
   return (
     <div className="tk-row">
       <Link to={pp(`/tenants/${t.slug}`)} style={{ display: "flex", gap: 12, flex: 1, minWidth: 0, color: "inherit", textDecoration: "none" }}>
@@ -195,13 +197,20 @@ export function TenantRow({ t, onReach }) {
           {t.qr_visits > 0 && t.stage !== "done" && t.stage !== "lost" && <span className="tk-pill tk-visitask">Wants a visit</span>}
           {t.new_actions > 0 && <span className="tk-newbadge"><Heart size={10} fill="currentColor" /> {t.new_actions} new</span>}
         </span>
-        <span className="tk-meta">{[requirementLine(t), (t.localities ?? []).slice(0, 2).join(", ")].filter(Boolean).join(" · ") || "No requirement yet"}{t.tentative ? " (tentative)" : ""}</span>
-        <span className="tk-meta">
-          {r ? <span className={overdue ? "tk-due" : ""}><AlarmClock size={11} /> {whenLabel(r.due_at)}{r.note ? ` · ${r.note}` : ""}</span>
-            : t.move_in_raw === "Immediate move-in" && t.stage !== "done" && t.stage !== "lost" ? "Immediate move-in"
-            : t.move_in && t.stage !== "done" && t.stage !== "lost" ? `Moving in ${new Date(t.move_in).toLocaleDateString("en-IN", { day: "numeric", month: "short" })}`
-              : t.liked ? `♥ ${t.liked} liked` : t.lists ? `${t.lists} list${t.lists === 1 ? "" : "s"} sent` : ""}
-        </span>
+        {/* Who · flat type · budget, then area · move-in (partner_lead_details.sql). */}
+        <span className="tk-meta tk-fact">{facts.one || "No requirement yet"}{t.tentative ? " (tentative)" : ""}</span>
+        {facts.two && (
+          <span className="tk-meta tk-fact">
+            {facts.area}{facts.area && facts.moveIn ? " · " : ""}
+            {facts.moveIn && <span className={facts.passed ? "tk-due" : ""}>{facts.moveIn.text}</span>}
+          </span>
+        )}
+        {(r || t.liked > 0 || t.lists > 0) && (
+          <span className="tk-meta">
+            {r ? <span className={overdue ? "tk-due" : ""}><AlarmClock size={11} /> {whenLabel(r.due_at)}{r.note ? ` · ${r.note}` : ""}</span>
+              : t.liked ? `♥ ${t.liked} liked` : `${t.lists} list${t.lists === 1 ? "" : "s"} sent`}
+          </span>
+        )}
       </span>
       </Link>
       {t.phone && t.stage !== "done" && t.stage !== "lost" && (

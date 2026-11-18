@@ -15,7 +15,8 @@ import { AlarmClock, CalendarClock, Check, ChevronRight, Heart, Pencil, Phone, R
 import { usePartner } from "./PartnerApp";
 import { Avatar, Empty, Loading, Sheet, TopBar, WhatsAppIcon, toast } from "./partnerUi";
 import { SmartListingImage } from "./partnerMedia";
-import { requirementLine } from "./leadBits";
+import { factLines } from "./leadBits";
+import LeadProfileCard from "./LeadProfileCard";
 import { MATCHER_CSS, MzBadge, QrBadge, ShareListSheet, WebBadge, useMatcherRows } from "./AiMatcher";
 import { useMatcherData } from "./matcherData";
 import { useTenants } from "./tenantData";
@@ -166,9 +167,20 @@ export default function TenantPage() {
               <strong style={{ display: "flex", alignItems: "center", gap: 6, flexWrap: "wrap", fontSize: 17 }}>
                 {tenant.name}{tenant.kind === "moveazy" && <MzBadge />}{tenant.pack === "website" && <WebBadge />}{tenant.via === "qr" && <QrBadge />}
               </strong>
-              <span className="pz-meta" style={{ display: "block" }}>
-                {[requirementLine(tenant), (tenant.localities ?? []).join(", ")].filter(Boolean).join(" · ") || "No requirement yet"}
-              </span>
+              {(() => {
+                const f = factLines({ ...tenant, localities: tenant.localities ?? [] });
+                return (
+                  <>
+                    <span className="pz-meta" style={{ display: "block" }}>{f.one || "No requirement yet"}</span>
+                    {f.two && (
+                      <span className="pz-meta" style={{ display: "block" }}>
+                        {(tenant.localities ?? []).join(", ")}{(tenant.localities ?? []).length && f.moveIn ? " · " : ""}
+                        {f.moveIn && <span className={f.passed ? "tk-due" : ""}>{f.moveIn.text}</span>}
+                      </span>
+                    )}
+                  </>
+                );
+              })()}
               {tenant.tentative && (
                 <span className="pz-hint" style={{ display: "block", color: "#92400E" }}>
                   Tentative — from the flats they looked at on your QR page{tenant.move_in_raw === "Immediate move-in" ? ", immediate move-in" : ""}. Tap ✎ to confirm it.
@@ -187,6 +199,9 @@ export default function TenantPage() {
             </div>
           )}
         </div>
+
+        {/* ── Everything a MovEazy tenant filled in ── */}
+        {tenant.kind === "moveazy" && <LeadProfileCard tenant={tenant} />}
 
         {/* ── Where they are ── */}
         <div className="pz-section">
