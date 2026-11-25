@@ -19,7 +19,7 @@
  */
 import { createContext, lazy, Suspense, useCallback, useContext, useEffect, useMemo, useRef, useState } from "react";
 import { Navigate, Route, Routes, useLocation, useNavigate, useParams } from "react-router-dom";
-import { Clock, ShieldOff } from "lucide-react";
+import { Clock, MapPin, ShieldOff } from "lucide-react";
 import { useAuth } from "../../context/AuthContext";
 import {
   acceptInvite, fetchLeads, fetchMyGroups, fetchPartnerInventory, fetchPartnerMe, fetchSavedIds, friendlyError,
@@ -39,6 +39,7 @@ import { DAY_MS, readCache, writeCache } from "../../lib/localCache";
 import TopProgress from "../../components/TopProgress";
 import { loadAreas } from "../../lib/areas";
 import { pokeDigest } from "../../lib/followUps";
+import { CITIES } from "../../lib/cities";
 
 // What the broker saw last time stays on the device for 30 days, so the app
 // opens on it at once and refreshes underneath (lib/localCache.js).
@@ -356,7 +357,9 @@ function PartnerWorkspace({ me, reloadMe }) {
 function Gate() {
   const { user, loading, updateUserProfile } = useAuth();
   const [me, setMe] = useState(null);
-  const [state, setState] = useState("idle"); // idle | loading | need_phone | ready | error
+  const [state, setState] = useState("idle"); // idle | loading | need_phone | need_city | ready | error
+  // The city a new partner works in, asked before signing up (multi_city.sql).
+  const signupCity = useRef("");
   const [error, setError] = useState("");
 
   const hasPhone = Boolean(String(user?.phone || "").trim());
@@ -393,7 +396,8 @@ function Gate() {
     try {
       let m = await fetchPartnerMe();
       if (!m?.partner) {
-        await registerPartner({ name: user?.name });
+        if (!signupCity.current) { setState("need_city"); return; }
+        await registerPartner({ name: user?.name, city: signupCity.current });
         m = await fetchPartnerMe();
       }
       if (!stamped.current) {
@@ -430,6 +434,18 @@ function Gate() {
       <Holding icon={<ShieldOff size={28} />} title="Something went wrong">
         {error}
         <div style={{ marginTop: 16 }}><button type="button" className="pz-btn pz-btn--primary" onClick={load}>Try again</button></div>
+      </Holding>
+    );
+  }
+  if (state === "need_city") {
+    return (
+      <Holding icon={<MapPin size={28} />} title="Which city do you work in?">
+        You'll get tenants and flats of this city. It can't be changed later from the app.
+        <div style={{ marginTop: 16, display: "grid", gridTemplateColumns: "repeat(2, minmax(0, 1fr))", gap: 8 }}>
+          {CITIES.map((c) => (
+            <button key={c.name} type="button" className="pz-btn" onClick={() => { signupCity.current = c.name; load(); }}>{c.label}</button>
+          ))}
+        </div>
       </Holding>
     );
   }

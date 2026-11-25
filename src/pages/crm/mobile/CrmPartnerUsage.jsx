@@ -12,6 +12,7 @@
  * app_analytics_user() (needs App analytics access).
  */
 import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCityFilter } from "../crmCityFilter";
 import { Link, useParams } from "react-router-dom";
 import { ChevronRight, Search } from "lucide-react";
 import { useCrm } from "../CrmShell";
@@ -57,15 +58,18 @@ function UsageList() {
   }, []);
   useEffect(() => { load(); }, [load]);
 
-  const sum = useMemo(() => usageSummary(rows ?? []), [rows]);
-  const quiet = useMemo(() => goneQuiet(rows ?? []), [rows]);
+  // Partners of the city the CRM is showing (multi_city.sql).
+  const cf = useCityFilter();
+  const mine = useMemo(() => (rows ?? []).filter((p) => cf.partner(p.user_id)), [rows, cf]);
+  const sum = useMemo(() => usageSummary(mine), [mine]);
+  const quiet = useMemo(() => goneQuiet(mine), [mine]);
   const list = useMemo(() => {
     const needle = q.trim().toLowerCase();
     const by = USAGE_SORTS.find((s) => s.id === sort)?.by ?? USAGE_SORTS[0].by;
-    return (rows ?? [])
+    return mine
       .filter((p) => !needle || [p.name, p.phone, p.agency].some((v) => String(v || "").toLowerCase().includes(needle)))
       .sort((a, b) => by(b) - by(a));
-  }, [rows, q, sort]);
+  }, [mine, q, sort]);
 
   if (err && !rows) return <Empty>{err}</Empty>;
   if (!rows) return <Loading label="Loading partner usage…" />;

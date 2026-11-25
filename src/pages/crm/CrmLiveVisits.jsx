@@ -5,6 +5,7 @@
  * a live map of both while it's on.
  */
 import { lazy, Suspense, useCallback, useEffect, useMemo, useState } from "react";
+import { useCityFilter } from "./crmCityFilter";
 import { Link } from "react-router-dom";
 import { ChevronDown, ChevronRight, Map as MapIcon } from "lucide-react";
 import { useCrm } from "./CrmShell";
@@ -103,8 +104,17 @@ function NewVisitForm({ partners, onSaved, onCancel, say, preset = null }) {
 export default function CrmLiveVisits({ say }) {
   const { access } = useCrm();
   const [open, setOpen] = useState(true);
-  const [d, setD] = useState(null);
-  const [partners, setPartners] = useState([]);
+  const [rawD, setD] = useState(null);
+  const [rawPartners, setPartners] = useState([]);
+  // Visits to flats of the city the CRM is showing, and its partners (multi_city.sql).
+  const cf = useCityFilter();
+  const fid = (v) => v?.flat?.property_id || v?.property_id;
+  const d = useMemo(() => rawD && {
+    ...rawD,
+    visits: (rawD.visits ?? []).filter((v) => !fid(v) || cf.flat(fid(v))),
+    unassigned: (rawD.unassigned ?? []).filter((v) => !fid(v) || cf.flat(fid(v))),
+  }, [rawD, cf]);
+  const partners = useMemo(() => rawPartners.filter((p) => cf.partner(p.broker_id)), [rawPartners, cf]);
   const [adding, setAdding] = useState(null); // "new" | a booking
   const [mapFor, setMapFor] = useState(null);
   const [show, setShow] = useState("open");

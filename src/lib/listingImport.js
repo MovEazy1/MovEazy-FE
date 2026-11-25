@@ -68,9 +68,10 @@ function parseFurnishing(text) {
   return "";
 }
 
-function parseLocalities(text) {
+/** The areas of one city (the form's; else the site's) named in the text. */
+function parseLocalities(text, city) {
   const t = lower(text);
-  return areaNames().filter((loc) => t.includes(lower(loc)));
+  return areaNames(city).filter((loc) => t.includes(lower(loc)));
 }
 
 function parseAmenities(text) {
@@ -222,7 +223,7 @@ export function detectSource(url) {
  *   `found` and `missing` drive the "we filled these, you fill the rest" hint —
  *   the form requires everything in `missing` before it will publish.
  */
-export function parseListingText(text) {
+export function parseListingText(text, { city } = {}) {
   const raw = String(text || "");
   const fields = {};
 
@@ -257,7 +258,7 @@ export function parseListingText(text) {
   if (floor != null) fields.floor_number = floor;
   if (total != null) fields.total_floors = total;
 
-  const localities = parseLocalities(raw);
+  const localities = parseLocalities(raw, city);
   if (localities.length) {
     fields.area = localities[0];
     if (localities.length > 1) fields.nearby_areas = localities.slice(1);

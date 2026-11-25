@@ -13,6 +13,7 @@ import {
 } from "lucide-react";
 import SwipeDeck from "../../components/SwipeDeck";
 import { fetchShowcaseInventory } from "../../lib/inventory";
+import { useSiteCity } from "../../lib/cities";
 import { thumbUrl } from "../../lib/imageShrink";
 import { listingForScoring, scoreMatch } from "../../lib/inventoryMatch";
 import { isVideoUrl } from "../../lib/listingMedia";
@@ -39,12 +40,15 @@ const shown = async (src) => {
  */
 export function useShowcaseMatches() {
   const [state, setState] = useState({ matches: [], requirement: null });
+  // The city being searched (lib/cities.js): its homes, again when it changes.
+  const { cities } = useSiteCity();
+  const cityKey = cities.join(",");
   useEffect(() => {
     let alive = true;
     (async () => {
       let rows = [];
       // Started by App.jsx as the page opened; this picks up the same request.
-      try { rows = await fetchShowcaseInventory(); } catch { rows = []; }
+      try { rows = await fetchShowcaseInventory({ cities: cityKey.split(",") }); } catch { rows = []; }
       const withPhoto = rows
         .map((l) => ({ l, src: [l.image, ...(l.images ?? [])].find((u) => u && !isVideoUrl(u)) }))
         .filter((x) => x.src && x.l.monthlyRent && x.l.bhk)
@@ -80,7 +84,7 @@ export function useShowcaseMatches() {
       startTransition(() => setState({ matches, requirement }));
     })();
     return () => { alive = false; };
-  }, []);
+  }, [cityKey]);
   return state;
 }
 

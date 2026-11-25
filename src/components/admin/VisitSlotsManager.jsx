@@ -21,7 +21,7 @@ export default function VisitSlotsManager() {
   const [msg, setMsg] = useState({ type: "", text: "" });
 
   useEffect(() => {
-    fetchPublishedInventory({ limit: 500 }).then((rows) => {
+    fetchPublishedInventory({ limit: 500, cities: null }).then((rows) => {
       setListings(rows);
       if (rows[0]) setSelected(rows[0].property_id);
     });

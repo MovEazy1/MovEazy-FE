@@ -22,6 +22,8 @@ import { leadSnapshot, loadLead, saveLead } from "../lib/leadIntake";
 import { useLoginModal } from "../context/LoginModalContext";
 import { ABOUT_ME, LOCALITIES, FLAT_TYPES, OFFICE_CHIPS, PRIORITIES, cleanAboutMe, reconcilePriority } from "../data/preferenceOptions";
 import { useAreas } from "../lib/areas";
+import { cityInfo, cityLabel, siteCity } from "../lib/cities";
+import { CityPickerSheet } from "./city/CityPicker";
 import MovEazyLogo from "./branding/MovEAZYLogo";
 
 // MovEazy's own palette (ink + mint), the same pairing used on the nav/hero —
@@ -83,7 +85,10 @@ const OCCUPANT_CARDS = [
  * needs different handling from someone whose lease is running out, and until
  * now an agent learned which was which on the call.
  */
-const PROFILE_SETTLED = "In Bengaluru 3+ months";
+// Stored tags the CRM groups on. Before other cities they named Bengaluru;
+// those rows keep their words and still count as settled.
+const PROFILE_SETTLED = "In the city 3+ months";
+const SETTLED_TAGS = [PROFILE_SETTLED, "In Bengaluru 3+ months"];
 /**
  * Ordered newest-arrival first, so the list runs along one axis — just out of
  * college, just arrived, settled — instead of jumping about.
@@ -95,8 +100,8 @@ const PROFILE_SETTLED = "In Bengaluru 3+ months";
  */
 const PROFILE_OPTIONS = [
   { value: "First job after college", label: "Fresh graduate" },
-  { value: "New to Bengaluru", label: "Moved to Bangalore recently" },
-  { value: PROFILE_SETTLED, label: "Been in Bangalore for more than 3 months" },
+  { value: "New to the city", label: "Moved to {city} recently" },
+  { value: PROFILE_SETTLED, label: "Been in {city} for more than 3 months" },
 ];
 
 /**
@@ -138,7 +143,7 @@ const STEPS = [
     q: "What best describes you?", sub: "It changes what we look for, and how quickly." },
   // `when` is what makes this one conditional; see stepsFor() below.
   { id: "moveReason", type: "choice", scalar: true, required: true, options: MOVE_REASON_OPTIONS,
-    when: (p) => p.profile === PROFILE_SETTLED,
+    when: (p) => SETTLED_TAGS.includes(p.profile),
     q: "The reason I'm looking for a flat is", sub: "So we know what you're working around." },
   { id: "office", type: "location", q: "Where's your office located?", sub: "We'll find homes that keep you close to work." },
   { id: "localities", type: "chips", q: "Which localities do you prefer?", sub: "Select multiple areas. We'll show you homes in and around these locations.", options: LOCALITIES },
@@ -583,7 +588,7 @@ function StepBody({ step, prefs, set, toggle, selectCard }) {
               onClick={() => set({ [step.id]: o.value })}
             >
               <span className="brk-choice-dot" aria-hidden="true">{on && <Check size={12} strokeWidth={3} />}</span>
-              <span className="brk-choice-label">{o.label}</span>
+              <span className="brk-choice-label">{o.label.replace("{city}", cityLabel(siteCity()))}</span>
             </button>
           );
         })}
@@ -669,15 +674,24 @@ function CardGrid({ step, prefs, onSelect }) {
 function LocalityChips({ prefs, toggle }) {
   const [query, setQuery] = useState("");
   // The CRM's list: its quick chips, and every area when searching (lib/areas.js).
-  const { chips, names } = useAreas();
+  // The city they are searching in (lib/cities.js) — its areas only.
+  const { chips, names, city } = useAreas();
+  const [changing, setChanging] = useState(false);
   const selected = prefs.localities || [];
   const q = query.trim().toLowerCase();
   const list = q ? names.filter((l) => l.toLowerCase().includes(q)) : chips;
   return (
     <>
+      <div className="brk-chips-label" style={{ marginTop: 0 }}>
+        Areas in <b>{cityLabel(city)}</b> ·{" "}
+        <button type="button" onClick={() => setChanging(true)} style={{ background: "none", border: "none", padding: 0, color: "inherit", textDecoration: "underline", cursor: "pointer", font: "inherit" }}>
+          change city
+        </button>
+      </div>
+      {changing && <CityPickerSheet onDone={() => setChanging(false)} onClose={() => setChanging(false)} />}
       <div className="brk-search-box">
         <Search size={17} className="brk-search-icon" />
-        <input value={query} onChange={(e) => setQuery(e.target.value)} placeholder="Search localities (e.g. HSR, Koramangala)" className="brk-search-plain" />
+        <input value={query} onChange={(e) => setQuery(e.target.value)} placeholder={`Search localities (e.g. ${chips.slice(0, 2).join(", ") || "your area"})`} className="brk-search-plain" />
       </div>
       <div className="brk-chips-label">Popular nearby</div>
       <div className="brk-chip-wrap">
@@ -697,7 +711,8 @@ function LocalityChips({ prefs, toggle }) {
 }
 
 /* ── Office location search — live autocomplete + interactive map ──────────── */
-const BLR = { lat: 12.9716, lng: 77.5946 };
+// The map opens on the city being searched.
+const cityCentre = () => { const c = cityInfo(siteCity()); return { lat: c?.lat ?? 12.9716, lng: c?.lng ?? 77.5946 }; };
 const OFFICE_ICON = L.divIcon({
   className: "brk-lmarker",
   html: `<svg width="30" height="40" viewBox="0 0 30 40" xmlns="http://www.w3.org/2000/svg"><path d="M15 1C7.8 1 2 6.8 2 14c0 9.2 13 25 13 25s13-15.8 13-25C28 6.8 22.2 1 15 1z" fill="#04211D" stroke="#fff" stroke-width="2.5"/><circle cx="15" cy="14" r="4.6" fill="#fff"/></svg>`,
@@ -863,7 +878,7 @@ function OfficeSearch({ value, onPick, chips }) {
       <div className="brk-mapbox" ref={boxRef}>
         <MapContainer
           ref={mapRef}
-          center={[pos?.lat ?? BLR.lat, pos?.lng ?? BLR.lng]}
+          center={[pos?.lat ?? cityCentre().lat, pos?.lng ?? cityCentre().lng]}
           zoom={pos ? 15 : 11}
           className="brk-leaflet"
           zoomControl={false}

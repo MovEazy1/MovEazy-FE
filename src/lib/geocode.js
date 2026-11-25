@@ -1,14 +1,25 @@
+import { CITIES, cityInfo, siteCity } from "./cities";
+
+/** The city the search is about (the site's, unless given): its name, centre and a box around it. */
+function around(city) {
+  const c = cityInfo(city || siteCity()) || CITIES[0];
+  const d = 0.32; // ~35 km each way: the metro and its suburbs
+  return { name: c.name, label: c.label, lat: c.lat, lon: c.lng, bbox: [c.lng - d, c.lat - d, c.lng + d, c.lat + d] };
+}
+const mentionsCity = (q, c) => new RegExp(`\\b(${[c.name, c.label].map((x) => x.toLowerCase()).join("|")}|india)\\b`, "i").test(q);
+
 /**
  * Forward geocode using OpenStreetMap Nominatim (no API key).
  * @see https://operations.osmfoundation.org/policies/nominatim/
  */
-export async function geocodePlace(query) {
+export async function geocodePlace(query, { city } = {}) {
   let q = String(query || "").trim();
   if (!q) return { ok: false, error: "Enter a place or landmark" };
 
-  // Bias company / landmark searches to Bangalore (matches product focus; improves Nominatim hits).
-  if (!/bangalore|bengaluru|karnataka|india/i.test(q)) {
-    q = `${q}, Bengaluru, Karnataka, India`;
+  // Bias company / landmark searches to the city being searched (improves Nominatim hits).
+  const c = around(city);
+  if (!mentionsCity(q, c)) {
+    q = `${q}, ${c.name}, India`;
   }
 
   const url = new URL("https://nominatim.openstreetmap.org/search");
@@ -24,7 +35,7 @@ export async function geocodePlace(query) {
   if (!res.ok) return { ok: false, error: "Search failed. Try again." };
   const data = await res.json().catch(() => []);
   const hit = Array.isArray(data) && data[0];
-  if (!hit) return { ok: false, error: "No results. Try adding the city (e.g. Google office Bangalore)." };
+  if (!hit) return { ok: false, error: `No results. Try adding the area (e.g. your office, ${c.label}).` };
 
   const lat = Number(hit.lat);
   const lng = Number(hit.lon);
@@ -38,9 +49,6 @@ export async function geocodePlace(query) {
   };
 }
 
-// Bengaluru proximity + a metro-area bounding box so results stay local.
-const BLR_CENTER = { lat: 12.9716, lon: 77.5946 };
-const BLR_BBOX = "77.30,12.72,77.90,13.24"; // minLon,minLat,maxLon,maxLat
 
 /** Build a {primary, secondary} pair from a Photon feature's properties. */
 function photonLabel(p, fallback) {
@@ -57,23 +65,24 @@ function photonLabel(p, fallback) {
 
 /**
  * Google-style live place search via Photon (Komoot) — an OSM-based geocoder
- * built for as-you-type autocomplete. No API key, CORS-enabled, Bangalore-biased.
+ * built for as-you-type autocomplete. No API key, CORS-enabled, biased to the city being searched.
  * Pass an AbortSignal to cancel stale in-flight requests as the user keeps typing.
  * @returns {Promise<Array<{id,primary,secondary,label,display,lat,lng}>>}
  */
-export async function searchPlaces(query, { limit = 6, signal } = {}) {
+export async function searchPlaces(query, { limit = 6, signal, city } = {}) {
   const raw = String(query || "").trim();
   if (raw.length < 3) return [];
 
-  // Bias to Bengaluru in the query text (Photon's `bbox` param is a hard filter
+  // Bias to the city in the query text (Photon's `bbox` param is a hard filter
   // that drops even valid local hits, so we over-fetch and box-filter below).
-  const q = /bangalore|bengaluru|karnataka/i.test(raw) ? raw : `${raw}, Bengaluru`;
+  const c = around(city);
+  const q = mentionsCity(raw, c) ? raw : `${raw}, ${c.name}`;
   const url = new URL("https://photon.komoot.io/api/");
   url.searchParams.set("q", q);
   url.searchParams.set("limit", String(Math.max(limit * 4, 20)));
   url.searchParams.set("lang", "en");
-  url.searchParams.set("lat", String(BLR_CENTER.lat));
-  url.searchParams.set("lon", String(BLR_CENTER.lon));
+  url.searchParams.set("lat", String(c.lat));
+  url.searchParams.set("lon", String(c.lon));
 
   let data;
   try {
@@ -83,7 +92,7 @@ export async function searchPlaces(query, { limit = 6, signal } = {}) {
   } catch {
     return []; // aborted or network error — caller keeps previous results
   }
-  const [minLon, minLat, maxLon, maxLat] = BLR_BBOX.split(",").map(Number);
+  const [minLon, minLat, maxLon, maxLat] = c.bbox;
   const feats = (Array.isArray(data?.features) ? data.features : []).filter((f) => {
     const c = f.geometry?.coordinates;
     return c && c[0] >= minLon && c[0] <= maxLon && c[1] >= minLat && c[1] <= maxLat;

@@ -122,8 +122,9 @@ async function rpc(name, args) {
 /** { partner, staff, can_manage, tiers } — partner is null before sign-up. */
 export const fetchPartnerMe = () => rpc("partner_me");
 
-export const registerPartner = ({ name, agency } = {}) =>
-  rpc("partner_register", { p_name: name || null, p_agency: agency || null });
+/** Sign up (or refresh the profile). The city is set once, at sign-up (multi_city.sql). */
+export const registerPartner = ({ name, agency, city } = {}) =>
+  rpc("partner_register", { p_name: name || null, p_agency: agency || null, ...(city ? { p_city: city } : {}) });
 
 /** Premium = the moveazy_inventory tier is active. */
 export const hasPremium = (me) => Boolean(me?.tiers?.moveazy_inventory?.active);
@@ -449,3 +450,6 @@ export const crmCreateUnion = (name, description, ownerPhone) =>
   rpc("crm_create_group", { p_name: name, p_description: description, p_owner_phone: ownerPhone });
 export const crmUpdateUnion = (groupId, name, description) =>
   rpc("crm_update_group", { p_group: groupId, p_name: name, p_description: description });
+
+/** The CRM moves a partner to another city (multi_city.sql; partners.manage). */
+export const crmPartnerSetCity = (userId, city) => rpc("crm_partner_set_city", { p_user: userId, p_city: city });

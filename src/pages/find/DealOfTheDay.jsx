@@ -5,7 +5,7 @@
  */
 import { useEffect, useState } from "react";
 import { Timer } from "lucide-react";
-import { DealCard, FindShell, useDealActions } from "./findKit";
+import { DealCard, FindShell, useDealActions, useDealsCity } from "./findKit";
 import { DAY_KINDS, fetchDealsFeed, untilMidnightIst } from "../../lib/deals";
 
 export default function DealOfTheDay() {
@@ -13,7 +13,12 @@ export default function DealOfTheDay() {
   const likes = useDealActions("day");
   const [feed, setFeed] = useState(null);
   const [left, setLeft] = useState(() => untilMidnightIst());
-  useEffect(() => { fetchDealsFeed().then(setFeed, () => setFeed({ day: [] })); }, []);
+  // The city's own deals (shared links name it); again when it changes.
+  const city = useDealsCity();
+  useEffect(() => {
+    setFeed(null);
+    fetchDealsFeed(city).then(setFeed, () => setFeed({ day: [] }));
+  }, [city]);
   useEffect(() => { const t = setInterval(() => setLeft(untilMidnightIst()), 30000); return () => clearInterval(t); }, []);
 
   const deals = DAY_KINDS.map((k) => ({ kind: k, deal: (feed?.day ?? []).find((d) => d.kind === k.id) })).filter((x) => x.deal);

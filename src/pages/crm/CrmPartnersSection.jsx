@@ -28,8 +28,10 @@ import { SCOPES } from "../../lib/adminScopes";
 import { whatsappUrl } from "../../lib/crmSettings";
 import { formatForDisplay } from "../../lib/mobile";
 import { fetchSocietyPartnerIds, setSocietyPartner } from "../../lib/societyPartners";
+import { fetchPartnerCities, useCityFilter } from "./crmCityFilter";
+import CitySelect from "../../components/city/CitySelect";
 import {
-  adminGrantPremium, adminListPartners, adminSetAutoApprove, adminSetClientShare, adminSetRating, adminSetReferralRate, adminSetStatus,
+  adminGrantPremium, adminListPartners, crmPartnerSetCity, adminSetAutoApprove, adminSetClientShare, adminSetRating, adminSetReferralRate, adminSetStatus,
   fetchProgramSettings,
   friendlyError,
 } from "../../lib/partners";
@@ -93,19 +95,22 @@ export default function CrmPartnersSection({ access }) {
     }
   };
 
+  // The partners of the city the CRM is showing (multi_city.sql).
+  const cf = useCityFilter();
+  const cityRows = useMemo(() => (rows ?? []).filter((r) => cf.partner(r.user_id)), [rows, cf]);
   const counts = useMemo(() => {
-    const c = { "": rows?.length ?? 0, pending: 0, approved: 0, suspended: 0, premium: 0, society: 0 };
-    for (const r of rows ?? []) { c[r.status] += 1; if (r.premium_until) c.premium += 1; if (societyIds.has(r.user_id)) c.society += 1; }
+    const c = { "": cityRows.length, pending: 0, approved: 0, suspended: 0, premium: 0, society: 0 };
+    for (const r of cityRows) { c[r.status] += 1; if (r.premium_until) c.premium += 1; if (societyIds.has(r.user_id)) c.society += 1; }
     return c;
-  }, [rows, societyIds]);
+  }, [cityRows, societyIds]);
 
   const shown = useMemo(() => {
     const needle = q.trim().toLowerCase();
-    return (rows ?? []).filter((r) => {
+    return cityRows.filter((r) => {
       if (filter === "premium" ? !r.premium_until : filter === "society" ? !societyIds.has(r.user_id) : filter && r.status !== filter) return false;
       return !needle || [r.name, r.phone, r.email, r.agency].join(" ").toLowerCase().includes(needle);
     });
-  }, [rows, filter, q, societyIds]);
+  }, [cityRows, filter, q, societyIds]);
 
   const partnerUrl = "https://partners.moveazy.co.in";
 
@@ -176,6 +181,11 @@ export default function CrmPartnersSection({ access }) {
                   <td>
                     <div style={{ fontWeight: 600 }}>{r.name || "—"}</div>
                     <div className="crm-mute" style={{ fontSize: 11 }}>{[r.agency, r.email].filter(Boolean).join(" · ")}</div>
+                    {/* The city they work: their leads and flats are this city's. */}
+                    <CitySelect className="crm-input" style={{ marginTop: 4, padding: "2px 6px", fontSize: 11, width: "auto" }}
+                      value={cf.ofPartner(r.user_id)} disabled={!canManage || !!busy} label={`${r.name || "Partner"}'s city`}
+                      onChange={(c) => window.confirm(`Move ${r.name || "this partner"} to ${c}? They'll get ${c}'s leads and flats from now on.`)
+                        && act(r.user_id, async () => { await crmPartnerSetCity(r.user_id, c); await fetchPartnerCities({ fresh: true }); }, `${r.name || "Partner"} now works in ${c}`)} />
                   </td>
                   <td className="crm-num">
                     {(() => {

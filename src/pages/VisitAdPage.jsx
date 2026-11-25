@@ -40,6 +40,8 @@ import { trackPixel } from "../lib/metaPixel";
 import { dropPrerender } from "../lib/prerender";
 import { adSlots, bookAdVisit, calendarLink, dayLabel, fetchAdPage, readAdBooking, readAdUtm, recordAdEvent, slotLabel, slotsByDay } from "../lib/visitAds";
 import { AvailableFlats, EXTRA_CSS, VisitCallCard } from "./VisitAdExtras";
+import { chosenCity, normalizeCity, setSiteCity } from "../lib/cities";
+import { cityOfArea, loadAreas } from "../lib/areas";
 // From public/, at a fixed address: the page drawn before the app (api/_adPrepaint.js) shows the same file.
 const logo = "/moveazy-logo-mint-light.png";
 
@@ -70,7 +72,15 @@ export default function VisitAdPage({ kind: asked = "flat" }) {
 
   useEffect(() => {
     let live = true;
-    fetchAdPage(kind, ref).then((p) => live && setPage(p || null), () => live && setPage(null));
+    fetchAdPage(kind, ref).then((p) => {
+      if (!live) return;
+      setPage(p || null);
+      // A visitor from an ad, with no city picked yet, is looking in this flat's
+      // city — so their lead is filed under it (lib/cities.js).
+      if (!chosenCity() && (p?.city || p?.area)) {
+        loadAreas().then(() => { const c = normalizeCity(p.city) || cityOfArea(p.area); if (c && !chosenCity()) setSiteCity(c); });
+      }
+    }, () => live && setPage(null));
     if (kind === "building") recordBuildingView(ref, "link"); else recordFlatView(ref, "link");
     return () => { live = false; };
   }, [kind, ref]);
@@ -82,7 +92,7 @@ export default function VisitAdPage({ kind: asked = "flat" }) {
 
   const title = !page ? "" : kind === "building" ? page.name
     : [page.flat_type, page.furnishing].filter(Boolean).join(" · ") || page.title || "Flat for rent";
-  useEffect(() => { if (title) document.title = `${title} in ${page?.area || "Bengaluru"} · Schedule a visit · MovEazy`; }, [title, page]);
+  useEffect(() => { if (title) document.title = `${title} in ${page?.area || page?.city || "Bengaluru"} · Schedule a visit · MovEazy`; }, [title, page]);
 
   const px = { content_ids: [ref], content_type: kind === "building" ? "product_group" : "home_listing", content_category: kind };
   const exploreUrl = `/tenant${search || ""}`;

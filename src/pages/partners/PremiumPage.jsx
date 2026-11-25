@@ -29,7 +29,8 @@ const PERKS = [
 
 export default function PremiumPage() {
   const { me, status, reloadStatus } = usePartner();
-  const s = useLandingSettings();
+  // The price and shares of the partner's own city (multi_city.sql).
+  const s = useLandingSettings(me?.city || me?.partner?.city);
   const [plans, setPlans] = useState(null);
   const [pick, setPick] = useState(POPULAR_PLAN);
   const [busy, setBusy] = useState(false);

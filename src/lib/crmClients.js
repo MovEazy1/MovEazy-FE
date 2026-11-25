@@ -106,7 +106,9 @@ export const fetchClients = () =>
       // The next step (crm_follow_ups.sql).
       "follow_up_note,follow_up_by,follow_up_set_at,last_outcome,last_outcome_at,no_answer_streak," +
       // Active / Probable / Dormant, and what they asked to be told about (lead_types.sql).
-      "lead_type,lead_type_at,lead_type_by,interests",
+      "lead_type,lead_type_at,lead_type_by,interests," +
+      // The city they search in, and where they are now (multi_city.sql).
+      "city,current_city",
     // MovEazy's own leads, plus tenants from a partner's QR poster (via = 'qr',
     // partner_qr_leads.sql), which both MovEazy and the broker follow up. Any
     // other number that first came through a partner broker is theirs
@@ -550,4 +552,12 @@ export async function recordClientReaction(client, propertyId, reaction, { actor
     meta: { property_id: propertyId, reaction },
     actorEmail,
   });
+}
+
+/** Move a client to the city they now search in (multi_city.sql; logged on their record). */
+export async function setClientCity(clientId, city) {
+  if (!isSupabaseConfigured || !supabase) throw new Error("Supabase is not configured.");
+  const { data, error } = await supabase.rpc("crm_client_set_city", { p_client: clientId, p_city: city });
+  if (error) throw error;
+  return data;
 }

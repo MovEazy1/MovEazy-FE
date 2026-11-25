@@ -13,6 +13,7 @@
  * Needs partners.manage.
  */
 import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCityFilter } from "./crmCityFilter";
 import { Btn, C, Chip, Empty, Loading, Toast, inr, relTime } from "./crmUi";
 import { waLink } from "../../lib/partners";
 import {
@@ -230,8 +231,10 @@ export default function CrmLeadRequestsPage() {
   }, [say]);
   useEffect(() => { load(); }, [load]);
 
-  const todo = useMemo(() => (reqs ?? []).filter((r) => ACTIVE.has(r.status)), [reqs]);
-  const done = useMemo(() => (reqs ?? []).filter((r) => !ACTIVE.has(r.status)), [reqs]);
+  // Requests from partners of the city the CRM is showing (multi_city.sql).
+  const cf = useCityFilter();
+  const todo = useMemo(() => (reqs ?? []).filter((r) => cf.partner(r.broker_id) && ACTIVE.has(r.status)), [reqs, cf]);
+  const done = useMemo(() => (reqs ?? []).filter((r) => cf.partner(r.broker_id) && !ACTIVE.has(r.status)), [reqs, cf]);
   const dueTotal = (closures ?? []).reduce((s, c) => s + Number(c.due_amount || 0), 0);
 
   return (

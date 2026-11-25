@@ -26,6 +26,7 @@ import { hasAnyOpenSlot } from "../../lib/visits";
 import { isSuperAdminEmail } from "../../lib/adminAccess";
 import { fetchRecentActivity } from "../../lib/ownerDashboard";
 import logoMint from "../../assets/logo/moveazy-logo-mint-dark.png";
+import { CitySwitch } from "../city/CityPicker";
 
 const OWNERS_URL = "https://owners.moveazy.co.in/";
 
@@ -471,6 +472,8 @@ export default function MovEazyNav({ active = "", transparentAtTop = false, onFi
           <Link to="/" style={{ flex: "none", display: "flex", alignItems: "center" }} aria-label="movEAZY home">
             <img src={logoMint} alt="movEAZY" draggable={false} style={{ height: "clamp(26px,2.4vw,34px)", width: "auto", display: "block" }} />
           </Link>
+          {/* Which city the flats are from (lib/cities.js): switch any time. */}
+          <CitySwitch style={{ marginRight: "auto" }} />
 
           <div className="mzn-nav-links" style={{ display: "flex", alignItems: "center", gap: "clamp(1px,.3vw,6px)", background: "rgba(255,255,255,.06)", border: "1px solid rgba(255,255,255,.09)", borderRadius: 100, padding: 4, flex: "0 1 auto", minWidth: 0, maxWidth: 780, overflowX: "auto", scrollbarWidth: "none", justifyContent: "center", WebkitMaskImage: "linear-gradient(to right, transparent 0, black 14px, black calc(100% - 14px), transparent 100%)", maskImage: "linear-gradient(to right, transparent 0, black 14px, black calc(100% - 14px), transparent 100%)" }}>
             <Link to="/" className="mzn-nav-link" style={active === "home" ? LINK_ACTIVE : LINK_BASE}>Home</Link>

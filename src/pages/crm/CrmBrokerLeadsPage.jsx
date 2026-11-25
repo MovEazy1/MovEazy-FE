@@ -8,6 +8,7 @@
  * to that partner as a MovEazy lead (partner_website_leads.sql).
  */
 import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCityFilter } from "./crmCityFilter";
 import { QrCode } from "lucide-react";
 import { Btn, C, Chip, Empty, Loading, inr, relTime } from "./crmUi";
 import { decideSoldOut, fetchBrokerLeads, fetchSoldOutRequests } from "../../lib/partnerCurated";
@@ -43,12 +44,14 @@ export default function CrmBrokerLeadsPage() {
   }, []);
   useEffect(() => { load(); }, [load]);
 
+  // Partners of the city the CRM is showing (multi_city.sql).
+  const cf = useCityFilter();
   const brokers = useMemo(() => {
     const m = new Map();
-    for (const t of leads?.tenants ?? []) m.set(t.broker_id, t.broker || "Broker");
+    for (const t of leads?.tenants ?? []) if (cf.partner(t.broker_id)) m.set(t.broker_id, t.broker || "Broker");
     return [...m.entries()].sort((a, b) => a[1].localeCompare(b[1]));
-  }, [leads]);
-  const rows = (leads?.tenants ?? []).filter((t) => (!broker || t.broker_id === broker)
+  }, [leads, cf]);
+  const rows = (leads?.tenants ?? []).filter((t) => cf.partner(t.broker_id) && (!broker || t.broker_id === broker)
     && (!q.trim() || `${t.name} ${t.phone} ${t.broker}`.toLowerCase().includes(q.trim().toLowerCase())));
   const pending = (sold ?? []).filter((r) => r.status === "pending").length;
 

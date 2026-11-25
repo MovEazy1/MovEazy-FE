@@ -5,7 +5,7 @@
  * mid-week stays, marked rented.
  */
 import { useEffect, useMemo, useState } from "react";
-import { DealCard, FindShell, KindChips, useDealActions } from "./findKit";
+import { DealCard, FindShell, KindChips, useDealActions, useDealsCity } from "./findKit";
 import { DAY_KINDS, fetchDealsFeed, weekLabel } from "../../lib/deals";
 
 export default function StealDeals() {
@@ -13,7 +13,12 @@ export default function StealDeals() {
   const likes = useDealActions("steal");
   const [feed, setFeed] = useState(null);
   const [kinds, setKinds] = useState([]); // picked flat types; none = all
-  useEffect(() => { fetchDealsFeed().then(setFeed, () => setFeed({ steal: [], weekStart: "", weekEnd: "" })); }, []);
+  // The city's own deals (shared links name it); again when it changes.
+  const city = useDealsCity();
+  useEffect(() => {
+    setFeed(null);
+    fetchDealsFeed(city).then(setFeed, () => setFeed({ steal: [], weekStart: "", weekEnd: "" }));
+  }, [city]);
 
   const all = useMemo(() => feed?.steal ?? [], [feed]);
   const counts = useMemo(() => {

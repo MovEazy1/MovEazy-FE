@@ -18,6 +18,7 @@ import { FindShell, useFindGate } from "./findKit";
 import { DAY_KINDS, fetchDealsFeed, untilMidnightIst, weekLabel } from "../../lib/deals";
 import { addLeadInterest } from "../../lib/leadIntake";
 import { fetchLiveSocieties } from "../../lib/societyPartners";
+import { useSiteCity } from "../../lib/cities";
 
 const SOON_KEY = "mz-notify-me";
 const readSoon = () => { try { return JSON.parse(localStorage.getItem(SOON_KEY) || "[]"); } catch { return []; } };
@@ -55,7 +56,9 @@ export default function FindHub() {
   const [societies, setSocieties] = useState(0);
   useEffect(() => { fetchLiveSocieties().then((r) => setSocieties(r.length), () => {}); }, []);
   const [left, setLeft] = useState(() => untilMidnightIst());
-  useEffect(() => { fetchDealsFeed().then(setFeed, () => setFeed({ steal: [], day: [] })); }, []);
+  // This city's deals (lib/cities.js), again when it changes.
+  const { city } = useSiteCity();
+  useEffect(() => { fetchDealsFeed(city).then(setFeed, () => setFeed({ steal: [], day: [] })); }, [city]);
   useEffect(() => { const t = setInterval(() => setLeft(untilMidnightIst()), 30000); return () => clearInterval(t); }, []);
 
   const steal = feed?.steal ?? [];

@@ -36,6 +36,7 @@ import { REFRESH_MS, fetchMobileSummary, waitingTotal } from "../../lib/crmMobil
 import { loadAreas } from "../../lib/areas";
 import { pokeDigest } from "../../lib/followUps";
 import { fetchWaPendingCount } from "../../lib/whatsappIntake";
+import { CrmCityContext, CrmCityPicker, useCrmCityState } from "./CrmCity";
 
 const CrmContext = createContext(null);
 export const useCrm = () => useContext(CrmContext);
@@ -152,6 +153,8 @@ function Rail({ access }) {
         padding: "10px 0", display: "flex", flexDirection: "column", alignItems: "center", gap: 4,
       }}
     >
+      {/* Which city the whole CRM shows (CrmCity.jsx). */}
+      <div style={{ marginBottom: 6 }}><CrmCityPicker rail /></div>
       {RAIL.filter((r) => !r.scope || access.has(r.scope)).map((r) => (
         <NavLink
           key={r.to}
@@ -340,16 +343,41 @@ export default function CrmShell() {
     return () => clearInterval(t);
   }, [phone, access.loading, access.isStaff, loadSummary]);
 
+  // The city the CRM shows (CrmCity.jsx): clients, and flats, of that city only —
+  // and everything that belongs to a client goes with them.
+  const cityState = useCrmCityState(user?.email, !access.loading && access.isStaff);
+  const { inCity, city } = cityState;
+  const shown = useMemo(() => {
+    const clients = (data.clients ?? []).filter((c) => inCity(c.city));
+    const ids = new Set(clients.map((c) => c.id));
+    const mine = (rows) => (Array.isArray(rows) ? rows.filter((r) => !r?.client_id || ids.has(r.client_id)) : rows);
+    return {
+      clients,
+      inventory: (data.inventory ?? []).filter((i) => inCity(i.city)),
+      requirements: mine(data.requirements),
+      shortlists: mine(data.shortlists),
+      priority: mine(data.priority),
+      interest: mine(data.interest),
+    };
+  }, [data.clients, data.inventory, data.requirements, data.shortlists, data.priority, data.interest, inCity]);
+
   // The daily work (Follow-ups, Pipeline, Priority closures, the day's tasks)
   // is Active leads only; Probable and Dormant live under Clients (lead_types.sql).
-  const activeClients = useMemo(() => (data.clients ?? []).filter((c) => leadTypeOf(c) === "active"), [data.clients]);
+  const activeClients = useMemo(() => shown.clients.filter((c) => leadTypeOf(c) === "active"), [shown.clients]);
   const value = useMemo(
-    () => ({ ...PENDING, ...data, activeClients, access, user, reload, patchClient, setData, phone, summary, summaryBusy, loadSummary }),
-    [data, activeClients, access, user, reload, patchClient, phone, summary, summaryBusy, loadSummary],
+    () => ({
+      ...PENDING, ...data,
+      // Pending keys stay pending (absent) so screens wait for them as before.
+      ...Object.fromEntries(Object.entries(shown).filter(([k]) => k in data)),
+      allClients: data.clients ?? [], allInventory: data.inventory ?? [],
+      city, cityState, activeClients, access, user, reload, patchClient, setData, phone, summary, summaryBusy, loadSummary,
+    }),
+    [data, shown, city, cityState, activeClients, access, user, reload, patchClient, phone, summary, summaryBusy, loadSummary],
   );
 
   if (phone) {
     return (
+      <CrmCityContext value={cityState}>
       <Gate>
         <div className="crm crm--phone" style={{ display: "flex", flexDirection: "column", height: "100dvh", minHeight: 0, overflow: "hidden" }}>
           <CrmStyles />
@@ -368,10 +396,12 @@ export default function CrmShell() {
           <PhoneNav badge={waitingTotal(summary)} />
         </div>
       </Gate>
+      </CrmCityContext>
     );
   }
 
   return (
+    <CrmCityContext value={cityState}>
     <Gate>
       <div className="crm" style={{ display: "flex", height: "100vh", overflow: "hidden" }}>
         <CrmStyles />
@@ -394,5 +424,6 @@ export default function CrmShell() {
         </main>
       </div>
     </Gate>
+    </CrmCityContext>
   );
 }

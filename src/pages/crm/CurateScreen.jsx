@@ -344,7 +344,7 @@ export default function CurateScreen({
           </div>
           {editing && (
             <div style={{ marginTop: 10 }}>
-              <RequirementFields req={requirement} canEdit={canEditReq} onChange={onRequirementChange} office={office} compact />
+              <RequirementFields req={requirement} canEdit={canEditReq} onChange={onRequirementChange} office={office} compact city={client?.city} />
             </div>
           )}
         </section>

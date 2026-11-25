@@ -26,6 +26,8 @@ import {
   MUST_HAVES, LIFESTYLE,
 } from "../data/preferenceOptions";
 import { useAreas, withCurrent } from "../lib/areas";
+import CitySelect from "../components/city/CitySelect";
+import { siteCity } from "../lib/cities";
 
 const BRAND_RED = "#ff3131";
 const RULE_OPTIONS = [
@@ -123,7 +125,9 @@ const STEPS = ["Who & Where", "The Home", "Publish"];
 
 export default function ListMyFlat() {
   // The CRM's list of areas (lib/areas.js): pick one, never type.
-  const { names: areaNames } = useAreas();
+  // The flat's city first; the areas are that city's (lib/cities.js).
+  const [city, setCity] = useState(() => siteCity());
+  const { names: areaNames } = useAreas(city);
   const { user } = useAuth();
   const navigate = useNavigate();
   const isPhone = useIsPhone();
@@ -298,6 +302,7 @@ export default function ListMyFlat() {
     propertyId,
     postedBy,
     phone: user?.phone || "",
+    city,
     area,
     nearbyAreas: [],
     fullAddress,
@@ -724,7 +729,7 @@ export default function ListMyFlat() {
               <div className="p-6 grid grid-cols-2 gap-4">
                 <div>
                   <Label>City</Label>
-                  <input value="Bengaluru" disabled className={inp + " bg-gray-50 cursor-not-allowed"} />
+                  <CitySelect value={city} onChange={(c) => { setCity(c); setArea(""); }} className={inp} />
                 </div>
                 <div>
                   <Label required>Area</Label>

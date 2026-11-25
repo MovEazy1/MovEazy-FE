@@ -9,6 +9,7 @@
  */
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { X } from "lucide-react";
+import { useCityFilter } from "./crmCityFilter";
 import { Btn, C, Chip, Empty, Toast, shortDate } from "./crmUi";
 import { whatsappUrl } from "../../lib/crmSettings";
 import { formatForDisplay, normalizeIndianMobile } from "../../lib/mobile";
@@ -55,13 +56,16 @@ export default function CrmUnionsSection() {
   useEffect(() => {
     load();
     adminListPartners().then((list) => setPartners(list.filter((p) => p.status === "approved" && p.phone)), () => {});
+    // (Suggestions below are narrowed to the union's city where it is shown.)
   }, [load]);
 
+  // The unions of the city the CRM is showing (multi_city.sql).
+  const cf = useCityFilter();
   const shown = useMemo(() => {
     const needle = q.trim().toLowerCase();
-    return (rows ?? []).filter((g) => !needle
+    return (rows ?? []).filter((g) => cf.ok(g.city)).filter((g) => !needle
       || [g.name, g.description, ...g.admins.flatMap((a) => [a.name, a.phone])].join(" ").toLowerCase().includes(needle));
-  }, [rows, q]);
+  }, [rows, q, cf]);
   const current = open && rows?.find((g) => g.id === open);
 
   return (
@@ -129,7 +133,8 @@ export default function CrmUnionsSection() {
           </table>
         )}
       </div>
-      {current && <UnionDrawer union={current} partners={partners} onClose={() => setOpen(null)} onChanged={load} onToast={showToast} />}
+      {current && <UnionDrawer union={current} partners={partners.filter((p) => cf.ofPartner(p.user_id) === (current.city || "Bengaluru"))}
+        onClose={() => setOpen(null)} onChanged={load} onToast={showToast} />}
       <Toast {...(toast ?? {})} />
     </div>
   );

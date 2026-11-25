@@ -16,6 +16,7 @@
  * has no staff read policy and this page is simply empty.
  */
 import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCityFilter } from "./crmCityFilter";
 import { useNavigate } from "react-router-dom";
 import { useCrm } from "./CrmShell";
 import { FollowUpActions } from "./FollowUpControls";
@@ -147,9 +148,12 @@ export default function CrmVisitsPage() {
   );
 
   /** Everything one row needs to render and to message, resolved once. */
+  // Visits to flats of the city the CRM is showing (multi_city.sql).
+  const cf = useCityFilter();
   const rows = useMemo(() => {
     const needle = q.trim().toLowerCase();
     return bookings
+      .filter((b) => !b.property_id || cf.flat(b.property_id))
       .map((b) => {
         const client = clientByUser.get(b.user_id) || (b.client_id ? clientById.get(b.client_id) : null) || null;
         const profile = profileByUser.get(b.user_id) || null;
@@ -176,7 +180,7 @@ export default function CrmVisitsPage() {
         return [r.name, r.phone, r.booking.property_id, r.listing?.area, r.listing?.title]
           .join(" ").toLowerCase().includes(needle);
       });
-  }, [bookings, clientByUser, clientById, profileByUser, listingById, filter, q, now]);
+  }, [bookings, clientByUser, clientById, profileByUser, listingById, filter, q, now, cf]);
 
   const summary = useMemo(() => summariseVisits(bookings, now), [bookings, now]);
 

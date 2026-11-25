@@ -1,5 +1,7 @@
 import { supabase, isSupabaseConfigured } from "./supabase";
 import { cleanAboutMe, reconcilePriority } from "../data/preferenceOptions";
+import { chosenCity, currentCity, normalizeCity, siteCity } from "./cities";
+import { cityOfAreas } from "./areas";
 
 /**
  * Per-user requirement profile — the demand side, one row per user_id in the
@@ -27,6 +29,10 @@ export function prefsToRow(prefs, user, extra = {}) {
     office: p.office || null,
     age: String(p.age || "").slice(0, 40),
     localities: arr(p.localities),
+    // The city they are searching in — what they picked, else their areas', else
+    // the city the site is on — and where they are now (multi_city.sql).
+    city: normalizeCity(p.city) || cityOfAreas(arr(p.localities), chosenCity()) || siteCity(),
+    current_city: currentCity(),
     budget_min: num(p.budgetMin),
     budget_max: num(p.budgetMax),
     stretch: !!p.stretch,
@@ -79,6 +85,7 @@ export function rowToPrefs(row) {
     office: row.office || null,
     age: row.age || "",
     localities: arr(row.localities),
+    city: row.city || "",
     budgetMin: num(row.budget_min) ?? 20000,
     budgetMax: num(row.budget_max) ?? 45000,
     stretch: !!row.stretch,

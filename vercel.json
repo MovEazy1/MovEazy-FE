@@ -63,6 +63,16 @@
       "destination": "/api/property-page?id=:id"
     },
     {
+      "source": "/:city(bangalore|mumbai|hyderabad|pune|noida|gurugram|delhi)",
+      "has": [
+        {
+          "type": "host",
+          "value": "www.moveazy.co.in"
+        }
+      ],
+      "destination": "/home.html"
+    },
+    {
       "source": "/how-it-works",
       "has": [
         {

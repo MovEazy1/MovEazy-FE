@@ -10,7 +10,8 @@
  *   Areas        GPS check-ins by nearest locality + scans counted by the
  *                poster spot the broker said it was pasted in
  */
-import { Suspense, lazy, useCallback, useEffect, useState } from "react";
+import { Suspense, lazy, useCallback, useEffect, useMemo, useState } from "react";
+import { useCityFilter } from "./crmCityFilter";
 import { QrCode } from "lucide-react";
 import { Btn, C, Chip, Empty, Loading, relTime } from "./crmUi";
 import { fetchQrScans } from "../../lib/qrLeads";
@@ -21,8 +22,16 @@ const RANGES = [[7, "Last 7 days"], [30, "Last 30 days"], [null, "All time"]];
 
 export default function CrmQrScansPage() {
   const [days, setDays] = useState(30);
-  const [data, setData] = useState(null);
+  const [raw, setData] = useState(null);
   const [err, setErr] = useState("");
+  // The partners and places of the city the CRM is showing (multi_city.sql); the totals stay every city's.
+  const cf = useCityFilter();
+  const data = useMemo(() => raw && {
+    ...raw,
+    brokers: (raw.brokers ?? []).filter((b) => cf.partner(b.broker_id)),
+    areas: (raw.areas ?? []).filter((a) => cf.area(a.area)),
+    points: (raw.points ?? []).filter((p) => !p.locality || cf.area(p.locality)),
+  }, [raw, cf]);
 
   const load = useCallback(async () => {
     setErr("");

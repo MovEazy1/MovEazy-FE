@@ -12,6 +12,7 @@
  * one address is the argument for doing it now.
  */
 import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCityFilter } from "./crmCityFilter";
 import { Link, useSearchParams } from "react-router-dom";
 import { useCrm } from "./CrmShell";
 import { SCOPES } from "../../lib/adminScopes";
@@ -242,9 +243,11 @@ export default function CrmNotificationsPage() {
     [inventory],
   );
 
+  // Requests for flats of the city the CRM is showing (multi_city.sql).
+  const cf = useCityFilter();
   const groups = useMemo(
-    () => groupRequestsByProperty(requests, listingsById, slots, profiles),
-    [requests, listingsById, slots, profiles],
+    () => groupRequestsByProperty(requests.filter((r) => cf.flat(r.property_id)), listingsById, slots, profiles),
+    [requests, listingsById, slots, profiles, cf],
   );
 
   /**

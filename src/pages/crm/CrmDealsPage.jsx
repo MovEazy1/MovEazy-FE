@@ -26,6 +26,7 @@ import {
   DAY_KINDS, addDays, addStealDeal, addStealKind, dayKindLabel, dealKind, dealLink, dealMessage, fetchCrmDeals, fetchDealPeople,
   fetchDealStats, setDayDeal, setStealDeals, weekLabel,
 } from "../../lib/deals";
+import CitySelect from "../../components/city/CitySelect";
 
 const istToday = () => new Date().toLocaleDateString("en-CA", { timeZone: "Asia/Kolkata" });
 
@@ -45,15 +46,16 @@ function Thumb({ src }) {
 }
 
 /** Live flats to pick from, searched by id, title or area (optionally one Deal of the Day type). */
-function FlatPicker({ kind = null, exclude = [], onPick, onClose }) {
+function FlatPicker({ kind = null, exclude = [], onPick, onClose, city }) {
   const { inventory } = useCrm();
   const [q, setQ] = useState("");
   const rows = useMemo(() => {
     const needle = q.trim().toLowerCase();
     return (inventory ?? [])
+      .filter((r) => (r.city || "Bengaluru") === city)
       .filter((r) => r.status === "published" && !exclude.includes(r.property_id) && (!kind || dealKind(r.flat_type) === kind))
       .filter((r) => !needle || `${r.property_id} ${r.title} ${r.area} ${r.flat_type}`.toLowerCase().includes(needle));
-  }, [inventory, q, kind, exclude]);
+  }, [inventory, q, kind, exclude, city]);
   return (
     <div style={{ ...card, padding: 12, display: "grid", gap: 8 }}>
       <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
@@ -111,8 +113,8 @@ function DealAlerts() {
 }
 
 /** The general link for a deals page: copy it, or send it on WhatsApp. */
-function ShareBar({ deal, say }) {
-  const link = dealLink(deal);
+function ShareBar({ deal, say, city }) {
+  const link = dealLink(deal, "crm", city);
   const copy = async () => {
     try { await navigator.clipboard.writeText(link); say("Link copied"); } catch { window.prompt("Copy the link", link); }
   };
@@ -122,7 +124,7 @@ function ShareBar({ deal, say }) {
       <b style={{ fontSize: 12.5 }}>Share {deal === "steal" ? "this week's Steal Deals" : "today's Deal of the Day"}</b>
       <span className="crm-mute" style={{ fontSize: 11.5, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", flex: "1 1 220px", minWidth: 0 }}>{link}</span>
       <Btn sm onClick={copy}><Copy size={13} /> Copy link</Btn>
-      <a className="crm-btn crm-btn--sm crm-btn--wa" href={`https://wa.me/?text=${encodeURIComponent(dealMessage(deal))}`}
+      <a className="crm-btn crm-btn--sm crm-btn--wa" href={`https://wa.me/?text=${encodeURIComponent(dealMessage(deal, "", city))}`}
         target="_blank" rel="noopener noreferrer" style={{ textDecoration: "none" }}>WhatsApp</a>
     </div>
   );
@@ -235,15 +237,16 @@ function DayStats() {
   );
 }
 
-function StealTab({ canEdit, say }) {
-  const { inventory } = useCrm();
+function StealTab({ canEdit, say, city }) {
+  const { inventory: crmInventory } = useCrm();
+  const inventory = useMemo(() => (crmInventory ?? []).filter((r) => (r.city || "Bengaluru") === city), [crmInventory, city]);
   const [week, setWeek] = useState(null);
   const [d, setD] = useState(null);
   const [busy, setBusy] = useState(false);
   const [picking, setPicking] = useState(false);
   const [kind, setKind] = useState(""); // the list filtered to one flat type; "" = all
-  const load = useCallback((wk) => fetchCrmDeals(wk, null, null).then((r) => { setD(r); setWeek(r.week_start); }, (e) => say(e?.message || "Couldn't load the deals", "error")), [say]);
-  useEffect(() => { load(null); }, [load]);
+  const load = useCallback((wk) => fetchCrmDeals(wk, null, null, city).then((r) => { setD(r); setWeek(r.week_start); }, (e) => say(e?.message || "Couldn't load the deals", "error")), [say, city]);
+  useEffect(() => { setD(null); load(null); }, [load]);
 
   const ids = useMemo(() => (d?.steal ?? []).map((x) => x.property_id), [d]);
   // Live flats of each type not in the week yet, for "Add all".
@@ -275,12 +278,12 @@ function StealTab({ canEdit, say }) {
     setBusy(true);
     try { setD(await fn()); if (ok) say(ok); } catch (e) { say(e?.message || "Couldn't save", "error"); } finally { setBusy(false); }
   };
-  const save = (next, ok) => run(() => setStealDeals(week, next), ok);
+  const save = (next, ok) => run(() => setStealDeals(week, next, city), ok);
   const plural = (n) => (n === 1 ? "" : "s");
   const addAll = (k) => {
     const n = addable[k] || 0;
     if (!n || !window.confirm(`Add all ${n} live ${dayKindLabel(k)} flat${plural(n)} to the Steal Deals for ${weekLabel(week, addDays(week, 6))}?`)) return;
-    run(() => addStealKind(week, k), `Added ${n} ${dayKindLabel(k)} flat${plural(n)}`);
+    run(() => addStealKind(week, k, city), `Added ${n} ${dayKindLabel(k)} flat${plural(n)}`);
   };
   const removeShown = () => {
     if (!window.confirm(`Take all ${shown.length} ${dayKindLabel(kind)} flat${plural(shown.length)} out of this week's Steal Deals?`)) return;
@@ -293,7 +296,7 @@ function StealTab({ canEdit, say }) {
 
   return (
     <div style={{ display: "grid", gap: 12 }}>
-      {thisWeek && <ShareBar deal="steal" say={say} />}
+      {thisWeek && <ShareBar deal="steal" say={say} city={city} />}
       <div style={{ display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap" }}>
         <Btn sm onClick={() => load(addDays(week, -7))} aria-label="Previous week"><ArrowLeft size={14} /></Btn>
         <b style={{ fontSize: 15, minWidth: 130, textAlign: "center" }}>{weekLabel(week, addDays(week, 6))}</b>
@@ -319,7 +322,7 @@ function StealTab({ canEdit, say }) {
           Nothing picked for this week{past ? "" : " yet — until you add some, the site keeps showing the last week that had deals"}.
         </div>
       )}
-      {picking && <FlatPicker exclude={ids} onClose={() => setPicking(false)} onPick={(id) => save([...ids, id])} />}
+      {picking && <FlatPicker city={city} exclude={ids} onClose={() => setPicking(false)} onPick={(id) => save([...ids, id])} />}
       {ids.length > 0 && (
         <div style={{ display: "flex", gap: 6, alignItems: "center", flexWrap: "wrap" }}>
           <Chip on={!kind} onClick={() => setKind("")}>All · {ids.length}</Chip>
@@ -355,15 +358,15 @@ function StealTab({ canEdit, say }) {
   );
 }
 
-function DayTab({ canEdit, say }) {
+function DayTab({ canEdit, say, city }) {
   const [d, setD] = useState(null);
   const [busy, setBusy] = useState(false);
   const [picking, setPicking] = useState(null); // { day, kind }
   const [today] = useState(istToday);
   // A month back too, so an empty day can say what rolls over into it.
-  const load = useCallback(() => fetchCrmDeals(null, addDays(today, -31), addDays(today, DAYS_AHEAD))
-    .then(setD, (e) => say(e?.message || "Couldn't load the deals", "error")), [say, today]);
-  useEffect(() => { load(); }, [load]);
+  const load = useCallback(() => fetchCrmDeals(null, addDays(today, -31), addDays(today, DAYS_AHEAD), city)
+    .then(setD, (e) => say(e?.message || "Couldn't load the deals", "error")), [say, today, city]);
+  useEffect(() => { setD(null); load(); }, [load]);
 
   const byKey = useMemo(() => new Map((d?.days ?? []).map((x) => [`${x.day}|${x.slot}`, x])), [d]);
   if (!d) return <Empty>Loading the calendar…</Empty>;
@@ -378,20 +381,20 @@ function DayTab({ canEdit, say }) {
   };
   const set = async (day, kind, id) => {
     setBusy(true);
-    try { await setDayDeal(day, kind, id); await load(); say(id ? "Deal of the Day set" : "Cleared — the last one rolls over"); }
+    try { await setDayDeal(day, kind, id, city); await load(); say(id ? "Deal of the Day set" : "Cleared — the last one rolls over"); }
     catch (e) { say(e?.message || "Couldn't save", "error"); }
     finally { setBusy(false); }
   };
 
   return (
     <div style={{ display: "grid", gap: 12 }}>
-      <ShareBar deal="day" say={say} />
+      <ShareBar deal="day" say={say} city={city} />
       <DayStats />
       <div className="crm-mute" style={{ fontSize: 12, lineHeight: 1.5 }}>
         One flat per type per day, live on the site from midnight. A day left empty keeps the last deal for that type (shown faded).
       </div>
       {picking && (
-        <FlatPicker kind={picking.kind} onClose={() => setPicking(null)}
+        <FlatPicker city={city} kind={picking.kind} onClose={() => setPicking(null)}
           onPick={(id) => { const p = picking; setPicking(null); set(p.day, p.kind, id); }} />
       )}
       <div style={{ overflowX: "auto" }}>
@@ -443,7 +446,10 @@ const th = { padding: "8px", textAlign: "left", fontSize: 12, color: C.textMute,
 const td = { padding: "8px", borderBottom: `1px solid ${C.lineSoft}`, verticalAlign: "top" };
 
 export default function CrmDealsPage() {
-  const { access } = useCrm();
+  const { access, city: crmCity, cityState } = useCrm();
+  // Each city has its own deals (multi_city.sql): the CRM's city, or the one picked here.
+  const [city, setCity] = useState(() => (crmCity && crmCity !== "all" ? crmCity : cityState?.cities?.[0] || "Bengaluru"));
+  useEffect(() => { if (crmCity && crmCity !== "all") setCity(crmCity); }, [crmCity]);
   // Steal Deals: anyone in the CRM. Deal of the Day: those who edit properties.
   const canEditSteal = Boolean(access.isStaff);
   const canEdit = access.has(SCOPES.PROPERTIES_WRITE);
@@ -453,7 +459,11 @@ export default function CrmDealsPage() {
     <div className="crm-scroll" style={{ flex: 1 }}>
       <div style={{ padding: 20, display: "flex", flexDirection: "column", gap: 14, maxWidth: 1100 }}>
         <div>
-          <h1 style={{ fontSize: 21, fontWeight: 800, margin: "0 0 6px" }}>Deals</h1>
+          <h1 style={{ fontSize: 21, fontWeight: 800, margin: "0 0 6px", display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap" }}>
+            Deals in
+            <CitySelect className="crm-input" style={{ width: "auto", fontSize: 15, fontWeight: 700 }} value={city} onChange={setCity}
+              allowed={cityState?.cities} label="Which city's deals" />
+          </h1>
           <p style={{ color: C.textDim, fontSize: 13.5, margin: 0, maxWidth: "75ch", lineHeight: 1.6 }}>
             What tenants see under Find my home: this week&apos;s Steal Deals (moveazy.co.in/find/steal-deals) and today&apos;s
             Deal of the Day (/find/deal-of-the-day). Best-value picks at the flat&apos;s own rent; the “% lower” line on each is worked out
@@ -465,7 +475,7 @@ export default function CrmDealsPage() {
           <Chip on={tab === "day"} onClick={() => setTab("day")}>Deal of the Day</Chip>
         </div>
         <DealAlerts />
-        {tab === "steal" ? <StealTab canEdit={canEditSteal} say={say} /> : <DayTab canEdit={canEdit} say={say} />}
+        {tab === "steal" ? <StealTab canEdit={canEditSteal} say={say} city={city} /> : <DayTab canEdit={canEdit} say={say} city={city} />}
         {/* The standard rents every deal's "% lower" line uses (deal_standards.sql). */}
         {tab === "day" && <CrmDealStandards canEdit={canEdit} say={say} />}
       </div>
@@ -479,22 +489,32 @@ export default function CrmDealsPage() {
  * are in, and add / take one out. Any CRM user (find_deals.sql crm_deal_staff).
  */
 export function useWeekSteal(onToast) {
-  const [week, setWeek] = useState(null); // { week, ids: Set } once read
+  // Each city's week (multi_city.sql): the cities the CRM is showing.
+  const { city, cityState } = useCrm();
+  const cities = useMemo(() => (city && city !== "all" ? [city] : cityState?.cities ?? ["Bengaluru"]), [city, cityState]);
+  const cityKey = cities.join(",");
+  const [week, setWeek] = useState(null); // { week, ids: Set, byCity: { city: [ids] } } once read
   const [busy, setBusy] = useState("");
   useEffect(() => {
     let live = true;
-    fetchCrmDeals(null).then((d) => live && setWeek({ week: d.week_start, ids: new Set((d.steal ?? []).map((x) => x.property_id)) }), () => {});
+    Promise.all(cityKey.split(",").map((c) => fetchCrmDeals(null, null, null, c).then((d) => [c, d]))).then((all) => {
+      if (!live) return;
+      const byCity = Object.fromEntries(all.map(([c, d]) => [c, (d?.steal ?? []).map((x) => x.property_id)]));
+      setWeek({ week: all[0]?.[1]?.week_start, ids: new Set(Object.values(byCity).flat()), byCity });
+    }, () => {});
     return () => { live = false; };
-  }, []);
-  const toggle = async (propertyId) => {
+  }, [cityKey]);
+  const toggle = async (propertyId, flatCity = "Bengaluru") => {
     if (!week || busy) return;
     setBusy(propertyId);
     try {
       const inNow = week.ids.has(propertyId);
+      const mine = week.byCity?.[flatCity] ?? [];
       const d = inNow
-        ? await setStealDeals(week.week, [...week.ids].filter((x) => x !== propertyId))
+        ? await setStealDeals(week.week, mine.filter((x) => x !== propertyId), flatCity)
         : await addStealDeal(week.week, propertyId);
-      setWeek({ week: d.week_start, ids: new Set((d.steal ?? []).map((x) => x.property_id)) });
+      const byCity = { ...week.byCity, [d.city || flatCity]: (d.steal ?? []).map((x) => x.property_id) };
+      setWeek({ week: d.week_start, ids: new Set(Object.values(byCity).flat()), byCity });
       onToast?.(inNow ? "Taken out of this week's Steal Deals" : "Added to this week's Steal Deals");
     } catch (e) {
       onToast?.(e?.message || "Couldn't save", "error");
@@ -511,7 +531,7 @@ export function StealDealButton({ listing, steal }) {
   const on = steal.has(listing.property_id);
   return (
     <Btn sm variant={on ? "primary" : undefined} disabled={steal.busy === listing.property_id}
-      onClick={() => steal.toggle(listing.property_id)}
+      onClick={() => steal.toggle(listing.property_id, listing.city || "Bengaluru")}
       title={on ? "In this week's Steal Deals — tap to take it out" : `Add to this week's Steal Deals (${steal.count} in now)`}>
       <Flame size={13} /> {on ? "In Steal Deals" : "Add to Steal Deals"}
     </Btn>
@@ -555,7 +575,7 @@ export function CrmDealShortcut({ propertyId, flatType, onToast }) {
 export function SendDealsButtons({ client, actorEmail = "", onToast, sm = false }) {
   if (!client?.phone) return null;
   const send = (deal) => {
-    const url = whatsappUrl(client.phone, dealMessage(deal, client.name));
+    const url = whatsappUrl(client.phone, dealMessage(deal, client.name, client.city));
     if (!url) return;
     window.open(url, "_blank", "noopener");
     logActivity(client.id, { type: "whatsapp", body: deal === "steal" ? "Sent this week's Steal Deals" : "Sent today's Deal of the Day", actorEmail })

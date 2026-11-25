@@ -24,6 +24,7 @@ import { useLoginModal } from "../context/LoginModalContext";
 import { fetchInventoryByIds, fetchListingById, mapInventoryToListing, takeInlineListing } from "../lib/inventory";
 import { dropPrerender } from "../lib/prerender";
 import { recordFlatView } from "../lib/flatInsights";
+import { chosenCity, setSiteCity } from "../lib/cities";
 
 const T = { ink: "#04211D", text: "#171412", textDim: "#5c554e" };
 
@@ -145,6 +146,10 @@ export default function PropertyPage() {
       .then((rows) => {
         if (!alive) return;
         setListing(mapInventoryToListing((rows || [])[0]) || null);
+        // Someone who came straight to a flat, with no city picked yet, is
+        // looking in that flat's city (lib/cities.js).
+        const flatCity = (rows || [])[0]?.city;
+        if (flatCity && !chosenCity()) setSiteCity(flatCity);
         // Drawn from the copy that came inside the page (api/property-page.js),
         // which the edge may have kept a few minutes: check it is still current.
         if (takeInlineListing(id)) {

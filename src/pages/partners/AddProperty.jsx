@@ -125,7 +125,9 @@ export default function AddProperty() {
 function PostFlat({ onAnother, edit = null }) {
   const navigate = useNavigate();
   const { user } = useAuth();
-  const { groups, reloadInventory } = usePartner();
+  const { groups, reloadInventory, me } = usePartner();
+  // The partner's city (multi_city.sql): every flat they add is in it.
+  const city = me?.city || me?.partner?.city || "Bengaluru";
   const localities = useLocalities();
   const popularAreas = usePopularAreas();
   const [prefs] = useState(readPrefs);
@@ -270,7 +272,7 @@ function PostFlat({ onAnother, edit = null }) {
       let [latitude, longitude] = pin || [null, null];
       if (latitude == null) {
         // A listing the map cannot plot is invisible on moveazy.co.in; the locality centre is better than nothing.
-        const g = await geocodePlace(`${area}, Bengaluru`).catch(() => null);
+        const g = await geocodePlace(`${area}, ${city}`, { city }).catch(() => null);
         if (g?.ok) { latitude = g.lat; longitude = g.lng; }
       }
       const done = photos.filter((p) => p.status === "done");
@@ -284,6 +286,7 @@ function PostFlat({ onAnother, edit = null }) {
       const id = await createPartnerListing({
         propertyId: pid,
         postedBy: "broker",
+        city,
         propertyType: room ? "Shared Room" : "Apartment",
         flatType: type,
         bedrooms: room ? 1 : Math.max(1, Math.floor(bedroomsOf(type) || 1)),
@@ -337,7 +340,7 @@ function PostFlat({ onAnother, edit = null }) {
     try {
       let [latitude, longitude] = pin || [null, null];
       if (latitude == null) {
-        const g = await geocodePlace(`${area}, Bengaluru`).catch(() => null);
+        const g = await geocodePlace(`${area}, ${city}`, { city }).catch(() => null);
         if (g?.ok) { latitude = g.lat; longitude = g.lng; }
       }
       const done = photos.filter((p) => p.status === "done");
@@ -585,7 +588,7 @@ function PostFlat({ onAnother, edit = null }) {
           </p>
           {showMap && !pin && (
             <div style={{ marginTop: 10 }}>
-              <ListingMapPicker height={220} focusQuery={`${area}, Bengaluru`} markerPosition={pin}
+              <ListingMapPicker height={220} focusQuery={`${area}, ${city}`} markerPosition={pin}
                 onMarkerChange={([lat, lng]) => { setPin([lat, lng]); setShowMap(false); }} />
             </div>
           )}

@@ -52,9 +52,11 @@ import { initialCoverFor, keptCover, photosChanged, savedCoverUrl } from "../../
 import { autoDepositHint } from "../../lib/deposit";
 import { moveByKey, useDragReorder } from "../../hooks/useDragReorder";
 import { Btn, C, Chip, Empty, Toast, inr } from "./crmUi";
+import CitySelect from "../../components/city/CitySelect";
+import { normalizeCity } from "../../lib/cities";
 
 const BLANK = {
-  area: "", nearby_areas: [], full_address: "", landmark: "",
+  city: "", area: "", nearby_areas: [], full_address: "", landmark: "",
   latitude: "", longitude: "",
   rent: "", deposit: "", maintenance: "", available_from: "",
   flat_type: "", bedrooms: "", bathrooms: "", floor_number: "", total_floors: "", furnishing: "",
@@ -82,6 +84,7 @@ const HOUSE_RULES = [
 function rowToForm(row) {
   const list = (v) => (Array.isArray(v) ? v : []);
   return {
+    city: normalizeCity(row.city) || "Bengaluru",
     area: row.area ?? "",
     nearby_areas: list(row.nearby_areas),
     full_address: row.full_address ?? "",
@@ -142,9 +145,9 @@ function Column({ title, children }) {
 
 export default function CrmPropertyForm() {
   const crm = useCrm();
-  // The CRM's own list of areas (Areas page; lib/areas.js).
-  const { names: areaNames } = useAreas();
   const { access, user, requirements, reload, inventory } = crm;
+  // A new flat starts in the city the CRM is showing (multi_city.sql).
+  const crmCity = crm.city && crm.city !== "all" ? crm.city : (crm.cityState?.cities?.[0] || "Bengaluru");
   const navigate = useNavigate();
   const { propertyId: editId } = useParams();
   const isEdit = Boolean(editId);
@@ -240,6 +243,9 @@ export default function CrmPropertyForm() {
   };
 
   const set = useCallback((patch) => setF((cur) => ({ ...cur, ...patch })), []);
+  // The flat's city; its areas are that city's (Areas page; lib/areas.js).
+  const flatCity = f.city || crmCity;
+  const { names: areaNames } = useAreas(flatCity);
   const toggle = (key, value) =>
     setF((cur) => {
       const list = cur[key] ?? [];
@@ -345,7 +351,7 @@ export default function CrmPropertyForm() {
   /* ── Import ────────────────────────────────────────────────────────────── */
 
   const runImport = () => {
-    const { fields, found, missing, internal: readInternal } = parseListingText(pasteText);
+    const { fields, found, missing, internal: readInternal } = parseListingText(pasteText, { city: flatCity });
     if (!found.length) {
       setImportInfo({ found: [], missing });
       return showToast("Nothing recognisable in that text — fill it in by hand", "error");
@@ -538,7 +544,7 @@ export default function CrmPropertyForm() {
         poster_name: f.poster_name || "",
         poster_email: user?.email || "",
         phone: f.phone || "",
-        city: "Bengaluru",
+        city: flatCity,
         area: f.area,
         // A flat in Kudlu Gate is also in HSR Extension, so a client asking
         // for the wider area finds it. The area keeps the precise name.
@@ -688,7 +694,7 @@ export default function CrmPropertyForm() {
       setSaving(false);
     }
   }, [canWrite, missingRequired, f, media, user, requirements, reload, isEdit, editId,
-      writeInternal, visitRule, internal, building, buildingOptions, links, reloadBuildingOptions, waId]);
+      writeInternal, visitRule, internal, building, buildingOptions, links, reloadBuildingOptions, waId, flatCity]);
 
   const reviewItems = useMemo(
     () => media.map((m) => ({ key: m.key, src: m.url, isVideo: isVideoItem(m), file: m.file })),
@@ -874,6 +880,11 @@ export default function CrmPropertyForm() {
             <Field label="Source link (optional)" hint="Saved for traceability, not fetched. Session parameters are stripped.">
               <input className="crm-input" value={f.source_url} placeholder="facebook.com/groups/…/posts/…"
                 onChange={(e) => set({ source_url: e.target.value })} />
+            </Field>
+
+            <Field label="City">
+              <CitySelect className="crm-input" value={flatCity} onChange={(c) => set({ city: c, area: "", nearby_areas: [] })}
+                allowed={crm.cityState?.cities} />
             </Field>
 
             <Field label="Locality">

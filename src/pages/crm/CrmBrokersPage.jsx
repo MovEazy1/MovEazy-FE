@@ -14,6 +14,7 @@ import { Suspense, lazy, useCallback, useEffect, useMemo, useState } from "react
 import { Link } from "react-router-dom";
 import { useCrm } from "./CrmShell";
 import CrmPartnersSection from "./CrmPartnersSection";
+import { useCityFilter } from "./crmCityFilter";
 
 // Unions open rarely: their code loads when the chip is tapped.
 const CrmUnionsSection = lazy(() => import("./CrmUnionsSection"));
@@ -135,13 +136,22 @@ function BrokerDirectory() {
     return [...n.entries()].sort((a, b) => b[1] - a[1]).slice(0, 3).map(([a]) => a);
   }, [clients, requirements]);
 
+  // The brokers of the city the CRM is showing: those with a flat there (one
+  // with no flats on record is Bengaluru's, as everyone was before other cities).
+  const cf = useCityFilter();
+  const cityBrokers = useMemo(() => {
+    if (cf.all) return brokers;
+    const flats = new Map();
+    for (const l of links ?? []) (flats.get(l.broker_id) ?? flats.set(l.broker_id, []).get(l.broker_id)).push(l.property_id);
+    return brokers.filter((b) => (flats.get(b.id)?.length ? flats.get(b.id).some(cf.flat) : cf.ok("Bengaluru")));
+  }, [brokers, links, cf]);
   const rows = useMemo(() => {
     const needle = q.trim().toLowerCase();
     const list = needle
-      ? brokers.filter((b) => [b.name, b.agency, b.phone, b.email, b.notes].join(" ").toLowerCase().includes(needle))
-      : brokers;
+      ? cityBrokers.filter((b) => [b.name, b.agency, b.phone, b.email, b.notes].join(" ").toLowerCase().includes(needle))
+      : cityBrokers;
     return sortBrokers(list, stats, sort);
-  }, [brokers, stats, q, sort]);
+  }, [cityBrokers, stats, q, sort]);
 
   const totals = useMemo(() => {
     const t = { flats: 0, active: 0, visits: 0, closures: 0, revenue: 0, received: 0 };

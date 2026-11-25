@@ -54,8 +54,9 @@ export default function CrmBuildingEditor() {
   const { id } = useParams();
   const [params] = useSearchParams();
   const navigate = useNavigate();
-  const { inventory, access, reload } = useCrm();
-  const { names: areaNames } = useAreas();
+  const { inventory, access, reload, city: crmCity, cityState } = useCrm();
+  // The areas of the city the CRM is showing (multi_city.sql).
+  const { names: areaNames } = useAreas(crmCity && crmCity !== "all" ? crmCity : cityState?.cities?.[0]);
   const canEdit = access.has(SCOPES.PROPERTIES_WRITE);
   const isNew = !id;
 

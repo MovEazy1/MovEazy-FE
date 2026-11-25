@@ -14,6 +14,17 @@ import { LandingStyles } from "../landing/landingKit";
 import { SITE_CSS, SiteFooter } from "../home/homeKit";
 import { hasLeadPhone } from "../../lib/leadIntake";
 import { dealFacts, dealShareUrl, dealTrack } from "../../lib/deals";
+import { CitySwitch } from "../../components/city/CityPicker";
+import { cityBySlug, setSiteCity, useSiteCity } from "../../lib/cities";
+
+/** A shared deals link names its city (?city=mumbai): open that one, remembered. Returns the city shown. */
+export function useDealsCity() {
+  useState(() => {
+    const q = new URLSearchParams(window.location.search).get("city");
+    if (q) setSiteCity(cityBySlug(q)?.name || q);
+  });
+  return useSiteCity().city;
+}
 
 /**
  * The number first, before any option (signed-in accounts go straight in).
@@ -86,6 +97,8 @@ export function FindShell({ kicker, title, sub, aside = null, children }) {
             {kicker && <p className="fd-kicker">{kicker}</p>}
             <h1 className="fd-h1">{title}</h1>
             {sub && <p className="fd-sub">{sub}</p>}
+            {/* The city whose deals these are (lib/cities.js). */}
+            <div style={{ marginTop: 12 }}><CitySwitch /></div>
           </div>
           {aside}
         </div>

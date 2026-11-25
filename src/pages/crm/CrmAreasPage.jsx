@@ -10,19 +10,24 @@
  *
  * Only the super admin changes the list; everyone else in the CRM sees it.
  */
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { ArrowDown, ArrowUp, Check, MapPin, Pencil, X } from "lucide-react";
 import { useCrm } from "./CrmShell";
 import { Btn, C, Chip, Empty, Toast } from "./crmUi";
 import { isSuperAdminEmail } from "../../lib/adminScopes";
 import { reorderAreas, saveArea, useAreas } from "../../lib/areas";
+import CitySelect from "../../components/city/CitySelect";
+import { cityLabel } from "../../lib/cities";
 
 const norm = (s) => String(s || "").trim().toLowerCase();
 
 export default function CrmAreasPage() {
-  const { inventory, access } = useCrm();
+  const { inventory, access, city: crmCity, cityState } = useCrm();
   const canEdit = isSuperAdminEmail(access.email);
-  const { rows, chips, loaded } = useAreas();
+  // Each city has its own list (multi_city.sql): the CRM's city, or the one picked here.
+  const [areaCity, setAreaCity] = useState(() => (crmCity && crmCity !== "all" ? crmCity : cityState?.cities?.[0] || "Bengaluru"));
+  useEffect(() => { if (crmCity && crmCity !== "all") setAreaCity(crmCity); }, [crmCity]);
+  const { rows, chips, loaded } = useAreas(areaCity);
   const [tab, setTab] = useState("on");
   const [busy, setBusy] = useState(false);
   const [toast, setToast] = useState(null);
@@ -63,7 +68,7 @@ export default function CrmAreasPage() {
   const add = async () => {
     const name = draft.name.trim();
     if (!name) return;
-    const done = await run(() => saveArea({ name, chip: draft.chip, parent_id: draft.parent_id || null }), `${name} added`);
+    const done = await run(() => saveArea({ city: areaCity, name, chip: draft.chip, parent_id: draft.parent_id || null }), `${name} added to ${cityLabel(areaCity)}`);
     if (done) setDraft({ name: "", parent_id: "", chip: false });
   };
   const move = (k, dir) => {
@@ -83,7 +88,11 @@ export default function CrmAreasPage() {
     <div className="crm-scroll" style={{ flex: 1 }}>
       <div style={{ padding: 20, display: "flex", flexDirection: "column", gap: 16, maxWidth: 1000 }}>
         <div>
-          <h1 style={{ fontSize: 21, fontWeight: 800, margin: "0 0 6px" }}>Areas</h1>
+          <h1 style={{ fontSize: 21, fontWeight: 800, margin: "0 0 6px", display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap" }}>
+            Areas in
+            <CitySelect className="crm-input" style={{ width: "auto", fontSize: 15, fontWeight: 700 }} value={areaCity}
+              onChange={setAreaCity} allowed={cityState?.cities} label="Which city's areas" />
+          </h1>
           <p style={{ color: C.textDim, fontSize: 13.5, margin: 0, maxWidth: "70ch", lineHeight: 1.6 }}>
             The one list every area picker shows: tenants choosing where they want to live, owners and partners
             listing a flat, the society app and the CRM's own forms. Nobody can type an area that isn't here.

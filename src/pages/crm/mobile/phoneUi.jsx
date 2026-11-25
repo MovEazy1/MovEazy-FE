@@ -13,6 +13,7 @@ import { PHONE_QUERY, isPhoneNow } from "./phoneQuery";
 // The official wordmark drawn for light grounds: the bar is white, and
 // /logo-moveazy-bar.png carries a black plate that showed as a box on it.
 import logoOnLight from "../../../assets/logo/moveazy-logo-mint-light.png";
+import { CrmCityPicker } from "../CrmCity";
 
 export { PHONE_QUERY, isPhoneNow };
 
@@ -50,6 +51,8 @@ export function PhoneTopBar({ onRefresh, refreshing }) {
         <button type="button" className="crm-ph-icon" onClick={back} aria-label="Back"><ChevronLeft size={22} /></button>
       )}
       <h1>{sec?.label === "Home" ? "CRM" : sec?.label || "CRM"}</h1>
+      {/* Which city the CRM shows (CrmCity.jsx). */}
+      <CrmCityPicker />
       {onRefresh && (
         <button type="button" className="crm-ph-icon" onClick={onRefresh} aria-label="Refresh" disabled={refreshing}>
           <RefreshCw size={18} className={refreshing ? "crm-ph-spin" : ""} />

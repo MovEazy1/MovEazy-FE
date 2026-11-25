@@ -2,6 +2,7 @@ import { isFirebaseConfigured } from "./firebase";
 import { getListingsData, isListingPubliclyVisible } from "./firestoreStore";
 import { fetchInventoryAsListings } from "./inventory";
 import { fetchPartnerFlatIds } from "./websiteLeads";
+import { searchCities } from "./cities";
 
 /**
  * The static/verified feed + user-uploaded inventory (Supabase), merged so
@@ -10,10 +11,12 @@ import { fetchPartnerFlatIds } from "./websiteLeads";
  * with the same id. Shared by the map and the top-matches swipe deck so
  * there's one listing pool, not two that can drift apart.
  */
-export async function fetchAllListings({ limit = 500, bhk = null, maxRent = null } = {}) {
+export async function fetchAllListings({ limit = 500, bhk = null, maxRent = null, cities = searchCities() } = {}) {
+  // The old static feed is Bengaluru's only.
+  const staticToo = isFirebaseConfigured && (!cities || cities.includes("Bengaluru"));
   const [staticRows, inventoryRows, partnerIds] = await Promise.all([
-    isFirebaseConfigured ? getListingsData({ limitCount: limit, bhk, maxRent }) : Promise.resolve([]),
-    fetchInventoryAsListings({ limit }).catch(() => []),
+    staticToo ? getListingsData({ limitCount: limit, bhk, maxRent }) : Promise.resolve([]),
+    fetchInventoryAsListings({ limit, cities }).catch(() => []),
     fetchPartnerFlatIds(),
   ]);
   const feed = staticRows.filter(isListingPubliclyVisible);

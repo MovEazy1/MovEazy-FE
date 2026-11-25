@@ -10,8 +10,27 @@ import { useCallback, useEffect, useState } from "react";
 import { useCrm } from "./CrmShell";
 import {
   ASSIGNABLE_ROLES, SCOPE_LABELS, fetchAdminRoster, grantAdminRole,
-  isSuperAdminEmail, revokeAdminRole, roleLabel, scopesForRole,
+  isSuperAdminEmail, revokeAdminRole, roleLabel, scopesForRole, setAdminCities,
 } from "../../lib/adminScopes";
+import { CITIES } from "../../lib/cities";
+import { cityCode } from "./CrmCity";
+
+/** Which cities a teammate works: none ticked = every city (multi_city.sql). */
+function CityTicks({ value = [], onChange, disabled }) {
+  const on = new Set(value);
+  return (
+    <div style={{ display: "flex", gap: 4, flexWrap: "wrap" }}>
+      {CITIES.map((c) => (
+        <button key={c.name} type="button" disabled={disabled} title={c.label}
+          onClick={() => onChange(on.has(c.name) ? value.filter((x) => x !== c.name) : [...value, c.name])}
+          className={on.has(c.name) ? "crm-chip crm-chip--on" : "crm-chip"} style={{ padding: "3px 7px", fontSize: 11 }}>
+          {cityCode(c.name)}
+        </button>
+      ))}
+      <span className="crm-mute" style={{ fontSize: 11, alignSelf: "center" }}>{value.length ? "" : "every city"}</span>
+    </div>
+  );
+}
 import { Btn, C, Empty, Loading, Toast, shortDate } from "./crmUi";
 
 export default function CrmTeamPage() {
@@ -20,6 +39,7 @@ export default function CrmTeamPage() {
   const [email, setEmail] = useState("");
   const [role, setRole] = useState(ASSIGNABLE_ROLES[0]?.id ?? "crm_manager");
   const [notes, setNotes] = useState("");
+  const [cities, setCities] = useState([]);
   const [busy, setBusy] = useState(false);
   const [toast, setToast] = useState(null);
 
@@ -46,15 +66,27 @@ export default function CrmTeamPage() {
     e.preventDefault();
     setBusy(true);
     try {
-      await grantAdminRole(email, role, notes);
+      await grantAdminRole(email, role, notes, cities);
       setEmail("");
       setNotes("");
+      setCities([]);
       load();
       showToast("Access granted — live on their next sign-in");
     } catch (err) {
       showToast(err?.message || "Could not grant access", "error");
     } finally {
       setBusy(false);
+    }
+  };
+
+  const saveCities = async (rowEmail, next) => {
+    setRows((cur) => cur.map((r) => (r.email === rowEmail ? { ...r, cities: next } : r)));
+    try {
+      await setAdminCities(rowEmail, next);
+      showToast(next.length ? `Now works ${next.length === 1 ? "1 city" : `${next.length} cities`} — on their next sign-in` : "Now works every city");
+    } catch (err) {
+      showToast(err?.message || "Could not save the cities", "error");
+      load();
     }
   };
 
@@ -93,6 +125,10 @@ export default function CrmTeamPage() {
           </div>
           <input className="crm-input" placeholder="Note (optional) — who they are, why"
             value={notes} onChange={(e) => setNotes(e.target.value)} />
+          <div>
+            <span className="crm-mute" style={{ fontSize: 11.5, display: "block", marginBottom: 4 }}>Cities they work (none ticked = every city)</span>
+            <CityTicks value={cities} onChange={setCities} disabled={busy} />
+          </div>
           <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
             <Btn variant="primary" type="submit" disabled={busy}>Grant access</Btn>
             <span className="crm-mute" style={{ fontSize: 11.5 }}>
@@ -111,13 +147,17 @@ export default function CrmTeamPage() {
             ) : (
               <table className="crm-table">
                 <thead>
-                  <tr><th>Email</th><th>Role</th><th>Added</th><th>Note</th><th /></tr>
+                  <tr><th>Email</th><th>Role</th><th title="Clients of other cities are hidden from them">Cities</th><th>Added</th><th>Note</th><th /></tr>
                 </thead>
                 <tbody>
                   {rows.map((r) => (
                     <tr key={r.email}>
                       <td>{r.email}</td>
                       <td>{roleLabel(r.role)}</td>
+                      <td>
+                        {isSuperAdminEmail(r.email) ? <span className="crm-mute" style={{ fontSize: 11 }}>every city</span>
+                          : <CityTicks value={r.cities ?? []} onChange={(next) => saveCities(r.email, next)} disabled={busy} />}
+                      </td>
                       <td className="crm-mute crm-num">{shortDate(r.created_at)}</td>
                       <td className="crm-mute">{r.notes || "—"}</td>
                       <td>

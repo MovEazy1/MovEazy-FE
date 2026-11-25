@@ -12,11 +12,14 @@ import { isPhoneNow } from "./pages/crm/mobile/phoneQuery";
 import { hasStoredSession } from "./lib/supabase";
 import { RouteHandOff } from "./lib/prerender";
 import { VIEW_AS_EVENT, VIEW_AS_PATH, isViewingAs } from "./lib/viewAsState";
+import { CITIES, cityBySlug, setSiteCity, useSiteCity } from "./lib/cities";
 
 // Lazy like every page: the tenant home pulls in the map, the swipe deck and
 // the landing kit, and the CRM, owner and partner apps were downloading all of
 // it before their own code could even start.
 const ForkHome = lazy(() => import("./pages/ForkHome"));
+// "Which city are you searching in?" — loaded only for a first visit to a page that lists flats.
+const CityPrompt = lazy(() => import("./components/city/CityPicker").then((m) => ({ default: m.CityPrompt })));
 // The super admin's "view as a user" portal and the bar shown while doing it.
 const SuperAdminViewAs = lazy(() => import("./pages/SuperAdminViewAs"));
 const ViewAsBanner = lazy(() => import("./components/ViewAsBanner"));
@@ -253,6 +256,7 @@ function SessionTrackerComponent() {
       <RequirePhoneModal />
       <ClaimEarlierViews />
       <AppRoutes />
+      <CityPromptSlot />
       <TenantVisitBubbleSlot />
       <ViewAsBannerSlot />
     </>
@@ -270,6 +274,22 @@ function TenantVisitBubbleSlot() {
   if (/^\/(crm|partners|owners|society|admin)(\/|$)/.test(pathname)) return null;
   return <Suspense fallback={null}><TenantVisitBubble /></Suspense>;
 }
+
+/** A first visit to a page that lists flats asks which city (components/city/CityPicker.jsx). */
+function CityPromptSlot() {
+  const { pathname } = useLocation();
+  const { chosen } = useSiteCity();
+  if (chosen || IS_OWNER_HOST || IS_SOCIETY_HOST || IS_PARTNER_HOST) return null;
+  if (!/^\/(tenant|find(\/[^/]*)?|matches|map)?\/?$/.test(pathname)) return null;
+  return <Suspense fallback={null}><CityPrompt /></Suspense>;
+}
+
+/** /bangalore, /mumbai…: the home page for that city, remembered on this device. */
+function CityHome({ slug }) {
+  useState(() => setSiteCity(cityBySlug(slug)?.name));
+  return IS_TENANT_HOST ? <ForkHome tenantEntry /> : <ForkHome />;
+}
+const CITY_ALIASES = { bengaluru: "bangalore", gurgaon: "gurugram", "new-delhi": "delhi", bombay: "mumbai" };
 
 /** Loads the view-as bar only while the super admin is viewing as someone. */
 function ViewAsBannerSlot() {
@@ -323,6 +343,8 @@ function AppRoutes() {
       <Routes>
         <Route path="/" element={IS_TENANT_HOST ? <ForkHome tenantEntry /> : <ForkHome />} />
         <Route path="/tenant" element={<ForkHome tenantEntry />} />
+        {CITIES.map((c) => <Route key={c.slug} path={`/${c.slug}`} element={<CityHome slug={c.slug} />} />)}
+        {Object.entries(CITY_ALIASES).map(([alias, slug]) => <Route key={alias} path={`/${alias}`} element={<Navigate to={`/${slug}`} replace />} />)}
         <Route path="/partners/*" element={<PartnerApp />} />
         <Route path="/society/*" element={<SocietyApp />} />
         {/* Explore societies (MovEazy Society's flats), live once the CRM switches it on. */}

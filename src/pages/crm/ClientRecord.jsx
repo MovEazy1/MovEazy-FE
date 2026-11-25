@@ -8,7 +8,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import {
   STATUSES, TEMPERATURES, CLOSED_STATUSES, fetchActivities, logActivity,
-  setClientNote, setClientStatus, setClientTemperature, setLeadType, leadTypeOf, LEAD_TYPES,
+  setClientNote, setClientStatus, setClientTemperature, setLeadType, leadTypeOf, LEAD_TYPES, setClientCity,
 } from "../../lib/crmClients";
 import { buildTemplateVars, renderTemplate, whatsappUrl } from "../../lib/crmSettings";
 import { CURATED_STATUS_LABEL } from "../../lib/curatedShares";
@@ -22,6 +22,7 @@ import { FollowUpActions } from "./FollowUpControls";
 import PropertyQuickView from "./PropertyQuickView";
 import { ClientBrokerActivity, ClientTenantViews } from "./CrmTenantViews";
 import { SendDealsButtons } from "./CrmDealsPage";
+import CitySelect from "../../components/city/CitySelect";
 
 /* ── Small pieces ─────────────────────────────────────────────────────────── */
 
@@ -414,7 +415,7 @@ function RequirementSummary({ req }) {
  * for changing a requirement and the wrong one for reading it, so reading is now
  * the default and editing is a click.
  */
-function RequirementCard({ req, isOverride, canEdit, onChange, onReset, inferred, office }) {
+function RequirementCard({ req, isOverride, canEdit, onChange, onReset, inferred, office, city }) {
   const [editing, setEditing] = useState(false);
   const known = hasRequirement(req);
 
@@ -485,7 +486,7 @@ function RequirementCard({ req, isOverride, canEdit, onChange, onReset, inferred
         </div>
       )}
 
-      {editing && <RequirementFields req={req} canEdit={canEdit} onChange={onChange} office={office} />}
+      {editing && <RequirementFields req={req} canEdit={canEdit} onChange={onChange} office={office} city={city} />}
     </div>
   );
 }
@@ -731,6 +732,20 @@ export default function ClientRecord({
 
         <PriorityControl client={client} onToast={onToast} />
 
+        {/* The city they search in (moving them is logged), and where they are now. */}
+        <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap", fontSize: 12.5 }}>
+          <span className="crm-label" style={{ margin: 0 }}>Searching in</span>
+          <CitySelect className="crm-input" style={{ width: "auto", padding: "3px 8px", fontSize: 12.5 }} value={client.city || "Bengaluru"}
+            disabled={!canWrite || busy} label="The city they search in"
+            onChange={async (c) => {
+              if (!window.confirm(`Move ${client.name || "this client"} to ${c}? They'll show under ${c} from now on.`)) return;
+              try { await setClientCity(client.id, c); onPatch({ ...client, city: c }); onToast?.(`Moved to ${c}`); refreshActivities(); }
+              catch (e) { onToast?.(e?.message || "Couldn't move them", "error"); }
+            }} />
+          {client.current_city && client.current_city !== (client.city || "Bengaluru") && (
+            <span className="crm-mute">· currently in <b style={{ color: C.text }}>{client.current_city}</b></span>
+          )}
+        </div>
         <HeaderFacts req={requirement} ownAnswers={ownAnswers} inferred={inferred} />
         {client.phone && (
           <span className="crm-mute crm-num" style={{ fontSize: 10.5, marginTop: -10 }}>
@@ -809,7 +824,7 @@ export default function ClientRecord({
           )}
         </div>
 
-        <RequirementCard req={requirement} isOverride={isOverride} canEdit={canEditReq}
+        <RequirementCard req={requirement} isOverride={isOverride} canEdit={canEditReq} city={client.city}
           onChange={onRequirementChange} onReset={onRequirementReset} inferred={inferred} office={ownAnswers?.office} />
 
         <WhatTheyToldUs ownAnswers={ownAnswers} />

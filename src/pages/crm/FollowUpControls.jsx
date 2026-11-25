@@ -13,6 +13,7 @@
  * Saving patches the shell's copy of the client, so every list shows it at once.
  */
 import { useEffect, useMemo, useState } from "react";
+import { useCityFilter } from "./crmCityFilter";
 import { CalendarClock, MessageCircle, UserPlus, X } from "lucide-react";
 import { useCrm } from "./CrmShell";
 import { Btn, C, Chip } from "./crmUi";
@@ -189,13 +190,16 @@ export function AssignPartnerSheet({ client, areas = [], defaultReplace = false,
   const has = useMemo(() => new Set(current.map((b) => b.broker_id)), [current]);
   // "HSR" takes in HSR Layout, Kudlu Gate… (the CRM's area list).
   const wanted = useMemo(() => new Set(expandAreas(areas).map(norm)), [areas]);
+  // Only partners of the city the client searches in (multi_city.sql: the database refuses the rest).
+  const cf = useCityFilter();
   const list = useMemo(() => {
     const needle = norm(q);
     return (partners ?? [])
+      .filter((p) => cf.ofPartner(p.broker_id) === (client.city || "Bengaluru"))
       .map((p) => ({ ...p, fits: (p.areas ?? []).filter((a) => wanted.has(norm(a))) }))
       .filter((p) => !needle || norm(p.name).includes(needle) || norm(p.agency).includes(needle) || (p.areas ?? []).some((a) => norm(a).includes(needle)))
       .sort((a, b) => (b.fits.length > 0) - (a.fits.length > 0) || a.open - b.open || a.name.localeCompare(b.name));
-  }, [partners, q, wanted]);
+  }, [partners, q, wanted, cf, client.city]);
 
   const toggle = (id) => setPicked((cur) => { const n = new Set(cur); if (n.has(id)) n.delete(id); else n.add(id); return n; });
   const others = current.filter((b) => b.status !== "closed");

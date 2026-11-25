@@ -9,7 +9,12 @@
  */
 import { useEffect, useState } from "react";
 import { Btn, C, shortDate } from "./crmUi";
-import { adminSaveProgramSettings, fetchLandingSettings } from "../../lib/landingSettings";
+import { adminSaveProgramSettings, fetchCitySettings, fetchLandingSettings } from "../../lib/landingSettings";
+import CitySelect from "../../components/city/CitySelect";
+import { cityLabel } from "../../lib/cities";
+
+/** Per city (multi_city.sql): the rest is one for every city. */
+const PER_CITY = new Set(["premiumPrice", "propertyShare", "clientShare"]);
 import { PlanRewards } from "./CrmPremiumPayments";
 
 const GROUPS = [
@@ -42,16 +47,19 @@ export default function CrmProgramSettings({ canManage, onToast, onSaved }) {
   const [saved, setSaved] = useState(null);
   const [draft, setDraft] = useState({});
   const [busy, setBusy] = useState(false);
+  // Whose Premium price and brokerage shares are shown and saved.
+  const [city, setCity] = useState("Bengaluru");
 
   useEffect(() => {
-    fetchLandingSettings({ fresh: true }).then((s) => { setSaved(s); setDraft(s); });
-  }, []);
+    setSaved(null);
+    (city === "Bengaluru" ? fetchLandingSettings({ fresh: true }) : fetchCitySettings(city)).then((s) => { setSaved(s); setDraft(s); });
+  }, [city]);
 
   if (!saved) return <div className="crm-mute" style={{ padding: 12, fontSize: 12 }}>Loading settings…</div>;
 
   const changed = Object.keys(draft).filter((k) => String(draft[k] ?? "") !== String(saved[k] ?? ""));
   const save = async () => {
-    const patch = {};
+    const patch = { city };
     for (const [, fields] of GROUPS) {
       for (const [k, , kind] of fields) {
         if (!changed.includes(k)) continue;
@@ -80,6 +88,11 @@ export default function CrmProgramSettings({ canManage, onToast, onSaved }) {
 
   return (
     <div style={{ display: "grid", gap: 14 }}>
+      <label style={{ display: "flex", alignItems: "center", gap: 8, fontSize: 12.5 }}>
+        <span className="crm-mute">Premium price and brokerage shares for</span>
+        <CitySelect className="crm-input" style={{ width: "auto" }} value={city} onChange={(c) => { if (!changed.length || window.confirm("Discard the unsaved changes?")) setCity(c); }} />
+        <span className="crm-mute" style={{ fontSize: 11.5 }}>(fields marked {cityLabel(city)} are this city's; the rest apply to every city)</span>
+      </label>
       <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(260px, 1fr))", gap: 14 }}>
         {GROUPS.map(([title, fields]) => (
           <div key={title} style={{ border: `1px solid ${C.line}`, borderRadius: 10, padding: 12, background: C.bg }}>
@@ -87,7 +100,9 @@ export default function CrmProgramSettings({ canManage, onToast, onSaved }) {
             <div style={{ display: "grid", gap: 8 }}>
               {fields.map(([k, label, kind]) => (
                 <label key={k} style={{ display: "grid", gap: 3 }}>
-                  <span className="crm-mute" style={{ fontSize: 11.5 }}>{label}</span>
+                  <span className="crm-mute" style={{ fontSize: 11.5 }}>
+                    {label}{PER_CITY.has(k) && <b style={{ color: C.accent, marginLeft: 4 }}>· {cityLabel(city)}</b>}
+                  </span>
                   <input className="crm-input" inputMode={kind === "num" ? "decimal" : undefined} disabled={!canManage || busy}
                     value={draft[k] ?? ""} onChange={(e) => setDraft((d) => ({ ...d, [k]: e.target.value }))}
                     style={changed.includes(k) ? { borderColor: C.gold } : undefined} />

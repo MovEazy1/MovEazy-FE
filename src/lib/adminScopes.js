@@ -133,13 +133,28 @@ export async function fetchAdminRoster() {
   if (!isSupabaseConfigured || !supabase) return [];
   const { data, error } = await supabase
     .from("admin_roles")
-    .select("email, role, scopes, notes, created_at")
+    .select("email, role, scopes, notes, created_at, cities")
     .order("created_at", { ascending: true });
+  if (error && /cities/.test(error.message || "")) {
+    // Before multi_city.sql: no cities yet.
+    const again = await supabase.from("admin_roles").select("email, role, scopes, notes, created_at").order("created_at", { ascending: true });
+    if (again.error) throw again.error;
+    return again.data ?? [];
+  }
   if (error) throw error;
   return data ?? [];
 }
 
-export async function grantAdminRole(email, roleId, notes = "") {
+/** Which cities a teammate works (multi_city.sql); [] = every city. Super admin only (the admin_roles policy). */
+export async function setAdminCities(email, cities) {
+  const normalized = normalizeAdminEmail(email);
+  if (!isSupabaseConfigured || !supabase) throw new Error("Supabase is not configured.");
+  const { error } = await supabase.from("admin_roles").update({ cities, updated_at: new Date().toISOString() }).ilike("email", normalized);
+  if (error) throw error;
+  invalidateAdminRoleCache();
+}
+
+export async function grantAdminRole(email, roleId, notes = "", cities = null) {
   const normalized = normalizeAdminEmail(email);
   if (!normalized || !normalized.includes("@")) throw new Error("Enter a valid email address.");
   if (!ROLE_DEFINITIONS[roleId]?.assignable) throw new Error("That role can't be assigned.");
@@ -153,6 +168,7 @@ export async function grantAdminRole(email, roleId, notes = "") {
         role: roleId,
         scopes: scopesForRole(roleId),
         notes: String(notes || "").trim().slice(0, 240),
+        ...(Array.isArray(cities) ? { cities } : {}),
         updated_at: new Date().toISOString(),
       },
       { onConflict: "email" },

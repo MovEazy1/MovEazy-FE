@@ -65,21 +65,44 @@ async function loadLandingSettings() {
   }
 }
 
-/** CRM only (partners.manage): save any subset, keyed as above. Returns the new settings. */
+/**
+ * CRM only (partners.manage): save any subset, keyed as above. With `city`,
+ * the price and shares are that city's. Returns that city's settings.
+ */
 export async function adminSaveProgramSettings(patch) {
   if (!isSupabaseConfigured || !supabase) throw new Error("Supabase is not configured.");
   const { data, error } = await supabase.rpc("admin_set_program_settings", { p: patch });
   if (error) throw error;
-  cached = merge(data || {});
-  return cached;
+  const out = merge(data || {});
+  if (!patch?.city || patch.city === "Bengaluru") cached = out;
+  else byCity.set(patch.city, Promise.resolve(out));
+  return out;
 }
 
-export function useLandingSettings() {
+/* Premium price and brokerage shares are per city (multi_city.sql); the rest is one. */
+const byCity = new Map();
+/** One city's settings (its price and shares, everything else shared). Bengaluru's is the plain call above. */
+export function fetchCitySettings(city) {
+  const c = String(city || "");
+  if (!c || c === "Bengaluru") return fetchLandingSettings();
+  if (!byCity.has(c)) {
+    byCity.set(c, (async () => {
+      if (!isSupabaseConfigured || !supabasePublic) return LANDING_DEFAULTS;
+      const { data, error } = await supabasePublic.rpc("landing_settings", { p_city: c });
+      if (error || !data || typeof data !== "object") { byCity.delete(c); return fetchLandingSettings(); }
+      return merge(data);
+    })());
+  }
+  return byCity.get(c);
+}
+
+/** The settings; with a city, that city's price and shares (a broker's own city). */
+export function useLandingSettings(city) {
   const [s, setS] = useState(cached || (saved ? { ...LANDING_DEFAULTS, ...saved } : LANDING_DEFAULTS));
   useEffect(() => {
     let alive = true;
-    fetchLandingSettings().then((v) => { if (alive) setS(v); });
+    fetchCitySettings(city).then((v) => { if (alive) setS(v); });
     return () => { alive = false; };
-  }, []);
+  }, [city]);
   return s;
 }

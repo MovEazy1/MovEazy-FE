@@ -81,7 +81,8 @@ const CONFETTI = Array.from({ length: 36 }, (_, i) => ({
 export function WelcomePremium() {
   const navigate = useNavigate();
   const { me, status, reloadStatus } = usePartner();
-  const s = useLandingSettings();
+  // The price and shares of the partner's own city (multi_city.sql).
+  const s = useLandingSettings(me?.city || me?.partner?.city);
   const [plans, setPlans] = useState([]);
   const [ref, setRef] = useState(null);
   // Seen: saved, then the app's status refreshed so it stops asking for this page.

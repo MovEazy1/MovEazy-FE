@@ -29,6 +29,7 @@ import { MOVEAZY_TEAM_WHATSAPP } from "../config/contactChannels";
 import { fetchMyCuratedProperties } from "../lib/curatedShares";
 import ExploreSocietiesCard from "./societies/ExploreSocietiesCard";
 import { dropPrerender } from "../lib/prerender";
+import { chosenCity, setSiteCity, useSiteCity } from "../lib/cities";
 
 const TOP_N = 5;
 const T = { ink: "#04211D", teal: "#0E7C68", gold: "#E8A33D", text: "#171412", textDim: "#5c554e" };
@@ -318,6 +319,9 @@ export default function TopMatches() {
       .then((row) => {
         if (!alive || !row) return;
         if (!prefs) setPrefs(rowToPrefs(row));
+        // Their saved search names its city: show that city, unless they have
+        // picked one on this device since.
+        if (row.city && !chosenCity()) setSiteCity(row.city);
         // They have been through the five already. Dealing them again is a
         // worse answer than the true one: we are still looking, and the
         // shortlist lands when it lands.
@@ -352,13 +356,17 @@ export default function TopMatches() {
     return () => { alive = false; };
   }, [user?.uid]);
 
+  // The city they are searching in (lib/cities.js): its flats, again when it changes.
+  const { cities } = useSiteCity();
+  const cityKey = cities.join(",");
   useEffect(() => {
     let alive = true;
-    fetchAllListings({ limit: 500 })
+    setListingsLoading(true);
+    fetchAllListings({ limit: 500, cities: cityKey.split(",") })
       .then((rows) => { if (alive) setListings(rows); })
       .finally(() => { if (alive) setListingsLoading(false); });
     return () => { alive = false; };
-  }, []);
+  }, [cityKey]);
 
   /**
    * The five, actually ranked.

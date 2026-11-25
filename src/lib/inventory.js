@@ -1,6 +1,8 @@
 import { supabase, supabasePublic, isSupabaseConfigured } from "./supabase";
 import { coverMedia, coverPhoto, isVideoFile, isVideoUrl, orderListingMedia } from "./listingMedia";
 import { withParentArea } from "../data/preferenceOptions";
+import { normalizeCity, searchCities, siteCity } from "./cities";
+import { cityOfArea } from "./areas";
 import { STORAGE_LIMIT_BYTES, VIDEO_TARGET_BYTES, shrinkVideo } from "./videoShrink";
 import { MAIN_MAX, THUMB_MAX, jpegName, shrinkImage, thumbPath, thumbUrl } from "./imageShrink";
 
@@ -164,7 +166,9 @@ export function buildInventoryRow(draft, poster) {
     poster_email: String(poster?.email || "").toLowerCase().trim(),
     phone: String(draft.phone || "").trim().slice(0, 20),
 
-    city: "Bengaluru",
+    // The form's city; else its area's; else the city the site is on. The
+    // database sets it from the area again (inventory_city_fill).
+    city: normalizeCity(draft.city) || cityOfArea(draft.area, draft.city) || siteCity(),
     area: String(draft.area || "").trim(),
     // Listing "Kudlu Gate" also means the flat is in HSR Extension. The area
     // itself keeps the precise name — a renter should still read Kudlu Gate.
@@ -342,27 +346,34 @@ export const fullInventory = (columns = "*", options) => supabase.rpc("inventory
 const SHOWCASE_COLS =
   "property_id, posted_by, area, nearby_areas, latitude, longitude, rent, deposit, maintenance, available_from, " +
   "flat_type, bedrooms, furnishing, occupants_allowed, amenities, floor_number, title, images, cover_image_url, status, created_at";
-let showcase = null;
-export function fetchShowcaseInventory() {
+/** Only the city being searched (plus the other NCR cities when ticked) — lib/cities.js. null = every city. */
+const inCities = (q, cities) => (cities?.length ? (cities.length === 1 ? q.eq("city", cities[0]) : q.in("city", cities)) : q);
+
+const showcases = new Map();
+export function fetchShowcaseInventory({ cities = searchCities() } = {}) {
   if (!isSupabaseConfigured || !supabasePublic) return Promise.resolve([]);
-  showcase ??= selectTolerantly(
-    "inventory",
-    SHOWCASE_COLS,
-    (q) => q.eq("status", "published").order("created_at", { ascending: false }).limit(80),
-    supabasePublic,
-  ).then(
-    ({ data, error }) => (error ? [] : (data || []).map(mapInventoryToListing).filter((l) => l && Number.isFinite(l.lat) && Number.isFinite(l.lng))),
-    () => [],
-  ).then((rows) => { if (!rows.length) showcase = null; return rows; });
-  return showcase;
+  const key = (cities || []).join(",");
+  if (!showcases.has(key)) {
+    showcases.set(key, selectTolerantly(
+      "inventory",
+      SHOWCASE_COLS,
+      (q) => inCities(q.eq("status", "published"), cities).order("created_at", { ascending: false }).limit(80),
+      supabasePublic,
+    ).then(
+      ({ data, error }) => (error ? [] : (data || []).map(mapInventoryToListing).filter((l) => l && Number.isFinite(l.lat) && Number.isFinite(l.lng))),
+      () => [],
+    ).then((rows) => { if (!rows.length) showcases.delete(key); return rows; }));
+  }
+  return showcases.get(key);
 }
 
-export async function fetchPublishedInventory({ limit = 500 } = {}) {
+/** Live flats, newest first: the city being searched unless `cities` says otherwise (null: every city — staff tools). */
+export async function fetchPublishedInventory({ limit = 500, cities = searchCities() } = {}) {
   if (!isSupabaseConfigured || !supabase) return [];
   const { data, error } = await selectTolerantly(
     "inventory",
     PUBLIC_INVENTORY_COLS,
-    (q) => q.eq("status", "published").order("created_at", { ascending: false }).limit(limit),
+    (q) => inCities(q.eq("status", "published"), cities).order("created_at", { ascending: false }).limit(limit),
   );
   if (error) return [];
   return data || [];
@@ -518,7 +529,8 @@ export function mapInventoryToListing(row) {
     bhk: String(row.flat_type || "").trim(),
     monthlyRent: rent,
     price: rent ? `₹${rent.toLocaleString("en-IN")}/mo` : "",
-    title: String(row.title || "").trim() || `${row.flat_type || "Home"} in ${row.area || "Bengaluru"}`,
+    title: String(row.title || "").trim() || `${row.flat_type || "Home"} in ${row.area || row.city || "Bengaluru"}`,
+    city: normalizeCity(row.city) || "",
     address,
     location: String(row.area || "").trim(),
     seller: String(row.poster_name || "MovEazy").trim(),

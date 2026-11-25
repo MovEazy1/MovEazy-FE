@@ -10,7 +10,7 @@ import { Camera, Check, Loader2, RotateCw, X } from "lucide-react";
 import { useOwner } from "./OwnerApp";
 import { Chip, Empty, Loading, TopBar, toast } from "./ownerUi";
 import ListingMapPicker from "../../components/ListingMapPicker";
-import { useAreas, withCurrent } from "../../lib/areas";
+import { cityOfArea, useAreas, withCurrent } from "../../lib/areas";
 import { mediaRejectionReason, uploadInventoryPhotos } from "../../lib/inventory";
 import { geocodePlace } from "../../lib/geocode";
 import { saveBuilding } from "../../lib/buildings";
@@ -18,6 +18,8 @@ import { friendlyError, op } from "../../lib/owners";
 import { moveByKey, useDragReorder } from "../../hooks/useDragReorder";
 import PhotoReview from "../../components/PhotoReview";
 import { initialCoverFor, keptCover, photosChanged, savedCoverUrl, splitCover, withCover } from "../../lib/photoReview";
+import CitySelect from "../../components/city/CitySelect";
+import { normalizeCity, siteCity } from "../../lib/cities";
 
 export const BUILDING_AMENITIES = [
   "Lift", "Power backup", "Car parking", "Bike parking", "24×7 security", "CCTV", "Gated", "Water 24×7",
@@ -35,10 +37,11 @@ export default function BuildingForm() {
 
 function BuildingFormInner({ existing }) {
   const navigate = useNavigate();
-  const { names: areaNames } = useAreas();
   const { reloadBuildings } = useOwner();
   const [f, setF] = useState(() => ({
     name: existing?.name || "",
+    // The building's city (lib/cities.js); the Locality list is that city's.
+    city: normalizeCity(existing?.city) || cityOfArea(existing?.area) || siteCity(),
     area: existing?.area || "",
     landmark: existing?.landmark || "",
     fullAddress: existing?.full_address || "",
@@ -49,6 +52,7 @@ function BuildingFormInner({ existing }) {
     description: existing?.description || "",
     coverVideo: existing?.cover_video || "",
   }));
+  const { names: areaNames } = useAreas(f.city);
   const [videoBusy, setVideoBusy] = useState(false);
   // Each photo: { key, url (once uploaded), preview, state: 'up' | 'ok' | 'err', file }
   // A framed cover rides as photos[0]; it is edited on the review screen, not in the grid.
@@ -111,7 +115,7 @@ function BuildingFormInner({ existing }) {
       }
       const r = await saveBuilding({
         ...(existing ? { id: existing.id } : {}),
-        name: f.name.trim(), area: f.area.trim(), landmark: f.landmark.trim(), full_address: f.fullAddress.trim(),
+        name: f.name.trim(), city: f.city, area: f.area.trim(), landmark: f.landmark.trim(), full_address: f.fullAddress.trim(),
         latitude: latitude ?? "", longitude: longitude ?? "", total_floors: f.totalFloors,
         amenities: f.amenities, description: f.description.trim(),
         photos: await (async () => {
@@ -150,6 +154,10 @@ function BuildingFormInner({ existing }) {
             <input id="bf-name" className="oz-input" placeholder="Sunrise Residency" value={f.name} onChange={(e) => set({ name: e.target.value.slice(0, 80) })} />
             {err("name")}
           </div>
+          <div className="oz-field">
+            <label className="oz-label" htmlFor="bf-city">City</label>
+            <CitySelect id="bf-city" className="oz-select" value={f.city} onChange={(c) => set({ city: c, area: "" })} />
+          </div>
           <div className="oz-grid2">
             <div className="oz-field">
               <label className="oz-label" htmlFor="bf-area">Locality</label>
@@ -170,7 +178,7 @@ function BuildingFormInner({ existing }) {
             <label className="oz-label" htmlFor="bf-landmark">Landmark <span className="oz-hint">(shown to tenants)</span></label>
             <input id="bf-landmark" className="oz-input" placeholder="Near Agara Lake" value={f.landmark} onChange={(e) => set({ landmark: e.target.value.slice(0, 160) })} />
           </div>
-          <ListingMapPicker height={160} focusQuery={f.area ? `${f.area}, Bengaluru` : ""} markerPosition={pin}
+          <ListingMapPicker height={160} focusQuery={f.area ? `${f.area}, ${f.city}` : ""} markerPosition={pin}
             onMarkerChange={([lat, lng]) => set({ latitude: lat, longitude: lng })} />
           <div className="oz-field" style={{ marginTop: 12, marginBottom: 0 }}>
             <label className="oz-label" htmlFor="bf-addr">Full address <span className="oz-hint">(never on the QR page — the partner shares it after confirming a visit)</span></label>

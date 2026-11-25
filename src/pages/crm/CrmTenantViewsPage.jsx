@@ -6,6 +6,7 @@
  * shows on the property, the client and, without the number, the owner's app.
  */
 import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCityFilter } from "./crmCityFilter";
 import { Link } from "react-router-dom";
 import { Phone } from "lucide-react";
 import { C, Chip, Empty, Toast } from "./crmUi";
@@ -24,7 +25,9 @@ export default function CrmTenantViewsPage() {
   useEffect(() => { load(); }, [load]);
 
   const today = istDay();
-  const views = useMemo(() => d?.views ?? [], [d]);
+  // Views of flats in the city the CRM is showing (multi_city.sql).
+  const cf = useCityFilter();
+  const views = useMemo(() => (d?.views ?? []).filter((v) => cf.flat(v.property_id)), [d, cf]);
   const counts = useMemo(() => Object.fromEntries(VIEW_FILTERS.map((f) => [f.id, views.filter((v) => f.test(v, today)).length])), [views, today]);
   const shown = useMemo(() => {
     const test = VIEW_FILTERS.find((f) => f.id === filter)?.test ?? (() => true);

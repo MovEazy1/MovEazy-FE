@@ -6,6 +6,7 @@
  * here (partners.manage, as on Brokers). ?step= opens one step.
  */
 import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCityFilter } from "../crmCityFilter";
 import { Link, useSearchParams } from "react-router-dom";
 import { useCrm } from "../CrmShell";
 import { C, Empty, Loading, Toast, inr, relTime, shortDate } from "../crmUi";
@@ -55,8 +56,11 @@ export default function CrmPartnerPayments() {
     return q;
   }, { replace: true });
 
-  const counts = useMemo(() => countSteps(rows ?? [], stepOf, steps), [rows, stepOf, steps]);
-  const shown = useMemo(() => (rows ?? []).filter((b) => step === "all" || stepOf(b) === step), [rows, step, stepOf]);
+  // Partners of the city the CRM is showing (multi_city.sql).
+  const cf = useCityFilter();
+  const mine = useMemo(() => (rows ?? []).filter((b) => cf.partner(b.user_id)), [rows, cf]);
+  const counts = useMemo(() => countSteps(mine, stepOf, steps), [mine, stepOf, steps]);
+  const shown = useMemo(() => mine.filter((b) => step === "all" || stepOf(b) === step), [mine, step, stepOf]);
 
   const decide = async (b, pay, approve) => {
     let note = "";

@@ -8,6 +8,7 @@
  */
 import { supabase, isSupabaseConfigured } from "./supabase";
 import { mapInventoryToListing } from "./inventory";
+import { cityLabel, citySlug, siteCity } from "./cities";
 
 /** Deal of the Day's four slots, in order. */
 export const DAY_KINDS = [
@@ -81,12 +82,13 @@ function deal(row) {
   return { listing, reason: row.reason || "", rented: Boolean(row.rented), kind: row.kind || dealKind(listing.bhk), since: row.since || "" };
 }
 
-/** What /find shows: { weekStart, weekEnd, today, steal: [deal], day: [deal] }. */
-export async function fetchDealsFeed() {
-  if (!isSupabaseConfigured || !supabase) return { weekStart: "", weekEnd: "", today: "", steal: [], day: [] };
-  const { data, error } = await supabase.rpc("deals_feed");
+/** What /find shows for one city (the site's): { city, weekStart, weekEnd, today, steal: [deal], day: [deal] }. */
+export async function fetchDealsFeed(city = siteCity()) {
+  if (!isSupabaseConfigured || !supabase) return { city, weekStart: "", weekEnd: "", today: "", steal: [], day: [] };
+  const { data, error } = await supabase.rpc("deals_feed", { p_city: city });
   if (error) throw error;
   return {
+    city: data?.city || city,
     weekStart: data?.week_start || "",
     weekEnd: data?.week_end || "",
     today: data?.today || "",
@@ -104,13 +106,15 @@ async function rpc(fn, args) {
   return data;
 }
 
-/** A week's Steal Deals, the weeks that have any, and the Deal of the Day calendar from..to. */
-export const fetchCrmDeals = (week, from, to) => rpc("crm_deals", { p_week: week || null, p_from: from || null, p_to: to || null });
-export const setStealDeals = (week, ids) => rpc("crm_deal_steal_set", { p_week: week, p_ids: ids });
+/** One city's week of Steal Deals, the weeks that have any, and its Deal of the Day calendar from..to. */
+export const fetchCrmDeals = (week, from, to, city) =>
+  rpc("crm_deals", { p_week: week || null, p_from: from || null, p_to: to || null, p_city: city || null });
+export const setStealDeals = (week, ids, city) => rpc("crm_deal_steal_set", { p_week: week, p_ids: ids, p_city: city || null });
 export const addStealDeal = (week, propertyId) => rpc("crm_deal_steal_add", { p_week: week || null, p_property: propertyId });
 /** Every live flat of one type ("1rk" | "1bhk" | "2bhk" | "3bhk") into a week's Steal Deals. */
-export const addStealKind = (week, kind) => rpc("crm_deal_steal_add_kind", { p_week: week || null, p_kind: kind });
-export const setDayDeal = (day, kind, propertyId) => rpc("crm_deal_day_set", { p_day: day, p_kind: kind, p_property: propertyId || null });
+export const addStealKind = (week, kind, city) => rpc("crm_deal_steal_add_kind", { p_week: week || null, p_kind: kind, p_city: city || null });
+export const setDayDeal = (day, kind, propertyId, city) =>
+  rpc("crm_deal_day_set", { p_day: day, p_kind: kind, p_property: propertyId || null, p_city: city || null });
 
 /** WhatsApp text for sharing a deal. */
 export function dealShareUrl(listing, what = "Steal Deal") {
@@ -140,15 +144,17 @@ export const DEAL_LINKS = {
   steal: "https://www.moveazy.co.in/find/steal-deals",
   day: "https://www.moveazy.co.in/find/deal-of-the-day",
 };
-export const dealLink = (deal, source = "crm") =>
-  `${DEAL_LINKS[deal]}?utm_source=${encodeURIComponent(source)}&utm_medium=whatsapp&utm_campaign=${deal === "steal" ? "steal_deals" : "deal_of_the_day"}`;
+/** The shareable link; with a city, it opens that city's deals (?city=mumbai). */
+export const dealLink = (deal, source = "crm", city = "") =>
+  `${DEAL_LINKS[deal]}?${citySlug(city) ? `city=${citySlug(city)}&` : ""}utm_source=${encodeURIComponent(source)}&utm_medium=whatsapp&utm_campaign=${deal === "steal" ? "steal_deals" : "deal_of_the_day"}`;
 
-/** The WhatsApp message a deals link goes out with; `name` greets a client. */
-export function dealMessage(deal, name = "") {
+/** The WhatsApp message a deals link goes out with; `name` greets a client, `city` is theirs. */
+export function dealMessage(deal, name = "", city = "") {
   const hi = name ? `Hi ${String(name).trim().split(/\s+/)[0]},` : "Hi,";
+  const where = city ? ` in ${cityLabel(city)}` : "";
   return deal === "steal"
-    ? `${hi} this week's Steal Deals on MovEazy — hand-picked flats priced below what's around them. Tap ♥ on the ones you like and we'll set up the visits:\n${dealLink("steal")}`
-    : `${hi} today's Deal of the Day on MovEazy — one standout flat for each type, today only. Tap ♥ if you like it and we'll set up a visit:\n${dealLink("day")}`;
+    ? `${hi} this week's Steal Deals${where} on MovEazy — hand-picked flats priced below what's around them. Tap ♥ on the ones you like and we'll set up the visits:\n${dealLink("steal", "crm", city)}`
+    : `${hi} today's Deal of the Day${where} on MovEazy — one standout flat for each type, today only. Tap ♥ if you like it and we'll set up a visit:\n${dealLink("day", "crm", city)}`;
 }
 
 /** CRM: numbers per period (Mondays / days) and per deal flat. */

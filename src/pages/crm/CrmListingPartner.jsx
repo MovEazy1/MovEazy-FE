@@ -9,6 +9,7 @@
  * changed or cleared. It stays theirs if their Premium ends.
  */
 import { useEffect, useState } from "react";
+import { useCityFilter } from "./crmCityFilter";
 import { C } from "./crmUi";
 import { adminListPartners, describeSharing, friendlyError } from "../../lib/partners";
 import { crmSetListingPartner } from "../../lib/partnerPlans";
@@ -30,8 +31,11 @@ export function usePartnerOptions(enabled) {
   return list;
 }
 
-export default function ListingPartner({ propertyId, info, partners, canEdit, onChanged, onToast, small }) {
+export default function ListingPartner({ propertyId, info, partners: allPartners, canEdit, onChanged, onToast, small }) {
   const [busy, setBusy] = useState(false);
+  // Only partners of the flat's city (multi_city.sql: the database refuses the rest).
+  const cf = useCityFilter();
+  const partners = allPartners.filter((p) => cf.ofPartner(p.id) === cf.ofFlat(propertyId));
   const fs = small ? 10.5 : 11.5;
   // Added in the partner app: theirs, not ours to move.
   if (info && !info.mappedBy) {

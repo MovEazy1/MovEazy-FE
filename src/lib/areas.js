@@ -13,18 +13,22 @@
  *
  * Until the list loads — or if it can't — pickers show the last list this
  * device saw, else the list the app shipped with, so none ever opens empty.
+ *
+ * Each city has its own list (multi_city.sql). useAreas(city) gives one
+ * city's; without a city, the city the site is showing (lib/cities.js).
  */
-import { useEffect, useSyncExternalStore } from "react";
+import { useEffect, useMemo, useSyncExternalStore } from "react";
 import { supabase, supabasePublic, isSupabaseConfigured } from "./supabase";
 import { AREA_GROUPS, LOCALITIES, LOCALITIES_MORE, setAreaGroups } from "../data/preferenceOptions";
+import { DEFAULT_CITY, normalizeCity, siteCity, useSiteCity } from "./cities";
 
-const SAVED_KEY = "mz_areas_v1";
+const SAVED_KEY = "mz_areas_v2";
 const norm = (s) => String(s || "").trim().toLowerCase();
 
 /** The list the app shipped with, as rows. */
 function defaultRows() {
   const rows = [...LOCALITIES, ...LOCALITIES_MORE].map((name, i) => ({
-    id: `default-${i}`, name, chip: i < LOCALITIES.length, parent_id: null, sort: (i + 1) * 10, active: true,
+    id: `default-${i}`, city: DEFAULT_CITY, name, chip: i < LOCALITIES.length, parent_id: null, sort: (i + 1) * 10, active: true,
   }));
   for (const [parent, children] of Object.entries(AREA_GROUPS)) {
     const p = rows.find((r) => norm(r.name) === norm(parent));
@@ -63,13 +67,28 @@ function readSaved() {
   }
 }
 
-let state = { ...deriveAreas(readSaved() || defaultRows()), loaded: false };
-setAreaGroups(state.groups);
+const rowCity = (r) => normalizeCity(r.city) || DEFAULT_CITY;
+/** One city's list. */
+function forCity(all, city) {
+  const c = normalizeCity(city) || DEFAULT_CITY;
+  return deriveAreas(all.filter((r) => rowCity(r) === c));
+}
+
+let state = { all: readSaved() || defaultRows(), loaded: false };
+// Wider-area groups from every city (names inside a group are that city's).
+setAreaGroups(deriveAreas(state.all).groups);
 const listeners = new Set();
+const derived = new Map();
 function publish(rows, loaded) {
-  state = { ...deriveAreas(rows), loaded };
-  setAreaGroups(state.groups);
+  state = { all: rows, loaded };
+  derived.clear();
+  setAreaGroups(deriveAreas(rows).groups);
   listeners.forEach((fn) => fn());
+}
+function cityState(city) {
+  const c = normalizeCity(city) || DEFAULT_CITY;
+  if (!derived.has(c)) derived.set(c, forCity(state.all, c));
+  return derived.get(c);
 }
 
 let inflight = null;
@@ -79,7 +98,7 @@ export function loadAreas({ fresh = false } = {}) {
   if (inflight && !fresh) return inflight;
   inflight = (async () => {
     try {
-      const { data, error } = await supabasePublic.from("areas").select("id,name,chip,parent_id,sort,active").order("sort").order("name");
+      const { data, error } = await supabasePublic.from("areas").select("id,city,name,chip,parent_id,sort,active").order("sort").order("name");
       if (error) throw error;
       if (Array.isArray(data) && data.length) {
         publish(data, true);
@@ -93,21 +112,46 @@ export function loadAreas({ fresh = false } = {}) {
   return inflight;
 }
 
-/** The areas, live: { chips, names, groups, rows, loaded }. Loads them on first use. */
-export function useAreas() {
+/**
+ * One city's areas, live: { chips, names, groups, rows, loaded, city }. Without
+ * a city, the city the site is showing. Loads them on first use.
+ */
+export function useAreas(city) {
   const snap = useSyncExternalStore((fn) => { listeners.add(fn); return () => listeners.delete(fn); }, () => state, () => state);
+  const site = useSiteCity().city;
+  const c = normalizeCity(city) || site;
   useEffect(() => { loadAreas(); }, []);
-  return snap;
+  return useMemo(() => ({ ...cityState(c), loaded: snap.loaded, city: c }), [snap, c]);
 }
 
-/** The list as it is now, outside React (e.g. reading areas out of pasted text). */
-export const areaNames = () => state.names;
+/** Every city's rows (the CRM's Areas page). */
+export const allAreaRows = () => state.all;
+
+/** One city's names as they are now, outside React (e.g. reading areas out of pasted text). */
+export const areaNames = (city) => cityState(city || siteCity()).names;
+
+/** The city an area is in (the hint city if it has one by that name), or "". */
+export function cityOfArea(area, hint = "") {
+  const a = String(area || "").trim().toLowerCase();
+  if (!a) return "";
+  const hits = [...new Set(state.all.filter((r) => r.name.trim().toLowerCase() === a).map(rowCity))];
+  const h = normalizeCity(hint);
+  if (h && hits.includes(h)) return h;
+  return hits.length === 1 ? hits[0] : "";
+}
+
+/** The city most of these areas are in, or "". */
+export function cityOfAreas(areas = [], hint = "") {
+  const n = {};
+  for (const a of areas) { const c = cityOfArea(a, hint); if (c) n[c] = (n[c] || 0) + 1; }
+  return Object.entries(n).sort((x, y) => y[1] - x[1] || (y[0] === normalizeCity(hint)) - (x[0] === normalizeCity(hint)))[0]?.[0] || "";
+}
 
 /**
  * The list's name for a place named elsewhere (Google's "HSR Layout" → "HSR"):
  * the same name, else the longest list name inside it, else "".
  */
-export function closestArea(text, names = state.names) {
+export function closestArea(text, names = areaNames()) {
   const t = norm(text);
   if (!t) return "";
   const exact = names.find((n) => norm(n) === t);
@@ -133,7 +177,7 @@ async function rpc(fn, args) {
   return data;
 }
 
-/** Add (no id) or change one area: { id?, name?, chip?, parent_id?, active? }. The list reloads after. */
+/** Add (no id) or change one area: { id?, city?, name?, chip?, parent_id?, active? }. The list reloads after. */
 export async function saveArea(patch) {
   const row = await rpc("area_save", { p: patch });
   await loadAreas({ fresh: true });

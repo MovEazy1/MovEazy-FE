@@ -27,9 +27,10 @@ export function ChipRow({ options, selected, onToggle, disabled }) {
   );
 }
 
-function LocalityPicker({ selected = [], onToggle, disabled }) {
+function LocalityPicker({ selected = [], onToggle, disabled, city }) {
   const [q, setQ] = useState("");
-  const { names } = useAreas();
+  // The areas of the city the client searches in (multi_city.sql).
+  const { names } = useAreas(city);
   const hits = useMemo(() => {
     const s = q.trim().toLowerCase();
     if (!s) return [];
@@ -66,7 +67,7 @@ const Label = ({ children }) => <span className="crm-label">{children}</span>;
  * @param {object}   [office]  the office the client gave us ({ display|label, lat, lng }), if any
  * @param {boolean}  [compact] only what changes the ranking and the curate rules
  */
-export default function RequirementFields({ req, canEdit, onChange, office = null, compact = false }) {
+export default function RequirementFields({ req, canEdit, onChange, office = null, compact = false, city = "" }) {
   const set = (patch) => onChange({ ...req, ...patch });
   const toggle = (key, value) => {
     const cur = req[key] ?? [];
@@ -80,7 +81,7 @@ export default function RequirementFields({ req, canEdit, onChange, office = nul
       <div>
         <Label>Localities</Label>
         <div style={{ marginTop: 5 }}>
-          <LocalityPicker selected={req.localities ?? []} disabled={!canEdit} onToggle={(v) => toggle("localities", v)} />
+          <LocalityPicker city={city} selected={req.localities ?? []} disabled={!canEdit} onToggle={(v) => toggle("localities", v)} />
         </div>
       </div>
 

@@ -14,7 +14,7 @@ import { useOwner } from "./OwnerApp";
 import { Chip, Empty, Loading, Switch, TopBar, toast } from "./ownerUi";
 import ListingMapPicker from "../../components/ListingMapPicker";
 import { FURNISHINGS, withParentArea } from "../../data/preferenceOptions";
-import { useAreas, withCurrent } from "../../lib/areas";
+import { cityOfArea, useAreas, withCurrent } from "../../lib/areas";
 import { BHK_OPTIONS } from "../../lib/partnerFilters";
 import { bedroomsOf } from "../../lib/partnerMatch";
 import { geocodePlace } from "../../lib/geocode";
@@ -28,6 +28,8 @@ import { moveByKey, useDragReorder } from "../../hooks/useDragReorder";
 import { listingMedia, MediaItem } from "../partners/partnerMedia";
 import { createOwnerProperty, friendlyError, listWhenReady, op, updateProperty } from "../../lib/owners";
 import { floorLabel, setFlatBuilding } from "../../lib/buildings";
+import CitySelect from "../../components/city/CitySelect";
+import { normalizeCity, siteCity } from "../../lib/cities";
 
 const FLOOR_OPTIONS = [-1, ...Array.from({ length: 31 }, (_, i) => i)];
 
@@ -39,6 +41,8 @@ function fromProperty(p) {
     flatType: p?.flat_type || "2 BHK",
     rent: p?.rent ? String(Math.round(p.rent)) : "",
     furnishing: p?.furnishing || "Semi Furnished",
+    // The flat's city (lib/cities.js); the Locality list is that city's.
+    city: normalizeCity(p?.city) || cityOfArea(p?.area) || siteCity(),
     area: p?.area || "",
     fullAddress: p?.full_address || "",
     latitude: p?.latitude ?? null,
@@ -63,7 +67,6 @@ export default function PropertyForm() {
 
 function PropertyFormInner({ existing }) {
   const navigate = useNavigate();
-  const { names: areaNames } = useAreas();
   const { user } = useAuth();
   const { reloadProperties, buildings, reloadBuildings } = useOwner();
   const [params] = useSearchParams();
@@ -79,6 +82,7 @@ function PropertyFormInner({ existing }) {
       latitude: fromBuilding.latitude ?? null, longitude: fromBuilding.longitude ?? null,
     } : {}),
   }));
+  const { names: areaNames } = useAreas(f.city);
   const [more, setMore] = useState(Boolean(existing));
   // Photos already on the listing and ones picked now, in one list in the
   // order renters will see them — drag either anywhere.
@@ -138,7 +142,7 @@ function PropertyFormInner({ existing }) {
     try {
       let { latitude, longitude } = f;
       if (latitude == null) {
-        const g = await geocodePlace(`${f.area}, Bengaluru`).catch(() => null);
+        const g = await geocodePlace(`${f.area}, ${f.city}`, { city: f.city }).catch(() => null);
         if (g?.ok) { latitude = g.lat; longitude = g.lng; }
       }
       const area = f.area.trim();
@@ -147,7 +151,7 @@ function PropertyFormInner({ existing }) {
       if (!pid) {
         pid = await createOwnerProperty({
           propertyType: f.propertyType, flatType: f.flatType, bedrooms, rent: f.rent, furnishing: f.furnishing,
-          area, fullAddress: f.fullAddress, latitude, longitude, areaSqft: f.areaSqft, deposit: f.deposit,
+          city: f.city, area, fullAddress: f.fullAddress, latitude, longitude, areaSqft: f.areaSqft, deposit: f.deposit,
           availableFrom: f.availableFrom || null, description: f.description, title: `${f.flatType} in ${area}`,
           occupied: f.occupied,
         }, user);
@@ -171,7 +175,7 @@ function PropertyFormInner({ existing }) {
       const patch = {
         ...(existing ? {
           property_type: f.propertyType, flat_type: f.flatType, bedrooms, rent: Number(f.rent), furnishing: f.furnishing,
-          area, nearby_areas: withParentArea(area, existing.nearby_areas ?? []), full_address: f.fullAddress,
+          city: f.city, area, nearby_areas: withParentArea(area, existing.nearby_areas ?? []), full_address: f.fullAddress,
           latitude, longitude, area_sqft: f.areaSqft || "", deposit: f.deposit || "", available_from: f.availableFrom || "",
           description: f.description, title: existing.title || `${f.flatType} in ${area}`,
         } : {}),
@@ -234,6 +238,10 @@ function PropertyFormInner({ existing }) {
         <div className="oz-section">
           <h2 className="oz-h2">Location</h2>
           <div className="oz-field">
+            <label className="oz-label" htmlFor="pf-city">City</label>
+            <CitySelect id="pf-city" className="oz-select" value={f.city} onChange={(c) => set({ city: c, area: "" })} />
+          </div>
+          <div className="oz-field">
             <label className="oz-label" htmlFor="pf-area">Locality</label>
             <select id="pf-area" className="oz-select" value={f.area} onChange={(e) => set({ area: e.target.value })}>
               <option value="">Pick the locality</option>
@@ -241,7 +249,7 @@ function PropertyFormInner({ existing }) {
             </select>
             {err("area")}
           </div>
-          <ListingMapPicker height={170} focusQuery={f.area ? `${f.area}, Bengaluru` : ""} markerPosition={pin}
+          <ListingMapPicker height={170} focusQuery={f.area ? `${f.area}, ${f.city}` : ""} markerPosition={pin}
             onMarkerChange={([lat, lng]) => set({ latitude: lat, longitude: lng })} />
           <div className="oz-field" style={{ marginTop: 12, marginBottom: 0 }}>
             <label className="oz-label" htmlFor="pf-addr">Full address <span className="oz-hint">(only shared with verified visitors)</span></label>

@@ -33,6 +33,8 @@ import {
   DEFAULT_POSTING_AMENITIES, FLAT_TYPES, FURNISHINGS, OCCUPANTS, OCCUPANT_OPTIONS, MUST_HAVES, LIFESTYLE,
 } from "../data/preferenceOptions";
 import { useAreas, withCurrent } from "../lib/areas";
+import CitySelect from "./city/CitySelect";
+import { siteCity } from "../lib/cities";
 
 const MINT = "#5EEAD4";
 const GOLD = "#E8A33D";
@@ -179,7 +181,9 @@ function SelectField({ label, value, onChange, children, disabled, placeholder }
 
 export default function ListMyFlatMobile({ user, onPublished }) {
   // The CRM's list of areas (lib/areas.js): pick one, never type.
-  const { names: areaNames } = useAreas();
+  // The flat's city first; the areas are that city's (lib/cities.js).
+  const [city, setCity] = useState(() => siteCity());
+  const { names: areaNames } = useAreas(city);
   const [step, setStep] = useState(1);
   const [saving, setSaving] = useState(false);
   const [uploadMsg, setUploadMsg] = useState("");
@@ -370,7 +374,7 @@ export default function ListMyFlatMobile({ user, onPublished }) {
       }
       setUploadMsg("");
       const row = await createInventoryItem({
-        propertyId, postedBy, phone: user?.phone || "", area, nearbyAreas: [], fullAddress, landmark,
+        propertyId, postedBy, phone: user?.phone || "", city, area, nearbyAreas: [], fullAddress, landmark,
         latitude: marker?.[0] ?? null, longitude: marker?.[1] ?? null,
         rent, deposit, maintenance, availableFrom, flatType, bedrooms, bathrooms, floorNumber, totalFloors, furnishing,
         maxFlatmates, genderPref, occupantsAllowed, amenities, lifestyle, houseRules,
@@ -516,7 +520,7 @@ export default function ListMyFlatMobile({ user, onPublished }) {
                 <div>
                   <SubQ>City</SubQ>
                   <Field>
-                    <input value="Bengaluru" disabled style={{ ...inputStyle, color: "#6F8681", cursor: "not-allowed" }} />
+                    <CitySelect value={city} onChange={(c) => { setCity(c); setArea(""); }} style={inputStyle} />
                   </Field>
                 </div>
                 <SelectField label="Area *" value={area} onChange={setArea} placeholder="Select…">

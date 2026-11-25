@@ -7,6 +7,7 @@
  * flats; staff can set it up for an owner who isn't in the app.
  */
 import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCityFilter } from "./crmCityFilter";
 import { Link, useSearchParams } from "react-router-dom";
 import { Btn, C, Chip, Empty, Loading, relTime } from "./crmUi";
 import {
@@ -20,8 +21,16 @@ const TONE = { amber: C.gold, blue: "#3B82F6", green: "#10B981", grey: C.textMut
 export default function CrmBuildingsPage() {
   const [params] = useSearchParams();
   const [tab, setTab] = useState(params.get("tab") === "buildings" ? "buildings" : "visits");
-  const [data, setData] = useState(null);
+  const [raw, setData] = useState(null);
   const [err, setErr] = useState("");
+  // Buildings in the city the CRM is showing (by their area; multi_city.sql), and their requests.
+  const cf = useCityFilter();
+  const data = useMemo(() => {
+    if (!raw) return raw;
+    const buildings = (raw.buildings ?? []).filter((b) => cf.area(b.area));
+    const ids = new Set(buildings.map((b) => b.id));
+    return { ...raw, buildings, leads: (raw.leads ?? []).filter((l) => !l.building_id || ids.has(l.building_id)) };
+  }, [raw, cf]);
   const [only, setOnly] = useState("");
   const [status, setStatus] = useState("open");
   const [q, setQ] = useState("");

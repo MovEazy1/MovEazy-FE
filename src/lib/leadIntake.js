@@ -22,6 +22,8 @@ import { trackPixel, trackPixelOnce } from "./metaPixel";
 import { supabase, isSupabaseConfigured } from "./supabase";
 import { anonId } from "./sessionSync";
 import { firstTouch } from "./attribution";
+import { chosenCity, currentCity, normalizeCity, siteCity } from "./cities";
+import { cityOfAreas } from "./areas";
 
 const KEY_STORAGE = "moveazy_lead_key";
 const SNAPSHOT_STORAGE = "moveazy_lead";
@@ -110,6 +112,14 @@ export function hasLeadPhone() {
  * Best-effort by design: losing a step to a failed network is not worth
  * interrupting somebody halfway through a questionnaire.
  */
+/** prefs plus { city, currentCity } (multi_city.sql's lead_intake_city_sync reads them). */
+function withCity(prefs) {
+  const p = prefs && typeof prefs === "object" ? prefs : {};
+  const city = normalizeCity(p.city) || cityOfAreas(Array.isArray(p.localities) ? p.localities : [], chosenCity()) || siteCity();
+  const here = currentCity();
+  return { ...p, city, ...(here ? { currentCity: here } : {}) };
+}
+
 export async function saveLead(patch = {}) {
   const key = leadKey();
   if (!key) return leadSnapshot();
@@ -151,7 +161,9 @@ export async function saveLead(patch = {}) {
       p_anon_id: anonId(),
       p_name: patch.name ?? null,
       p_phone: patch.phone ?? null,
-      p_prefs: patch.prefs ?? null,
+      // The city they are searching in (the CRM files them under it), and where
+      // they are now: prefs is replaced whole, so the city rides with all of it.
+      p_prefs: withCity(patch.prefs ?? next.prefs),
       p_step: patch.step ?? null,
       p_completed: patch.completed ?? null,
       p_utm: touch
