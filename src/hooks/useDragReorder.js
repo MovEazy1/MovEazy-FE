@@ -1,4 +1,4 @@
-import { useId, useRef, useState } from "react";
+import { useEffect, useId, useRef, useState } from "react";
 
 /**
  * Drag to reorder a grid or strip of photos — with a finger or a mouse.
@@ -18,6 +18,15 @@ import { useId, useRef, useState } from "react";
 export const HOLD_MS = 300;
 const SLOP = 8;
 
+// Once a finger has picked a photo up, the page must not scroll under it.
+// One shared function, so the remove in end() always matches the add in begin().
+// (It used to be made fresh on every render: begin() ran from the render that
+// started the hold and end() from a later one, so removeEventListener was handed
+// a different function and the block stayed on the page for good. Every swipe
+// was then cancelled and nothing scrolled, on that page or any page opened
+// after it, until a full reload.)
+function stopScroll(e) { if (e.cancelable) e.preventDefault(); }
+
 export function useDragReorder(onMove) {
   const group = useId();
   const [dragKey, setDragKey] = useState(null);
@@ -25,37 +34,61 @@ export function useDragReorder(onMove) {
   const moveRef = useRef(onMove);
   moveRef.current = onMove;
 
-  // Once a finger has picked a photo up, the page must not scroll under it.
-  const stopScroll = (e) => { if (e.cancelable) e.preventDefault(); };
+  // begin/end live for the whole life of the component (not per render), for
+  // the same reason as stopScroll: what one adds, the other must remove.
+  const api = useRef(null);
+  if (!api.current) {
+    const end = () => {
+      const d = drag.current;
+      if (d?.timer) clearTimeout(d.timer);
+      document.removeEventListener("touchmove", stopScroll);
+      // A finger or button let go anywhere ends the drag, even off the photos:
+      // moving a tile in the grid can drop its pointer capture, and then the
+      // tile itself never hears the "up".
+      document.removeEventListener("pointerup", end, true);
+      document.removeEventListener("pointercancel", end, true);
+      document.removeEventListener("touchend", end, true);
+      document.removeEventListener("touchcancel", end, true);
+      drag.current = null;
+      setDragKey(null);
+    };
+    const arm = (d) => {
+      drag.current = d;
+      document.addEventListener("pointerup", end, true);
+      document.addEventListener("pointercancel", end, true);
+      if (d.touch) {
+        document.addEventListener("touchend", end, true);
+        document.addEventListener("touchcancel", end, true);
+      }
+    };
+    const begin = (d) => {
+      d.on = true;
+      setDragKey(d.key);
+      try { d.el.setPointerCapture(d.id); } catch { /* fine without it */ }
+      if (d.touch) document.addEventListener("touchmove", stopScroll, { passive: false });
+      navigator.vibrate?.(10);
+    };
+    api.current = { arm, begin, end };
+  }
+  const { arm, begin, end } = api.current;
 
-  const begin = (d) => {
-    d.on = true;
-    setDragKey(d.key);
-    try { d.el.setPointerCapture(d.id); } catch { /* fine without it */ }
-    if (d.touch) document.addEventListener("touchmove", stopScroll, { passive: false });
-    navigator.vibrate?.(10);
-  };
-
-  const end = () => {
-    const d = drag.current;
-    if (d?.timer) clearTimeout(d.timer);
-    if (d?.touch) document.removeEventListener("touchmove", stopScroll);
-    drag.current = null;
-    setDragKey(null);
-  };
+  // Leaving the page mid-drag (Back, a save that navigates) must not leave the
+  // scroll block behind.
+  useEffect(() => () => { if (drag.current) end(); }, [end]);
 
   const bind = (key) => ({
     "data-sort-group": group,
     "data-sort-key": key,
     onPointerDown: (e) => {
       if (e.button > 0 || e.target.closest("button, a, input, label")) return;
+      if (drag.current) end();
       const d = { key, x: e.clientX, y: e.clientY, id: e.pointerId, el: e.currentTarget, on: false, touch: e.pointerType === "touch" };
       if (d.touch) d.timer = setTimeout(() => { if (drag.current === d) begin(d); }, HOLD_MS);
-      drag.current = d;
+      arm(d);
     },
     onPointerMove: (e) => {
       const d = drag.current;
-      if (!d) return;
+      if (!d || e.pointerId !== d.id) return;
       if (!d.on) {
         const moved = Math.hypot(e.clientX - d.x, e.clientY - d.y);
         // A finger that moves before the hold is up is scrolling: let it.

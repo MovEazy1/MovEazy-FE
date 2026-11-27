@@ -170,7 +170,7 @@ export default function MediaUploadField({
                 outline: dragOverIdx === idx && dragFrom !== null && dragFrom !== idx ? "2px solid #2563eb" : "none",
                 outlineOffset: 2,
                 borderRadius: "10px",
-                touchAction: "none",
+                touchAction: "manipulation", // a swipe over the photos still scrolls the page (HTML drag-and-drop is mouse-only; phones use the arrows)
               }}
             >
               {item.isVideo ? (
