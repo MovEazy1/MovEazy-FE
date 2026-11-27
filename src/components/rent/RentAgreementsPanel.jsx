@@ -90,7 +90,7 @@ function AgreementCard({ a, onChanged }) {
       <Steps status={a.status} />
 
       <div className="ra-row" style={{ justifyContent: "flex-start", gap: 8, marginTop: 10, flexWrap: "wrap" }}>
-        {a.status === "unpaid" && <span className="ra-muted">Payment pending · {fmtINR(a.price)}. We'll confirm and send it to the vendor.</span>}
+        {a.status === "unpaid" && <span className="ra-muted">Our team will contact you to collect {fmtINR(a.price)}, then send it to the vendor to prepare.</span>}
         {canSign && <a className="ra-btn primary" href={signUrl(mine.sign_token)}>Review & e-sign</a>}
         {a.has_document && url && <a className="ra-btn ghost" href={url} target="_blank" rel="noreferrer">Download PDF</a>}
         {a.renew_due && <button className="ra-btn primary" onClick={renew}>Renew</button>}
@@ -231,7 +231,7 @@ function RequestForm({ role, city, onCancel, onDone, busy, setBusy }) {
         <button className="ra-btn ghost" disabled={busy} onClick={onCancel}>Cancel</button>
       </div>
       <div className="ra-muted" style={{ marginTop: 8 }}>
-        We'll ask your location to pick the nearest vendor. You pay after we confirm; then the vendor prepares and stamps it.
+        We'll ask your location to pick the nearest vendor. Our team will contact you to collect the fee; then the vendor prepares and stamps your agreement.
       </div>
     </div>
   );
