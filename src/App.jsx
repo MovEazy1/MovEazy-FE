@@ -94,6 +94,12 @@ const CrmAreasPage = lazy(() => import("./pages/crm/CrmAreasPage"));
 const CrmSocietyProspectsPage = lazy(() => import("./pages/crm/CrmSocietyProspectsPage"));
 const CrmDealsPage = lazy(() => import("./pages/crm/CrmDealsPage"));
 const CrmSocietyLeadsPage = lazy(() => import("./pages/crm/CrmSocietyLeadsPage"));
+const CrmRentAgreementsPage = lazy(() => import("./pages/crm/CrmRentAgreementsPage"));
+// Rent agreements: the person's own agreements + request form, the party sign
+// page, and the vendor app (vendor.moveazy.co.in). See rent_agreements.sql.
+const RentAgreements = lazy(() => import("./pages/RentAgreements"));
+const RentSign = lazy(() => import("./pages/RentSign"));
+const VendorApp = lazy(() => import("./pages/vendor/VendorApp"));
 // The broker app. Its own route tree: at /partners here, and at the root of
 // partners.moveazy.co.in (same deployment, same bundle — see lib/partners.js).
 const PartnerApp = lazy(() => import("./pages/partners/PartnerApp"));
@@ -172,7 +178,7 @@ if (typeof window !== "undefined" && /^\/crm(\/|$)/.test(window.location.pathnam
  * the page picks up these same requests.
  */
 if (typeof window !== "undefined" && window.location.pathname === "/"
-  && !/^(partners|owners?|society|tenant)\./i.test(window.location.hostname) && !hasStoredSession()) {
+  && !/^(partners|owners?|society|tenant|vendor)\./i.test(window.location.hostname) && !hasStoredSession()) {
   import("./lib/inventory").then((m) => m.fetchShowcaseInventory()).catch(() => {});
   import("./lib/landingSettings").then((m) => m.fetchLandingSettings()).catch(() => {});
 }
@@ -193,6 +199,8 @@ const IS_PARTNER_HOST = typeof window !== "undefined" && /^partners\./i.test(win
 const IS_SOCIETY_HOST = typeof window !== "undefined" && /^society\./i.test(window.location.hostname);
 // tenant.moveazy.co.in: the whole site, but its front door is the tenant app.
 const IS_TENANT_HOST = typeof window !== "undefined" && /^tenants?\./i.test(window.location.hostname);
+// vendor.moveazy.co.in: MovEazy Vendor, the local agreement shop's app (pages/vendor/).
+const IS_VENDOR_HOST = typeof window !== "undefined" && /^vendor\./i.test(window.location.hostname);
 
 function PageLoader() {
   return (
@@ -307,6 +315,33 @@ function ViewAsBannerSlot() {
 }
 
 function AppRoutes() {
+  // vendor.moveazy.co.in: the local agreement shop's app, nothing else.
+  if (IS_VENDOR_HOST) {
+    return (
+      <Suspense fallback={<PageLoader />}>
+        <RouteHandOff />
+        <Routes>
+          <Route path="/*" element={<VendorApp />} />
+        </Routes>
+      </Suspense>
+    );
+  }
+  // Rent agreements work on every host: the list/request at /rent, and the
+  // party sign page at /rent/sign/:token (the link sign-in lands here). The
+  // requester's role follows the app it opens in.
+  if (typeof window !== "undefined" && /^\/rent(\/|$)/.test(window.location.pathname)) {
+    const rentRole = IS_OWNER_HOST ? "owner" : IS_PARTNER_HOST ? "broker" : "tenant";
+    return (
+      <Suspense fallback={<PageLoader />}>
+        <RouteHandOff />
+        <Routes>
+          <Route path="/rent" element={<RentAgreements role={rentRole} />} />
+          <Route path="/rent/sign/:token" element={<RentSign />} />
+          <Route path="/rent/*" element={<Navigate to="/rent" replace />} />
+        </Routes>
+      </Suspense>
+    );
+  }
   if (IS_OWNER_HOST) {
     return (
       <Suspense fallback={<PageLoader />}>
@@ -459,6 +494,7 @@ function AppRoutes() {
           <Route path="areas" element={<CrmAreasPage />} />
           <Route path="society-prospects" element={<CrmSocietyProspectsPage />} />
           <Route path="deals" element={<CrmDealsPage />} />
+          <Route path="rent-agreements" element={<CrmRentAgreementsPage />} />
           <Route path="society-leads" element={<CrmSocietyLeadsPage />} />
           <Route path="society-prospects/:id" element={<CrmSocietyProspectsPage />} />
         </Route>

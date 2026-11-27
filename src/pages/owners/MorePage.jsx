@@ -5,7 +5,7 @@
  */
 import { useState } from "react";
 import { Link } from "react-router-dom";
-import { BadgeCheck, Bell, Building2, ChevronRight, FileText, LayoutDashboard, LifeBuoy, LogOut, Pencil, Users } from "lucide-react";
+import { BadgeCheck, Bell, Building2, ChevronRight, FileSignature, FileText, LayoutDashboard, LifeBuoy, LogOut, Pencil, Users } from "lucide-react";
 import { useAuth } from "../../context/AuthContext";
 import { useOwner } from "./OwnerApp";
 import { Avatar, Confirm, Sheet, TopBar, toast } from "./ownerUi";
@@ -74,6 +74,7 @@ export default function MorePage() {
           {row(op("/properties"), Building2, "My Properties", `${(properties ?? []).length} in your account`)}
           {row(op("/tenants"), Users, "My Tenants", `${tenants.filter((t) => t.status === "active" || t.status === "invited").length} current`)}
           {row(op("/documents"), FileText, "Documents", "Rental agreements, verification, move-in photos")}
+          {row("/rent", FileSignature, "Rent agreement", "Get a stamped, e-signed agreement made")}
           {row(op("/notifications"), Bell, "Notifications", "Visits, interest and repair updates")}
         </div>
         <div className="oz-card" style={{ marginBottom: 12 }}>
